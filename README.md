@@ -6,6 +6,7 @@ Books and close for one US service business: a USD accrual ledger kept by the ow
 - Moving in from QuickBooks Online: [MOVE-IN.md](MOVE-IN.md). HTTP and agent commands: [API.md](API.md) and `node scripts/pantry-agent.mjs`.
 - Synthetic example files: [fixtures/](fixtures/README.md).
 - Source code: [just-every/run-pantry](https://github.com/just-every/run-pantry).
+- Website: [run-pantry.com](https://run-pantry.com).
 
 Tests: `pnpm run test:pantry` (one flow per clause on the real Worker and D1), `pnpm run test:browser` (fresh clones, the screens at 1440 and 390 wide, export and restore), and `rer verify` for the full wall.
 
