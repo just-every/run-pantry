@@ -1,0 +1,113 @@
+// Pantry's HTTP surface. People use /api/pantry/* with their native session;
+// agents use /api/pantry/agent/* with a bearer token the owner issued. Every
+// route resolves its actor and checks the capability before any work.
+import { Hono, type Context as HonoContext } from 'hono'
+import type { Bindings } from '../auth.server'
+import { deploymentHealth } from '../base/deployment-health'
+import { agent, must, person, type Actor } from './access'
+import { date, Fault, requireThat, type Data } from './core'
+import { one } from './db'
+import type { Command, Context } from './context'
+import { settingsCommands, settingsView } from './settings'
+import { accountCommands } from './accounts'
+import { contactCommands } from './contacts'
+import { journalCommands, journalView } from './journal'
+import { invoiceCommands, invoicesView } from './invoices'
+import { payableCommands, billsView, paymentsView } from './payables'
+import { bankCommands, bankView } from './bank'
+import { matchCommands } from './matching'
+import { reconcileCommands, reconciliationState } from './reconcile'
+import { closeCommands, closeState } from './close'
+import { proposalCommands, proposalsView, agentContext, fileProposal, proposal } from './proposals'
+import { moveInCommands, moveInView } from './cutover/commands'
+import { ageing, balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports'
+import { accountantPackage, ledgerCsv } from './package'
+import { activity, actorView, documents, lookups, overview } from './views'
+
+const commands: Record<string, Command> = {
+  ...settingsCommands, ...accountCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands,
+  ...bankCommands, ...matchCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands,
+}
+
+type C = HonoContext<{ Bindings: Bindings }>
+export const api = new Hono<{ Bindings: Bindings }>()
+
+api.get('/health', c => c.json({ status: 'ok', ...deploymentHealth(c.env) }))
+api.use('/api/pantry/*', async (c, next) => { await next(); c.header('cache-control', 'no-store'); c.header('x-content-type-options', 'nosniff') })
+api.onError((e, c) => e instanceof Fault ? c.json({ error: e.message }, e.status as 400) : (console.error(e), c.json({ error: 'Unexpected error; check the server log' }, 500)))
+
+async function reader(c: C): Promise<Context> {
+  const actor = await person(c.req.raw, c.env)
+  must(actor, 'read')
+  return { db: c.env.DB, env: c.env, request: c.req.raw, actor }
+}
+
+const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => c.json(await build(await reader(c), c)))
+const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10)) => date(c.req.query(name) ?? fallback, name)
+
+view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await lookups(ctx.db)), overview: await overview(ctx.db), settings: await settingsView(ctx) }))
+view('journal', async ctx => ({ entries: await journalView(ctx.db) }))
+view('sales', async ctx => ({ invoices: await invoicesView(ctx.db), bills: await billsView(ctx.db), payments: await paymentsView(ctx.db) }))
+view('bank', async ctx => bankView(ctx.db))
+view('reconciliation/:statement', async (ctx, c) => reconciliationState(ctx.db, c.req.param('statement')!))
+view('close/:period', async (ctx, c) => closeState(ctx.db, c.req.param('period')!))
+view('proposals', async ctx => ({ proposals: await proposalsView(ctx.db) }))
+view('move-in', async ctx => moveInView(ctx))
+view('activity', async ctx => activity(ctx.db))
+view('documents', async ctx => ({ documents: await documents(ctx.db) }))
+view('reports/:kind', async (ctx, c) => {
+  const kind = c.req.param('kind'), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
+  const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
+  if (kind === 'trial-balance') return trialBalance(ctx.db, to)
+  if (kind === 'general-ledger') return generalLedger(ctx.db, from, to, c.req.query('account') || undefined)
+  if (kind === 'profit-and-loss') return profitAndLoss(ctx.db, from, to)
+  if (kind === 'balance-sheet') return balanceSheet(ctx.db, to, Number(e?.fiscal_year_start ?? 1))
+  if (kind === 'receivables' || kind === 'payables') return ageing(ctx.db, kind === 'receivables' ? 'receivable' : 'payable', to)
+  throw new Fault(404, 'Unknown report')
+})
+
+api.get('/api/pantry/documents/:id', async c => {
+  const ctx = await reader(c)
+  const doc = await one<{ name: string; media_type: string; content: ArrayBuffer }>(ctx.db, 'SELECT name, media_type, content FROM pt_documents WHERE id = ?', c.req.param('id'))
+  requireThat(doc, 'Document not found', 404)
+  return new Response(new Uint8Array(doc.content as any), { headers: { 'content-type': doc.media_type, 'content-disposition': `attachment; filename="${doc.name.replace(/[^\w.-]+/g, '_')}"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox" } })
+})
+
+api.get('/api/pantry/package/:period', async c => {
+  const ctx = await reader(c), period = c.req.param('period')
+  const body = JSON.stringify(await accountantPackage(ctx.db, period), null, 2)
+  return new Response(body, { headers: { 'content-type': 'application/json', 'content-disposition': `attachment; filename="pantry-close-${period}.json"`, 'cache-control': 'no-store' } })
+})
+
+api.get('/api/pantry/package/:period/general-ledger.csv', async c => {
+  const ctx = await reader(c), period = c.req.param('period')
+  return new Response(await ledgerCsv(ctx.db, period), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-general-ledger-${period}.csv"`, 'cache-control': 'no-store' } })
+})
+
+api.post('/api/pantry/command/:op', async c => {
+  const command = commands[c.req.param('op')]
+  requireThat(command, 'Unknown action', 404)
+  const actor: Actor = await person(c.req.raw, c.env)
+  must(actor, command.need)
+  requireThat(Number(c.req.header('content-length') ?? 0) <= 8_000_000, 'Request too large', 413)
+  const body = await c.req.json().catch(() => { throw new Fault(400, 'Send a JSON object') })
+  requireThat(body && typeof body === 'object' && !Array.isArray(body), 'Send a JSON object')
+  return c.json(await command.run({ db: c.env.DB, env: c.env, request: c.req.raw, actor }, body as Data))
+})
+
+// Agents: read context, file proposals, follow their outcome. Nothing else.
+api.get('/api/pantry/agent/context', async c => {
+  const actor = await agent(c.req.raw, c.env)
+  return c.json(await agentContext({ db: c.env.DB, env: c.env, request: c.req.raw, actor }, c.req.query('period') || undefined))
+})
+api.post('/api/pantry/agent/proposals', async c => {
+  const actor = await agent(c.req.raw, c.env)
+  const body = await c.req.json().catch(() => { throw new Fault(400, 'Send a JSON object') })
+  return c.json(await fileProposal(c.env.DB, actor, body as Data))
+})
+api.get('/api/pantry/agent/proposals/:id', async c => {
+  const actor = await agent(c.req.raw, c.env)
+  const p = await proposal(c.env.DB, c.req.param('id'))
+  requireThat(p.agent_id === actor.id, 'Proposal not found', 404)
+  return c.json(p)
+})

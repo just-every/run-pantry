@@ -1,0 +1,29 @@
+{
+  "sections": [
+    {
+      "title": "Start here",
+      "pages": [
+        { "slug": "getting-started", "title": "Getting started", "file": "getting-started.md", "summary": "Install rer, start Pantry on your own computer, sign in as the owner and finish setup." },
+        { "slug": "first-month", "title": "Your first month", "file": "first-month.md", "summary": "The five setup steps on Overview, from the business details to your first close." }
+      ]
+    },
+    {
+      "title": "Run your books",
+      "pages": [
+        { "slug": "sales-and-bills", "title": "Sales and bills", "file": "sales-and-bills.md", "summary": "Draft, approve and issue invoices and credits, record bills with their receipts, and record payments." },
+        { "slug": "reconcile", "title": "Reconcile a bank statement", "file": "reconcile.md", "summary": "Import a CSV or OFX statement, match each line to your books, and finish when the difference is $0.00." },
+        { "slug": "journals", "title": "Journals and corrections", "file": "journals.md", "summary": "Prepare a balanced entry, have someone else post it, and correct a posted entry with a reversal." },
+        { "slug": "close", "title": "Close the month", "file": "close.md", "summary": "Pass the checklist, finish the review tasks, lock the month and download the accountant package." },
+        { "slug": "agent-work", "title": "Agent work", "file": "agent-work.md", "summary": "Give the agent you already use a token; it proposes matches and entries and a person approves each one." }
+      ]
+    },
+    {
+      "title": "Keep your books",
+      "pages": [
+        { "slug": "people", "title": "People and roles", "file": "people.md", "summary": "Owner, bookkeeper, accountant and viewer, the post, lock and reopen grants, and who may approve what." },
+        { "slug": "move-in", "title": "Move in from QuickBooks Online", "file": "move-in.md", "summary": "Preview seven QuickBooks Online exports and their tie-outs, import them as staged records, and sign them off." },
+        { "slug": "backup", "title": "Back up and restore", "file": "backup.md", "summary": "Export the whole book to one archive and restore it into an empty installation." }
+      ]
+    }
+  ]
+}

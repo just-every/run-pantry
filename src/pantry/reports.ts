@@ -1,0 +1,97 @@
+// Reports, all calculated from posted journal lines (and, for ageing, the open
+// items those lines carry). Nothing here stores or accepts a total.
+import { daysBetween, requireThat, type Data } from './core'
+import { all, one } from './db'
+
+type Balance = { id: string; code: string; name: string; type: string; subtype: string; debit: number; credit: number; net: number }
+
+export async function balances(db: D1Database, to: string, from = '0000-01-01'): Promise<Balance[]> {
+  const rows = await all(db, `SELECT a.id, a.code, a.name, a.type, a.subtype,
+      COALESCE(SUM(CASE WHEN e.status = 'posted' AND e.entry_date BETWEEN ? AND ? THEN l.debit_cents END), 0) AS debit,
+      COALESCE(SUM(CASE WHEN e.status = 'posted' AND e.entry_date BETWEEN ? AND ? THEN l.credit_cents END), 0) AS credit
+    FROM pt_accounts a LEFT JOIN pt_journal_lines l ON l.account_id = a.id LEFT JOIN pt_journal_entries e ON e.id = l.entry_id
+    GROUP BY a.id ORDER BY a.code`, from, to, from, to)
+  return rows.map(r => ({ ...r, debit: Number(r.debit), credit: Number(r.credit), net: Number(r.debit) - Number(r.credit) })) as Balance[]
+}
+
+export async function trialBalance(db: D1Database, asOf: string) {
+  const rows = (await balances(db, asOf)).filter(r => r.net !== 0).map(r => ({ ...r, debitBalance: r.net > 0 ? r.net : 0, creditBalance: r.net < 0 ? -r.net : 0 }))
+  const debit = rows.reduce((s, r) => s + r.debitBalance, 0), credit = rows.reduce((s, r) => s + r.creditBalance, 0)
+  return { asOf, rows, debit, credit, balanced: debit === credit }
+}
+
+export async function generalLedger(db: D1Database, from: string, to: string, accountId?: string) {
+  const opening = new Map((await balances(db, prevDay(from))).map(b => [b.id, b.net]))
+  const lines = await all(db, `SELECT l.*, e.number, e.entry_date, e.memo AS entry_memo, e.source_kind, e.reverses_id, e.reversed_by_id, a.code, a.name AS account_name, c.name AS contact_name
+    FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id JOIN pt_accounts a ON a.id = l.account_id LEFT JOIN pt_contacts c ON c.id = l.contact_id
+    WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? ${accountId ? 'AND l.account_id = ?' : ''} ORDER BY a.code, e.entry_date, e.number, l.line_no`, from, to, ...(accountId ? [accountId] : []))
+  const accounts = await all(db, `SELECT id, code, name, type FROM pt_accounts ${accountId ? 'WHERE id = ?' : ''} ORDER BY code`, ...(accountId ? [accountId] : []))
+  return { from, to, accounts: accounts.map(a => {
+    let running = opening.get(a.id) ?? 0
+    const rows = lines.filter(l => l.account_id === a.id).map(l => ({ ...l, running: (running += l.debit_cents - l.credit_cents) }) as Data)
+    return { ...a, opening: opening.get(a.id) ?? 0, rows, closing: running } as Data
+  }).filter(a => a.rows.length || a.opening !== 0) }
+}
+
+export async function profitAndLoss(db: D1Database, from: string, to: string) {
+  const rows = (await balances(db, to, from)).filter(r => (r.type === 'income' || r.type === 'expense') && r.net !== 0)
+  const income = rows.filter(r => r.type === 'income').map(r => ({ ...r, amount: -r.net }))
+  const expenses = rows.filter(r => r.type === 'expense').map(r => ({ ...r, amount: r.net }))
+  const totalIncome = income.reduce((s, r) => s + r.amount, 0), totalExpenses = expenses.reduce((s, r) => s + r.amount, 0)
+  return { from, to, income, expenses, totalIncome, totalExpenses, netIncome: totalIncome - totalExpenses }
+}
+
+export function fiscalYearStart(asOf: string, startMonth: number) {
+  const [y, m] = asOf.split('-').map(Number)
+  const year = m >= startMonth ? y : y - 1
+  return `${year}-${String(startMonth).padStart(2, '0')}-01`
+}
+
+export async function balanceSheet(db: D1Database, asOf: string, startMonth: number) {
+  const all_ = await balances(db, asOf)
+  const fyStart = fiscalYearStart(asOf, startMonth)
+  const current = await profitAndLoss(db, fyStart, asOf)
+  const prior = (await balances(db, prevDay(fyStart))).filter(r => r.type === 'income' || r.type === 'expense').reduce((s, r) => s - r.net, 0)
+  const assets = all_.filter(r => r.type === 'asset' && r.net !== 0).map(r => ({ ...r, amount: r.net }))
+  const liabilities = all_.filter(r => r.type === 'liability' && r.net !== 0).map(r => ({ ...r, amount: -r.net }))
+  const equity = all_.filter(r => r.type === 'equity' && r.net !== 0).map(r => ({ ...r, amount: -r.net }))
+  // Earnings not yet closed to an equity account appear as calculated lines, labelled as such.
+  if (prior) equity.push({ id: 'prior-earnings', code: '', name: "Prior years' earnings (calculated)", type: 'equity', subtype: 'retained', debit: 0, credit: 0, net: -prior, amount: prior })
+  if (current.netIncome) equity.push({ id: 'current-earnings', code: '', name: `Net income since ${fyStart} (calculated)`, type: 'equity', subtype: 'retained', debit: 0, credit: 0, net: -current.netIncome, amount: current.netIncome })
+  const totalAssets = assets.reduce((s, r) => s + r.amount, 0), totalLiabilities = liabilities.reduce((s, r) => s + r.amount, 0), totalEquity = equity.reduce((s, r) => s + r.amount, 0)
+  return { asOf, assets, liabilities, equity, totalAssets, totalLiabilities, totalEquity, balanced: totalAssets === totalLiabilities + totalEquity }
+}
+
+const BUCKETS = ['Current', '1–30 days', '31–60 days', '61–90 days', 'Over 90 days']
+const bucket = (overdue: number) => overdue <= 0 ? 0 : overdue <= 30 ? 1 : overdue <= 60 ? 2 : overdue <= 90 ? 3 : 4
+
+/** Open items as of a date and their tie-out to the control account. */
+export async function ageing(db: D1Database, kind: 'receivable' | 'payable', asOf: string) {
+  const items = kind === 'receivable'
+    ? await all(db, "SELECT i.id, i.number AS ref, i.issue_date AS doc_date, i.due_date, i.total_cents, c.name AS contact, c.id AS contact_id FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id WHERE i.kind = 'invoice' AND i.status = 'issued' AND i.issue_date <= ? ORDER BY i.due_date, i.number, i.id", asOf)
+    : await all(db, "SELECT b.id, b.reference AS ref, b.bill_date AS doc_date, b.due_date, b.total_cents, c.name AS contact, c.id AS contact_id FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id WHERE (b.status = 'posted' OR (b.opening = 1 AND b.status <> 'void')) AND b.bill_date <= ? ORDER BY b.due_date, b.reference, b.id", asOf)
+  const applied = new Map((await all(db, `SELECT a.target_id, SUM(a.amount_cents) AS n FROM pt_allocations a LEFT JOIN pt_payments p ON a.source_kind = 'payment' AND p.id = a.source_id
+    WHERE a.target_kind = ? AND a.allocation_date <= ? AND (a.source_kind = 'credit' OR (p.reversal_id IS NULL OR EXISTS (SELECT 1 FROM pt_journal_entries r WHERE r.id = p.reversal_id AND r.entry_date > ?))) GROUP BY a.target_id`, kind === 'receivable' ? 'invoice' : 'bill', asOf, asOf)).map(r => [r.target_id, Number(r.n)]))
+  const open = items.map(i => ({ ...i, open: i.total_cents - (applied.get(i.id) ?? 0), overdue: daysBetween(i.due_date, asOf) })).filter(i => i.open !== 0)
+  for (const i of open) (i as Data).bucket = BUCKETS[bucket(i.overdue)]
+  // Money received or credited but not yet applied lowers what is owed overall.
+  const unapplied = kind === 'receivable'
+    ? Number((await one(db, `SELECT
+        COALESCE((SELECT SUM(p.amount_cents) FROM pt_payments p WHERE p.direction = 'received' AND p.payment_date <= ? AND (p.reversal_id IS NULL OR EXISTS (SELECT 1 FROM pt_journal_entries r WHERE r.id = p.reversal_id AND r.entry_date > ?))), 0)
+        - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a JOIN pt_payments p ON p.id = a.source_id WHERE a.source_kind = 'payment' AND p.direction = 'received' AND a.allocation_date <= ? AND (p.reversal_id IS NULL OR EXISTS (SELECT 1 FROM pt_journal_entries r WHERE r.id = p.reversal_id AND r.entry_date > ?))), 0)
+        + COALESCE((SELECT SUM(i.total_cents) FROM pt_invoices i WHERE i.kind = 'credit' AND i.status = 'issued' AND i.issue_date <= ?), 0)
+        - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a WHERE a.source_kind = 'credit' AND a.allocation_date <= ?), 0) AS n`, asOf, asOf, asOf, asOf, asOf, asOf))?.n ?? 0)
+    : Number((await one(db, `SELECT
+        COALESCE((SELECT SUM(p.amount_cents) FROM pt_payments p WHERE p.direction = 'paid' AND p.payment_date <= ? AND (p.reversal_id IS NULL OR EXISTS (SELECT 1 FROM pt_journal_entries r WHERE r.id = p.reversal_id AND r.entry_date > ?))), 0)
+        - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a JOIN pt_payments p ON p.id = a.source_id WHERE a.source_kind = 'payment' AND p.direction = 'paid' AND a.allocation_date <= ? AND (p.reversal_id IS NULL OR EXISTS (SELECT 1 FROM pt_journal_entries r WHERE r.id = p.reversal_id AND r.entry_date > ?))), 0) AS n`, asOf, asOf, asOf, asOf))?.n ?? 0)
+  const totals = BUCKETS.map(name => open.filter(i => (i as Data).bucket === name).reduce((s, i) => s + i.open, 0))
+  const itemsTotal = open.reduce((s, i) => s + i.open, 0)
+  const control = (await balances(db, asOf)).find(b => b.subtype === kind)
+  const controlBalance = control ? (kind === 'receivable' ? control.net : -control.net) : 0
+  return { kind, asOf, buckets: BUCKETS, items: open, totals, itemsTotal, unapplied, subledger: itemsTotal - unapplied, control: control ? { id: control.id, code: control.code, name: control.name, balance: controlBalance } : null, agrees: !!control && itemsTotal - unapplied === controlBalance }
+}
+
+export function prevDay(day: string) {
+  requireThat(/^\d{4}-\d{2}-\d{2}$/.test(day), 'Use YYYY-MM-DD dates')
+  return new Date(Date.parse(day + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10)
+}

@@ -1,0 +1,61 @@
+# Pantry product contract
+
+Pantry keeps the books of one US service business: an owner, a bookkeeper and an outside accountant maintain one legal entity's USD ledger, reconcile it to bank statements, close each month and hand the accountant a package they can defend. An agent the owner already uses can prepare work; a person approves it.
+
+This document sets the required behaviour of the first release. Each clause's proof is recorded in [ACCEPTANCE.md](ACCEPTANCE.md); a named test is a target until its result is recorded there. Local proof does not establish hosted operation, provider behaviour, a real accountant's acceptance or tax compliance.
+
+## Operating rules
+
+- **One coherent book.** One legal entity, US dollars, accrual double-entry books. Money is integer cents; amounts arrive as decimal strings and are converted exactly; tax and line amounts round half up on integers.
+- **Balanced, immutable postings.** Every posted entry has at least two lines and equal debits and credits. Posting, balance and period locks are enforced by the database's own triggers as well as the server. A posted entry never changes or disappears; it is corrected by a linked reversal.
+- **Authority at the moment of writing.** Every handler resolves the signed-in person (or agent token) and checks the capability it needs; the same check is a guard row inside the atomic D1 batch, so a role removed or a session revoked mid-request still stops the write. Route guards alone are never relied on.
+- **Approvals name exact versions.** Posting a journal, approving an invoice, deciding an agent proposal, locking or reopening a period and signing off a cutover each record who approved which revision. A changed record makes the earlier review unusable.
+- **Evidence, not inference.** Bank statements are evidence and never post on import. Documents are kept byte for byte and treated as untrusted text. No figure is accepted from a person or agent as a total: reports are always calculated from posted lines.
+- **Locks bind everyone.** A locked month refuses drafts, postings, payments, matches and agent proposals dated in it, until a reopening request is approved by someone holding that grant.
+
+## Roles and grants
+
+| Role | Can do |
+| --- | --- |
+| Owner (the installation's native owner) | Everything, including the business settings, people, agent tokens, locking and approving reopening. The owner may approve their own preparation. |
+| Bookkeeper | Read; record contacts, documents, accounts, invoice and journal drafts, bills, payments, statement imports, matches, reconciliations, close tasks; request reopening. |
+| Accountant | As bookkeeper, plus whatever grants the owner gives: **post** (post journals prepared by someone else, approve invoices, decide journal proposals, sign off a cutover, waive missing evidence, reverse entries), **lock**, **reopen**. |
+| Viewer | Read the books, reports, documents and the accountant package; no writes. |
+| Agent (token) | Read its context and file proposals; never post, approve, lock or use a person's routes. |
+
+A person other than the preparer approves journals, invoices and reopening requests, unless that person is the owner.
+
+## First release: sixteen clauses
+
+1. **PAN-01 Set up the business.** The owner records the legal name, entity type, state, fiscal year start, books start date, the tax method declared with the accountant and the book/report policies; adds people with a role and grants and invites them to sign in. Each role is enforced by the server on every request.
+2. **PAN-02 Chart of accounts and opening balances.** A person starts from a small service-business chart or builds their own (one receivable, one payable and one retained-earnings control account); opening balances are a balanced draft that a second person posts. An account with postings keeps its type and role.
+3. **PAN-03 Customers, vendors and documents.** A person keeps customers and vendors with terms, and uploads source documents (PDF, image, text, CSV, OFX) whose exact bytes and SHA-256 are kept and returned.
+4. **PAN-04 Invoices and credits.** A person drafts an invoice with lines, income accounts and a sales tax code or exemption per line; a line with no tax decision stops approval. A second person approves the exact version; issuing posts receivable, income and sales tax. A credit for an issued invoice is approved and issued the same way and applies to that invoice.
+5. **PAN-05 Bills and evidence.** A person records a bill or expense with lines and posts it to payables, attaches its source document, and sees its payable status. A posted bill without a document is a close exception until a document is attached or someone with the post grant records why there is none.
+6. **PAN-06 Payments recorded, not made.** A person records a payment received or made outside Pantry against a bank account and allocates it, wholly or partly, to open invoices or bills; unapplied money stays visible as a credit. Pantry never moves funds. Reversing a payment reopens what it paid.
+7. **PAN-07 Statement import.** A person imports a CSV or OFX bank statement for a named bank account. OFX must name that account; a CSV is confirmed by its last four digits. Re-importing the same file adds nothing; an overlapping download adds only new lines; a statement in the other format overlapping the same days is refused. The original file is kept.
+8. **PAN-08 Matching.** A person (or an approved agent proposal) matches statement lines to ledger postings: one-to-one, one deposit split across several receipts, a fee or bank income the books lack, a transfer between accounts, a vendor payment, or a partial customer settlement. A payment already recorded is cleared by its bank line without being posted again. A match that does not balance is refused; a line or posting is matched once.
+9. **PAN-09 Reconciliation.** A statement reconciles only when its opening follows the last reconciled closing, its lines account for the change in balance, every line is matched, and the ledger's bank balance less items not yet on a statement equals the closing balance. Every remaining difference is listed; a completed reconciliation stores its proof and freezes its matches. Balances typed wrongly from a statement can be corrected, with a reason, before reconciliation.
+10. **PAN-10 Journals.** A person prepares a balanced manual entry, optionally citing a document; someone else with the post grant posts the exact revision they reviewed. Preparer, poster and approval are kept. Control accounts post only through invoices, bills and payments.
+11. **PAN-11 Reversal.** A person with the post grant corrects a posted entry with a dated reversal linked both ways. Both entries stay in the ledger; an invoice is corrected by a credit instead; a matched posting must be unmatched first.
+12. **PAN-12 Reports.** Trial balance, general ledger with running balances, profit and loss, balance sheet (with calculated current and prior-year earnings) and receivables/payables ageing, all from the same posted lines, with the subledgers tied to their control accounts.
+13. **PAN-13 Close and lock.** A period's checklist calculates whether every bank account is reconciled through month end, nothing is left unposted, bills have evidence, subledgers agree with control accounts, the trial balance balances and no agent proposal waits; review tasks are completed by named people. Someone with the lock grant locks the month. A reopening is requested with a reason and approved by a different person holding the reopen grant.
+14. **PAN-14 Leave with the books.** Anyone in the books downloads the accountant package for a period (entity and declared policies, close checklist, trial balance, P&L for the month and year to date, balance sheet, ageing, general ledger, reconciliations with proof, reversals, approvals, notes, document index) and the general ledger as CSV. `rer export` and `rer import` restore the complete books, documents, reconciliations, close state and move-in journal into a fresh installation, refusing an archive whose posted entries do not balance.
+15. **PAN-15 Agent preparation.** The owner issues an agent token. The agent reads its context (unmatched lines and postings, documents marked as untrusted evidence, close status) and files typed proposals: a match, a journal entry citing its document and quoting the passages used, a close packet of exceptions, or a variance explanation citing entries. A person approves or rejects each; approval re-checks the cited records, the lock and the approver's grants. A proposal whose cited record changed becomes stale. Typed commands: `node scripts/pantry-agent.mjs` and [API.md](API.md).
+16. **PAN-16 Move in from QuickBooks Online.** A person uploads the seven QuickBooks Online report exports and the reconciled bank balance at cutover; a dry run shows counts, refused rows with reasons, tie-outs (trial balance balances, open invoices equal receivables, unpaid bills equal payables, each bank balance equals its statement, one control account each) and missing documents. Import writes staged records through Base's import kit with its journal and originals; undo removes them while nothing has been posted; the accountant's sign-off re-checks the tie-outs and posts the opening balances, after which corrections are entries, not undo. See [MOVE-IN.md](MOVE-IN.md).
+
+## Decided defaults
+
+These were decided for this release and are not open questions:
+
+- **Name:** Pantry, the adopted working name. The live "Pantry Software" class 42 mark (ERP/inventory) stays recorded as a launch-naming risk; this contract makes no clearance claim.
+- **Scope:** one US service-business legal entity, USD only, owner + bookkeeper + outside accountant.
+- **Basis:** accrual double-entry books. The tax accounting method is declared (cash, accrual or not yet declared) as a record of the accountant's decision; Pantry does not perform or imply a method change. Cash-basis presentation is not in this release.
+- **State and tax:** the state and declared policies are recorded at setup. Sales tax codes and rates are entered by the business as its accountant confirms them; Pantry gives no tax advice and never assumes a zero rate.
+- **Move-in order:** QuickBooks Online first (this release), then Xero, then Zoho Books. The QBO kit imports the chart, contacts, an accountant-approved trial balance, open receivables and payables and a read-only GL history archive; complete transactional replay waits for a real package.
+- **Agents:** the owner's existing agent through typed commands; no embedded model or model account in this release.
+- **Banking:** CSV and OFX files; no live bank feed.
+
+## Not in the first release
+
+Live bank feeds or any provider account; payment initiation; sending invoices or reminders by email; tax filing, tax calculation beyond the business's own rates, or tax advice; payroll; multi-currency; consolidation or more than one entity; inventory valuation; fixed-asset depreciation automation; advanced revenue recognition; cash-basis reports; budgets and FP&A; the Xero and Zoho kits; transactional history replay from QuickBooks; attachments from QuickBooks (report exports carry none); a hosted deployment; brand, homepage, docs site and run site content.

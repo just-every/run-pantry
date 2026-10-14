@@ -1,0 +1,23 @@
+Juniper Lane Design LLC
+Account List
+""
+Account #,Full name,Type,Detail type,Description,Total balance
+1000,Operating Checking,Bank,Checking,Main business checking,"24,813.52"
+1010,Savings,Bank,Savings,Reserve savings,0.00
+1200,Accounts Receivable (A/R),Accounts receivable (A/R),Accounts Receivable (A/R),,"6,250.00"
+1500,Equipment,Fixed Assets,Machinery & Equipment,Computers and studio equipment,"8,400.00"
+2000,Accounts Payable (A/P),Accounts payable (A/P),Accounts Payable (A/P),,"1,940.00"
+2100,Business Card,Credit Card,Credit Card,,812.40
+2200,Sales Tax Payable,Other Current Liabilities,Sales Tax Payable,,0.00
+3000,Owner's Equity,Equity,Owner's Equity,,"20,000.00"
+3900,Retained Earnings,Equity,Retained Earnings,,"6,236.12"
+4000,Service Revenue,Income,Service/Fee Income,,"41,672.11"
+4900,Interest Income,Other Income,Interest Earned,,0.00
+6000,Contractors,Expenses,Cost of Labor,,"18,200.00"
+6100,Rent,Expenses,Rent or Lease of Buildings,,"10,400.00"
+6200,Software and Subscriptions,Expenses,Office/General Administrative Expenses,,"1,964.32"
+6300,Office Supplies,Expenses,Office/General Administrative Expenses,,0.00
+6400,Bank Fees,Expenses,Bank Charges,,124.00
+6500,Professional Fees,Expenses,Legal & Professional Fees,,508.79
+
+"Wednesday, September 2, 2026 09:12 AM GMT-04:00"

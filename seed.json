@@ -1,0 +1,162 @@
+{
+  "id": "pantry",
+  "name": "Pantry",
+  "version": "0.1.0",
+  "maturity": "first-release-local",
+  "category": "accounting",
+  "spine": {
+    "id": "books-and-close",
+    "record": "JournalEntry \u2192 JournalLine \u2190 Match \u2192 BankLine \u2190 Statement \u2192 Reconciliation \u2192 Period lock"
+  },
+  "description": "Books and close for one US business: balanced accrual ledger, invoices, bills, recorded payments, CSV/OFX statement reconciliation, period close and an accountant package, with agent proposals a person approves and a QuickBooks Online move-in kit.",
+  "capabilities": [
+    {
+      "id": "business-and-roles",
+      "clauses": [
+        "PAN-01"
+      ]
+    },
+    {
+      "id": "chart-and-opening",
+      "clauses": [
+        "PAN-02"
+      ]
+    },
+    {
+      "id": "contacts-and-documents",
+      "clauses": [
+        "PAN-03"
+      ]
+    },
+    {
+      "id": "receivables",
+      "clauses": [
+        "PAN-04",
+        "PAN-06"
+      ]
+    },
+    {
+      "id": "payables",
+      "clauses": [
+        "PAN-05",
+        "PAN-06"
+      ]
+    },
+    {
+      "id": "bank-reconciliation",
+      "clauses": [
+        "PAN-07",
+        "PAN-08",
+        "PAN-09"
+      ]
+    },
+    {
+      "id": "journal",
+      "clauses": [
+        "PAN-10",
+        "PAN-11"
+      ]
+    },
+    {
+      "id": "reports",
+      "clauses": [
+        "PAN-12"
+      ]
+    },
+    {
+      "id": "close",
+      "clauses": [
+        "PAN-13"
+      ]
+    },
+    {
+      "id": "portability",
+      "clauses": [
+        "PAN-14"
+      ]
+    },
+    {
+      "id": "agent-proposals",
+      "clauses": [
+        "PAN-15"
+      ]
+    },
+    {
+      "id": "quickbooks-online-move-in",
+      "clauses": [
+        "PAN-16"
+      ]
+    }
+  ],
+  "nonGoals": [
+    "Live bank feeds",
+    "Payment initiation",
+    "Tax filing or tax advice",
+    "Payroll",
+    "Multi-currency",
+    "Multi-entity consolidation",
+    "Inventory valuation",
+    "Depreciation automation",
+    "Advanced revenue recognition",
+    "Cash-basis reports",
+    "Embedded AI model"
+  ],
+  "externals": [
+    {
+      "id": "cloudflare",
+      "required": true,
+      "why": "Worker hosting",
+      "data": [
+        "HTTP requests"
+      ],
+      "adapters": []
+    }
+  ],
+  "env": [],
+  "deploy": {
+    "healthPath": "/health",
+    "publicPaths": [
+      "/",
+      "/health",
+      "/signin"
+    ],
+    "notes": "Native owner sessions guard /app; unknown paths return real 404s; the development outbox is local-only."
+  },
+  "extensionPoints": {
+    "contributions": [],
+    "policies": [],
+    "events": [],
+    "slots": [],
+    "adapters": []
+  },
+  "limits": {
+    "status": "unmeasured"
+  },
+  "accessibility": {
+    "level": "WCAG 2.2 AA",
+    "status": "target; unaudited"
+  },
+  "operatingCost": {
+    "status": "unmeasured"
+  },
+  "composition": {
+    "base": "base",
+    "family": "accounting",
+    "edition": "pantry",
+    "modules": [
+      "job-queue",
+      "release",
+      "deploy-kit",
+      "container",
+      "demo-host",
+      "integrations",
+      "mail",
+      "ai",
+      "portability",
+      "erasure",
+      "dependencies",
+      "operator-auth",
+      "owner-claim"
+    ]
+  }
+}

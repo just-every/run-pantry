@@ -1,0 +1,22 @@
+Juniper Lane Design LLC
+General Ledger
+"August 1-31, 2026"
+,Date,Transaction Type,Num,Name,Memo/Description,Split,Amount,Balance
+Operating Checking
+,Beginning Balance,,,,,,,"21,950.40"
+,08/03/2026,Payment,,Willow Services,,Accounts Receivable (A/R),"3,600.00","25,550.40"
+,08/05/2026,Expense,,,Monthly service fee,Bank Fees,-12.00,"25,538.40"
+,08/12/2026,Bill Payment (Check),2051,Brightline Software,,Accounts Payable (A/P),-724.88,"24,813.52"
+Total for Operating Checking,,,,,,,"$2,863.12",
+Service Revenue
+,Beginning Balance,,,,,,,"37,322.11"
+,08/04/2026,Invoice,1041,Cedar Studio,Website refresh,Accounts Receivable (A/R),"2,400.00","39,722.11"
+,08/21/2026,Invoice,1040,Willow Services,Brand workshop,Accounts Receivable (A/R),"1,950.00","41,672.11"
+Total for Service Revenue,,,,,,,"$4,350.00",
+Bank Fees
+,Beginning Balance,,,,,,,112.00
+,08/05/2026,Expense,,,Monthly service fee,Operating Checking,12.00,124.00
+Total for Bank Fees,,,,,,,$12.00,
+TOTAL,,,,,,,"$7,225.12",
+
+"Accrual Basis Wednesday, September 2, 2026 09:12 AM GMT-04:00"
