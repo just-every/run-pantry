@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "domain": "run-pantry.com",
+  "name": "Pantry",
+  "instanceType": "basic",
+  "settings": {
+    "MAIL_PROVIDER": "development"
+  }
+}

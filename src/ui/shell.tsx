@@ -46,7 +46,7 @@ export function Shell() {
   useEffect(() => { void reload() }, [reload])
   return <div className="app">
     <HydrationUnit><header className="app-header">
-      <Link to="/app" className="brand"><img src="/brand/mark.svg" alt="" width="28" height="28" />Pantry</Link>
+      <Link to="/app" className="brand"><img src="/brand/mark.svg" alt="" width="28" height="28" /><span data-rer-name>Pantry</span></Link>
       <nav className="app-nav" aria-label="Work">
         {MAIN.map(m => <Link key={m.to} to={m.to} className={`nav-link${path.startsWith(m.to) ? ' active' : ''}`} aria-current={path.startsWith(m.to) ? 'page' : undefined}><Icon name={m.icon} /><span className="wide-label">{m.label}</span><span className="short-label">{m.short}</span></Link>)}
         <More path={path} />
