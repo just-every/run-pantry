@@ -40,7 +40,7 @@ function People() {
       </fieldset>
       {editing && <Field label="Status" name="active" defaultValue={editing.active ? 'yes' : 'no'} options={[{ value: 'yes', label: 'Active' }, { value: 'no', label: 'Inactive' }]} />}
     </Form>
-    <p className="hint">Invitations go to the local outbox until a mail provider is set up. Roles take effect on the person's next request.</p>
+    <p className="hint">Invitations are emailed once a mail provider is set up. Roles take effect on the person's next request.</p>
   </Card>
 }
 

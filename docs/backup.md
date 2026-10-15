@@ -9,7 +9,7 @@ rer dev --stop
 rer export --output exports/pantry-books.rer
 ```
 
-The archive is saved in the `exports` folder with an integrity receipt. Copy it somewhere safe, away from this computer. Sign-ins, the local outbox and private settings are not part of it.
+The archive is saved in the `exports` folder with an integrity receipt. Copy it somewhere safe, away from this computer. Sign-ins and private settings are not part of it.
 
 ## Restore
 

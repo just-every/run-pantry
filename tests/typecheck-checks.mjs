@@ -5,7 +5,7 @@ const __rerTestEntryPnpm = (program, args) => {
  const at = program === 'nice' ? args.indexOf('pnpm') : -1;
  if (program === 'nice' && at < 0) return [program, args];
  const command = at < 0 ? args : args.slice(at + 1), offset = command[0] === 'run' ? 1 : 0;
- const aliases = {"build":"build","dev":"dev","preview":"preview","verify":"verify","setup":"setup","deploy":"deploy","reset":"reset","export":"export","import":"import","release":"release","outbox":"outbox","doctor":"doctor","describe":"describe","check":"check","deps":"install","rer":""}, alias = command[offset];
+ const aliases = {"build":"build","dev":"dev","preview":"preview","verify":"verify","setup":"setup","deploy":"deploy","reset":"reset","export":"export","import":"import","release":"release","doctor":"doctor","describe":"describe","check":"check","deps":"install","rer":""}, alias = command[offset];
  if (!Object.hasOwn(aliases, alias)) return [program, args];
  const forwarded = command.slice(offset + 1); if (forwarded[0] === '--') forwarded.shift();
  const launch = __rerTestEntryArgs([__rerTestEntry, ...(aliases[alias] ? [aliases[alias]] : []), ...forwarded]);

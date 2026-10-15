@@ -31,5 +31,5 @@
 
 - A real QuickBooks Online package (only documented-shape synthetic fixtures were used), `.xlsx` reading and the separate attachments `.zip`.
 - A real accountant's review of a close, and any tax-method, state or sales-tax correctness.
-- Hosted deployment, mail delivery of invitations (local outbox only), bank-feed or model providers.
+- Hosted deployment, mail delivery of invitations (suppressed locally), bank-feed or model providers.
 - Accessibility beyond the keyboard and label conventions built in (no audit run).

@@ -120,7 +120,7 @@
       "/health",
       "/signin"
     ],
-    "notes": "Native owner sessions guard /app; unknown paths return real 404s; the development outbox is local-only."
+    "notes": "Native owner sessions guard /app; unknown paths return real 404s; local runs send no email."
   },
   "extensionPoints": {
     "contributions": [],

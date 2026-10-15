@@ -23,4 +23,4 @@ Someone other than the preparer approves journals, invoices and reopening reques
 
 ## Add a person
 
-In **People & settings**, under **People**, enter their name, email and role, tick their grants and choose **Add person**, then **Send sign-in invitation**. While you run Pantry on your own computer, invitations go to the local outbox rather than to their mailbox; `rer dev` prints how to open it.
+In **People & settings**, under **People**, enter their name, email and role, tick their grants and choose **Add person**, then **Send sign-in invitation**. While you run Pantry on your own computer, no email is sent; invitations reach people's mailboxes once Pantry is hosted with a mail provider.
