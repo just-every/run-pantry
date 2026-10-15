@@ -23,12 +23,13 @@ function Business() {
 
 function People() {
   const { state, reload } = useShared(), members = state.settings.members
-  const [editing, setEditing] = useState<D | null>(null)
+  const [editing, setEditing] = useState<D | null>(null), [invited, setInvited] = useState('')
   return <Card title="People">
     <Table heads={['Name', 'Email', 'Role', 'Grants', 'Status', '']} empty="Only the owner so far. Add a bookkeeper or accountant.">
       {members.map((m: D) => <tr key={m.email}><td>{m.name}</td><td>{m.email}</td><td>{ROLE_LABEL[m.role]}</td><td>{[m.can_post && 'Post', m.can_lock && 'Lock', m.can_reopen && 'Reopen'].filter(Boolean).join(', ') || '—'}</td><td>{m.active ? <Chip tone="good">Active</Chip> : <Chip>Inactive</Chip>}</td>
-        <td className="row-actions"><button type="button" className="btn btn-link" onClick={() => setEditing(m)}>Edit</button>{m.active ? <Action run={async () => { await command('member.invite', { email: m.email }) }}>Send sign-in invitation</Action> : null}</td></tr>)}
+        <td className="row-actions"><button type="button" className="btn btn-link" onClick={() => setEditing(m)}>Edit</button>{m.active ? <Action run={async () => { setInvited(''); await command('member.invite', { email: m.email }); setInvited(m.email) }}>Send sign-in invitation</Action> : null}</td></tr>)}
     </Table>
+    {invited && <p role="status" className="hint">Sign-in invitation sent to {invited}.</p>}
     <Form key={editing?.email ?? 'new'} label={editing ? 'Save person' : 'Add person'} submit={b => command('member.save', { ...b, canPost: b.canPost === 'on', canLock: b.canLock === 'on', canReopen: b.canReopen === 'on', active: b.active !== 'no' })} onDone={async () => { setEditing(null); await reload() }} className="grid-form">
       <Field label="Name" name="name" defaultValue={editing?.name} required />
       <Field label="Email" name="email" type="email" defaultValue={editing?.email} required />
@@ -40,7 +41,7 @@ function People() {
       </fieldset>
       {editing && <Field label="Status" name="active" defaultValue={editing.active ? 'yes' : 'no'} options={[{ value: 'yes', label: 'Active' }, { value: 'no', label: 'Inactive' }]} />}
     </Form>
-    <p className="hint">Invitations are emailed once a mail provider is set up. Roles take effect on the person's next request.</p>
+    <p className="hint">An invitation emails a one-time sign-in link. Roles take effect on the person's next request.</p>
   </Card>
 }
 
