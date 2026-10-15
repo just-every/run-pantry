@@ -56,7 +56,7 @@ p { margin: 0 0 10px; text-wrap: pretty; }
 .tabs button { font: inherit; font-size: 15px; font-weight: 500; color: var(--muted); background: none; border: 0; padding: 12px 16px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
 .tabs button:hover { color: var(--ink); }
 .tabs button.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--glaze); }
-.tabs-pick { display: none; margin-bottom: 22px; }
+.field.tabs-pick { display: none; margin-bottom: 22px; }
 
 /* Figures, and the double rule under final ones. Proportional digits: this face's tnum also widens "." and ",". */
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--card-shadow); padding: 22px 0; margin-bottom: 20px; }
@@ -288,7 +288,7 @@ blockquote.evidence footer { font-size: 13px; color: var(--muted); }
   .tabs { overflow-x: visible; flex-wrap: wrap; row-gap: 4px; }
   .tabs button { padding: 10px 12px; }
   .tabs.tabs-pickable { display: none; }
-  .tabs-pick { display: flex; }
+  .field.tabs-pick { display: flex; }
 }
 
 /* Line editors keep their fields readable: the table scrolls before inputs shrink. */
