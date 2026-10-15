@@ -4,6 +4,7 @@
   "name": "Pantry",
   "instanceType": "basic",
   "settings": {
-    "MAIL_PROVIDER": "development"
+    "MAIL_PROVIDER": "development",
+    "MAIL_FROM": "Pantry <auth@example.invalid>"
   }
 }

@@ -51,7 +51,7 @@ export function Shell() {
         {MAIN.map(m => <Link key={m.to} to={m.to} className={`nav-link${path.startsWith(m.to) ? ' active' : ''}`} aria-current={path.startsWith(m.to) ? 'page' : undefined}><Icon name={m.icon} /><span className="wide-label">{m.label}</span><span className="short-label">{m.short}</span></Link>)}
         <More path={path} />
       </nav>
-      {state && <div className="profile"><span className="profile-name">{state.actor.name}</span><small>{ROLE_LABEL[state.actor.role]}</small></div>}
+      {state && <div className="profile"><span className="profile-name">{state.actor.name}</span>{state.actor.name !== ROLE_LABEL[state.actor.role] && <small>{ROLE_LABEL[state.actor.role]}</small>}</div>}
     </header></HydrationUnit>
     <main className="workspace">
       {state ? <SharedState.Provider value={{ state, reload }}><Outlet /></SharedState.Provider> : <Loading error={error} what="your books" />}
