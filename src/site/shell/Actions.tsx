@@ -6,6 +6,7 @@ const Arrow = () => <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" s
 export function Actions() {
   return <div className="site-actions">
     <a className="site-pill" href={links.run}>Run Pantry<Arrow /></a>
+    <a className="site-pill" href="https://demo.run-pantry.com/">Try the demo<Arrow /></a>
     <a className="site-link" href={links.docs}>Read the docs</a>
   </div>
 }
