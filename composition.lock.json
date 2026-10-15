@@ -27,7 +27,7 @@
     },
     "base": {
       "repository": "runeditrun/base",
-      "commit": "1ce15dd8cbb7c8cf2d83ebfde2b4a8a130ff9d74"
+      "commit": "1ee378e41142c673a9098f60af21664c6d8477d1"
     }
   },
   "assemblyTool": {
@@ -422,14 +422,14 @@
       "source": "editions/pantry/README.md"
     },
     "RUN-LOCALLY.md": {
-      "sha256": "3d4e1bf5a29e887dcde9173a10d8e8a8bc2e657771d109da7661f3e5730d2dde",
+      "sha256": "07b36d5616eef6a07f9ce16b784db166d4ebe78ba279095fb9afe8444a64a2b9",
       "mode": 420,
       "component": "base",
       "repository": "base",
       "source": "export/RUN-LOCALLY.md"
     },
     "SEED-COMMAND-CONTRACT.md": {
-      "sha256": "bc75a370396fc1f655a5993919e108b0eba0441e18d1d346934b482b0d9fe518",
+      "sha256": "0b97e2459883fbb77845844cf20e6760dc775881fd26640a6a6dae050504b891",
       "mode": 420,
       "component": "base",
       "repository": "base",
@@ -961,7 +961,7 @@
       "source": "modules/d1-transport/index.mjs"
     },
     "src/modules/demo/README.md": {
-      "sha256": "b00a8aa86d6a0df3c7ce904c3fa3bbb18b0b25a5fac722b4d7beafad183ae74f",
+      "sha256": "8fb9b98295fa59c8d4bdd6bd0d0b9940dc1113bb4a6d01813e76b5c878a445fc",
       "mode": 420,
       "component": "base",
       "repository": "base",
@@ -996,14 +996,14 @@
       "source": "modules/demo/label.d.mts"
     },
     "src/modules/demo/label.mjs": {
-      "sha256": "05c208a184941cf4c8be04502e2918c0ce9372159978022f02fb35c219f74d4f",
+      "sha256": "e39cffea58d72eebacf6d587f539f1632dd7139bb8e851451877a5ef0a60f2e5",
       "mode": 420,
       "component": "base",
       "repository": "base",
       "source": "modules/demo/label.mjs"
     },
     "src/modules/demo/responses.mjs": {
-      "sha256": "3194f1a6aaec1f84477c15cf22fd32b650e317a119cfca26f0529c7ec5cd0cc5",
+      "sha256": "f91b6cb14dfde5c30750e6d248820f7218a855353e43e2defbc10fcc25fedc5d",
       "mode": 420,
       "component": "base",
       "repository": "base",
@@ -1325,7 +1325,7 @@
       "source": "modules/import-kit/src/d1/erasure-snapshot.ts"
     },
     "src/modules/import-kit/src/d1/erasure-stage.ts": {
-      "sha256": "9ecbdf112c28bb1bccf49ad28fcb2f469b01c8982a726efd99d3271ec64018b4",
+      "sha256": "9e4a69b1373d49269ef38bf3311468102bb94b308391838a8317ca361ddbe42d",
       "mode": 420,
       "component": "base",
       "repository": "base",
@@ -1339,7 +1339,7 @@
       "source": "modules/import-kit/src/d1/erasure-step.ts"
     },
     "src/modules/import-kit/src/d1/erasure-values.ts": {
-      "sha256": "aa84881bea35969c83fce0b072a2878e761cbbc58137786a6d657ea28a27f22d",
+      "sha256": "57ccad1fc84f020c6b8d4d8bed2d2018028455961e38bc793acc5f27865094fe",
       "mode": 420,
       "component": "base",
       "repository": "base",
@@ -1675,7 +1675,7 @@
       "source": "modules/import-kit/src/d1/retained-values.ts"
     },
     "src/modules/import-kit/src/d1/retirement-bounded.ts": {
-      "sha256": "508f3e2efa5624e525eb4ebf1c75ed954a3cfbdce8129ee10f8821a125f8e25d",
+      "sha256": "832581740e597e7c42e701370cf01372a67f97be84d42c44d701c13f5e62eaca",
       "mode": 420,
       "component": "base",
       "repository": "base",
@@ -2312,7 +2312,7 @@
       "source": "modules/mail/LICENSE"
     },
     "src/modules/mail/README.md": {
-      "sha256": "4eae21c84caf86429a0274e5dccb002a304915c74ff58f0c75279555d2cb16a0",
+      "sha256": "2067e03ab3f25fcf55d0ada52a19c44689839c6ca322853529d497430d4aa429",
       "mode": 420,
       "component": "base",
       "repository": "base",
@@ -2438,14 +2438,14 @@
       "source": "modules/mail/src/adapters/messaging/serialize.mjs"
     },
     "src/modules/mail/src/adapters/rer/contract.mjs": {
-      "sha256": "b8ae90da173b40c7bde1a194ac35e9367802b9b608f050d63e2337a64e58454c",
+      "sha256": "3dba4b2c07367775768b5d1683cb859ffd000a6eefd2236308a33ebf7ecad1dd",
       "mode": 420,
       "component": "base",
       "repository": "base",
       "source": "modules/mail/src/adapters/rer/contract.mjs"
     },
     "src/modules/mail/src/adapters/rer/index.mjs": {
-      "sha256": "2f27ff23d1182b4792b13b777e44fe1de9f7568474df11f3b60655415d2a6635",
+      "sha256": "23faa46d74aa987e7fc51e1a78d83760414a169e8bc0101e399bb4d685c4ce14",
       "mode": 420,
       "component": "base",
       "repository": "base",
@@ -2515,7 +2515,7 @@
       "source": "modules/mail/src/core/errors.mjs"
     },
     "src/modules/mail/src/core/transport.mjs": {
-      "sha256": "aecc91b5b12c2f315a3154679bb6780518453d04516c750517f06f25548ebb18",
+      "sha256": "67b721f37bdde8a5f419ca88eda0e88650ffaca06bcbf91eab0e33c879d0e230",
       "mode": 420,
       "component": "base",
       "repository": "base",
@@ -2746,7 +2746,7 @@
       "source": "modules/mail/src/unsubscribe/index.mjs"
     },
     "src/modules/operator-auth/README.md": {
-      "sha256": "10699d8f086345f71c1f5fd1dd3b95dea72813ace61a9095dac5a4858d239e58",
+      "sha256": "fa9f1b13e8b98c269ebedc93ef703ac3438120b6a05937bc43eb1dc97c029b12",
       "mode": 420,
       "component": "base",
       "repository": "base",
@@ -3110,7 +3110,7 @@
       "source": "modules/operator-auth/identity/email-link/index.d.mts"
     },
     "src/modules/operator-auth/identity/email-link/index.mjs": {
-      "sha256": "a682f502d87661d6556a005c3d0caef7896e5d7a5dd36703ec0088e2d95f9d0d",
+      "sha256": "7d7aa3530804b772006dfd881a8457ba11bc10ca65893a6bc1ec23a5e48e9c43",
       "mode": 420,
       "component": "base",
       "repository": "base",
@@ -3187,7 +3187,7 @@
       "source": "modules/operator-auth/identity/oidc/index.mjs"
     },
     "src/modules/operator-auth/identity/oidc/jwt.mjs": {
-      "sha256": "b66750270020887f31339122c08ee9a55a7c6057486777e629d18bf7678d8562",
+      "sha256": "3a0e5c5ce7df5a9784fdd732c2f57e5760bddc5aa8566c608bf05e580d0c808c",
       "mode": 420,
       "component": "base",
       "repository": "base",

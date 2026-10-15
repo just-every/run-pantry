@@ -3,8 +3,9 @@
   "domain": "run-pantry.com",
   "name": "Pantry",
   "instanceType": "basic",
+  "ownerEmail": "priya@juniperlane.example",
   "settings": {
     "MAIL_PROVIDER": "development",
-    "MAIL_FROM": "Pantry <auth@example.invalid>"
+    "MAIL_FROM": "Pantry <books@juniperlane.example>"
   }
 }
