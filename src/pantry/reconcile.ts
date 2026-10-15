@@ -2,9 +2,9 @@
 // A statement reconciles when its opening follows the last reconciled closing,
 // its lines add up to its balances, every line is matched, and the ledger's
 // bank balance less items not yet on a statement equals the closing balance.
-import { authority, who } from './access'
+import { authority, who, type Actor } from './access'
 import { now, requireThat, text, uid, usd, type Data } from './core'
-import { all, audit, guard, one, q, run } from './db'
+import { all, audit, guard, one, q, run, type Sql } from './db'
 import type { Command } from './context'
 
 export async function reconciliationState(db: D1Database, statementId: string): Promise<Data> {
@@ -47,20 +47,26 @@ export async function reconciliationState(db: D1Database, statementId: string): 
   return { statement, bank, completed: done, opening: statement.opening_cents, closing: statement.closing_cents, book, outstanding, outstandingTotal, cleared, difference, lines, postings, blockers, ready: !done && blockers.length === 0 }
 }
 
-const complete: Command = { need: 'record', async run(c, b) {
-  const state = await reconciliationState(c.db, text(b.statementId, 'Statement'))
+/** The batch that records a ready statement's reconciliation with its proof. */
+export async function completion(db: D1Database, actor: Actor, statementId: string): Promise<{ state: Data; statements: Sql[] }> {
+  const state = await reconciliationState(db, statementId)
   requireThat(!state.completed, 'Already reconciled', 409)
   requireThat(state.ready, state.blockers.map((x: Data) => x.message).join('; ') || 'Not ready', 409)
   const id = uid(), matchIds = [...new Set(state.lines.map((l: Data) => l.match_id))]
   const proof = { opening: state.opening, closing: state.closing, book: state.book, outstanding: state.outstanding, cleared: state.cleared, lines: state.lines.map((l: Data) => ({ id: l.id, date: l.posted_date, amount: l.amount_cents, match: l.match_id })) }
-  await run(c.db, [authority(c.actor, 'record'),
+  return { state, statements: [
     // The proof must still hold at commit: no match changed and no posting arrived.
     guard(`(SELECT COUNT(*) FROM pt_match_bank_lines mb JOIN pt_bank_lines l ON l.id = mb.bank_line_id WHERE mb.active = 1 AND l.bank_account_id = ? AND l.posted_date BETWEEN ? AND ?) = ?`, state.bank.id, state.statement.start_date, state.statement.end_date, state.lines.length),
     guard("(SELECT COALESCE(SUM(l.debit_cents - l.credit_cents), 0) FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id WHERE e.status = 'posted' AND l.account_id = ? AND e.entry_date <= ?) = ?", state.bank.account_id, state.statement.end_date, state.book),
     q('INSERT INTO pt_reconciliations (id, bank_account_id, statement_id, end_date, opening_cents, closing_cents, book_cents, outstanding_cents, proof, completed_by, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      id, state.bank.id, state.statement.id, state.statement.end_date, state.opening, state.closing, state.book, state.outstandingTotal, JSON.stringify(proof), c.actor.email, now()),
+      id, state.bank.id, state.statement.id, state.statement.end_date, state.opening, state.closing, state.book, state.outstandingTotal, JSON.stringify(proof), actor.email, now()),
     ...matchIds.map(m => q('UPDATE pt_matches SET reconciliation_id = ? WHERE id = ?', id, m)),
-    audit(who(c.actor), 'reconciliation.complete', 'statement', state.statement.id, { closing: state.closing, outstanding: state.outstandingTotal })])
+    audit(who(actor), 'reconciliation.complete', 'statement', state.statement.id, { closing: state.closing, outstanding: state.outstandingTotal })] }
+}
+
+const complete: Command = { need: 'record', async run(c, b) {
+  const { state, statements } = await completion(c.db, c.actor, text(b.statementId, 'Statement'))
+  await run(c.db, [authority(c.actor, 'record'), ...statements])
   return reconciliationState(c.db, state.statement.id)
 } }
 

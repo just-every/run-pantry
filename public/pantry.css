@@ -105,6 +105,7 @@ table.ledger { width: 100%; border-collapse: collapse; color: var(--ink); }
 .gl-account { margin-bottom: 22px; }
 .row-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
 .row-actions.small { margin-top: 8px; }
+td > .row-actions { margin-top: 0; justify-content: flex-end; flex-wrap: nowrap; }
 
 /* Chips: pills outside tables; inside tables a glaze tick, a ring, or a pill for refusals. */
 .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600; line-height: 1.35; white-space: nowrap; background: var(--line); color: var(--ink); }

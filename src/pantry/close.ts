@@ -1,9 +1,9 @@
 // Period close: calculated checks plus reviewed tasks, then a lock that both
 // people and agents' approved work must respect. Reopening is a separate
 // request approved by someone holding the reopen grant.
-import { authority, who } from './access'
+import { authority, who, type Actor } from './access'
 import { longDay, monthBounds, monthName, now, optionalText, requireThat, text, uid, usd, type Data } from './core'
-import { all, approval, audit, changed, guard, one, q, run } from './db'
+import { all, approval, audit, changed, guard, one, q, run, type Sql } from './db'
 import { ageing, trialBalance } from './reports'
 import { requireEntity } from './settings'
 import type { Command } from './context'
@@ -76,24 +76,30 @@ const completeTask: Command = { need: 'record', async run(c, b) {
   return closeState(c.db, task.period)
 } }
 
-const lock: Command = { need: 'lock', async run(c, b) {
-  await requireEntity(c.db)
-  const id = text(b.period, 'Period'), state = await closeState(c.db, id)
+/** The batch that locks a period whose checks pass and whose tasks are done. */
+export async function lockPlan(db: D1Database, actor: Actor, id: string, note: string): Promise<Sql[]> {
+  await requireEntity(db)
+  const state = await closeState(db, id)
   requireThat(state.status !== 'locked', 'Period is already locked', 409)
   const failing = state.checks.filter((x: Data) => !x.ok).map((x: Data) => x.title)
   requireThat(!failing.length, `Resolve before locking: ${failing.join('; ')}`, 409)
   requireThat(state.tasks.length && state.tasks.every((t: Data) => t.status === 'done'), 'Complete every review task before locking', 409)
   const revision = uid()
-  await run(c.db, [authority(c.actor, 'lock'),
+  return [
     // The checked state must still hold: no task reopened, no draft or posting added in the period meanwhile.
     guard("(SELECT COUNT(*) FROM pt_close_tasks WHERE period = ? AND status <> 'done') = 0", id),
     guard("NOT EXISTS (SELECT 1 FROM pt_journal_entries WHERE status = 'draft' AND entry_date BETWEEN ? AND ?)", state.start, state.end),
     state.period
-      ? q("UPDATE pt_periods SET status = 'locked', locked_by = ?, locked_at = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'open'", c.actor.email, now(), revision, id, state.period.revision)
-      : q("INSERT INTO pt_periods (id, start_date, end_date, status, locked_by, locked_at, revision) VALUES (?, ?, ?, 'locked', ?, ?, ?)", id, state.start, state.end, c.actor.email, now(), revision),
+      ? q("UPDATE pt_periods SET status = 'locked', locked_by = ?, locked_at = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'open'", actor.email, now(), revision, id, state.period.revision)
+      : q("INSERT INTO pt_periods (id, start_date, end_date, status, locked_by, locked_at, revision) VALUES (?, ?, ?, 'locked', ?, ?, ?)", id, state.start, state.end, actor.email, now(), revision),
     changed(),
-    approval(who(c.actor), 'period', id, state.period?.revision ?? 'new', 'lock', 'approved', optionalText(b.note, 'Note', 500)),
-    audit(who(c.actor), 'period.lock', 'period', id)])
+    approval(who(actor), 'period', id, state.period?.revision ?? 'new', 'lock', 'approved', note),
+    audit(who(actor), 'period.lock', 'period', id)]
+}
+
+const lock: Command = { need: 'lock', async run(c, b) {
+  const id = text(b.period, 'Period')
+  await run(c.db, [authority(c.actor, 'lock'), ...await lockPlan(c.db, c.actor, id, optionalText(b.note, 'Note', 500))])
   return closeState(c.db, id)
 } }
 

@@ -1,6 +1,6 @@
 // Read models for the screens. Every view is behind the read capability.
 import { allowed, type Person } from './access'
-import { longDay, type Data } from './core'
+import { addDays, longDay, period, type Data } from './core'
 import { all, one } from './db'
 import { entity } from './settings'
 
@@ -38,7 +38,15 @@ export async function overview(db: D1Database) {
     proposals: await n("SELECT COUNT(*) AS n FROM pt_proposals WHERE status = 'proposed'"),
     reopenRequests: await n("SELECT COUNT(*) AS n FROM pt_reopen_requests WHERE status = 'pending'"),
   }
-  return { entity: e, steps, queue }
+  return { entity: e, steps, queue, closing: await closing(db, e?.books_start) }
+}
+
+/** The period due to close: the month after the last lock, else the books' first month; never past this month. */
+async function closing(db: D1Database, booksStart?: string) {
+  const last = (await one<{ id: string | null }>(db, "SELECT MAX(id) AS id FROM pt_periods WHERE status = 'locked'"))?.id
+  const next = last ? period(addDays(`${last}-28`, 7)) : booksStart ? period(addDays(booksStart, 1)) : null
+  const current = new Date().toISOString().slice(0, 7)
+  return next && next < current ? next : current
 }
 
 /** The name to show for each email that acts in these books: a member's name, else the operator's display name. Agents act as "agent:<name>". */

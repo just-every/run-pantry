@@ -27,7 +27,7 @@ function People() {
   return <Card title="People">
     <Table heads={['Name', 'Email', 'Role', 'Grants', 'Status', '']} empty="Only the owner so far. Add a bookkeeper or accountant.">
       {members.map((m: D) => <tr key={m.email}><td>{m.name}</td><td>{m.email}</td><td>{ROLE_LABEL[m.role]}</td><td>{[m.can_post && 'Post', m.can_lock && 'Lock', m.can_reopen && 'Reopen'].filter(Boolean).join(', ') || '—'}</td><td>{m.active ? <Chip tone="good">Active</Chip> : <Chip>Inactive</Chip>}</td>
-        <td className="row-actions"><button type="button" className="btn btn-link" onClick={() => setEditing(m)}>Edit</button>{m.active ? <Action run={async () => { setInvited(''); await command('member.invite', { email: m.email }); setInvited(m.email) }}>Send sign-in invitation</Action> : null}</td></tr>)}
+        <td><div className="row-actions"><button type="button" className="btn btn-link" onClick={() => setEditing(m)}>Edit</button>{m.active ? <Action run={async () => { setInvited(''); await command('member.invite', { email: m.email }); setInvited(m.email) }}>Send sign-in invitation</Action> : null}</div></td></tr>)}
     </Table>
     {invited && <p role="status" className="hint">Sign-in invitation sent to {invited}.</p>}
     <Form key={editing?.email ?? 'new'} label={editing ? 'Save person' : 'Add person'} submit={b => command('member.save', { ...b, canPost: b.canPost === 'on', canLock: b.canLock === 'on', canReopen: b.canReopen === 'on', active: b.active !== 'no' })} onDone={async () => { setEditing(null); await reload() }} className="grid-form">

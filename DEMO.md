@@ -10,7 +10,11 @@ records with fixed IDs and dates relative to the start: customers and vendors,
 a service-business chart, two bank accounts, opening balances, invoices, bills,
 recorded payments, a statement to reconcile, a journal draft, review tasks,
 source documents, approvals and an agent proposal a person can decide.
-`src/demo.ts` is idempotent and never fetches.
+The month before last is closed the way a person closes it: `src/demo/close.ts`
+matches its statement lines, completes both reconciliations and locks the
+period through Pantry's own match, reconciliation and lock plans. Last month is
+open, with its statement to reconcile. The owner is Priya Shah
+(`ownerEmail` in `deploy-demo.json`). `src/demo.ts` is idempotent and never fetches.
 
 Public reads run for real. Pantry has no public URL check, bank feed or payment
 initiation. Its invoice/payment commands record books locally; issuing an invoice
