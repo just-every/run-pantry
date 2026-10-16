@@ -48,7 +48,7 @@ export function RecordView({ record, reportLabel }: { record: string; reportLabe
   const search = useSearch({ from: '/app/reports' })
   const [kind, id] = record.split(':')
   const { data: r, error } = useView<D>(`reports/record/${kind}/${id}`)
-  const crumbs = <nav className="crumbs" aria-label="Report"><Link to="/app/reports" search={{ ...search, line: undefined, record: undefined }}>{reportLabel}</Link> <span aria-hidden="true">›</span> <Link to="/app/reports" search={{ ...search, record: undefined }}>Back to the figure</Link>{r && <> <span aria-hidden="true">›</span> <span>{r.title}</span></>}</nav>
+  const crumbs = <nav className="crumbs" aria-label="Report"><Link to="/app/reports" search={{ ...search, line: undefined, record: undefined }}>{reportLabel}</Link>{search.line && <> <span aria-hidden="true">›</span> <Link to="/app/reports" search={{ ...search, record: undefined }}>Back to the figure</Link></>}{r && <> <span aria-hidden="true">›</span> <span>{r.title}</span></>}</nav>
   if (!r) return <>{crumbs}<Loading error={error} what="the record" /></>
   return <>
     {crumbs}

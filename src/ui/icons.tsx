@@ -11,6 +11,8 @@ const PATHS: Record<string, string> = {
   alert: 'M12 4l9 16H3zM12 10v4M12 17h.01',
   ok: 'M5 12.5l4.5 4.5L19 7.5',
   upload: 'M12 16V4M7 9l5-5 5 5M4 20h16',
+  camera: 'M4 8h3.5L9 5.5h6L16.5 8H20v11H4zM12 10.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+  receipt: 'M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21zM9 8h6M9 12h6M9 16h3',
 }
 
 export function Icon({ name }: { name: string }) {

@@ -9,6 +9,7 @@ import { authResponse, runtimeBindings, type Bindings } from './auth.server'
 import { identity } from './identity'
 import { api } from './pantry/api'
 import { runDue } from './pantry/feeds/sync'
+import { emailHandler } from './pantry/receipts/mail'
 
 // Start documents keep their own cache policy and add no-transform, so no proxy
 // rewrites the HTML React hydrates (Cloudflare's email address obfuscation
@@ -36,5 +37,9 @@ export default withDemo({
   // Scheduled bank and card feed pulls: each connection is due every few hours, sooner after a webhook.
   async scheduled(_controller, env) {
     await runDue(runtimeBindings(env), 10)
+  },
+  // Cloudflare Email Routing delivers mail for the Pantry address here.
+  async email(message, env) {
+    await emailHandler(message, runtimeBindings(env))
   },
 } satisfies ExportedHandler<Bindings>, { seed: seedDemo })

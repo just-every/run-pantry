@@ -1,6 +1,7 @@
 // People & settings: the business, its declared policies, who has which role, and agent access.
 import { useState } from 'react'
 import { Action, Card, Chip, command, Details, Field, Form, PageHead, ROLE_LABEL, Table, day, useShared, type D } from './kit'
+import { ReceiptSettings } from './receipt-settings'
 
 const ENTITY_LABEL: Record<string, string> = { 'sole-proprietorship': 'Sole proprietorship', 'single-member-llc': 'Single-member LLC', 'multi-member-llc': 'Multi-member LLC', 's-corporation': 'S corporation', 'c-corporation': 'C corporation', partnership: 'Partnership' }
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -60,8 +61,8 @@ function Agents() {
 export function Settings() {
   const { state } = useShared()
   return <>
-    <PageHead title="People & settings" lead="The business these books belong to, who works in them, and agent access." />
+    <PageHead title="People & settings" lead="The business these books belong to, who works in them, agent access, and how receipts are read and received." />
     <Business />
-    {state.actor.can.owner && <><People /><Agents /></>}
+    {state.actor.can.owner && <><People /><Agents /><ReceiptSettings /></>}
   </>
 }
