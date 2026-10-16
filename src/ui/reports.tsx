@@ -36,16 +36,21 @@ function Ageing({ r }: { r: D }) {
   </>
 }
 
+const DAY = /^(\d{4})-(\d{2})-\d{2}$/
+// A date field's text is only used once it is a real YYYY-MM-DD; the package period is rebuilt from numbers.
+const isDay = (v: string) => DAY.test(v)
+const periodOf = (v: string) => { const m = DAY.exec(v); return `${String(Number(m![1])).padStart(4, '0')}-${String(Number(m![2])).padStart(2, '0')}` }
+
 export function Reports() {
   const [kind, setKind] = useState('Trial balance'), [to, setTo] = useState(today()), [from, setFrom] = useState(today().slice(0, 8) + '01')
   const slug = KINDS.find(k => k[0] === kind)![1], ranged = slug === 'general-ledger' || slug === 'profit-and-loss'
   const { data: r, error } = useView<D>(`reports/${slug}?to=${to}${ranged ? `&from=${from}` : ''}`)
-  const period = to.slice(0, 7)
+  const period = periodOf(to)
   return <>
     <PageHead title="Reports" lead="Every report is calculated from the same posted ledger."
       actions={<><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv`} download>General ledger CSV</a><a className="btn btn-primary" href={`/api/pantry/package/${period}`} download>Download accountant package</a></>} />
     <Tabs tabs={KINDS.map(k => k[0])} current={kind} onChange={setKind} pick="Report" />
-    <Card title={kind} actions={<div className="inline-fields">{ranged && <div className="field inline"><label htmlFor="r-from">From</label><input id="r-from" type="date" value={from} onChange={e => e.target.value && setFrom(e.target.value)} /></div>}<div className="field inline"><label htmlFor="r-to">{ranged ? 'To' : 'As of'}</label><input id="r-to" type="date" value={to} onChange={e => e.target.value && setTo(e.target.value)} /></div></div>}>
+    <Card title={kind} actions={<div className="inline-fields">{ranged && <div className="field inline"><label htmlFor="r-from">From</label><input id="r-from" type="date" value={from} onChange={e => isDay(e.target.value) && setFrom(e.target.value)} /></div>}<div className="field inline"><label htmlFor="r-to">{ranged ? 'To' : 'As of'}</label><input id="r-to" type="date" value={to} onChange={e => isDay(e.target.value) && setTo(e.target.value)} /></div></div>}>
       {!r ? <Loading error={error} what="the report" />
         : slug === 'trial-balance' ? <Trial r={r} />
         : slug === 'general-ledger' ? <Ledger r={r} />
