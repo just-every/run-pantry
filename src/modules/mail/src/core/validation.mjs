@@ -48,26 +48,25 @@ export function validateConfig(config, dependencies = {}) {
   return config;
 }
 
-// Linear-time split of `Name <email>` or a bare `email`, shaped like the match array it replaced (name at 1, angle email at 2, bare email at 3).
-function splitMailbox(text) {
-  const open = text.lastIndexOf('<');
-  if (open < 0) return /[<>]/.test(text) ? null : [text, undefined, undefined, text];
-  const name = text.slice(0, open).trimEnd();
-  const email = text.slice(open + 1, -1);
-  if (!text.endsWith('>') || !email || /[<>]/.test(email) || /[\n\r\u2028\u2029]/.test(name)) return null;
-  return [text, name, email];
-}
-
 export function parseAddress(value) {
   bounded(value, 998, 'invalid_address');
-  const match = splitMailbox(value.trim());
-  const email = (match?.[2] ?? match?.[3] ?? '').trim();
+  const text = value.trim();
+  let email = '', name;
+  if (text.endsWith('>')) {
+    // Display name, then the last '<' opens the angle address.
+    const open = text.lastIndexOf('<');
+    const inner = text.slice(open + 1, -1);
+    const display = text.slice(0, Math.max(open, 0)).trimEnd();
+    if (open >= 0 && inner && !inner.includes('>') && !/[\u2028\u2029]/.test(display)) {
+      email = inner.trim(); name = display;
+    }
+  } else if (text && !text.includes('<') && !text.includes('>')) email = text;
   // Conservative mailbox subset; never serialize multiple mailboxes as one.
   const parts = email.split('@');
   if (parts.length !== 2 || !parts[0] || parts[0].length > 64 || email.length > 254 ||
       !/^[^\s@<>(),:;"\\]+$/u.test(parts[0]) || parts[0].startsWith('.') || parts[0].endsWith('.') || parts[0].includes('..') ||
       !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(parts[1])) fail('invalid_address');
-  let name = match?.[1]?.trim();
+  name = name?.trim();
   if (name?.startsWith('"') && name.endsWith('"')) name = name.slice(1, -1);
   if (name && /[<>"\\]/.test(name)) fail('invalid_address');
   return name ? { email, name } : { email };
