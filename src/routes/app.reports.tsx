@@ -1,4 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Reports } from '../ui/reports'
+import { Reports, type ReportSearch } from '../ui/reports'
 
-export const Route = createFileRoute('/app/reports')({ component: Reports })
+// Which report, basis, period, figure and record are open lives in the address, so every level links and goes back.
+const KEYS = ['report', 'basis', 'from', 'to', 'line', 'record', 'year'] as const
+
+export const Route = createFileRoute('/app/reports')({
+  validateSearch: (s: Record<string, unknown>): ReportSearch => Object.fromEntries(KEYS.filter(k => s[k] !== undefined && s[k] !== '').map(k => [k, String(s[k])])),
+  component: Reports,
+})

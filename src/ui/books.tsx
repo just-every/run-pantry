@@ -34,14 +34,17 @@ function NewAccount() {
 }
 
 function TaxCodes() {
-  const { state, reload } = useShared()
+  const { state, reload } = useShared(), states = state.settings.choices.states.map((s: string) => ({ value: s, label: s }))
   return <Card title="Sales tax codes">
-    <p className="hint">Invoices need a tax code or “Exempt” on every line before approval. Rates are those your accountant confirms for your state.</p>
-    <Table heads={['Code', 'Rate', 'Liability account']} figures={[1]} empty="No sales tax codes. Lines can still be marked exempt.">
-      {state.taxCodes.map((t: D) => <tr key={t.id}><td>{t.name}</td><td className="fig">{(t.rate_milli_percent / 1000).toFixed(3)}%</td><td>{state.accounts.find((a: D) => a.id === t.account_id)?.name}</td></tr>)}
+    <p className="hint">Invoices need a tax code or “Exempt” on every line before approval. Rates are those your accountant confirms; each code belongs to the state it is collected for, which the sales tax report groups by.</p>
+    <Table heads={['Code', 'State', 'Rate', 'Liability account']} figures={[2]} empty="No sales tax codes. Lines can still be marked exempt.">
+      {state.taxCodes.map((t: D) => <tr key={t.id}><td>{t.name}</td>
+        <td>{state.actor.can.post ? <select aria-label={`State for ${t.name}`} value={t.state} onChange={async e => { await command('tax-code.save', { id: t.id, revision: t.revision, name: t.name, state: e.target.value }); await reload() }}>{!t.state && <option value="">Choose…</option>}{states.map((s: D) => <option key={s.value} value={s.value}>{s.label}</option>)}</select> : t.state || '—'}</td>
+        <td className="fig">{(t.rate_milli_percent / 1000).toFixed(3)}%</td><td>{state.accounts.find((a: D) => a.id === t.account_id)?.name}</td></tr>)}
     </Table>
     {state.actor.can.post && <Form label="Add tax code" submit={b => command('tax-code.save', b)} onDone={reload} className="grid-form">
       <Field label="Name" name="name" required /><Field label="Rate (%)" name="rate" required inputMode="decimal" />
+      <Field label="State" name="state" required defaultValue={state.settings.entity?.state} options={states} />
       <Field label="Liability account" name="accountId" required options={accountOptions(state.accounts, a => a.subtype === 'tax')} />
     </Form>}
   </Card>

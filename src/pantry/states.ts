@@ -1,0 +1,3 @@
+// Two-letter codes for the states, DC and the territories a US business may
+// collect sales tax in or pay a contractor in.
+export const STATES = 'AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY AS GU MP PR VI'.split(' ')

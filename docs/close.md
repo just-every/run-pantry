@@ -15,7 +15,7 @@ A check that fails shows **Not yet** with a link to the screen where you fix it.
 
 ## Review tasks
 
-Choose **Add the standard review tasks** to add reviewing the trial balance, the receivables and payables ageing and the adjusting entries, or add your own. Each person marks their task with **Mark done**, and Pantry records who did it and when.
+Choose **Add the standard review tasks** to add reviewing the trial balance, the receivables and payables aging and the adjusting entries, or add your own. Each person marks their task with **Mark done**, and Pantry records who did it and when.
 
 ## Lock the month
 
@@ -27,4 +27,4 @@ If a locked month must change, choose **Request reopening** and say why. Someone
 
 ## Hand over the month
 
-In **Reports**, choose **Download accountant package** for the month. It holds the business and its declared policies, the close checklist, the trial balance, profit and loss for the month and the year to date, the balance sheet, the ageing, the general ledger, each reconciliation with its proof, reversals, approvals, notes and an index of documents. **General ledger CSV** downloads the ledger alone.
+In **Reports**, choose **Download accountant package** for the month. It holds the business and its declared policies, the close checklist, the trial balance, profit and loss for the month and the year to date, the balance sheet, the aging, the general ledger, each reconciliation with its proof, reversals, approvals, notes and an index of documents. **General ledger CSV** downloads the ledger alone.

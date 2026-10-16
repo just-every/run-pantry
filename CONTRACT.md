@@ -454,7 +454,7 @@ These are decided and are not open questions:
 
 ## Homepage claims
 
-Every capability claimed on the owner-accepted homepage (desk build, branch `br/style`, 17 October 2026), in page order, mapped to the clauses that deliver it. The status is the claim's own: `done` where the claimed form runs today, otherwise what exists and what is missing.
+Every capability claimed on the owner-accepted homepage (desk build, branch `br/style`, 17 October 2026, with claim 42's copy as corrected on `main` in `22748ee`), in page order, mapped to the clauses that deliver it. The status is the claim's own: `done` where the claimed form runs today, otherwise what exists and what is missing.
 
 | # | Section | Claim | Clause(s) | Status |
 |---|---|---|---|---|
@@ -478,8 +478,8 @@ Every capability claimed on the owner-accepted homepage (desk build, branch `br/
 | 18 | Invoices | "Customers pay by card or ACH from the link" | PAY-001, INVOICE-003 | missing |
 | 19 | Invoices | "the payment matches itself" | PAY-003, PROC-001 | partial — matched by a person or an approved proposal |
 | 20 | Invoices | "Repeats monthly" | INVOICE-005, PAY-005 | missing |
-| 21 | Every number | "Every figure on your P&L opens to the bills, receipts and transactions behind it" | REPORT-005 | partial — general ledger lists every posted line |
-| 22 | Every number | "Cash or accrual, one switch" | REPORT-002 | partial — tax method recorded; cash-basis reports missing |
+| 21 | Every number | "Every figure on your P&L opens to the bills, receipts and transactions behind it" | REPORT-005 | done for the P&L and balance sheet: every figure opens to its postings, records, documents and bank lines (`tests/api/reports.test.mjs`); REPORT-005 stays partial for the other reports and export at each level |
+| 22 | Every number | "Cash or accrual, one switch" | REPORT-002 | done for the trial balance, general ledger, P&L, balance sheet and sales tax (`tests/api/reports.test.mjs`); REPORT-002 stays partial for the other reports, the dashboard and PDF labels |
 | 23 | Books agent | "Pantry follows up on what doesn't add up" ("Asked Maya by text") | AGENT-002, NOTIFY-001 | partial — the owner's agent files proposals; Pantry does not contact anyone |
 | 24 | Books agent | "shows you the change before anything moves" (Approve / Not now) | PAN-15, AGENT-003 | partial — every proposal waits for approval (PAN-15, done); the before/after preview is AGENT-003 |
 | 25 | Month-end close | "Reconcile" | PAN-09, BANK-005 | done (PAN-09) |
@@ -489,7 +489,7 @@ Every capability claimed on the owner-accepted homepage (desk build, branch `br/
 | 29 | Interlude | "Books up to date · Oct 31" | PAN-13, REPORT-008 | done (PAN-13 close status per period); the dashboard line is REPORT-008 |
 | 30 | Connected | "Payouts split into sales and fees" (Stripe) | PROC-001 | partial — manual deposit-and-fee match only |
 | 31 | Connected | "payroll posts as one balanced entry" (Gusto) | PAYROLL-001, CONNECT-001 | missing |
-| 32 | Connected | "sales tax tracks by state" | SALESTAX-001, SALESTAX-002 | partial — tax codes per invoice line; no report by state |
+| 32 | Connected | "sales tax tracks by state" | SALESTAX-001, SALESTAX-002 | done: sales tax by state and code, tied to each liability account (`tests/api/reports.test.mjs`); address-based rates and filing remain partial |
 | 33 | Move in | "Move from QuickBooks Online" | PAN-16, MIGRATE-001 | done (PAN-16) |
 | 34 | Move in | "or Xero" | MIGRATE-002 | missing |
 | 35 | Move in | "with balances, open invoices" | PAN-16, MIGRATE-001, MIGRATE-002 | done (PAN-16 for QuickBooks Online) |
@@ -499,7 +499,7 @@ Every capability claimed on the owner-accepted homepage (desk build, branch `br/
 | 39 | Ownership | "keep every record" / "Your books, your database" | OWN-001, PAN-14 | done |
 | 40 | Ownership | "Export everything, any time" | PAN-14 | done |
 | 41 | Quiet details | Bank rules: "routine transactions file themselves" | RULE-002 | missing |
-| 42 | Quiet details | 1099 tracking: "Contractors flagged at $600, forms ready in January" | TAXFORM-001, TAXFORM-002 | missing — TAXFORM-002 keeps the threshold per tax year: $600 applies to payments made in 2025 and $2,000 from 2026, so the "$600" copy needs the owner's attention |
+| 42 | Quiet details | 1099 tracking: "Contractors flagged at the IRS threshold ($2,000 from 2026), forms ready in January" | TAXFORM-001, TAXFORM-002, CONNECT-003 | done for tracking, flags at the tax year's threshold and the January forms and filing CSV (`tests/api/reports.test.mjs`); W-9 requests and IRIS filing are partial |
 | 43 | Quiet details | Audit trail: "who, what and when" | AUDIT-001 | done for who, what and when; AUDIT-001's filters and before/after values are partial |
 | 44 | Quiet details | Locked periods: "Closed months stay closed" | PAN-13 | done |
 | 45 | Quiet details | Attachments everywhere: "Every entry keeps its receipt or bill" | PAN-03, PAN-05, CAPTURE-004, CAPTURE-008 | partial — documents link to bills, invoices and journals; not required on every entry |
@@ -508,13 +508,13 @@ Every capability claimed on the owner-accepted homepage (desk build, branch `br/
 
 ## Status
 
-Judged from the code and tests at commit `bdbdad0` (17 October 2026). The code audit's baseline was `bbbe289`; no file under `src/pantry`, `tests`, `migrations` or `scripts` changed between the two, so its findings carry over. `done` means the stated behaviour has cited code and a test through a public door. `partial` cites the shipped subset and names what remains. `missing` means the target capability has no implementation. Cited tests were read for this documentation round, not re-run, and a cited local test is not hosted, provider, accountant or tax acceptance. The ledger-foundation IDs keep their two-digit form (PAN-01 to PAN-16) because code, tests, `seed.json` and ACCEPTANCE.md name them.
+Judged from the code and tests at commit `56716f2` (17 October 2026). The code audit's baseline was `bbbe289`. Between the two, `src/pantry`, `src/ui`, `migrations` and `tests` changed only for cash or accrual reports, report drill-through, sales tax by state and 1099 contractors (with payment methods recorded on payments), apart from spelling fixes, so REPORT-002, REPORT-004, REPORT-005, SALESTAX-001, SALESTAX-002, TAXFORM-001, TAXFORM-002, VENDOR-001 and CONNECT-003 were re-judged from that code and `tests/api/reports.test.mjs`; every other finding carries over. `done` means the stated behaviour has cited code and a test through a public door. `partial` cites the shipped subset and names what remains. `missing` means the target capability has no implementation. Cited tests were read for this documentation round, not re-run, and a cited local test is not hosted, provider, accountant or tax acceptance. The ledger-foundation IDs keep their two-digit form (PAN-01 to PAN-16) because code, tests, `seed.json` and ACCEPTANCE.md name them.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 16 | 0 | 0 | 16 |
-| Target and push further | 2 | 41 | 68 | 111 |
-| All | 18 | 41 | 68 | 127 |
+| Target and push further | 2 | 45 | 64 | 111 |
+| All | 18 | 45 | 64 | 127 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -577,23 +577,23 @@ Judged from the code and tests at commit `bdbdad0` (17 October 2026). The code a
 | `BILLPAY-001` | Pay bills through a provider | target | missing |  | No implementation; Pantry records payments made elsewhere (PAN-06). |
 | `BILLPAY-002` | Payment fraud controls | target | missing |  | No implementation. |
 | `CHECK-001` | Write and print checks | target | missing |  | No implementation. |
-| `VENDOR-001` | Vendor records with the whole history | target | partial | `src/pantry/contacts.ts`, `src/pantry/payables.ts` | Vendors with terms and linked bills exist; 1099 fields, W-9 status, history view and spend by period do not. |
+| `VENDOR-001` | Vendor records with the whole history | target | partial | `src/pantry/contacts.ts`, `src/pantry/payables.ts`, `src/pantry/contractors.ts` | Vendors with terms, linked bills, 1099 status and a TIN masked to its last four exist; the 1099-MISC box choice, W-9 request status, the history view, spend by period and step-up reveal do not. |
 | `PROC-001` | Stripe payouts split into sales and fees | target | partial | `src/pantry/matching.ts`, `tests/api/bank.test.mjs` | A person can match one deposit to several receipts and add the fee the books lack; no Stripe connection or payout journal exists. |
 | `PROC-002` | Square, PayPal and Shopify | target | missing |  | No implementation. |
 | `PROC-003` | Clearing accounts never hide money | target | missing |  | No implementation. |
 | `PAYROLL-001` | Payroll posts as one balanced entry | target | missing |  | No implementation; payroll can only be posted as a manual journal (PAN-10). |
 | `PAYROLL-002` | Payroll liabilities reconciled | target | missing |  | No implementation. |
-| `SALESTAX-001` | Sales tax rates by address | target | partial | `src/pantry/invoices.ts`, `src/pantry/accounts.ts`, `tests/api/subledgers.test.mjs` | Business-entered tax codes and rates per line, with approval stopped on an undecided line; address-based rates, jurisdictions and tax services do not exist. |
-| `SALESTAX-002` | Liability by state and filing | target | missing |  | No implementation. |
+| `SALESTAX-001` | Sales tax rates by address | target | partial | `src/pantry/invoices.ts`, `src/pantry/accounts.ts`, `src/pantry/sales-tax.ts`, `tests/api/subledgers.test.mjs` | Business-entered tax codes, each belonging to a state, with rates per line and approval stopped on an undecided line; address-based rates, local jurisdictions, state-published rate sources and tax services do not exist. |
+| `SALESTAX-002` | Liability by state and filing | target | partial | `src/pantry/sales-tax.ts`, `src/ui/sales-tax.tsx`, `tests/api/reports.test.mjs` | Taxable sales, tax charged, collected and owed by state and code for any period, on either basis, tied to each sales tax liability account; local jurisdictions, the filing calendar, recorded returns with PDF and payment, partner filing, approved adjustments and the filed-period lock do not exist. |
 | `SALESTAX-003` | Exemption certificates | target | partial | `src/pantry/invoices.ts`, `tests/api/subledgers.test.mjs` | A line can be marked exempt; certificates, covered states and expiry do not exist. |
 | `SALESTAX-004` | Economic nexus watch | target | missing |  | No implementation. |
-| `TAXFORM-001` | W-9 collection | target | missing |  | No implementation. |
-| `TAXFORM-002` | 1099 tracking and e-filing | target | missing |  | No implementation; no 1099 code. |
+| `TAXFORM-001` | W-9 collection | target | partial | `src/pantry/contractors.ts`, `src/ui/contractors.tsx`, `migrations/core/0017_pantry_reports.sql`, `tests/api/reports.test.mjs` | A person records a contractor's legal name, TIN and address, masked to its last four everywhere except the audited filing CSV; the secure W-9 request link with online certification or signed upload, encryption at rest, step-up reveal, the list of vendors paid without a W-9 and the backup-withholding flag do not exist. |
+| `TAXFORM-002` | 1099 tracking and e-filing | target | partial | `src/pantry/contractors.ts`, `src/ui/contractors.tsx`, `tests/api/reports.test.mjs` | Calendar-year 1099-NEC box 1 totals by payment method with card and payment-network payments left out, the per-year threshold table and, after year end, the forms and a filing CSV ship; 1099-MISC boxes, IRIS filing (CONNECT-003), Combined Federal/State Filing and state filings, recipient e-delivery and corrections do not. |
 | `REPORT-001` | Financial statements with comparisons | target | partial | `src/pantry/reports.ts`, `tests/api/close.test.mjs` | Single-period P&L and balance sheet ship; comparison columns and splits by customer or dimension do not. |
-| `REPORT-002` | Cash or accrual, one switch | target | partial | `src/pantry/settings.ts` | The declared tax method is recorded; cash-basis reports are not built. |
+| `REPORT-002` | Cash or accrual, one switch | target | partial | `src/pantry/basis.ts`, `src/pantry/reports.ts`, `src/pantry/package.ts`, `docs/reports.md`, `tests/api/reports.test.mjs` | Trial balance, general ledger, P&L with an accrual-to-cash bridge, balance sheet and sales tax switch basis, partial payments spread across lines and tax, and the basis is named on the GL CSV and package; cash basis on sales by customer, expenses by vendor and the dashboard, and the basis label on PDF exports, do not exist. |
 | `REPORT-003` | Statement of cash flows | target | missing |  | No implementation. |
-| `REPORT-004` | The everyday report library | target | partial | `src/pantry/reports.ts`, `src/pantry/api.ts`, `tests/api/close.test.mjs` | Trial balance, general ledger and receivables/payables ageing ship; the other listed reports do not. |
-| `REPORT-005` | Every figure opens to its source | target | partial | `src/pantry/reports.ts`, `src/ui/reports.tsx` | The general ledger lists every posted line by account; report figures do not open to their lines, transactions or documents. |
+| `REPORT-004` | The everyday report library | target | partial | `src/pantry/reports.ts`, `src/pantry/sales-tax.ts`, `src/pantry/contractors.ts`, `src/pantry/api.ts`, `tests/api/close.test.mjs`, `tests/api/reports.test.mjs` | Trial balance, general ledger, receivables and payables ageing, sales tax liability and the 1099 summary ship; detail ageing, open invoices and unpaid bills, customer and vendor balances, sales by customer and item, expenses by vendor, transaction lists, the journal, deposit and check detail, reconciliation reports and the audit report do not. |
+| `REPORT-005` | Every figure opens to its source | target | partial | `src/pantry/drilldown.ts`, `src/pantry/records.ts`, `src/ui/report-detail.tsx`, `tests/api/reports.test.mjs` | Every P&L and balance sheet figure opens to its postings or cash-basis shares, each record with its lines, entries, linked records, documents and matched bank lines, adding up to the figure; drill-through from the other reports, provider events, approval and audit history on the record, filters carried through and export at each level do not exist. |
 | `REPORT-006` | Custom reports and management packages | target | missing |  | No implementation. |
 | `REPORT-007` | Export and scheduled delivery | target | partial | `src/pantry/package.ts`, `src/pantry/api.ts` | The general ledger downloads as CSV and the accountant package as JSON; PDF and Excel export and scheduled delivery do not exist. |
 | `REPORT-008` | A dashboard that says what needs doing | target | partial | `src/pantry/views.ts`, `src/ui/overview.tsx` | A setup-and-progress overview ships; cash from feeds, money in/out, trend, waiting-work tiles and "books up to date through" do not. |
@@ -623,7 +623,7 @@ Judged from the code and tests at commit `bdbdad0` (17 October 2026). The code a
 | `INTEG-002` | One connections page, and automation platforms | target | missing |  | No implementation. |
 | `CONNECT-001` | Every provider connects in production without a developer account | target | missing |  | No implementation; Pantry has no outside connections, so no production path exists for any provider. |
 | `CONNECT-002` | Pantry Connect, the connection broker | target | missing |  | No implementation; no Pantry Connect broker, partner approvals or relay exist. |
-| `CONNECT-003` | A 1099 filing route without a transmitter code of one's own | target | missing |  | No implementation; no IRIS transmitter route or IRIS Taxpayer Portal CSV output exists. |
+| `CONNECT-003` | A 1099 filing route without a transmitter code of one's own | target | partial | `src/pantry/contractors.ts`, `tests/api/reports.test.mjs` | A 1099-NEC filing CSV with full TINs is produced after year end in Pantry's own columns; the IRS IRIS Taxpayer Portal template, Pantry Connect as an IRIS transmitter with annual ATS, acknowledgements, corrections and state filings do not exist. |
 | `CONNECT-004` | Fees, steps and data shown before connecting | target | missing |  | No implementation; no connect dialog, fee table or fee confirmation exists. |
 | `MOBILE-001` | Every screen works on a phone browser | target | done | `src/ui/`, `tests/browser/journey.mjs`, `tests/browser/run.mjs` |  |
 | `MOBILE-002` | Native iOS and Android apps | target | missing |  | No implementation. |

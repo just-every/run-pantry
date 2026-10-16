@@ -8,7 +8,7 @@ export const identity: EditionIdentity = {
   product: branding.name,
   deployment: branding.name,
   purpose: '{deployment} keeps one business\'s books: ledger, bank reconciliation and the month-end close.',
-  tagline: 'Books and close for one US business, with an accountant-ready package.',
+  tagline: 'Know where every dollar went. Free, open source accounting for US small businesses.',
   signInPath: '/signin',
   // The run site `rer deploy --site` publishes (deploy-site.json).
   runSite: `https://${site.domain}`,

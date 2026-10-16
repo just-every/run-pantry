@@ -24,7 +24,7 @@ const saveEntity: Command = { need: 'owner', async run(c, b) {
   const entityType = text(b.entityType, 'Entity type')
   requireThat(ENTITY_TYPES.includes(entityType), 'Choose an entity type')
   const state = text(b.state, 'State')
-  requireThat(STATES.includes(state), 'Choose the state the business is organised in')
+  requireThat(STATES.includes(state), 'Choose the state the business is organized in')
   const fy = Number(b.fiscalYearStart)
   requireThat(Number.isInteger(fy) && fy >= 1 && fy <= 12, 'Fiscal year start must be a month (1–12)')
   const taxMethod = text(b.taxMethod, 'Tax accounting method')

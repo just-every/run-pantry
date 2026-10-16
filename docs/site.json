@@ -3,7 +3,7 @@
     {
       "title": "Start here",
       "pages": [
-        { "slug": "getting-started", "title": "Getting started", "file": "getting-started.md", "summary": "Start Pantry on your own computer with one line, sign in as the owner and finish setup." },
+        { "slug": "getting-started", "title": "Getting started", "file": "getting-started.md", "summary": "Start Pantry on your own computer in two lines, sign in as the owner and finish setup." },
         { "slug": "first-month", "title": "Your first month", "file": "first-month.md", "summary": "The five setup steps on Overview, from the business details to your first close." }
       ]
     },
@@ -13,6 +13,7 @@
         { "slug": "sales-and-bills", "title": "Sales and bills", "file": "sales-and-bills.md", "summary": "Draft, approve and issue invoices and credits, record bills with their receipts, and record payments." },
         { "slug": "reconcile", "title": "Reconcile a bank statement", "file": "reconcile.md", "summary": "Import a CSV or OFX statement, match each line to your books, and finish when the difference is $0.00." },
         { "slug": "journals", "title": "Journals and corrections", "file": "journals.md", "summary": "Prepare a balanced entry, have someone else post it, and correct a posted entry with a reversal." },
+        { "slug": "reports", "title": "Reports, cash or accrual", "file": "reports.md", "summary": "Open any figure to its records, switch between cash and accrual, report sales tax by state and track 1099 contractors." },
         { "slug": "close", "title": "Close the month", "file": "close.md", "summary": "Pass the checklist, finish the review tasks, lock the month and download the accountant package." },
         { "slug": "agent-work", "title": "Agent work", "file": "agent-work.md", "summary": "Give the agent you already use a token; it proposes matches and entries and a person approves each one." }
       ]

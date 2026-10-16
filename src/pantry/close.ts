@@ -8,7 +8,7 @@ import { ageing, trialBalance } from './reports'
 import { requireEntity } from './settings'
 import type { Command } from './context'
 
-const DEFAULT_TASKS = ['Review the trial balance', 'Review receivables and payables ageing', 'Review adjusting entries']
+const DEFAULT_TASKS = ['Review the trial balance', 'Review receivables and payables aging', 'Review adjusting entries']
 
 export async function closeState(db: D1Database, id: string): Promise<Data> {
   const { start, end } = monthBounds(id)

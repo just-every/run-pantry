@@ -1,8 +1,11 @@
 import { links } from './links'
 
-/** One line: the name, the licence and the source. */
-export function SiteFooter() {
-  return <footer className="site-footer">
-    <div className="site-wrap"><p>Pantry · MIT licensed · <a href={links.source}>Source</a></p></div>
+/** One line: the lockup, then Docs, Source and the licence. `tone="on-art"` is the homepage's, over the closing painting. */
+export function SiteFooter({ tone = 'paper' }: { tone?: 'paper' | 'on-art' }) {
+  return <footer className={`site-footer ${tone}`}>
+    <div className="site-wrap"><div>
+      <a className="site-brand" href={links.home}><img src={tone === 'on-art' ? '/brand/mark-light.svg' : '/brand/mark.svg'} alt="" width="22" height="22" /><span>Pantry</span></a>
+      <nav aria-label="Footer"><a href={links.docs}>Docs</a><a href={links.source}>Source</a><a href={`${links.source}/blob/main/LICENSE`}>MIT licensed</a></nav>
+    </div></div>
   </footer>
 }
