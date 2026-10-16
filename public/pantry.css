@@ -324,8 +324,8 @@ ul.plain li:last-child { border-bottom: 0; }
 /* Bank feeds, transactions filed by rule, rules and the connect page. */
 .feed + .feed { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
 .feed-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
-.feed .callout { margin: 8px 0 12px; }
-.feed .callout > div { flex: 1 1 220px; }
+.callout.relink > div { flex: 1 1 220px; }
+.callout.relink > .action { align-self: center; }
 .feed-accounts { list-style: none; margin: 0; padding: 0; }
 .feed-accounts li { display: flex; flex-direction: column; padding: 8px 0; border-top: 1px solid var(--line); }
 .feed-accounts li:first-child { border-top: 0; }
