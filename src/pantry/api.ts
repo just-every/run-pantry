@@ -28,10 +28,17 @@ import { salesTax } from './sales-tax'
 import { contractorCommands, contractors, necCsv } from './contractors'
 import { accountantPackage, ledgerCsv } from './package'
 import { activity, actorView, documents, lookups, overview } from './views'
+import { ruleCommands, rulesView } from './rules'
+import { bankLinesView } from './bank-lines'
+import { feedCommands, feedsView } from './feeds/commands'
+import { anyDue, runDue, syncItem } from './feeds/sync'
+import { receive, verify } from './feeds/webhook'
+import { availability } from './feeds/plaid'
 
 const commands: Record<string, Command> = {
   ...settingsCommands, ...accountCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands,
   ...bankCommands, ...matchCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
+  ...ruleCommands, ...feedCommands,
 }
 
 type C = HonoContext<{ Bindings: Bindings }>
@@ -39,6 +46,8 @@ export const api = new Hono<{ Bindings: Bindings }>()
 
 api.get('/health', c => c.json({ status: 'ok', ...deploymentHealth(c.env) }))
 api.use('/api/pantry/*', async (c, next) => { await next(); c.header('cache-control', 'no-store'); c.header('x-content-type-options', 'nosniff') })
+// Feed syncs that have come due run after an ordinary read answers, as well as on the Cron trigger.
+api.use('/api/pantry/*', async (c, next) => { await next(); if (c.req.method === 'GET' && await anyDue(c.env)) c.executionCtx.waitUntil(runDue(c.env, 2).catch(e => console.error(e))) })
 api.onError((e, c) => e instanceof Fault ? c.json({ error: e.message }, e.status as 400) : (console.error(e), c.json({ error: 'Unexpected error; check the server log' }, 500)))
 
 async function reader(c: C): Promise<Context> {
@@ -54,6 +63,9 @@ view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await look
 view('journal', async ctx => ({ entries: await journalView(ctx.db) }))
 view('sales', async ctx => ({ invoices: await invoicesView(ctx.db), bills: await billsView(ctx.db), payments: await paymentsView(ctx.db) }))
 view('bank', async ctx => bankView(ctx.db))
+view('bank/lines', async ctx => bankLinesView(ctx.db))
+view('bank/rules', async ctx => rulesView(ctx.db))
+view('bank/feeds', async ctx => feedsView(ctx))
 view('reconciliation/:statement', async (ctx, c) => reconciliationState(ctx.db, c.req.param('statement')!))
 view('close/:period', async (ctx, c) => closeState(ctx.db, c.req.param('period')!))
 view('proposals', async ctx => ({ proposals: await proposalsView(ctx.db) }))
@@ -119,6 +131,18 @@ api.post('/api/pantry/command/:op', async c => {
   const body = await c.req.json().catch(() => { throw new Fault(400, 'Send a JSON object') })
   requireThat(body && typeof body === 'object' && !Array.isArray(body), 'Send a JSON object')
   return c.json(await command.run({ db: c.env.DB, env: c.env, request: c.req.raw, actor }, body as Data))
+})
+
+// Plaid's webhook: verified by its signature, never by a session. It marks work due; the sync runs after the answer.
+api.post('/api/pantry/feeds/plaid/webhook', async c => {
+  const a = availability(c.env)
+  requireThat(a.available, a.available ? '' : a.reason, 503)
+  const body = await c.req.text()
+  requireThat(body.length <= 100_000, 'Request too large', 413)
+  await verify(c.env, c.req.header('plaid-verification') ?? null, body)
+  const item = await receive(c.env, (() => { try { return JSON.parse(body) } catch { throw new Fault(400, 'Send a JSON object') } })())
+  if (item) c.executionCtx.waitUntil(syncItem(c.env, item, 'webhook').catch(e => console.error(e)))
+  return c.json({ ok: true })
 })
 
 // Agents: read context, file proposals, follow their outcome. Nothing else.

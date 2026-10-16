@@ -7,7 +7,7 @@ import { STATES } from './states'
 
 export const TYPES = ['asset', 'liability', 'equity', 'income', 'expense'] as const
 export const SUBTYPES = ['bank', 'receivable', 'payable', 'tax', 'retained', 'other'] as const
-const SUBTYPE_TYPE: Record<string, string> = { bank: 'asset', receivable: 'asset', payable: 'liability', tax: 'liability', retained: 'equity' }
+const SUBTYPE_TYPE: Record<string, string> = { receivable: 'asset', payable: 'liability', tax: 'liability', retained: 'equity' }
 
 /** A small service-business chart a person can start from and edit. */
 export const SERVICE_CHART: [string, string, string, string][] = [
@@ -36,6 +36,8 @@ export function accountRow(b: Data) {
   requireThat((TYPES as readonly string[]).includes(type), 'Account type is asset, liability, equity, income or expense')
   const subtype = optionalText(b.subtype, 'Account role') || 'other'
   requireThat((SUBTYPES as readonly string[]).includes(subtype), 'Unknown account role')
+  // A bank role is an asset (checking, savings) or a liability (a business credit card).
+  requireThat(subtype !== 'bank' || type === 'asset' || type === 'liability', 'A bank or card account must be an asset or liability account')
   requireThat(!SUBTYPE_TYPE[subtype] || SUBTYPE_TYPE[subtype] === type, `A ${subtype} account must be a${SUBTYPE_TYPE[subtype] === 'asset' ? 'n' : ''} ${SUBTYPE_TYPE[subtype]} account`)
   return { code, name: text(b.name, 'Account name', 200), type, subtype, description: optionalText(b.description, 'Description', 500) }
 }

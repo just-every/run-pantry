@@ -6,6 +6,7 @@ import { all, audit, guard, one, q, run, type Sql } from './db'
 import { account } from './accounts'
 import { documentInsert } from './contacts'
 import { parseCsvStatement, parseOfxStatement, type ParsedStatement } from './statement-files'
+import { applyRulesAs } from './rules'
 import type { Command } from './context'
 
 const saveBankAccount: Command = { need: 'record', async run(c, b) {
@@ -65,15 +66,25 @@ const importStatement: Command = { need: 'record', async run(c, b) {
     return { ...l, fingerprint: l.fitid ? base : `${base}#${n}` }
   }))
   const known = new Set((await all<{ fingerprint: string }>(c.db, 'SELECT fingerprint FROM pt_bank_lines WHERE bank_account_id = ?', bank.id)).map(r => r.fingerprint))
-  const fresh = keyed.filter(l => !known.has(l.fingerprint))
+  // A line the feed already brought in (same day, same amount) is this file's line: it joins the statement instead of repeating.
+  const feed = await all(c.db, "SELECT id, posted_date, amount_cents FROM pt_bank_lines WHERE bank_account_id = ? AND source = 'feed' AND statement_id IS NULL AND removed_at IS NULL AND posted_date BETWEEN ? AND ? ORDER BY id", bank.id, start, end)
+  const fresh: (typeof keyed[number] & { id: string; feedLineId?: string })[] = []
+  for (const l of keyed.filter(l => !known.has(l.fingerprint))) {
+    const k = feed.findIndex(f => f.posted_date === l.date && f.amount_cents === l.amount)
+    fresh.push({ ...l, id: k >= 0 ? feed[k].id : uid(), feedLineId: k >= 0 ? feed[k].id : undefined })
+    if (k >= 0) feed.splice(k, 1)
+  }
+  const added = fresh.filter(l => !l.feedLineId), fromFeed = fresh.length - added.length
   const id = uid(), doc = await documentInsert(c, { name, mediaType: format === 'ofx' ? 'application/x-ofx' : 'text/csv', bytes: new TextEncoder().encode(content), linkedKind: 'statement', linkedId: id })
   const statements: Sql[] = [authority(c.actor, 'record'), doc.statement,
     q('INSERT INTO pt_statements (id, bank_account_id, format, source_name, source_sha256, start_date, end_date, opening_cents, closing_cents, line_count, duplicate_count, document_id, imported_by, imported_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      id, bank.id, format, name, hash, start, end, opening, closing, fresh.length, keyed.length - fresh.length, doc.id, c.actor.email, now()),
-    ...fresh.map(l => q('INSERT INTO pt_bank_lines (id, statement_id, bank_account_id, posted_date, amount_cents, description, reference, fingerprint) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', uid(), id, bank.id, l.date, l.amount, l.description, l.reference, l.fingerprint)),
-    audit(who(c.actor), 'statement.import', 'statement', id, { file: name, sha256: hash, added: fresh.length, duplicates: keyed.length - fresh.length })]
+      id, bank.id, format, name, hash, start, end, opening, closing, added.length, keyed.length - added.length, doc.id, c.actor.email, now()),
+    ...added.map(l => q("INSERT INTO pt_bank_lines (id, statement_id, bank_account_id, posted_date, amount_cents, description, reference, fingerprint, source, arrived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'file', ?)", l.id, id, bank.id, l.date, l.amount, l.description, l.reference, l.fingerprint, now())),
+    ...fresh.filter(l => l.feedLineId).map(l => q('UPDATE pt_bank_lines SET statement_id = ?, fingerprint = ? WHERE id = ? AND statement_id IS NULL', id, l.fingerprint, l.feedLineId)),
+    audit(who(c.actor), 'statement.import', 'statement', id, { file: name, sha256: hash, added: added.length, duplicates: keyed.length - fresh.length, fromFeed })]
   await run(c.db, statements)
-  return { statement: await one(c.db, 'SELECT * FROM pt_statements WHERE id = ?', id), duplicate: false, added: fresh.length, duplicates: keyed.length - fresh.length, fileBalances: { opening, closing, lineTotal: total, agrees: closing - opening === total } }
+  const filed = await applyRulesAs(c, added.map(l => l.id))
+  return { statement: await one(c.db, 'SELECT * FROM pt_statements WHERE id = ?', id), duplicate: false, added: added.length, duplicates: keyed.length - fresh.length, fromFeed, filedByRule: filed.filed, fileBalances: { opening, closing, lineTotal: total, agrees: closing - opening === total } }
 } }
 
 /** Correct balances typed from a CSV statement before it is reconciled; the lines stay as imported. */

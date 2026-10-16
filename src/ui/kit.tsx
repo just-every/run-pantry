@@ -88,12 +88,12 @@ export function Table({ heads, figures = [], children, empty, caption }: { heads
     <tbody>{rows.length ? rows.map(r => labelled(r, heads)) : <tr className="empty"><td colSpan={heads.length}><Empty>{empty ?? 'Nothing here yet.'}</Empty></td></tr>}</tbody></table></div>
 }
 
-export function Field({ label, name, type = 'text', defaultValue, required = false, options, hint, error, wide, ...rest }: {
-  label: string; name: string; type?: string; defaultValue?: any; required?: boolean; options?: { value: string; label: string }[]; hint?: string; error?: string; wide?: boolean; [k: string]: any
+export function Field({ label, name, type = 'text', defaultValue, required = false, options, hint, error, wide, empty = 'Choose…', ...rest }: {
+  label: string; name: string; type?: string; defaultValue?: any; required?: boolean; options?: { value: string; label: string }[]; hint?: string; error?: string; wide?: boolean; empty?: string; [k: string]: any
 }) {
   const id = useId(), initial = 'value' in rest ? {} : { defaultValue: defaultValue ?? (options ? '' : undefined) }
   const control = options
-    ? <select id={id} name={name} {...initial} required={required} aria-invalid={error ? true : undefined} {...rest}><option value="">Choose…</option>{options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
+    ? <select id={id} name={name} {...initial} required={required} aria-invalid={error ? true : undefined} {...rest}><option value="">{empty}</option>{options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
     : type === 'textarea' ? <textarea id={id} name={name} {...initial} required={required} {...rest} />
     : <input id={id} name={name} type={type} {...initial} required={required} aria-invalid={error ? true : undefined} {...rest} />
   return <div className={`field${wide ? ' field-wide' : ''}`}><label htmlFor={id}>{label}</label>{control}{hint && <small className="hint">{hint}</small>}{error && <small className="error">{error}</small>}</div>

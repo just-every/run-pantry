@@ -1,6 +1,6 @@
 # Pantry homepage claims → code (run-site gate table)
 
-Branch `br/style` on just-every/run-pantry, 17 Oct 2026; rows 21, 22, 32 and 42 updated on 17 Oct 2026 when their code landed (sd-pantry-reports). Every capability the homepage states, in page order, with the code that backs it today or **contract, not yet in code**. The copy is the design desk's (owner-accepted 16 Oct 2026) and is not watered down; this table is what the run-site gate reads before any deploy.
+Branch `br/style` on just-every/run-pantry, 17 Oct 2026; rows 21, 22, 32 and 42 updated on 17 Oct 2026 when their code landed (sd-pantry-reports); rows 1, 7, 12, 13, 14 and 41 updated on 17 Oct 2026 when bank rules and feeds landed (sd-pantry-bank). Every capability the homepage states, in page order, with the code that backs it today or **contract, not yet in code**. The copy is the design desk's (owner-accepted 16 Oct 2026) and is not watered down; this table is what the run-site gate reads before any deploy.
 
 Note on "the contract": the brief describes Pantry's new contract (connected US small-business accounting replacing QuickBooks Online, Xero and FreshBooks). `CONTRACT.md` on `main` (last changed in v0.1.0, 7435b66) is still the first-release contract, which lists live bank feeds, payment initiation, invoice email, payroll and cash-basis reports under "Not in the first release". So every "contract, not yet in code" row below is backed only by the brief's description of the new contract, not by a file on `main`.
 
@@ -8,20 +8,20 @@ Status key: **code** = the capability exists and runs today; **partial** = a nar
 
 | # | Section | Claim on the page | Status | Code path / what exists |
 |---|---|---|---|---|
-| 1 | Hero | "pulls in your bank and cards" | partial | CSV/OFX statement import per bank account: `src/pantry/bank.ts`, `src/pantry/statement-files.ts` (PAN-07). No live bank or card feed. |
+| 1 | Hero | "pulls in your bank and cards" | code | Live bank and card feeds through Plaid beside CSV/OFX statement import: `src/pantry/feeds/` (Link, account mapping, `/transactions/sync`), `src/pantry/bank.ts`, `src/pantry/statement-files.ts`; a card is a bank-role liability account. Runs on installations holding their own Plaid keys (optional `PLAID_CLIENT_ID`/`PLAID_SECRET` deploy secrets); on RER Managed the feeds say "not available yet" until its egress relay ships. Proven with Plaid's documented responses as recorded fixtures at the network edge (`tests/api/feeds.test.mjs`); the live Plaid sandbox journey waits on the Plaid keys. |
 | 2 | Hero | "catches every receipt" | partial | Source documents kept byte for byte with SHA-256 and linked to records: `src/pantry/contacts.ts` (`documentInsert`), bills with evidence and the close exception for a bill without one: `src/pantry/payables.ts`, `src/pantry/close.ts`. No capture by photo or email. |
 | 3 | Hero | "gets invoices paid" | partial | Invoices drafted, approved by a second person and issued: `src/pantry/invoices.ts`; payments received recorded and allocated: `src/pantry/payables.ts` (PAN-04, PAN-06). Pantry does not send invoices or collect money. |
 | 4 | Hero | "closes the month with your accountant" | code | Close checklist, review tasks by named people, lock by the lock grant, reopen with a second approver: `src/pantry/close.ts`; accountant role and grants: `src/pantry/access.ts` (PAN-13). |
 | 5 | Hero | "100% free, open source" | code | `LICENSE` (MIT). |
 | 6 | Hero cards | Net income · October with its lines (P&L) | code | `src/pantry/reports.ts` (`profitAndLoss`), screen `src/ui/reports.tsx`. |
-| 7 | Hero cards | Chase Business ••4417 feed, 2,847 transactions | contract | Statement lines exist only from imported files (row 1). |
+| 7 | Hero cards | Chase Business ••4417 feed, 2,847 transactions | code | Each connected account shows its feed, last sync and bank balance in **Bank → Bank and card feeds** (`src/ui/bank-feeds.tsx`, `src/pantry/feeds/commands.ts`); lines arrive under **Transactions**. As row 1 for where it runs. |
 | 8 | Hero cards | Home Depot receipt read into vendor, date, category | contract | Documents are stored as evidence (row 2); nothing extracts fields. |
 | 9 | Hero cards | Stripe payout matched to 23 charges, fees split | partial | Matching one deposit across several receipts, and fees the books lack: `src/pantry/matching.ts` (PAN-08). No Stripe connection. |
 | 10 | Hero cards | INV-0231 paid via ACH | partial | Payment recorded against the invoice (row 3); no ACH collection. |
 | 11 | Hero cards | "Looks right, closing October · Reviewed by your accountant" | code | Review tasks marked done by named people and the lock: `src/pantry/close.ts`. |
-| 12 | Live bank feeds | "Connect your bank and cards once. Transactions arrive on their own" | contract | File import only (row 1). |
-| 13 | Live bank feeds | "your rules file the routine ones" (Adobe → Software "by rule") | contract | No bank rules in `src/pantry`. |
-| 14 | Live bank feeds | "re-link to stay current" (Amex) | contract | No feed connections exist to re-link. |
+| 12 | Live bank feeds | "Connect your bank and cards once. Transactions arrive on their own" | code | `/app/bank/connect` completes alone: Plaid Link, then each account to an existing, new or no Pantry bank account (`src/ui/bank-connect.tsx`, `src/pantry/feeds/commands.ts`). Transactions then arrive by verified Plaid webhooks, the Cron trigger (`*/30`) and due work run after ordinary requests, one claim per sync, idempotent on Plaid transaction ids, pending and removed transactions handled, file lines adopted instead of duplicated (`src/pantry/feeds/sync.ts`, `src/pantry/feeds/webhook.ts`). As row 1 for where it runs. |
+| 13 | Live bank feeds | "your rules file the routine ones" (Adobe → Software "by rule") | code | Bank rules (payee, description, amount, direction, account → category or split, contact, tax code, memo) with a preview before saving; matching lines from feeds and files are filed and shown "Filed by rule · <name>" with an undo; never in a locked month or reconciled statement; a payee filed the same way three times is suggested (`src/pantry/rules.ts`, `src/ui/bank-rules.tsx`, `src/ui/bank-lines.tsx`, `tests/api/rules.test.mjs`). |
+| 14 | Live bank feeds | "re-link to stay current" (Amex) | code | A connection Plaid reports as ITEM_LOGIN_REQUIRED (or pending expiry, revoked consent) says so in one plain sentence with a **Re-link** button that reopens Link in update mode (`src/ui/bank-feeds.tsx`, `src/pantry/feeds/plaid.ts`, `src/pantry/feeds/webhook.ts`). As row 1 for where it runs. |
 | 15 | Receipts | "Take a photo or forward the email" | contract | Upload of a file exists (row 2); no camera capture, no inbound mail address for receipts. |
 | 16 | Receipts | "Pantry reads the vendor, date and total, and attaches it to the right transaction" | contract | Attaching a document to a bill or journal by a person exists (`src/pantry/contacts.ts`, `src/pantry/journal.ts` cites documents); no reading or automatic attachment. |
 | 17 | Invoices | "Send it and Pantry follows up" (sent, viewed, reminder) | contract | `CONTRACT.md` on main: "sending invoices or reminders by email" not in the first release. |
@@ -48,7 +48,7 @@ Status key: **code** = the capability exists and runs today; **partial** = a nar
 | 38 | Ownership | "Run Pantry on your own computer" (the five commands) | code | `rer install`, `rer setup`, `rer dev` via `@runeditrun/rer` 0.2.37 (`package.json`, `OPERATIONS.json`). |
 | 39 | Ownership | "keep every record" / "Your books, your database" | code | Local D1 database under the checkout; documents kept byte for byte. |
 | 40 | Ownership | "Export everything, any time" | code | `rer export` / `rer import` (PAN-14), accountant package and general-ledger CSV: `src/pantry/package.ts`. |
-| 41 | Quiet details | Bank rules: "routine transactions file themselves" | contract | As row 13. |
+| 41 | Quiet details | Bank rules: "routine transactions file themselves" | code | As row 13. |
 | 42 | Quiet details | 1099 tracking: "Contractors flagged at the IRS threshold ($2,000 from 2026), forms ready in January" | code | Vendors marked as 1099 contractors with legal name, TIN (masked everywhere; full only in the audited filing CSV for the owner or the posting grant) and address; payments by method per calendar year, card and payment-network payments excluded; flagged at the tax year's threshold ($600 for 2025 payments, $2,000 for 2026); after year end the 1099-NEC figures and a filing CSV; Pantry does not file: `src/pantry/contractors.ts`, `src/ui/contractors.tsx`, `migrations/core/0017_pantry_reports.sql`; test `tests/api/reports.test.mjs` (TAXFORM-002). |
 | 43 | Quiet details | Audit trail: "who, what and when" | code | `audit(...)` on every write (`src/pantry/db.ts`), Activity screen `src/routes/app.activity.tsx`. |
 | 44 | Quiet details | Locked periods: "Closed months stay closed" | code | As row 27; reopening needs a second person with the reopen grant. |
@@ -58,6 +58,6 @@ Status key: **code** = the capability exists and runs today; **partial** = a nar
 
 ## Summary
 
-47 claims: **23 code**, **9 partial**, **15 contract, not yet in code**. Counting the partial claims, whose claimed form is not built, 24 of 47 go beyond today's code. The largest gaps are live bank and card feeds, receipt capture and reading, invoice sending and payment collection, Stripe and Gusto connections, bank rules, Xero move-in and imported attachments.
+47 claims: **29 code**, **8 partial**, **10 contract, not yet in code**. Counting the partial claims, whose claimed form is not built, 18 of 47 go beyond today's code. The largest gaps are receipt capture and reading, invoice sending and payment collection, Stripe and Gusto connections, Xero move-in and imported attachments. Live bank and card feeds run on self-hosted installations with their own Plaid keys; on RER Managed they wait for its egress relay.
 
 "Try the demo" links `https://demo.run-pantry.com/`, Pantry's hosted demo (`deploy-demo.json`, `DEMO.md`), which answered 200 on 17 Oct 2026.

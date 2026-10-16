@@ -1,0 +1,139 @@
+// Feed sync. Each connection (Plaid Item) is synced by one claim at a time:
+// /transactions/sync pages from the stored cursor, applied idempotently on
+// Plaid's transaction ids. Posted transactions become bank lines (or adopt the
+// same day's same-amount line an imported file already brought); pending ones
+// are shown apart until the bank posts them; removed ones leave, unless a match
+// holds them. New lines then go through the business's rules. Work becomes due
+// by webhook, by schedule, or when a person asks; the Cron trigger and ordinary
+// requests both run what is due.
+import type { Bindings } from '../../auth.server'
+import { now, uid, type Data } from '../core'
+import { all, guard, one, q, run, type Sql } from '../db'
+import { applyRules, authorFiler } from '../rules'
+import { availability, plaid, PlaidError, relinkMessage, type PlaidTransaction, type SyncPage } from './plaid'
+import { open } from './vault'
+
+export type Trigger = 'connect' | 'webhook' | 'schedule' | 'person'
+const LEASE_MS = 5 * 60_000, EVERY_MS = 6 * 3600_000, RETRY_MS = 3600_000
+const later = (ms: number) => new Date(Date.now() + ms).toISOString()
+
+async function claim(db: D1Database, itemId: string) {
+  const id = uid(), at = now()
+  const r = await db.prepare("UPDATE pt_feed_items SET claim_id = ?, claim_until = ? WHERE id = ? AND status = 'active' AND (claim_until IS NULL OR claim_until < ?)").bind(id, later(LEASE_MS), itemId, at).run()
+  return r.meta.changes === 1 ? id : null
+}
+
+const UNMATCHED = 'NOT EXISTS (SELECT 1 FROM pt_match_bank_lines m WHERE m.bank_line_id = pt_bank_lines.id AND m.active = 1)'
+
+/** Plaid counts money leaving the account as positive; Pantry's lines are signed the bank's way round. */
+const cents = (t: PlaidTransaction) => -Math.round(t.amount * 100)
+const describe = (t: PlaidTransaction) => (t.name || t.merchant_name || '(no description)').slice(0, 300)
+
+function posted(t: PlaidTransaction, bankAccountId: string, stamp: string): Sql[] {
+  const amount = cents(t), payee = (t.merchant_name ?? '').slice(0, 120)
+  return [
+    ...(t.pending_transaction_id ? [q('DELETE FROM pt_feed_pending WHERE feed_txn_id = ?', t.pending_transaction_id)] : []),
+    q(`UPDATE pt_bank_lines SET posted_date = ?, amount_cents = ?, description = ?, payee = ? WHERE feed_txn_id = ? AND source = 'feed' AND statement_id IS NULL AND ${UNMATCHED}`, t.date, amount, describe(t), payee, t.transaction_id),
+    // The same day's same-amount line from an imported file is this transaction: it adopts the id instead of a second line.
+    q(`UPDATE pt_bank_lines SET feed_txn_id = ?, payee = CASE WHEN payee = '' THEN ? ELSE payee END WHERE id = (SELECT id FROM pt_bank_lines WHERE bank_account_id = ? AND source = 'file' AND feed_txn_id IS NULL AND removed_at IS NULL AND posted_date = ? AND amount_cents = ? ORDER BY id LIMIT 1) AND NOT EXISTS (SELECT 1 FROM pt_bank_lines WHERE feed_txn_id = ?)`,
+      t.transaction_id, payee, bankAccountId, t.date, amount, t.transaction_id),
+    q(`INSERT INTO pt_bank_lines (id, statement_id, bank_account_id, posted_date, amount_cents, description, reference, fingerprint, source, payee, feed_txn_id, arrived_at)
+      SELECT ?, NULL, ?, ?, ?, ?, ?, ?, 'feed', ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM pt_bank_lines WHERE feed_txn_id = ?)`,
+      uid(), bankAccountId, t.date, amount, describe(t), (t.check_number ?? '').slice(0, 60), `plaid:${t.transaction_id}`, payee, t.transaction_id, stamp, t.transaction_id),
+  ]
+}
+
+const pending = (t: PlaidTransaction, feedAccountId: string, stamp: string): Sql =>
+  q(`INSERT INTO pt_feed_pending (feed_txn_id, feed_account_id, txn_date, amount_cents, description, payee, seen_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (feed_txn_id) DO UPDATE SET txn_date = excluded.txn_date, amount_cents = excluded.amount_cents, description = excluded.description, payee = excluded.payee, seen_at = excluded.seen_at`,
+    t.transaction_id, feedAccountId, t.date, cents(t), describe(t), (t.merchant_name ?? '').slice(0, 120), stamp)
+
+const removed = (id: string, stamp: string): Sql[] => [
+  q('DELETE FROM pt_feed_pending WHERE feed_txn_id = ?', id),
+  // A feed line nothing ever matched goes; one a match holds or held stays, marked as removed by the bank.
+  q("DELETE FROM pt_bank_lines WHERE feed_txn_id = ? AND source = 'feed' AND statement_id IS NULL AND NOT EXISTS (SELECT 1 FROM pt_match_bank_lines m WHERE m.bank_line_id = pt_bank_lines.id)", id),
+  q("UPDATE pt_bank_lines SET removed_at = ? WHERE feed_txn_id = ? AND source = 'feed' AND statement_id IS NULL", stamp, id),
+  // A statement keeps its line; it just stops being this transaction's.
+  q('UPDATE pt_bank_lines SET feed_txn_id = NULL WHERE feed_txn_id = ? AND statement_id IS NOT NULL', id),
+]
+
+/** Sync one connection. Returns what changed, or `claimed: false` when another sync holds it. */
+export async function syncItem(env: Bindings, itemId: string, trigger: Trigger): Promise<Data> {
+  const db = env.DB, claimId = await claim(db, itemId)
+  if (!claimId) return { claimed: false }
+  const item = (await one(db, 'SELECT * FROM pt_feed_items WHERE id = ?', itemId))!
+  const syncId = uid(), stamp = now()
+  const mine = guard('EXISTS (SELECT 1 FROM pt_feed_items WHERE id = ? AND claim_id = ?)', itemId, claimId)
+  const release = (sets: string, ...params: unknown[]) => run(db, [q(`UPDATE pt_feed_items SET ${sets}, claim_id = NULL, claim_until = NULL, revision = ? WHERE id = ? AND claim_id = ?`, ...params, uid(), itemId, claimId)])
+  await run(db, [q('INSERT INTO pt_feed_syncs (id, item_id, trigger, started_at) VALUES (?, ?, ?, ?)', syncId, itemId, trigger, stamp)])
+  try {
+    const token = await open(env.SESSION_SECRET, item.access_token)
+    if (!token) {
+      await release("status = 'disconnected', error_code = 'KEY_ELSEWHERE', error_message = ?", 'This connection was made by another installation; connect the bank again here.')
+      await run(db, [q("UPDATE pt_feed_syncs SET finished_at = ?, error_code = 'KEY_ELSEWHERE' WHERE id = ?", now(), syncId)])
+      return { claimed: true, error: 'KEY_ELSEWHERE' }
+    }
+    const client = plaid(env)
+    let cursor = item.cursor as string, pages: SyncPage[] = [], restarts = 0
+    for (;;) {
+      try {
+        const page = await client.sync(token, cursor)
+        pages.push(page); cursor = page.next_cursor
+        if (!page.has_more) break
+      } catch (e) {
+        // Plaid asks for the whole pagination again from the cursor it started at.
+        if (e instanceof PlaidError && e.code === 'TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION' && restarts++ < 3) { pages = []; cursor = item.cursor; continue }
+        throw e
+      }
+    }
+    const accounts = new Map((await all(db, 'SELECT f.*, b.opening_date FROM pt_feed_accounts f LEFT JOIN pt_bank_accounts b ON b.id = f.bank_account_id WHERE f.item_id = ?', itemId)).map(a => [a.provider_account_id, a]))
+    const statements: Sql[] = [], counts = { updated: 0, removed: 0 }
+    for (const page of pages) {
+      for (const t of [...page.added, ...page.modified]) {
+        const a = accounts.get(t.account_id)
+        // Only accounts brought into Pantry, only after their opening statement date, never a zero amount.
+        if (!a?.bank_account_id || t.date <= a.opening_date || cents(t) === 0) continue
+        statements.push(...(t.pending ? [pending(t, a.id, stamp)] : posted(t, a.bank_account_id, stamp)))
+      }
+      counts.updated += page.modified.length
+      for (const r of page.removed) { statements.push(...removed(r.transaction_id, stamp)); counts.removed++ }
+      for (const pa of page.accounts ?? []) {
+        const a = accounts.get(pa.account_id), balance = pa.balances?.current
+        if (a && typeof balance === 'number') statements.push(q('UPDATE pt_feed_accounts SET balance_cents = ? WHERE id = ?', Math.round(balance * 100), a.id))
+      }
+    }
+    for (let i = 0; i < statements.length; i += 200) await run(db, [mine, ...statements.slice(i, i + 200)])
+    const mapped = [...accounts.values()].filter(a => a.bank_account_id)
+    await run(db, [mine,
+      ...mapped.map(a => q('UPDATE pt_feed_accounts SET last_synced_at = ? WHERE id = ?', now(), a.id)),
+      q("UPDATE pt_feed_items SET cursor = ?, last_sync_at = ?, last_sync_error = '', error_code = '', error_message = '', sync_due_at = ?, claim_id = NULL, claim_until = NULL, revision = ? WHERE id = ? AND claim_id = ?", cursor, now(), later(EVERY_MS), uid(), itemId, claimId)])
+    const arrived = await all<{ id: string }>(db, 'SELECT id FROM pt_bank_lines WHERE arrived_at = ? AND source = \'feed\'', stamp)
+    const filed = await applyRules(db, arrived.map(l => l.id), authorFiler)
+    const waiting = Number((await one(db, 'SELECT COUNT(*) AS n FROM pt_feed_pending p JOIN pt_feed_accounts f ON f.id = p.feed_account_id WHERE f.item_id = ?', itemId))?.n ?? 0)
+    await run(db, [q('UPDATE pt_feed_syncs SET finished_at = ?, added = ?, updated = ?, removed = ?, pending = ?, filed = ? WHERE id = ?', now(), arrived.length, counts.updated, counts.removed, waiting, filed.filed, syncId)])
+    return { claimed: true, added: arrived.length, updated: counts.updated, removed: counts.removed, pending: waiting, filed: filed.filed }
+  } catch (e) {
+    const plaidError = e instanceof PlaidError ? e : null
+    const code = plaidError?.code ?? 'ERROR', message = plaidError ? (plaidError.display || plaidError.message) : String((e as Error)?.message ?? e)
+    if (plaidError?.relink) await release("status = 'relink', error_code = ?, error_message = ?, last_sync_error = ?", code, relinkMessage(code, plaidError.display), message)
+    else await release('last_sync_error = ?, sync_due_at = ?', message, later(RETRY_MS))
+    await run(db, [q('UPDATE pt_feed_syncs SET finished_at = ?, error_code = ? WHERE id = ?', now(), code, syncId)])
+    if (!plaidError) throw e
+    return { claimed: true, error: code, message }
+  }
+}
+
+/** Sync connections whose time has come, at most `limit`, for the Cron trigger and ordinary requests. */
+export async function runDue(env: Bindings, limit = 3) {
+  if (!availability(env).available) return []
+  const due = await all<{ id: string }>(env.DB, "SELECT id FROM pt_feed_items WHERE status = 'active' AND sync_due_at <= ? AND (claim_until IS NULL OR claim_until < ?) ORDER BY sync_due_at LIMIT ?", now(), now(), limit)
+  const out = []
+  for (const d of due) out.push(await syncItem(env, d.id, 'schedule'))
+  return out
+}
+
+/** Cheap check an ordinary request makes before handing due work to waitUntil. */
+export async function anyDue(env: Bindings) {
+  if (!availability(env).available) return false
+  return !!(await one(env.DB, "SELECT 1 FROM pt_feed_items WHERE status = 'active' AND sync_due_at <= ? AND (claim_until IS NULL OR claim_until < ?) LIMIT 1", now(), now()))
+}

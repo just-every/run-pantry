@@ -13,7 +13,7 @@
 | PAN-05 | Record bills posted to payables with their evidence; a missing document is a close exception until attached or explained by someone with the post grant. | `subledgers.test.mjs` › `PAN-05 bills post to payables with their evidence…` | LOCAL PROVEN |
 | PAN-06 | Record payments made outside Pantry and allocate them wholly or partly; unapplied money stays visible; reversing a payment reopens the bill. | `subledgers.test.mjs` › `PAN-06 payments made outside Pantry are recorded and allocated…` | LOCAL PROVEN |
 | PAN-07 | Import CSV and OFX statements against the right account; repeats and overlaps add no duplicates; cross-format overlaps refused; file kept exactly. | `bank.test.mjs` › `PAN-07 CSV and OFX statements import against the right bank account, and repeats create no duplicates` | LOCAL PROVEN |
-| PAN-08 | Match through one-to-one, split deposits, fees, transfers, vendor payments and partial settlements; a recorded payment is never posted twice; unbalanced or repeated matches refused. | `bank.test.mjs` › `PAN-08 statement lines match… never posting a recorded payment twice` | LOCAL PROVEN |
+| PAN-08 | Match through one-to-one, split deposits, fees, transfers, vendor payments and partial settlements; a recorded payment is never posted twice; unbalanced or repeated matches refused. Bank rules preview, file by rule with undo, split with tax, and leave locked or reconciled months alone; feeds connect, sync by webhook, schedule and request exactly once beside imported files, and ask to re-link. | `bank.test.mjs` › `PAN-08 statement lines match… never posting a recorded payment twice`; `rules.test.mjs`; `feeds.test.mjs` (Plaid's recorded responses at the network edge) | LOCAL PROVEN |
 | PAN-09 | Reconcile only with a proven balance; a statement mismatch blocks with the difference explained; completed proof freezes its matches; outstanding items carry to the next statement. | `bank.test.mjs` › `PAN-09 a statement reconciles only when its balances are proven…` | LOCAL PROVEN |
 | PAN-10 | Post a balanced journal approved by someone other than its preparer for the exact revision reviewed; immutability enforced by the database; agent tokens cannot post. | `ledger.test.mjs` › `PAN-10 a journal entry posts balanced, approved by someone other than its preparer…` | LOCAL PROVEN |
 | PAN-11 | Correct a posted entry with a linked, dated reversal; both stay in the ledger. | `ledger.test.mjs` › `PAN-11 a posted entry is corrected by a linked reversal and its history survives` | LOCAL PROVEN |
@@ -31,5 +31,6 @@
 
 - A real QuickBooks Online package (only documented-shape synthetic fixtures were used), `.xlsx` reading and the separate attachments `.zip`.
 - A real accountant's review of a close, and any tax-method, state or sales-tax correctness.
-- Hosted deployment, mail delivery of invitations (suppressed locally), bank-feed or model providers.
+- Hosted deployment, mail delivery of invitations (suppressed locally), or model providers.
+- Live Plaid: bank and card feeds are proven against Plaid's documented responses recorded as fixtures; the Plaid sandbox journey runs once this installation's Plaid keys exist, and production banks need Plaid's production access.
 - Accessibility beyond the keyboard and label conventions built in (no audit run).

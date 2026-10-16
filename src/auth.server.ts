@@ -38,6 +38,11 @@ export interface Bindings {
  MAIL_FROM?: string
  MAIL_API_KEY?: string
  MAIL_ACCOUNT_ID?: string
+ /** Live bank and card feeds: this installation's own Plaid keys (self-hosted installs). */
+ PLAID_CLIENT_ID?: string
+ PLAID_SECRET?: string
+ PLAID_ENV?: string
+ PLAID_REDIRECT_URI?: string
 }
 
 export const runtimeBindings = (env: Bindings): Bindings => env.RER_DEV_ORIGIN && env.AUTH_LOCAL === 'true' ? { ...env, AUTH_ORIGIN: env.RER_DEV_ORIGIN } : env

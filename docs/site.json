@@ -11,6 +11,7 @@
       "title": "Run your books",
       "pages": [
         { "slug": "sales-and-bills", "title": "Sales and bills", "file": "sales-and-bills.md", "summary": "Draft, approve and issue invoices and credits, record bills with their receipts, and record payments." },
+        { "slug": "bank-feeds-and-rules", "title": "Bank feeds and rules", "file": "bank-feeds-and-rules.md", "summary": "Connect your bank and cards once, choose where each account goes, and let your rules file the routine transactions." },
         { "slug": "reconcile", "title": "Reconcile a bank statement", "file": "reconcile.md", "summary": "Import a CSV or OFX statement, match each line to your books, and finish when the difference is $0.00." },
         { "slug": "journals", "title": "Journals and corrections", "file": "journals.md", "summary": "Prepare a balanced entry, have someone else post it, and correct a posted entry with a reversal." },
         { "slug": "reports", "title": "Reports, cash or accrual", "file": "reports.md", "summary": "Open any figure to its records, switch between cash and accrual, report sales tax by state and track 1099 contractors." },

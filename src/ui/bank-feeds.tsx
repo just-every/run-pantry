@@ -1,0 +1,56 @@
+// Connected banks and cards: each connection's accounts with their last sync,
+// a plain warning and a Re-link button when the bank needs the owner to sign in
+// again, and the link to connect another one.
+import { Link } from '@tanstack/react-router'
+import { Action, Card, Chip, command, usd, useShared, type D } from './kit'
+import { Icon } from './icons'
+import { openLink } from './plaid-link'
+
+export function ago(iso?: string | null) {
+  if (!iso) return 'never'
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  const days = Math.round(hours / 24)
+  return `${days} day${days === 1 ? '' : 's'} ago`
+}
+
+export async function relink(c: D) {
+  const { linkToken } = await command('feed.link-token', { itemId: c.id })
+  if (!await openLink(linkToken, `relink:${c.id}`)) return false
+  await command('feed.relinked', { itemId: c.id })
+  return true
+}
+
+function Connection({ c, onDone }: { c: D; onDone: () => Promise<void> }) {
+  const can = useShared().state.actor.can.record
+  const brought = c.accounts.filter((a: D) => a.bank_account_id)
+  return <div className="feed">
+    <div className="feed-head"><strong>{c.institution_name}</strong>{c.status === 'relink' ? <Chip tone="warn">Needs re-link</Chip> : <Chip tone="good">Live</Chip>}</div>
+    {c.status === 'relink' && <div className="callout callout-warn" role="status"><Icon name="alert" /><div><strong>{c.institution_name} needs you to sign in again to stay current.</strong><span>{c.error_message} Nothing new arrives until then.</span></div>
+      {can && <Action tone="primary" run={async () => { await relink(c); await onDone() }}>Re-link</Action>}</div>}
+    <ul className="feed-accounts">{c.accounts.map((a: D) => <li key={a.id}>
+      <span>{a.name} <small className="sub">••{a.mask}</small></span>
+      {a.bank_account_id ? <small>→ {a.bank_name} · {a.last_synced_at ? <>synced {ago(a.last_synced_at)}</> : 'not synced yet'}{a.pending ? ` · ${a.pending} pending` : ''}{a.balance_cents !== null ? ` · bank shows ${usd(a.balance_cents)}${a.kind.startsWith('credit') ? ' owed' : ''}` : ''}</small> : <small className="sub">Not brought in</small>}
+    </li>)}</ul>
+    {c.status === 'active' && c.last_sync_error && <p className="hint">Last try: {c.last_sync_error}. Pantry tries again within the hour.</p>}
+    {can && <div className="row-actions small">
+      {!brought.length && <Link className="btn btn-primary btn-small" to="/app/bank/connect" search={{ connection: c.id }}>Choose accounts</Link>}
+      {c.status === 'active' && brought.length > 0 && <Action run={async () => { await command('feed.sync', { itemId: c.id }); await onDone() }}>Sync now</Action>}
+      <Action tone="danger" run={async () => { if (window.confirm(`Disconnect ${c.institution_name}? Lines already in Pantry stay.`)) { await command('feed.disconnect', { itemId: c.id }); await onDone() } }}>Disconnect</Action>
+    </div>}
+  </div>
+}
+
+export function Feeds({ data, onDone }: { data: D | undefined; onDone: () => Promise<void> }) {
+  const can = useShared().state.actor.can.record
+  if (!data) return null
+  const a = data.availability
+  return <Card title="Bank and card feeds" actions={a.available && can && <Link className="btn btn-secondary btn-small" to="/app/bank/connect">Connect a bank or card</Link>}>
+    {!a.available ? <p className="hint">{a.reason}</p>
+      : !data.connections.length ? <p className="hint">Connect a bank or card once and its transactions arrive on their own. Statement files keep working beside it.</p>
+      : data.connections.map((c: D) => <Connection key={c.id} c={c} onDone={onDone} />)}
+  </Card>
+}
