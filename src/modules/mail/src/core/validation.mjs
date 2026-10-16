@@ -47,9 +47,19 @@ export function validateConfig(config, dependencies = {}) {
   return config;
 }
 
+// Linear-time split of `Name <email>` or a bare `email`, shaped like the match array it replaced (name at 1, angle email at 2, bare email at 3).
+function splitMailbox(text) {
+  const open = text.lastIndexOf('<');
+  if (open < 0) return /[<>]/.test(text) ? null : [text, undefined, undefined, text];
+  const name = text.slice(0, open).trimEnd();
+  const email = text.slice(open + 1, -1);
+  if (!text.endsWith('>') || !email || /[<>]/.test(email) || /[\n\r\u2028\u2029]/.test(name)) return null;
+  return [text, name, email];
+}
+
 export function parseAddress(value) {
   bounded(value, 998, 'invalid_address');
-  const match = value.trim().match(/^(?:(.*?)\s*<([^<>]+)>|([^<>]+))$/u);
+  const match = splitMailbox(value.trim());
   const email = (match?.[2] ?? match?.[3] ?? '').trim();
   // Conservative mailbox subset; never serialize multiple mailboxes as one.
   const parts = email.split('@');
