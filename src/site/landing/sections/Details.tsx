@@ -2,7 +2,7 @@ import { Icon } from '../parts'
 
 const DETAILS: [string, string, string, string][] = [
   ['bank', 'lavender', 'Bank rules', 'Teach it once, and routine transactions file themselves.'],
-  ['receipt', 'green', '1099 tracking', 'Contractors flagged at $600, forms ready in January.'],
+  ['receipt', 'green', '1099 tracking', 'Contractors flagged at the IRS threshold ($2,000 from 2026), forms ready in January.'],
   ['clock', 'apricot', 'Audit trail', 'Every change records who, what and when.'],
   ['lock', 'apricot', 'Locked periods', 'Closed months stay closed.'],
   ['clip', 'lavender', 'Attachments everywhere', 'Every entry keeps its receipt or bill.'],
