@@ -2,7 +2,6 @@
   "version": 1,
   "domain": "run-pantry.com",
   "name": "Pantry",
-  "instanceType": "basic",
   "ownerEmail": "priya@juniperlane.example",
   "settings": {
     "MAIL_PROVIDER": "development",
