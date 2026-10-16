@@ -29,14 +29,16 @@ added. Outside `RER_DEMO`, the worker keeps the real application behavior.
 
 ## Hosted demo
 
-`deploy-demo.json` declares `demo.run-pantry.com`, with one isolated Cloudflare
-Container per visitor. The `Run demo` workflow reads the `run-demo` environment;
+`deploy-demo.json` declares `demo.run-pantry.com`. Each visitor gets their own
+native Worker Loader isolate with SQLite storage for Pantry's D1 database, on
+Base's native demo host (rer 0.2.30). The `Run demo` workflow reads the `run-demo` environment;
 manual dispatch with `test_only` uses a separate `demo.test.run-pantry.com` and
 Cloudflare's published passing Turnstile test keys. Dispatch with both
 `test_only` and `remove` to delete that test host and read back resource absence.
-Production uses the environment's real Turnstile keys. No repository variable
-is required for a manual deployment.
+Test starts need the private `RER_DEMO_MEASUREMENT_TOKEN` as the `rer_demo_measure`
+cookie. Production uses the environment's real Turnstile keys and the
+environment variable `CLOUDFLARE_ACCOUNT_ID`.
 
 Base ends each visitor's copy after 60 minutes or 15 idle minutes. Each start
-gets its own owner/session, database and disk. The homepage links to production
+gets its own owner/session and database, erased when the copy ends. The homepage links to production
 only after its start page passes the live readback.
