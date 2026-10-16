@@ -1,0 +1,160 @@
+{
+  "accounts": [
+    {
+      "account_id": "BxBXxLj1m4HMXBm9WZZmCWVbPjX16EHwv99vp",
+      "balances": {
+        "available": 100,
+        "current": 1110,
+        "iso_currency_code": "USD",
+        "limit": null,
+        "unofficial_currency_code": null
+      },
+      "mask": "0000",
+      "name": "Plaid Checking",
+      "official_name": "Plaid Gold Standard 0% Interest Checking",
+      "persistent_account_id": null,
+      "subtype": "checking",
+      "type": "depository"
+    },
+    {
+      "account_id": "dVzbVMLjrxTnLjX4G66XUp5GLklm4oiZy88yK",
+      "balances": {
+        "available": 200,
+        "current": 210,
+        "iso_currency_code": "USD",
+        "limit": null,
+        "unofficial_currency_code": null
+      },
+      "mask": "1111",
+      "name": "Plaid Saving",
+      "official_name": "Plaid Silver Standard 0.1% Interest Saving",
+      "persistent_account_id": null,
+      "subtype": "savings",
+      "type": "depository"
+    },
+    {
+      "account_id": "JqMLm4rJwpF6gMPJwBqdh9ZjjPvvpDcb7kDK1",
+      "balances": {
+        "available": null,
+        "current": 410,
+        "iso_currency_code": "USD",
+        "limit": null,
+        "unofficial_currency_code": null
+      },
+      "mask": "3333",
+      "name": "Plaid Credit Card",
+      "official_name": "Plaid Diamond 12.5% APR Interest Credit Card",
+      "persistent_account_id": null,
+      "subtype": "credit card",
+      "type": "credit"
+    }
+  ],
+  "added": [
+    {
+      "account_id": "JqMLm4rJwpF6gMPJwBqdh9ZjjPvvpDcb7kDK1",
+      "account_owner": null,
+      "amount": 18.75,
+      "authorized_date": "2026-10-07",
+      "authorized_datetime": null,
+      "category": null,
+      "category_id": null,
+      "check_number": null,
+      "counterparties": [],
+      "date": "2026-10-07",
+      "datetime": null,
+      "iso_currency_code": "USD",
+      "location": {
+        "address": null,
+        "city": null,
+        "country": null,
+        "lat": null,
+        "lon": null,
+        "postal_code": null,
+        "region": null,
+        "store_number": null
+      },
+      "logo_url": null,
+      "merchant_entity_id": null,
+      "merchant_name": "Uber",
+      "name": "UBER *TRIP",
+      "payment_channel": "online",
+      "payment_meta": {
+        "by_order_of": null,
+        "payee": null,
+        "payer": null,
+        "payment_method": null,
+        "payment_processor": null,
+        "ppd_id": null,
+        "reason": null,
+        "reference_number": null
+      },
+      "pending": false,
+      "pending_transaction_id": "pK3vYbN8xLqRz6WoGmTdEa1sHjU9cFiQ4nVy7",
+      "personal_finance_category": null,
+      "transaction_code": null,
+      "transaction_id": "mT4kQz8NxLpWb2RvYoHaEd6sJgU1cFiK9nVy3",
+      "transaction_type": "special",
+      "unofficial_currency_code": null,
+      "website": null
+    }
+  ],
+  "has_more": false,
+  "modified": [
+    {
+      "account_id": "JqMLm4rJwpF6gMPJwBqdh9ZjjPvvpDcb7kDK1",
+      "account_owner": null,
+      "amount": 412.5,
+      "authorized_date": "2026-10-05",
+      "authorized_datetime": null,
+      "category": null,
+      "category_id": null,
+      "check_number": null,
+      "counterparties": [],
+      "date": "2026-10-05",
+      "datetime": null,
+      "iso_currency_code": "USD",
+      "location": {
+        "address": null,
+        "city": null,
+        "country": null,
+        "lat": null,
+        "lon": null,
+        "postal_code": null,
+        "region": null,
+        "store_number": null
+      },
+      "logo_url": null,
+      "merchant_entity_id": null,
+      "merchant_name": "United Airlines",
+      "name": "UNITED AIRLINES 0162345678",
+      "payment_channel": "online",
+      "payment_meta": {
+        "by_order_of": null,
+        "payee": null,
+        "payer": null,
+        "payment_method": null,
+        "payment_processor": null,
+        "ppd_id": null,
+        "reason": null,
+        "reference_number": null
+      },
+      "pending": false,
+      "pending_transaction_id": null,
+      "personal_finance_category": null,
+      "transaction_code": null,
+      "transaction_id": "rQ7gWz4kLmHvPoNa8EdXyTb2sJ6cFuYi0RtKe",
+      "transaction_type": "special",
+      "unofficial_currency_code": null,
+      "website": null
+    }
+  ],
+  "next_cursor": "tVUUL15lYQN5rBnfDIc1I8xudpGdIlw9nsgeXWvhOfkECvUeR663i3Dt1uf/94S8ASkitgLcIiOSqNwzzp+bh89kirazha5vuZHBb2ZA5NtCDkkX",
+  "removed": [
+    {
+      "account_id": "BxBXxLj1m4HMXBm9WZZmCWVbPjX16EHwv99vp",
+      "transaction_id": "eJ9wXq2LmZbRk5TnVpHaYd8sGfU3cBiO7xQz1"
+    }
+  ],
+  "transactions_update_status": "HISTORICAL_UPDATE_COMPLETE",
+  "request_id": "Wvhy9"
+}

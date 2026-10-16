@@ -17,3 +17,11 @@ inputs only; no real company's data is used.
   Amount, Type, Balance, Check or Slip #). Opening 24,813.52, closing 27,797.02.
 - `bank/savings-2026-09.ofx`: an OFX 1.0.2 (SGML) savings statement for the
   account ending 7730, closing ledger balance 2,001.25.
+- `bank/operating-checking-2026-10.csv`: October for the same checking account
+  (opening 27,797.02, closing 28,623.51) with routine card charges (Adobe,
+  Staples, Google, Comcast) for the bank-rules flow.
+- `plaid/`: Plaid API responses in the shapes Plaid's API reference documents
+  for its sandbox institution First Platypus Bank (`ins_109508`): Link token,
+  public token exchange, accounts, three `/transactions/sync` pages (history,
+  then a pending charge posting, a removal and a modification) and the
+  `ITEM_LOGIN_REQUIRED` error. Tests serve them at the network edge only.

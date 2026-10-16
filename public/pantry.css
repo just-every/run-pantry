@@ -320,3 +320,35 @@ ul.plain li:last-child { border-bottom: 0; }
   .basis-switch button { flex: 1; }
   .ledger td .doc-link, .ledger td .bank-line { display: inline; }
 }
+
+/* Bank feeds, transactions filed by rule, rules and the connect page. */
+.feed + .feed { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
+.feed-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+.feed .callout { margin: 8px 0 12px; }
+.feed .callout > div { flex: 1 1 220px; }
+.feed-accounts { list-style: none; margin: 0; padding: 0; }
+.feed-accounts li { display: flex; flex-direction: column; padding: 8px 0; border-top: 1px solid var(--line); }
+.feed-accounts li:first-child { border-top: 0; }
+.feed-accounts small { color: var(--muted); font-size: 13px; }
+.filed { display: inline-flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; justify-content: flex-end; }
+.filed .btn { min-height: 32px; padding: 4px 14px; font-size: 13px; }
+.ledger td .filed .sub { font-size: 13px; }
+.card-actions .inline-fields .field { min-width: 150px; }
+.callout > .btn { margin-left: auto; align-self: center; }
+.rule-editor h3 { font-size: 15px; margin: 4px 0 10px; }
+.rule-editor h3 + .grid-form { margin-bottom: 18px; }
+.split-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.split-row .field:first-child { flex: 1 1 240px; }
+.split-row .field:nth-child(2) { flex: 0 1 110px; }
+.rule-preview { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 16px; }
+.preview-lines { list-style: none; margin: 8px 0 14px; padding: 0; max-height: 280px; overflow-y: auto; }
+.preview-lines li { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.preview-lines.held li { color: var(--muted); }
+.connect-accounts { display: grid; gap: 14px; margin: 12px 0 18px; }
+.connect-account legend { font-weight: 600; padding: 0 6px; }
+@media (max-width: 720px) {
+  .card-actions .inline-fields { width: 100%; }
+  .card-actions .inline-fields .field { flex: 1 1 140px; min-width: 0; }
+  .ledger td .filed { display: inline-flex; max-width: 70%; }
+  .preview-lines li { flex-direction: column; gap: 2px; }
+}

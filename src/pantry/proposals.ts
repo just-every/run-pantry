@@ -153,7 +153,7 @@ export async function proposalsView(db: D1Database) {
 
 /** What an agent may read: the working records, with documents as quoted evidence only. */
 export async function agentContext(c: Context, period?: string) {
-  const unmatched = await all(c.db, 'SELECT l.id, l.bank_account_id, l.posted_date, l.amount_cents, l.description, l.reference FROM pt_bank_lines l WHERE NOT EXISTS (SELECT 1 FROM pt_match_bank_lines m WHERE m.bank_line_id = l.id AND m.active = 1) ORDER BY l.posted_date')
+  const unmatched = await all(c.db, 'SELECT l.id, l.bank_account_id, l.posted_date, l.amount_cents, l.description, l.reference FROM pt_bank_lines l WHERE l.removed_at IS NULL AND NOT EXISTS (SELECT 1 FROM pt_match_bank_lines m WHERE m.bank_line_id = l.id AND m.active = 1) ORDER BY l.posted_date')
   const openPostings = await all(c.db, `SELECT l.id, l.entry_id, l.account_id, l.debit_cents, l.credit_cents, l.memo, e.entry_date, e.number FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id
     WHERE e.status = 'posted' AND e.reversed_by_id IS NULL AND l.account_id IN (SELECT account_id FROM pt_bank_accounts) AND NOT EXISTS (SELECT 1 FROM pt_match_postings m WHERE m.journal_line_id = l.id AND m.active = 1) ORDER BY e.entry_date`)
   const documents = await all(c.db, "SELECT id, name, media_type, size, sha256, linked_kind, linked_id, CASE WHEN media_type LIKE 'text/%' THEN CAST(content AS TEXT) END AS text FROM pt_documents WHERE linked_kind IS NULL OR linked_kind <> 'statement' ORDER BY uploaded_at")

@@ -34,7 +34,7 @@ export async function overview(db: D1Database) {
   const queue = {
     journalDrafts: await n("SELECT COUNT(*) AS n FROM pt_journal_entries WHERE status = 'draft'"),
     invoiceDrafts: await n("SELECT COUNT(*) AS n FROM pt_invoices WHERE status IN ('draft', 'approved')"),
-    unmatchedLines: await n('SELECT COUNT(*) AS n FROM pt_bank_lines l WHERE NOT EXISTS (SELECT 1 FROM pt_match_bank_lines m WHERE m.bank_line_id = l.id AND m.active = 1)'),
+    unmatchedLines: await n('SELECT COUNT(*) AS n FROM pt_bank_lines l WHERE l.removed_at IS NULL AND NOT EXISTS (SELECT 1 FROM pt_match_bank_lines m WHERE m.bank_line_id = l.id AND m.active = 1)'),
     proposals: await n("SELECT COUNT(*) AS n FROM pt_proposals WHERE status = 'proposed'"),
     reopenRequests: await n("SELECT COUNT(*) AS n FROM pt_reopen_requests WHERE status = 'pending'"),
   }

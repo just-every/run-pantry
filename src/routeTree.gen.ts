@@ -21,6 +21,7 @@ import { Route as AppMoveInRouteImport } from './routes/app.move-in'
 import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppSalesRouteImport } from './routes/app.sales'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
+import { Route as AppBankConnectRouteImport } from './routes/app.bank_.connect'
 
 const AppRoute = AppRouteImport.update({
   id: '/app',
@@ -82,6 +83,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBankConnectRoute = AppBankConnectRouteImport.update({
+  id: '/bank_/connect',
+  path: '/bank/connect',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/app/sales': typeof AppSalesRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/': typeof AppIndexRoute
+  '/app/bank/connect': typeof AppBankConnectRoute
 }
 export interface FileRoutesByTo {
   '/app/activity': typeof AppActivityRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/app/sales': typeof AppSalesRoute
   '/app/settings': typeof AppSettingsRoute
   '/app': typeof AppIndexRoute
+  '/app/bank/connect': typeof AppBankConnectRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/app/sales': typeof AppSalesRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/': typeof AppIndexRoute
+  '/app/bank_/connect': typeof AppBankConnectRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/app/sales'
     | '/app/settings'
     | '/app/'
+    | '/app/bank/connect'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/app/activity'
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/app/sales'
     | '/app/settings'
     | '/app'
+    | '/app/bank/connect'
   id:
     | '__root__'
     | '/app'
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/app/sales'
     | '/app/settings'
     | '/app/'
+    | '/app/bank_/connect'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -259,6 +271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/bank_/connect': {
+      id: '/app/bank_/connect'
+      path: '/bank/connect'
+      fullPath: '/app/bank/connect'
+      preLoaderRoute: typeof AppBankConnectRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -274,6 +293,7 @@ interface AppRouteChildren {
   AppSalesRoute: typeof AppSalesRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppBankConnectRoute: typeof AppBankConnectRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -288,6 +308,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSalesRoute: AppSalesRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
+  AppBankConnectRoute: AppBankConnectRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

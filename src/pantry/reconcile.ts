@@ -21,9 +21,11 @@ export async function reconciliationState(db: D1Database, statementId: string): 
   if (statement.opening_cents !== expectedOpening) blockers.push({ kind: 'opening', amount: statement.opening_cents - expectedOpening, message: `Statement opening ${usd(statement.opening_cents)} differs from the ${previous ? 'last reconciled closing' : 'opening statement balance'} ${usd(expectedOpening)}` })
 
   const lines = await all(db, `SELECT l.*, m.match_id FROM pt_bank_lines l LEFT JOIN pt_match_bank_lines m ON m.bank_line_id = l.id AND m.active = 1
-    WHERE l.bank_account_id = ? AND l.posted_date BETWEEN ? AND ? ORDER BY l.posted_date, l.description, l.id`, bank.id, statement.start_date, statement.end_date)
+    WHERE l.bank_account_id = ? AND l.posted_date BETWEEN ? AND ? AND (l.removed_at IS NULL OR m.match_id IS NOT NULL) ORDER BY l.posted_date, l.description, l.id`, bank.id, statement.start_date, statement.end_date)
   const lineTotal = lines.reduce((s, l) => s + l.amount_cents, 0)
   if (lineTotal !== statement.closing_cents - statement.opening_cents) blockers.push({ kind: 'statement', amount: statement.closing_cents - statement.opening_cents - lineTotal, message: `Statement lines total ${usd(lineTotal)} but the balances move by ${usd(statement.closing_cents - statement.opening_cents)}: a line is missing or the balances were entered wrongly` })
+  const gone = lines.filter(l => l.removed_at)
+  if (gone.length) blockers.push({ kind: 'removed', ids: gone.map(l => l.id), message: `${gone.length} line${gone.length === 1 ? ' was' : 's were'} removed by the bank after being matched; undo ${gone.length === 1 ? 'its match' : 'their matches'}` })
   const unmatched = lines.filter(l => !l.match_id)
   if (unmatched.length) blockers.push({ kind: 'unmatched', amount: unmatched.reduce((s, l) => s + l.amount_cents, 0), ids: unmatched.map(l => l.id), message: `${unmatched.length} statement line${unmatched.length === 1 ? '' : 's'} not matched to the books` })
 

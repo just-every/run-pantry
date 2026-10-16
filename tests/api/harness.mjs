@@ -23,7 +23,8 @@ async function freePort() {
 
 export const fixture = (path) => readFile(new URL(`../../fixtures/${path}`, import.meta.url), 'utf8')
 
-export async function harness() {
+/** `bindings` extend the Worker's; `outbound` answers any request not bound for the mail provider. */
+export async function harness({ bindings = {}, outbound } = {}) {
   const port = await freePort(), origin = `http://127.0.0.1:${port}`
   const dir = await mkdtemp(join(tmpdir(), 'pantry-test-'))
   const mail = []
@@ -31,8 +32,9 @@ export async function harness() {
   const mf = new Miniflare({ ...convertV4MiniflareOptions({
     host: '127.0.0.1', port, modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'],
     d1Databases: { DB: 'pantry' },
-    bindings: { AUTH_ORIGIN: origin, AUTH_LOCAL: 'true', OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: 'local-test-secret-not-production-0123456789', SETUP_TOKEN: BOOTSTRAP, MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'test-resend-key', MAIL_FROM: 'Pantry <pantry@example.test>' },
+    bindings: { AUTH_ORIGIN: origin, AUTH_LOCAL: 'true', OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: 'local-test-secret-not-production-0123456789', SETUP_TOKEN: BOOTSTRAP, MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'test-resend-key', MAIL_FROM: 'Pantry <pantry@example.test>', ...bindings },
     async outboundService(request) {
+      if (outbound && new URL(request.url).hostname !== 'api.resend.com') return outbound(request)
       assert.equal(new URL(request.url).href, 'https://api.resend.com/emails', `unexpected outbound ${request.method} ${request.url}`)
       mail.push(await request.json())
       return Response.json({ id: `test-${mail.length}` })
@@ -88,8 +90,10 @@ export async function harness() {
       }
       return { token, call }
     }
+    /** Fire the Worker's Cron trigger. */
+    const cron = async () => (await mf.getWorker()).scheduled({ cron: '*/30 * * * *' })
     const close = async () => { await mf.dispose(); await rm(dir, { recursive: true, force: true }) }
-    return { db, origin, owner, send, command, view, member, agent, confirmMail, close }
+    return { db, origin, owner, send, command, view, member, agent, confirmMail, cron, close }
   } catch (error) {
     await mf.dispose(); await rm(dir, { recursive: true, force: true })
     throw error

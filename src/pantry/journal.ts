@@ -105,12 +105,13 @@ const post: Command = { need: 'post', async run(c, b) {
   return entry(c.db, current.id)
 } }
 
-export async function reversalStatements(db: D1Database, actor: Actor, original: Data, day: string, memo: string) {
+/** `unmatching`: the same batch ends the entry's match first (undoing a filing by rule). */
+export async function reversalStatements(db: D1Database, actor: Actor, original: Data, day: string, memo: string, { unmatching = false } = {}) {
   requireThat(original.status === 'posted', 'Only posted entries are reversed; edit or discard a draft', 409)
   requireThat(!original.reversed_by_id, 'Entry is already reversed', 409)
   requireThat(day >= original.entry_date, 'A reversal is dated on or after the original entry')
   await assertOpen(db, day)
-  const matched = await one(db, 'SELECT 1 FROM pt_match_postings mp JOIN pt_journal_lines l ON l.id = mp.journal_line_id WHERE l.entry_id = ? AND mp.active = 1', original.id)
+  const matched = !unmatching && await one(db, 'SELECT 1 FROM pt_match_postings mp JOIN pt_journal_lines l ON l.id = mp.journal_line_id WHERE l.entry_id = ? AND mp.active = 1', original.id)
   requireThat(!matched, 'This entry is matched to a bank statement line; undo the match first', 409)
   const id = uid()
   const lines: Line[] = original.lines.map((l: Data) => ({ accountId: l.account_id, debit: l.credit_cents, credit: l.debit_cents, memo: l.memo, contactId: l.contact_id }))

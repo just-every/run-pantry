@@ -8,6 +8,7 @@ import { setupStateResponse } from './base/setup-state'
 import { authResponse, runtimeBindings, type Bindings } from './auth.server'
 import { identity } from './identity'
 import { api } from './pantry/api'
+import { runDue } from './pantry/feeds/sync'
 
 // Start documents keep their own cache policy and add no-transform, so no proxy
 // rewrites the HTML React hydrates (Cloudflare's email address obfuscation
@@ -31,5 +32,9 @@ export default withDemo({
     const lobby = await lobbyResponse(request, runtimeBindings(env), identity)
     if (lobby) return lobby
     return dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request)))
+  },
+  // Scheduled bank and card feed pulls: each connection is due every few hours, sooner after a webhook.
+  async scheduled(_controller, env) {
+    await runDue(runtimeBindings(env), 10)
   },
 } satisfies ExportedHandler<Bindings>, { seed: seedDemo })

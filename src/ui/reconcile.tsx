@@ -7,7 +7,7 @@ import { Icon } from './icons'
 
 type NewItem = { type: string; amount: string; accountId?: string; contactId?: string; otherBankAccountId?: string; direction?: string; memo?: string }
 
-function MatchPanel({ lines, postings, bankId, clear, onDone }: { lines: D[]; postings: D[]; bankId: string; clear: () => void; onDone: () => Promise<void> }) {
+export function MatchPanel({ lines, postings, bankId, clear, onDone }: { lines: D[]; postings: D[]; bankId: string; clear: () => void; onDone: () => Promise<void> }) {
   const { state } = useShared(), [items, setItems] = useState<NewItem[]>([]), [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const statement = lines.reduce((s, l) => s + l.amount_cents, 0)
   const signed = (i: NewItem) => { const c = /^\d+(\.\d{1,2})?$/.test(i.amount) ? Math.round(Number(i.amount) * 100) : 0; return i.type === 'payment' || ((i.type === 'fee' || i.type === 'transfer') && i.direction !== 'in') ? -c : c }
