@@ -8,6 +8,7 @@ import { contact } from './contacts'
 import { entryStatements, type Line } from './journal'
 import { invoice, openBalance } from './invoices'
 import type { Command } from './context'
+import { METHODS } from './contractors'
 
 export async function bill(db: D1Database, id: string) {
   const row = await one(db, 'SELECT b.*, c.name AS vendor_name FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id WHERE b.id = ?', id)
@@ -99,6 +100,8 @@ export async function paymentStatements(db: D1Database, actor: Actor, b: Data) {
   requireThat(direction === 'received' || direction === 'paid', 'A payment is received or paid')
   const who_ = await contact(db, text(b.contactId, direction === 'received' ? 'Customer' : 'Vendor'), direction === 'received' ? 'customer' : 'vendor')
   const day = date(b.date, 'Payment date'), amount = cents(b.amount, 'Amount')
+  const method = optionalText(b.method, 'Payment method') || 'unrecorded'
+  requireThat((['unrecorded', ...METHODS] as string[]).includes(method), 'Payment method is check, ACH, wire, cash, card or a payment network')
   await assertOpen(db, day)
   const bank = await one(db, 'SELECT * FROM pt_bank_accounts WHERE id = ?', text(b.bankAccountId, 'Bank account'))
   requireThat(bank, 'Bank account not found', 404)
@@ -110,8 +113,8 @@ export async function paymentStatements(db: D1Database, actor: Actor, b: Data) {
     : [{ accountId: control.id, debit: amount, credit: 0, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }, { accountId: bank.account_id, debit: 0, credit: amount, memo: `Paid to ${who_.name}` }]
   const statements: Sql[] = [
     ...entryStatements({ id: journalId, date: day, memo: `${received ? 'Payment from' : 'Payment to'} ${who_.name}`, sourceKind: 'payment', sourceId: id, preparedBy: actor.email, preparedKind: 'person', lines }, actor.email),
-    q('INSERT INTO pt_payments (id, direction, contact_id, payment_date, amount_cents, bank_account_id, reference, memo, journal_id, recorded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      id, direction, who_.id, day, amount, bank.id, optionalText(b.reference, 'Reference', 80), optionalText(b.memo, 'Memo', 500), journalId, actor.email, now()),
+    q('INSERT INTO pt_payments (id, direction, contact_id, payment_date, amount_cents, bank_account_id, reference, memo, method, journal_id, recorded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      id, direction, who_.id, day, amount, bank.id, optionalText(b.reference, 'Reference', 80), optionalText(b.memo, 'Memo', 500), method, journalId, actor.email, now()),
     ...allocated.list.map(a => allocationInsert(actor, id, received ? 'invoice' : 'bill', a, day)), ...allocated.guards,
     audit(who(actor), 'payment.record', 'payment', id, { direction, amount, allocations: allocated.list }),
   ]

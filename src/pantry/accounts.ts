@@ -3,6 +3,7 @@ import { authority, who } from './access'
 import { optionalText, requireThat, text, uid, type Data } from './core'
 import { all, audit, changed, one, q, run, type Sql } from './db'
 import type { Command } from './context'
+import { STATES } from './states'
 
 export const TYPES = ['asset', 'liability', 'equity', 'income', 'expense'] as const
 export const SUBTYPES = ['bank', 'receivable', 'payable', 'tax', 'retained', 'other'] as const
@@ -79,16 +80,28 @@ const startChart: Command = { need: 'record', async run(c) {
   return { accounts: await all(c.db, 'SELECT * FROM pt_accounts ORDER BY code') }
 } }
 
+/** A sales tax code is a rate in one state. Once saved its rate and account stay; its name and state can be corrected. */
 const saveTaxCode: Command = { need: 'post', async run(c, b) {
   const name = text(b.name, 'Tax code name', 100)
+  // A code is in the business's own state unless another state is chosen.
+  const state = (optionalText(b.state, 'State', 2) || (await one(c.db, 'SELECT state FROM pt_entity WHERE id = 1'))?.state || '').toUpperCase()
+  requireThat(STATES.includes(state), 'Choose the state this tax is collected for (two-letter code)')
+  if (b.id) {
+    const current = await one(c.db, 'SELECT * FROM pt_tax_codes WHERE id = ?', text(b.id, 'Tax code'))
+    requireThat(current, 'Tax code not found', 404)
+    requireThat(current.revision === b.revision, 'Tax code changed; reload', 409)
+    await run(c.db, [authority(c.actor, 'post'), q('UPDATE pt_tax_codes SET name = ?, state = ?, revision = ? WHERE id = ? AND revision = ?', name, state, uid(), current.id, b.revision), changed(),
+      audit(who(c.actor), 'tax-code.update', 'tax-code', current.id, { name, state })])
+    return (await one(c.db, 'SELECT * FROM pt_tax_codes WHERE id = ?', current.id))!
+  }
   const rate = text(String(b.rate ?? ''), 'Rate')
   requireThat(/^\d{1,2}(\.\d{1,3})?$/.test(rate), 'Rate is a percentage with up to three decimals, like 8.875')
   const [w, f = ''] = rate.split('.'), milli = Number(w) * 1000 + Number(f.padEnd(3, '0'))
   const liability = await account(c.db, text(b.accountId, 'Sales tax account'))
   requireThat(liability.subtype === 'tax', 'Choose a sales tax liability account')
   const id = uid()
-  await run(c.db, [authority(c.actor, 'post'), q('INSERT INTO pt_tax_codes (id, name, rate_milli_percent, account_id, active, revision) VALUES (?, ?, ?, ?, 1, ?)', id, name, milli, liability.id, uid()),
-    audit(who(c.actor), 'tax-code.create', 'tax-code', id, { name, rate })])
+  await run(c.db, [authority(c.actor, 'post'), q('INSERT INTO pt_tax_codes (id, name, rate_milli_percent, account_id, state, active, revision) VALUES (?, ?, ?, ?, ?, 1, ?)', id, name, milli, liability.id, state, uid()),
+    audit(who(c.actor), 'tax-code.create', 'tax-code', id, { name, rate, state })])
   return (await one(c.db, 'SELECT * FROM pt_tax_codes WHERE id = ?', id))!
 } }
 

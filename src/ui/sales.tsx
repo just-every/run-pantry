@@ -120,6 +120,7 @@ function Payments({ data, reload }: { data: D; reload: () => Promise<void> }) {
           <Field label="Amount" name="amount" required inputMode="decimal" />
           <Field label="Bank account" name="bankAccountId" required options={state.bankAccounts.map((b: D) => ({ value: b.id, label: b.name }))} />
           <Field label="Reference" name="reference" />
+          <Field label="How it was paid" name="method" options={[{ value: 'check', label: 'Check' }, { value: 'ach', label: 'ACH' }, { value: 'wire', label: 'Wire' }, { value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }, { value: 'payment-network', label: 'Payment network (e.g. PayPal)' }]} hint="Card and payment-network payments stay out of 1099-NEC totals" />
         </div>
         {open.length > 0 && <fieldset className="allocations"><legend>Apply to open items</legend>{open.map(o => <div className="field" key={o.id}><label htmlFor={`al-${o.id}`}>{o.number ?? o.reference} — {usd(o.open_cents)} open</label><input id={`al-${o.id}`} inputMode="decimal" value={alloc[o.id] ?? ''} onChange={e => setAlloc(a => ({ ...a, [o.id]: e.target.value }))} /></div>)}</fieldset>}
       </Form>

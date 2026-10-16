@@ -4,7 +4,7 @@
 import { Hono, type Context as HonoContext } from 'hono'
 import type { Bindings } from '../auth.server'
 import { deploymentHealth } from '../base/deployment-health'
-import { agent, must, person, type Actor } from './access'
+import { agent, must, person, who, type Actor } from './access'
 import { date, Fault, requireThat, type Data } from './core'
 import { one } from './db'
 import type { Command, Context } from './context'
@@ -21,12 +21,17 @@ import { closeCommands, closeState } from './close'
 import { proposalCommands, proposalsView, agentContext, fileProposal, proposal } from './proposals'
 import { moveInCommands, moveInView } from './cutover/commands'
 import { ageing, balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports'
+import { basisOf, BASIS_LABEL } from './basis'
+import { figureDetail } from './drilldown'
+import { recordView } from './records'
+import { salesTax } from './sales-tax'
+import { contractorCommands, contractors, necCsv } from './contractors'
 import { accountantPackage, ledgerCsv } from './package'
 import { activity, actorView, documents, lookups, overview } from './views'
 
 const commands: Record<string, Command> = {
   ...settingsCommands, ...accountCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands,
-  ...bankCommands, ...matchCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands,
+  ...bankCommands, ...matchCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
 }
 
 type C = HonoContext<{ Bindings: Bindings }>
@@ -55,15 +60,33 @@ view('proposals', async ctx => ({ proposals: await proposalsView(ctx.db) }))
 view('move-in', async ctx => moveInView(ctx))
 view('activity', async ctx => activity(ctx.db))
 view('documents', async ctx => ({ documents: await documents(ctx.db) }))
-view('reports/:kind', async (ctx, c) => {
-  const kind = c.req.param('kind'), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
+const year = (c: C) => { const y = Number(c.req.query('year') ?? new Date().getUTCFullYear()); requireThat(Number.isInteger(y) && y >= 2000 && y <= 2100, 'Choose a tax year'); return y }
+view('reports/detail', async (ctx, c) => {
+  const to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
-  if (kind === 'trial-balance') return trialBalance(ctx.db, to)
-  if (kind === 'general-ledger') return generalLedger(ctx.db, from, to, c.req.query('account') || undefined)
-  if (kind === 'profit-and-loss') return profitAndLoss(ctx.db, from, to)
-  if (kind === 'balance-sheet') return balanceSheet(ctx.db, to, Number(e?.fiscal_year_start ?? 1))
+  return figureDetail(ctx.db, { report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: basisOf(c.req.query('basis')) }, Number(e?.fiscal_year_start ?? 1))
+})
+view('reports/record/:kind/:id', async (ctx, c) => recordView(ctx.db, c.req.param('kind')!, c.req.param('id')!))
+view('reports/contractors', async (ctx, c) => contractors(ctx.db, year(c)))
+view('reports/:kind', async (ctx, c) => {
+  const kind = c.req.param('kind'), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01'), basis = basisOf(c.req.query('basis'))
+  const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
+  if (kind === 'trial-balance') return trialBalance(ctx.db, to, basis)
+  if (kind === 'general-ledger') return generalLedger(ctx.db, from, to, c.req.query('account') || undefined, basis)
+  if (kind === 'profit-and-loss') return profitAndLoss(ctx.db, from, to, basis)
+  if (kind === 'balance-sheet') return balanceSheet(ctx.db, to, Number(e?.fiscal_year_start ?? 1), basis)
+  if (kind === 'sales-tax') return salesTax(ctx.db, from, to, basis)
   if (kind === 'receivables' || kind === 'payables') return ageing(ctx.db, kind === 'receivables' ? 'receivable' : 'payable', to)
   throw new Fault(404, 'Unknown report')
+})
+
+// The 1099-NEC filing file carries full TINs: the owner or someone with the posting grant, audited.
+api.get('/api/pantry/reports/contractors/:year/1099-nec.csv', async c => {
+  const ctx = await reader(c)
+  must(ctx.actor, 'post')
+  const y = Number(c.req.param('year'))
+  requireThat(Number.isInteger(y) && y >= 2000 && y <= 2100, 'Choose a tax year')
+  return new Response(await necCsv(ctx.db, who(ctx.actor), y), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-1099-nec-${y}.csv"`, 'cache-control': 'no-store' } })
 })
 
 api.get('/api/pantry/documents/:id', async c => {
@@ -73,15 +96,18 @@ api.get('/api/pantry/documents/:id', async c => {
   return new Response(new Uint8Array(doc.content as any), { headers: { 'content-type': doc.media_type, 'content-disposition': `attachment; filename="${doc.name.replace(/[^\w.-]+/g, '_')}"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox" } })
 })
 
+// Exports name their basis: in the file name (cash only, so accrual names stay as they were) and inside the file.
+const suffix = (basis: string) => basis === 'cash' ? '-cash' : ''
+
 api.get('/api/pantry/package/:period', async c => {
-  const ctx = await reader(c), period = c.req.param('period')
-  const body = JSON.stringify(await accountantPackage(ctx.db, period), null, 2)
-  return new Response(body, { headers: { 'content-type': 'application/json', 'content-disposition': `attachment; filename="pantry-close-${period}.json"`, 'cache-control': 'no-store' } })
+  const ctx = await reader(c), period = c.req.param('period'), basis = basisOf(c.req.query('basis'))
+  const body = JSON.stringify(await accountantPackage(ctx.db, period, basis), null, 2)
+  return new Response(body, { headers: { 'content-type': 'application/json', 'content-disposition': `attachment; filename="pantry-close-${period}${suffix(basis)}.json"`, 'cache-control': 'no-store' } })
 })
 
 api.get('/api/pantry/package/:period/general-ledger.csv', async c => {
-  const ctx = await reader(c), period = c.req.param('period')
-  return new Response(await ledgerCsv(ctx.db, period), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-general-ledger-${period}.csv"`, 'cache-control': 'no-store' } })
+  const ctx = await reader(c), period = c.req.param('period'), basis = basisOf(c.req.query('basis'))
+  return new Response(await ledgerCsv(ctx.db, period, basis), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-general-ledger-${period}${suffix(basis)}.csv"`, 'x-pantry-basis': BASIS_LABEL[basis], 'cache-control': 'no-store' } })
 })
 
 api.post('/api/pantry/command/:op', async c => {

@@ -1,8 +1,24 @@
-// Reports, all from the same ledger, and the accountant package download.
-import { useState } from 'react'
-import { Card, Chip, Loading, PageHead, Table, Tabs, day, today, usd, useView, type D } from './kit'
+// Reports, all from the same ledger, on the cash or accrual basis, and the
+// accountant package download. Every figure on the profit and loss and the
+// balance sheet opens to the records behind it (report-detail.tsx).
+import { Link, useNavigate, useSearch } from '@tanstack/react-router'
+import { Card, Chip, Loading, PageHead, Table, Tabs, day, today, usd, useShared, useView, type D } from './kit'
+import { BASIS_NAME, FigureDetail, RecordView } from './report-detail'
+import { SalesTax } from './sales-tax'
+import { Contractors } from './contractors'
 
-const KINDS: [string, string][] = [['Trial balance', 'trial-balance'], ['General ledger', 'general-ledger'], ['Profit and loss', 'profit-and-loss'], ['Balance sheet', 'balance-sheet'], ['Receivables aging', 'receivables'], ['Payables aging', 'payables']]
+export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string }
+type Basis = 'cash' | 'accrual'
+
+// [tab, slug, reads on a basis, takes a date range]
+const KINDS: [string, string, boolean, boolean][] = [['Trial balance', 'trial-balance', true, false], ['General ledger', 'general-ledger', true, true], ['Profit and loss', 'profit-and-loss', true, true], ['Balance sheet', 'balance-sheet', true, false],
+  ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false]]
+
+/** A figure that opens to its records. */
+function Figure({ line, children }: { line: string; children: React.ReactNode }) {
+  const search = useSearch({ from: '/app/reports' })
+  return <Link to="/app/reports" search={{ ...search, line, record: undefined }} className="figure-link">{children}</Link>
+}
 
 function Trial({ r }: { r: D }) {
   return <Table heads={['Code', 'Account', 'Debit', 'Credit']} figures={[2, 3]} empty="No posted balances on this date.">
@@ -15,15 +31,29 @@ function Ledger({ r }: { r: D }) {
   return <>{r.accounts.length ? r.accounts.map((a: D) => <div key={a.id} className="gl-account"><h3>{a.code} · {a.name}</h3>
     <Table heads={['Date', 'Entry', 'Description', 'Debit', 'Credit', 'Balance']} figures={[3, 4, 5]}>
       {[<tr key="open" className="muted"><td /><td /><td>Opening balance</td><td /><td /><td className="fig">{usd(a.opening)}</td></tr>,
-        ...a.rows.map((l: D) => <tr key={l.id}><td>{day(l.entry_date)}</td><td>{l.number}</td><td>{l.entry_memo}{l.reverses_id ? ' (reversal)' : l.reversed_by_id ? ' (reversed)' : ''}</td><td className="fig">{l.debit_cents ? usd(l.debit_cents) : ''}</td><td className="fig">{l.credit_cents ? usd(l.credit_cents) : ''}</td><td className="fig">{usd(l.running)}</td></tr>)]}
+        ...a.rows.map((l: D) => <tr key={l.id}><td>{day(l.entry_date)}</td><td>{l.number ?? '—'}</td><td>{l.entry_memo}{l.reverses_id ? ' (reversal)' : l.reversed_by_id ? ' (reversed)' : ''}</td><td className="fig">{l.debit_cents ? usd(l.debit_cents) : ''}</td><td className="fig">{l.credit_cents ? usd(l.credit_cents) : ''}</td><td className="fig">{usd(l.running)}</td></tr>)]}
     </Table></div>) : <p>No activity in this range.</p>}</>
 }
 
-function Statement({ sections, total }: { sections: [string, D[], number][]; total?: [string, number] }) {
+/** A statement whose every line and total opens to its records. Sections are [title, rows, total, total's line key]. */
+function Statement({ sections, total }: { sections: [string, D[], number, string][]; total?: [string, number, string] }) {
   return <Table heads={['Account', 'Amount']} figures={[1]}>
-    {[...sections.flatMap(([title, rows, sum]) => [<tr key={title} className="section"><td colSpan={2}>{title}</td></tr>, ...rows.map(x => <tr key={title + x.id}><td>{x.code ? `${x.code} · ` : ''}{x.name}</td><td className="fig">{usd(x.amount)}</td></tr>), <tr key={title + 'total'} className="total"><td>Total {title.toLowerCase()}</td><td className="fig">{usd(sum)}</td></tr>]),
-      ...(total ? [<tr key="grand" className="total grand"><td>{total[0]}</td><td className="fig">{usd(total[1])}</td></tr>] : [])]}
+    {[...sections.flatMap(([title, rows, sum, key]) => [<tr key={title} className="section"><td colSpan={2}>{title}</td></tr>,
+      ...rows.map(x => <tr key={title + x.id}><td><Figure line={x.id}>{x.code ? `${x.code} · ` : ''}{x.name}</Figure></td><td className="fig"><Figure line={x.id}>{usd(x.amount)}</Figure></td></tr>),
+      <tr key={title + 'total'} className="total"><td><Figure line={key}>Total {title.toLowerCase()}</Figure></td><td className="fig"><Figure line={key}>{usd(sum)}</Figure></td></tr>]),
+      ...(total ? [<tr key="grand" className="total grand"><td><Figure line={total[2]}>{total[0]}</Figure></td><td className="fig"><Figure line={total[2]}>{usd(total[1])}</Figure></td></tr>] : [])]}
   </Table>
+}
+
+/** Accrual net income to cash net income for the same range. */
+function Bridge({ b }: { b: D }) {
+  return <div className="bridge"><h3>From accrual to cash net income</h3>
+    <Table heads={['', 'Amount']} figures={[1]}>
+      <tr><td>Net income on the accrual basis</td><td className="fig">{usd(b.accrualNetIncome)}</td></tr>
+      <tr><td>Less invoices, credits and bills recorded in this period</td><td className="fig">{usd(-b.recordedInRange)}</td></tr>
+      <tr><td>Plus the shares of them paid or credited in this period</td><td className="fig">{usd(b.settledInRange)}</td></tr>
+      <tr className="total"><td>Net income on the cash basis {b.ties ? '' : '(does not tie)'}</td><td className="fig">{usd(b.cashNetIncome)}</td></tr>
+    </Table></div>
 }
 
 function Ageing({ r }: { r: D }) {
@@ -36,27 +66,52 @@ function Ageing({ r }: { r: D }) {
   </>
 }
 
+function BasisSwitch({ basis, onChange }: { basis: Basis; onChange: (b: Basis) => void }) {
+  return <div className="basis-switch" role="radiogroup" aria-label="Cash or accrual">
+    {(['cash', 'accrual'] as const).map(b => <button key={b} type="button" role="radio" aria-checked={basis === b} className={basis === b ? 'active' : ''} onClick={() => onChange(b)}>{b === 'cash' ? 'Cash' : 'Accrual'}</button>)}
+  </div>
+}
+
 const DAY = /^(\d{4})-(\d{2})-\d{2}$/
 // A date field's text is only used once it is a real YYYY-MM-DD; the package period is rebuilt from numbers.
 const isDay = (v: string) => DAY.test(v)
 const periodOf = (v: string) => { const m = DAY.exec(v); return `${String(Number(m![1])).padStart(4, '0')}-${String(Number(m![2])).padStart(2, '0')}` }
 
+function Report({ slug, basis, from, to }: { slug: string; basis: Basis; from: string; to: string }) {
+  const ranged = KINDS.find(k => k[1] === slug)![3]
+  const { data: r, error } = useView<D>(`reports/${slug}?to=${to}${ranged ? `&from=${from}` : ''}&basis=${basis}`)
+  if (!r) return <Loading error={error} what="the report" />
+  if (slug === 'trial-balance') return <Trial r={r} />
+  if (slug === 'general-ledger') return <Ledger r={r} />
+  if (slug === 'profit-and-loss') return <><p className="hint">Choose any line or total to see the records behind it.</p>
+    <Statement sections={[['Income', r.income, r.totalIncome, 'income'], ['Expenses', r.expenses, r.totalExpenses, 'expenses']]} total={['Net income', r.netIncome, 'net-income']} />{r.bridge && <Bridge b={r.bridge} />}</>
+  if (slug === 'balance-sheet') return <><p>{r.balanced ? <Chip tone="good">Assets equal liabilities plus equity</Chip> : <Chip tone="bad">Out of balance</Chip>}</p>
+    {basis === 'cash' && <p className="hint">On the cash basis, unpaid invoices and bills stay off the balance sheet with the tax on them; money received or paid but not yet applied stays in receivables or payables.</p>}
+    <Statement sections={[['Assets', r.assets, r.totalAssets, 'assets'], ['Liabilities', r.liabilities, r.totalLiabilities, 'liabilities'], ['Equity', r.equity, r.totalEquity, 'equity']]} total={['Liabilities and equity', r.totalLiabilities + r.totalEquity, 'liabilities-and-equity']} /></>
+  if (slug === 'sales-tax') return <SalesTax r={r} />
+  return <Ageing r={r} />
+}
+
 export function Reports() {
-  const [kind, setKind] = useState('Trial balance'), [to, setTo] = useState(today()), [from, setFrom] = useState(today().slice(0, 8) + '01')
-  const slug = KINDS.find(k => k[0] === kind)![1], ranged = slug === 'general-ledger' || slug === 'profit-and-loss'
-  const { data: r, error } = useView<D>(`reports/${slug}?to=${to}${ranged ? `&from=${from}` : ''}`)
-  const period = periodOf(to)
+  const search = useSearch({ from: '/app/reports' }), navigate = useNavigate({ from: '/app/reports' }), { state } = useShared()
+  const set = (patch: ReportSearch) => navigate({ search: (s: ReportSearch) => ({ ...s, ...patch }), replace: !('report' in patch || 'line' in patch || 'record' in patch) })
+  const kind = KINDS.find(k => k[1] === search.report) ?? KINDS[0], [label, slug, based, ranged] = kind
+  // The declared tax method picks the basis a report opens on; the switch changes only what is shown.
+  const basis: Basis = search.basis === 'cash' || search.basis === 'accrual' ? search.basis : state.settings?.entity?.tax_method === 'cash' ? 'cash' : 'accrual'
+  const to = search.to && isDay(search.to) ? search.to : today(), from = search.from && isDay(search.from) ? search.from : to.slice(0, 8) + '01'
+  const period = periodOf(to), q = basis === 'cash' ? '?basis=cash' : ''
+  const detail = (slug === 'profit-and-loss' || slug === 'balance-sheet') && search.line
   return <>
-    <PageHead title="Reports" lead="Every report is calculated from the same posted ledger."
-      actions={<><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv`} download>General ledger CSV</a><a className="btn btn-primary" href={`/api/pantry/package/${period}`} download>Download accountant package</a></>} />
-    <Tabs tabs={KINDS.map(k => k[0])} current={kind} onChange={setKind} pick="Report" />
-    <Card title={kind} actions={<div className="inline-fields">{ranged && <div className="field inline"><label htmlFor="r-from">From</label><input id="r-from" type="date" value={from} onChange={e => isDay(e.target.value) && setFrom(e.target.value)} /></div>}<div className="field inline"><label htmlFor="r-to">{ranged ? 'To' : 'As of'}</label><input id="r-to" type="date" value={to} onChange={e => isDay(e.target.value) && setTo(e.target.value)} /></div></div>}>
-      {!r ? <Loading error={error} what="the report" />
-        : slug === 'trial-balance' ? <Trial r={r} />
-        : slug === 'general-ledger' ? <Ledger r={r} />
-        : slug === 'profit-and-loss' ? <Statement sections={[['Income', r.income, r.totalIncome], ['Expenses', r.expenses, r.totalExpenses]]} total={['Net income', r.netIncome]} />
-        : slug === 'balance-sheet' ? <><p>{r.balanced ? <Chip tone="good">Assets equal liabilities plus equity</Chip> : <Chip tone="bad">Out of balance</Chip>}</p><Statement sections={[['Assets', r.assets, r.totalAssets], ['Liabilities', r.liabilities, r.totalLiabilities], ['Equity', r.equity, r.totalEquity]]} total={['Liabilities and equity', r.totalLiabilities + r.totalEquity]} /></>
-        : <Ageing r={r} />}
-    </Card>
+    <PageHead title="Reports" lead="Every report is calculated from the same posted ledger, on the cash or the accrual basis."
+      actions={<><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv${q}`} download>General ledger CSV · {basis === 'cash' ? 'cash' : 'accrual'}</a><a className="btn btn-primary" href={`/api/pantry/package/${period}${q}`} download>Download accountant package</a></>} />
+    <Tabs tabs={KINDS.map(k => k[0])} current={label} onChange={t => set({ report: KINDS.find(k => k[0] === t)![1], line: undefined, record: undefined })} pick="Report" />
+    {slug === 'contractors' ? <Contractors year={Number(search.year) || Number(today().slice(0, 4))} onYear={y => set({ year: String(y) })} />
+      : search.record && detail ? <RecordView record={search.record} reportLabel={label} />
+      : detail ? <FigureDetail report={slug} line={search.line!} from={from} to={to} basis={basis} reportLabel={label} />
+      : <Card title={<>{label} <Chip tone="info">{based ? BASIS_NAME[basis] : 'Open items'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}
+          {ranged && <div className="field inline"><label htmlFor="r-from">From</label><input id="r-from" type="date" value={from} onChange={e => isDay(e.target.value) && set({ from: e.target.value })} /></div>}
+          <div className="field inline"><label htmlFor="r-to">{ranged ? 'To' : 'As of'}</label><input id="r-to" type="date" value={to} onChange={e => isDay(e.target.value) && set({ to: e.target.value })} /></div></div>}>
+          <Report slug={slug} basis={basis} from={from} to={to} />
+        </Card>}
   </>
 }

@@ -50,7 +50,7 @@ These were decided for this release and are not open questions:
 
 - **Name:** Pantry, the adopted working name. The live "Pantry Software" class 42 mark (ERP/inventory) stays recorded as a launch-naming risk; this contract makes no clearance claim.
 - **Scope:** one US service-business legal entity, USD only, owner + bookkeeper + outside accountant.
-- **Basis:** accrual double-entry books. The tax accounting method is declared (cash, accrual or not yet declared) as a record of the accountant's decision; Pantry does not perform or imply a method change. Cash-basis presentation is not in this release.
+- **Basis:** accrual double-entry books. The tax accounting method is declared (cash, accrual or not yet declared) as a record of the accountant's decision; Pantry does not perform or imply a method change. Reports can be read on the cash basis, calculated from the accrual books and never written back; the declared method picks the default ([docs/reports.md](docs/reports.md)).
 - **State and tax:** the state and declared policies are recorded at setup. Sales tax codes and rates are entered by the business as its accountant confirms them; Pantry gives no tax advice and never assumes a zero rate.
 - **Move-in order:** QuickBooks Online first (this release), then Xero, then Zoho Books. The QBO kit imports the chart, contacts, an accountant-approved trial balance, open receivables and payables and a read-only GL history archive; complete transactional replay waits for a real package.
 - **Agents:** the owner's existing agent through typed commands; no embedded model or model account in this release.
@@ -58,4 +58,4 @@ These were decided for this release and are not open questions:
 
 ## Not in the first release
 
-Live bank feeds or any provider account; payment initiation; sending invoices or reminders by email; tax filing, tax calculation beyond the business's own rates, or tax advice; payroll; multi-currency; consolidation or more than one entity; inventory valuation; fixed-asset depreciation automation; advanced revenue recognition; cash-basis reports; budgets and FP&A; the Xero and Zoho kits; transactional history replay from QuickBooks; attachments from QuickBooks (report exports carry none); a hosted deployment; brand, homepage, docs site and run site content.
+Live bank feeds or any provider account; payment initiation; sending invoices or reminders by email; tax filing (sales tax returns or 1099s; Pantry reports sales tax by state and prepares 1099-NEC figures and a filing CSV, and files nothing), tax calculation beyond the business's own rates, or tax advice; payroll; multi-currency; consolidation or more than one entity; inventory valuation; fixed-asset depreciation automation; advanced revenue recognition; budgets and FP&A; the Xero and Zoho kits; transactional history replay from QuickBooks; attachments from QuickBooks (report exports carry none); a hosted deployment; brand, homepage, docs site and run site content.
