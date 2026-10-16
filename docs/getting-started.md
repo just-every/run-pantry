@@ -1,22 +1,12 @@
 Pantry runs on your own computer. You need Node 22 or later and pnpm 10.12.4, on macOS, Linux or Windows with WSL2. Pantry is MIT licensed: there is nothing to buy and no account to create.
 
-## Install rer
-
-`rer` is the Run Edit Run command that installs, starts, backs up and restores Pantry. Install it once per computer:
-
-```sh
-curl -fsSL https://runeditrun.com/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-If you prefer npm, `npm install -g @runeditrun/rer` installs the same command.
-
 ## Get Pantry and start it
 
 ```sh
-git clone https://github.com/just-every/run-pantry.git pantry
-cd pantry && rer dev
+npx -y @runeditrun/rer dev just-every/run-pantry
 ```
+
+That one line installs `rer`, the Run Edit Run command that installs, starts, backs up and restores Pantry, then clones Pantry and starts it. To start it again later, run `cd run-pantry && rer dev`.
 
 The first start installs everything Pantry needs, which can take a few minutes. When it is ready, `rer dev` prints two lines:
 
