@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { Card, Chip, Loading, PageHead, Table, Tabs, day, today, usd, useView, type D } from './kit'
 
-const KINDS: [string, string][] = [['Trial balance', 'trial-balance'], ['General ledger', 'general-ledger'], ['Profit and loss', 'profit-and-loss'], ['Balance sheet', 'balance-sheet'], ['Receivables ageing', 'receivables'], ['Payables ageing', 'payables']]
+const KINDS: [string, string][] = [['Trial balance', 'trial-balance'], ['General ledger', 'general-ledger'], ['Profit and loss', 'profit-and-loss'], ['Balance sheet', 'balance-sheet'], ['Receivables aging', 'receivables'], ['Payables aging', 'payables']]
 
 function Trial({ r }: { r: D }) {
   return <Table heads={['Code', 'Account', 'Debit', 'Credit']} figures={[2, 3]} empty="No posted balances on this date.">

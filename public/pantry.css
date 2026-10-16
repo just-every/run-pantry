@@ -17,8 +17,8 @@ p { margin: 0 0 10px; text-wrap: pretty; }
 
 /* Shell: lockup, the destinations as pills with the current one glazed, who is signed in. */
 .app-header { height: 72px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; padding: 0 48px; border-bottom: 1px solid var(--line); background: var(--paper); position: relative; z-index: 20; }
-.brand { justify-self: start; display: inline-flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; }
-.brand img { width: 28px; height: 28px; filter: drop-shadow(0 2px 2px rgba(26, 26, 27, .12)); }
+.brand { justify-self: start; display: inline-flex; align-items: center; gap: 10px; font-family: var(--rer-font-heading); font-size: 23px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); text-decoration: none; }
+.brand img { width: 28px; height: 28px; margin-top: -2px; }
 .app-nav { display: flex; align-items: center; gap: 4px; }
 .nav-link { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: 10px; color: var(--ink); font: inherit; font-size: 15px; font-weight: 500; text-decoration: none; background: none; border: 0; cursor: pointer; white-space: nowrap; }
 .nav-link .icon { display: none; }
