@@ -5,6 +5,7 @@ import { Link } from '@tanstack/react-router'
 import { Action, Card, Chip, command, usd, useShared, type D } from './kit'
 import { Icon } from './icons'
 import { openLink } from './plaid-link'
+import { SetupSteps } from './provider-guides'
 
 export function ago(iso?: string | null) {
   if (!iso) return 'never'
@@ -52,11 +53,11 @@ export function RelinkNotices({ data, onDone }: { data: D | undefined; onDone: (
 }
 
 export function Feeds({ data, onDone }: { data: D | undefined; onDone: () => Promise<void> }) {
-  const can = useShared().state.actor.can.record
+  const { can } = useShared().state.actor
   if (!data) return null
   const a = data.availability
-  return <Card title="Bank and card feeds" actions={a.available && can && <Link className="btn btn-secondary btn-small" to="/app/bank/connect">Connect a bank or card</Link>}>
-    {!a.available ? <p className="hint">{a.reason}</p>
+  return <Card title="Bank and card feeds" actions={a.available && can.record && <Link className="btn btn-secondary btn-small" to="/app/bank/connect">Connect a bank or card</Link>}>
+    {!a.available ? a.needsKeys ? <SetupSteps provider="plaid" reason={a.reason} summary="Set up live bank feeds" owner={can.owner} /> : <p className="hint">{a.reason}</p>
       : !data.connections.length ? <p className="hint">Connect a bank or card once and its transactions arrive on their own. Statement files keep working beside it.</p>
       : data.connections.map((c: D) => <Connection key={c.id} c={c} onDone={onDone} />)}
   </Card>

@@ -44,6 +44,21 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
   checks.push({ key: 'subledgers', title: 'Receivables and payables agree to control accounts', ok: ar.agrees && ap.agrees,
     detail: `Receivables ${usd(ar.subledger)} vs ${ar.control ? usd(ar.control.balance) : 'no control account'}; payables ${usd(ap.subledger)} vs ${ap.control ? usd(ap.control.balance) : 'no control account'}` })
 
+  // Money paid or received but left unapplied while the same customer or vendor has open invoices or bills: the bill still
+  // reads as owed and the cash-basis profit misses it. A prepayment with nothing open is fine.
+  const applied = (target: string) => `COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a LEFT JOIN pt_payments ap ON a.source_kind = 'payment' AND ap.id = a.source_id
+    WHERE a.target_kind = '${target}' AND a.target_id = t.id AND (a.source_kind = 'credit' OR ap.reversal_id IS NULL)), 0)`
+  const unapplied = await all(db, `SELECT p.id, p.direction, c.name, p.amount_cents - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a WHERE a.source_kind = 'payment' AND a.source_id = p.id), 0) AS left_cents
+    FROM pt_payments p JOIN pt_contacts c ON c.id = p.contact_id WHERE p.reversal_id IS NULL AND p.payment_date <= ?
+      AND p.amount_cents > COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a WHERE a.source_kind = 'payment' AND a.source_id = p.id), 0)
+      AND CASE p.direction WHEN 'paid' THEN EXISTS (SELECT 1 FROM pt_bills t WHERE t.vendor_id = p.contact_id AND (t.status = 'posted' OR t.opening = 1) AND t.status <> 'void' AND t.bill_date <= ? AND t.total_cents > ${applied('bill')})
+        ELSE EXISTS (SELECT 1 FROM pt_invoices t WHERE t.customer_id = p.contact_id AND t.kind = 'invoice' AND t.status = 'issued' AND t.issue_date <= ? AND t.total_cents > ${applied('invoice')}) END
+    ORDER BY p.payment_date, p.id`, end, end, end)
+  checks.push({ key: 'unapplied', title: 'Payments applied to their invoices and bills', ok: unapplied.length === 0,
+    items: unapplied.map(x => ({ kind: 'payment', id: x.id, label: `${usd(x.left_cents)} ${x.direction === 'paid' ? 'to' : 'from'} ${x.name}` })),
+    detail: unapplied.length ? `${unapplied.map(x => `${usd(x.left_cents)} ${x.direction === 'paid' ? 'paid to' : 'received from'} ${x.name}`).join('; ')} not applied while they have open ${unapplied.every(x => x.direction === 'paid') ? 'bills' : unapplied.every(x => x.direction !== 'paid') ? 'invoices' : 'invoices or bills'}: apply ${unapplied.length === 1 ? 'it' : 'them'} under Sales & bills › Payments`
+      : 'No payment is waiting to be applied' })
+
   const tb = await trialBalance(db, end)
   checks.push({ key: 'trial-balance', title: 'Trial balance balances', ok: tb.balanced, detail: `Debits ${usd(tb.debit)}, credits ${usd(tb.credit)}` })
 

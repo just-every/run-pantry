@@ -55,11 +55,11 @@ export async function postingFor(h, statementId, memo) {
   return at(r.postings, p => p.memo.includes(memo))
 }
 
-export async function matchSeptember(h, s, st, { skip = [] } = {}) {
+/** The September lines a person matches; the Cedar deposit, which names its recorded payment, matched itself on import. */
+export async function matchSeptember(h, s, st) {
   const r = await h.view(`reconciliation/${st.checking.id}`)
   const ln = text => at(r.lines, l => l.description.includes(text))
   const posting = memo => at(r.postings, p => p.memo.includes(memo))
-  if (!skip.includes('cedar')) await h.command('match.approve', { bankLineIds: [ln('CEDAR STUDIO').id], journalLineIds: [posting('Payment from Cedar Studio').id] })
   await h.command('match.approve', { bankLineIds: [ln('SERVICE FEE').id], create: [{ type: 'fee', amount: '12.00', accountId: s.acct['6400'], direction: 'out', memo: 'Monthly service fee' }] })
   await h.command('match.approve', { bankLineIds: [ln('BRIGHTLINE').id], create: [{ type: 'payment', amount: '640.00', contactId: s.c['Brightline Software'].id, allocations: [{ targetId: s.bills.brightline.id, amount: '640.00' }] }] })
   await h.command('match.approve', { bankLineIds: [ln('NORTHSTAR').id], create: [{ type: 'receipt', amount: '1500.00', contactId: s.c['Northstar Consulting'].id, allocations: [{ targetId: s.inv.northstar.id, amount: '1500.00' }] }] })

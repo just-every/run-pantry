@@ -15,7 +15,7 @@ export const SERVICE_CHART: [string, string, string, string][] = [
   ['1200', 'Accounts receivable', 'asset', 'receivable'],
   ['1500', 'Equipment', 'asset', 'other'],
   ['2000', 'Accounts payable', 'liability', 'payable'],
-  ['2100', 'Credit card', 'liability', 'other'],
+  ['2100', 'Credit card', 'liability', 'bank'],
   ['2200', 'Sales tax payable', 'liability', 'tax'],
   ['3000', "Owner's equity", 'equity', 'other'],
   ['3900', 'Retained earnings', 'equity', 'retained'],

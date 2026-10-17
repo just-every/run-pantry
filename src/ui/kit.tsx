@@ -1,6 +1,6 @@
 // Shared screen pieces: API calls, money, status chips, forms and tables that
 // stack into label/value blocks on a phone.
-import { Children, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useId, useState, type ReactElement, type ReactNode } from 'react'
+import { Children, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from 'react'
 
 export type D = Record<string, any>
 
@@ -14,12 +14,20 @@ export async function api(path: string, body?: D) {
 
 export const command = (op: string, body: D) => api('command/' + op, body)
 
-/** Load a view; `reload` refetches after a change. */
+/** Load a view; `reload` refetches after a change. What it returns always belongs to the current
+ * path: while a new path loads (a report tab, a record) there is no data, never the previous path's,
+ * and an answer for a path no longer shown is dropped. */
 export function useView<T = D>(path: string | null) {
-  const [data, setData] = useState<T>(), [error, setError] = useState('')
-  const reload = useCallback(async () => { if (!path) return; try { setData(await api(path)); setError('') } catch (e) { setError((e as Error).message) } }, [path])
-  useEffect(() => { setData(undefined); void reload() }, [reload])
-  return { data, error, reload }
+  const [view, setView] = useState<{ path: string; data?: T; error: string }>(), current = useRef(path)
+  current.current = path
+  const reload = useCallback(async () => {
+    if (!path) return
+    try { const data = await api(path); if (current.current === path) setView({ path, data, error: '' }) }
+    catch (e) { if (current.current === path) setView(v => ({ path, data: v?.path === path ? v.data : undefined, error: (e as Error).message })) }
+  }, [path])
+  useEffect(() => { void reload() }, [reload])
+  const mine = view?.path === path ? view : undefined
+  return { data: mine?.data, error: mine?.error ?? '', reload }
 }
 
 export type Shared = { state: D; reload: () => Promise<void> }

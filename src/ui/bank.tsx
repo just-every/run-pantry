@@ -22,14 +22,15 @@ function Import({ accounts, onDone }: { accounts: D[]; onDone: () => Promise<voi
       </div>
     </Form>
     {result && <div className={`callout ${result.duplicate ? 'callout-warn' : 'callout-good'}`} role="status"><strong>{result.duplicate ? 'This file was already imported' : `Imported ${result.added} line${result.added === 1 ? '' : 's'}`}</strong><span>{result.duplicate ? 'No lines were added.' : `${result.duplicates} already in Pantry were skipped.${result.fromFeed ? ` ${result.fromFeed} came in from the feed already and joined this statement.` : ''}${result.filedByRule ? ` ${result.filedByRule} filed by your rules.` : ''}`}{result.fileBalances && !result.fileBalances.agrees ? ` The file's lines total ${usd(result.fileBalances.lineTotal)}, which does not match its balances; reconciliation will show the difference.` : ''}</span></div>}
-    {result && <AutomaticResult automatic={result.automatic} />}
+    {result && <AutomaticResult automatic={result.automatic} recorded={result.recorded} />}
   </Card>
 }
 
 /** What the import matched by itself, and the deposits it left for a person. */
-function AutomaticResult({ automatic }: { automatic?: D }) {
+function AutomaticResult({ automatic, recorded = [] }: { automatic?: D; recorded?: D[] }) {
   if (!automatic) return null
   return <>
+    {recorded.length > 0 && <div className="callout callout-good" role="status"><strong>{recorded.length} recorded payment{recorded.length === 1 ? '' : 's'} met {recorded.length === 1 ? 'its' : 'their'} bank line{recorded.length === 1 ? '' : 's'}</strong><span>{recorded.map((m: D) => `${usd(Math.abs(m.amount))} ${m.amount < 0 ? 'to' : 'from'} ${m.contact}`).join('; ')}. Nothing was posted twice; each can be undone on the reconciliation screen.</span></div>}
     {automatic.matched.length > 0 && <div className="callout callout-good" role="status"><strong>{automatic.matched.length} deposit{automatic.matched.length === 1 ? '' : 's'} matched automatically</strong><span>{automatic.matched.map((m: D) => `${usd(m.amount)} from ${m.customer} paid ${m.invoice}`).join('; ')}. Each can be undone on the reconciliation screen.</span></div>}
     {automatic.needsPerson.length > 0 && <div className="callout callout-warn" role="status"><strong>{automatic.needsPerson.length} deposit{automatic.needsPerson.length === 1 ? '' : 's'} need{automatic.needsPerson.length === 1 ? 's' : ''} you</strong><span>{automatic.needsPerson.map((m: D) => `${m.description}: ${m.reason}`).join(' · ')}</span></div>}
   </>
@@ -39,7 +40,7 @@ function NewBankAccount({ onDone }: { onDone: () => Promise<void> }) {
   const { state } = useShared(), used = new Set(state.bankAccounts.map((b: D) => b.account_id))
   return <Card title="Add a bank or card account"><Form label="Add bank account" submit={b => command('bank-account.save', b)} onDone={onDone} className="grid-form">
     <Field label="Name" name="name" required /><Field label="Bank" name="institution" required />
-    <Field label="Ledger account" name="accountId" required options={accountOptions(state.accounts, a => a.subtype === 'bank' && !used.has(a.id))} hint="A bank or card account in your chart" />
+    <Field label="Ledger account" name="accountId" required options={accountOptions(state.accounts, a => a.subtype === 'bank' && !used.has(a.id))} hint="Chart accounts with the Bank or card role. For a credit card, use 2100 Credit card or add a liability account with that role under Books." />
     <Field label="Last four digits" name="numberLast4" required inputMode="numeric" />
     <Field label="Routing number (optional)" name="routing" inputMode="numeric" />
     <Field label="Opening statement date" name="openingDate" type="date" required /><Field label="Opening statement balance" name="openingBalance" required inputMode="decimal" />

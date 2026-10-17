@@ -22,7 +22,8 @@ export class PlaidError extends Error {
   get relink() { return RELINK_CODES.has(this.code) }
 }
 
-export type Availability = { available: true; environment: string } | { available: false; reason: string }
+// needsKeys: this installation has no Plaid account of its own yet; the app shows how to set one up.
+export type Availability = { available: true; environment: string } | { available: false; reason: string; needsKeys?: boolean }
 
 /** RER Managed sets RER_INSTALLATION_ID beside a non-loopback management origin. */
 function managed(env: Bindings) {
@@ -32,7 +33,7 @@ function managed(env: Bindings) {
 
 export function availability(env: Bindings): Availability {
   if (managed(env)) return { available: false, reason: 'Live bank feeds are not available yet on RER Managed; import statement files instead.' }
-  if (!env.PLAID_CLIENT_ID || !env.PLAID_SECRET) return { available: false, reason: 'Live bank feeds need this installation’s own Plaid keys (PLAID_CLIENT_ID and PLAID_SECRET); until then, import statement files.' }
+  if (!env.PLAID_CLIENT_ID || !env.PLAID_SECRET) return { available: false, needsKeys: true, reason: 'Live bank feeds come through Plaid, with a Plaid account of your own, and this Pantry has none set up yet. Until then, import statement files.' }
   const environment = env.PLAID_ENV || 'sandbox'
   if (!HOSTS[environment]) return { available: false, reason: `PLAID_ENV is "${environment}"; use sandbox or production.` }
   return { available: true, environment }

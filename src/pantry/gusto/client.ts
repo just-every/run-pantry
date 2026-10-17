@@ -11,11 +11,11 @@ import { managedInstall } from '../stripe-api'
 const HOSTS: Record<string, string> = { demo: 'https://api.gusto-demo.com', production: 'https://api.gusto.com' }
 export const API_VERSION = '2026-06-15'
 
-export type Availability = { available: true; environment: string; redirectUri: string } | { available: false; reason: string }
+export type Availability = { available: true; environment: string; redirectUri: string } | { available: false; reason: string; needsKeys?: boolean }
 
 export function availability(env: Bindings): Availability {
   if (managedInstall(env)) return { available: false, reason: 'Payroll from Gusto is not available yet on RER Managed: managed installs cannot reach Gusto until RER adds a provider relay.' }
-  if (!env.GUSTO_CLIENT_ID || !env.GUSTO_CLIENT_SECRET) return { available: false, reason: 'Payroll from Gusto needs this installation’s own Gusto app: set GUSTO_CLIENT_ID and GUSTO_CLIENT_SECRET (and GUSTO_ENV=production once Gusto approves it).' }
+  if (!env.GUSTO_CLIENT_ID || !env.GUSTO_CLIENT_SECRET) return { available: false, needsKeys: true, reason: 'Payroll from Gusto needs a Gusto developer app of your own, and this Pantry has none set up yet.' }
   const environment = env.GUSTO_ENV || 'demo'
   if (!HOSTS[environment]) return { available: false, reason: `GUSTO_ENV is "${environment}"; use demo or production.` }
   return { available: true, environment, redirectUri: `${runtimeBindings(env).AUTH_ORIGIN}/api/pantry/gusto/callback` }

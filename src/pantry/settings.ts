@@ -52,6 +52,16 @@ const saveMember: Command = { need: 'owner', async run(c, b) {
   requireThat(['bookkeeper', 'accountant', 'viewer'].includes(role), 'Role is bookkeeper, accountant or viewer')
   const flag = (v: unknown) => (v === true || v === 'on' || v === 'true' || v === 1) && role !== 'viewer' ? 1 : 0
   const row = { name: text(b.name, 'Name', 200), post: flag(b.canPost), lock: flag(b.canLock), reopen: flag(b.canReopen), active: b.active === false || b.active === 'false' ? 0 : 1 }
+  // Editing someone's email moves that person to the new address: the old one no longer signs in to these books.
+  const previous = b.previousEmail ? text(b.previousEmail, 'Previous email', 254).toLowerCase() : email
+  if (previous !== email) {
+    requireThat(await one(c.db, 'SELECT 1 FROM pt_members WHERE email = ?', previous), 'That person is no longer in People; reload', 404)
+    requireThat(!(await one(c.db, 'SELECT 1 FROM pt_members WHERE email = ?', email)), `${email} is already in People`, 409)
+    await run(c.db, [authority(c.actor, 'owner'),
+      q('UPDATE pt_members SET email = ?, name = ?, role = ?, can_post = ?, can_lock = ?, can_reopen = ?, active = ?, revision = ? WHERE email = ?', email, row.name, role, row.post, row.lock, row.reopen, row.active, uid(), previous), changed(),
+      audit(who(c.actor), 'member.save', 'member', email, { previousEmail: previous, role, canPost: !!row.post, canLock: !!row.lock, canReopen: !!row.reopen, active: !!row.active })])
+    return (await one(c.db, 'SELECT * FROM pt_members WHERE email = ?', email))!
+  }
   await run(c.db, [authority(c.actor, 'owner'),
     q('INSERT INTO pt_members (email, name, role, can_post, can_lock, can_reopen, active, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(email) DO UPDATE SET name = excluded.name, role = excluded.role, can_post = excluded.can_post, can_lock = excluded.can_lock, can_reopen = excluded.can_reopen, active = excluded.active, revision = excluded.revision',
       email, row.name, role, row.post, row.lock, row.reopen, row.active, uid()),
@@ -65,7 +75,33 @@ const inviteMember: Command = { need: 'owner', async run(c, b) {
   requireThat(member, 'Add the person with a role before inviting them')
   await operatorAuth(runtimeBindings(c.env)).invite(c.request, { email, displayName: member.name, role: 'member', returnTo: '/app' })
   await run(c.db, [authority(c.actor, 'owner'), audit(who(c.actor), 'member.invite', 'member', email)])
-  return { invited: email }
+  // A run on this computer (or the demo) records the invitation but sends no email.
+  const e = runtimeBindings(c.env)
+  return { invited: email, name: member.name, emailed: !(e.MAIL_PROVIDER === 'development' || e.RER_DEMO === '1') }
+} }
+
+// The owner's own name and sign-in email. The email changes through sign-in, which asks for a fresh
+// proof (on this computer the dev sign-in is enough; hosted, an email-link sign-in in the last ten minutes).
+const STEP_UP = 'To change your sign-in email, sign out, sign in again with the emailed link, and change it within ten minutes.'
+const saveOwner: Command = { need: 'owner', async run(c, b) {
+  const name = text(b.name, 'Name', 200), email = text(b.email, 'Email', 254).toLowerCase()
+  requireThat(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email), 'Enter a valid email')
+  requireThat(!(await one(c.db, 'SELECT 1 FROM pt_members WHERE email = ?', email)), `${email} is already someone in People`, 409)
+  if (email !== c.actor.email) {
+    const auth = operatorAuth(runtimeBindings(c.env)) as unknown as { changeEmail?: (r: Request, i: Data) => Promise<unknown> }
+    requireThat(auth.changeEmail, 'This installation cannot change sign-in emails', 409)
+    try { await auth.changeEmail!(c.request, { email }) }
+    catch (error) {
+      const code = (error as { code?: string }).code
+      if (code === 'step_up_required') throw new Fault(403, STEP_UP)
+      if (code === 'email_in_use') throw new Fault(409, `${email} already signs in to this Pantry`)
+      if (code === 'email_not_allowed') throw new Fault(400, `${email} is not allowed to sign in here`)
+      throw error
+    }
+  }
+  await run(c.db, [authority(c.actor, 'owner'), q('UPDATE oa_operators SET display_name = ? WHERE id = ?', name, c.actor.id), changed(),
+    audit(who(c.actor), 'owner.save', 'owner', c.actor.id, { name, ...(email !== c.actor.email ? { previousEmail: c.actor.email, email } : {}) })])
+  return { name, email }
 } }
 
 const createAgent: Command = { need: 'owner', async run(c, b) {
@@ -91,6 +127,7 @@ export const settingsCommands: Record<string, Command> = {
   'entity.save': saveEntity,
   'member.save': saveMember,
   'member.invite': inviteMember,
+  'owner.save': saveOwner,
   'agent.create': createAgent,
   'agent.deactivate': deactivateAgent,
 }

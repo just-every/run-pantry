@@ -349,6 +349,7 @@ ul.plain li:last-child { border-bottom: 0; }
 @media (max-width: 720px) {
   .card-actions .inline-fields { width: 100%; }
   .card-actions .inline-fields .field { flex: 1 1 140px; min-width: 0; }
+  .card-actions .inline-fields .field input { min-width: 0; width: 100%; }
   .ledger td .filed { display: inline-flex; max-width: 70%; }
   .preview-lines li { flex-direction: column; gap: 2px; }
 }
@@ -436,3 +437,10 @@ ol.how-to code { overflow-wrap: anywhere; }
   .own-words .action, .own-words .btn { width: 100%; }
 }
 .choice input[type='radio'] { accent-color: var(--glaze); flex: none; width: 18px; height: 18px; min-height: 0; padding: 0; margin: 3px 0 0; }
+
+/* Provider setup steps: the lines to paste keep their line breaks and scroll sideways on a phone. */
+.provider-setup pre.env-lines { margin: 8px 0 0; padding: 10px 12px; background: var(--paper-2, rgba(0,0,0,.04)); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; font-size: 13px; }
+.provider-setup .how-to code { overflow-wrap: anywhere; }
+details.setup-steps summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
+.provider-setup, details.setup-steps, ol.how-to > li { min-width: 0; }
+.provider-setup pre.env-lines { max-width: 100%; }

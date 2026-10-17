@@ -1,14 +1,15 @@
 // Attachments carried over from Xero after a Xero move-in: connect Xero
 // (read-only), then carry the files on each imported open invoice and bill
 // over in batches, showing what was kept and what could not be.
+import { SetupSteps } from './provider-guides'
 import { useEffect, useState } from 'react'
-import { Action, Card, Chip, command, Table, day, useWho, type D } from './kit'
+import { Action, Card, Chip, command, Table, day, useShared, useWho, type D } from './kit'
 
 const size = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1000))} KB`
 const pause = (seconds: number) => new Promise(r => setTimeout(r, seconds * 1000))
 
 export function XeroAttachments({ xero, reload }: { xero: D; reload: () => Promise<void> }) {
-  const who = useWho()
+  const who = useWho(), owner = useShared().state.actor.can.owner
   const [notice, setNotice] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null), [status, setStatus] = useState('')
   useEffect(() => {
     const q = new URLSearchParams(window.location.search)
@@ -27,7 +28,7 @@ export function XeroAttachments({ xero, reload }: { xero: D; reload: () => Promi
   const chip = !xero.available ? <Chip>Not available here</Chip> : !xero.connection ? <Chip tone="warn">Not connected</Chip> : xero.done ? <Chip tone="good">Carried over</Chip> : <Chip tone="info">Connected</Chip>
   return <Card title="Attachments from Xero" actions={chip}>
     {notice && <p role={notice.tone === 'bad' ? 'alert' : 'status'} className={notice.tone === 'bad' ? 'error' : 'hint'}>{notice.text}</p>}
-    {!xero.available ? <p>{xero.reason}</p> : !xero.connection ? <>
+    {!xero.available ? xero.needsKeys ? <SetupSteps provider="xero" reason={xero.reason} summary="Set up a Xero app for attachments" owner={owner} /> : <p>{xero.reason}</p> : !xero.connection ? <>
       <p>Xero’s exports carry no files. Connect Xero to bring over the files attached to the {xero.items} open invoices and bills you imported. Pantry asks Xero only to read invoices and their attachments.</p>
       <div className="row-actions"><Action tone="primary" run={async () => { const { url } = await command('move-in.xero.connect', {}); window.location.assign(url) }}>Connect Xero</Action></div>
     </> : <>

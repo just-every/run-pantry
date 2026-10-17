@@ -51,7 +51,7 @@ export async function xeroView(c: Context) {
   const files = await all(c.db, 'SELECT a.id, a.item_id, a.item_kind, a.file_name, a.media_type, a.size, a.status, a.document_id, i.number FROM pt_xero_attachments a JOIN pt_xero_items i ON i.item_id = a.item_id ORDER BY i.number, a.file_name')
   const pending = items.length - looked.length + looked.filter(x => x.status === 'found' && x.has_attachments && !x.listed).length + files.filter(f => f.status === 'pending').length
   return {
-    available: a.available, reason: a.available ? '' : a.reason,
+    available: a.available, reason: a.available ? '' : a.reason, needsKeys: !a.available && !!a.needsKeys,
     connection: l?.status === 'connected' ? { tenantName: l.tenant_name, connectedBy: l.connected_by, connectedAt: l.connected_at } : null,
     items: items.length, checked: looked.length,
     notFound: looked.filter(x => x.status === 'not-found').map(x => ({ kind: x.item_kind, number: x.number })),

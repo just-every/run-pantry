@@ -1,6 +1,7 @@
 // Connected: Stripe payouts booked as sales, fees and refunds against the
 // deposit, and Gusto payrolls posted as one entry against their debits. Each
 // card is completed from this page and says plainly what this install can do.
+import { SetupSteps } from './provider-guides'
 import { ago } from './bank-feeds'
 import { Action, Card, Chip, command, day, Field, Form, Loading, Table, today, usd, useShared, useView, type D } from './kit'
 
@@ -62,7 +63,7 @@ function GustoSettings({ g, onDone }: { g: D; onDone: () => Promise<void> }) {
 function Payroll({ g, onDone }: { g: D; onDone: () => Promise<void> }) {
   const owner = useShared().state.actor.can.owner, can = useShared().state.actor.can.record, c = g.connected, a = g.availability
   const failed = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('gusto_error')
-  if (!a.available && !c) return <Card title="Payroll (Gusto)"><p className="hint">{a.reason}</p></Card>
+  if (!a.available && !c) return <Card title="Payroll (Gusto)">{a.needsKeys ? <SetupSteps provider="gusto" reason={a.reason} summary="Set up payroll from Gusto" owner={owner} /> : <p className="hint">{a.reason}</p>}</Card>
   return <div id="payroll"><Card title="Payroll (Gusto)" actions={c?.bank && a.available && can && <Action run={async () => { await command('gusto.sync', {}); await onDone() }}>Read payrolls now</Action>}>
     <p>Each processed Gusto payroll posts as one balanced entry on its check date: gross wages and employer taxes, the taxes and deductions withheld, and net pay. Pantry matches it to Gusto's bank debits when they arrive.</p>
     {failed && <div className="callout callout-warn" role="alert"><strong>Gusto did not connect</strong><span>{failed}</span></div>}

@@ -8,6 +8,17 @@ import { localPortability } from '@runeditrun/rer/portability';
 import * as model from './ui/seed.mjs';
 
 export { selectLocalState };
+
+// rer's refusal of a restore into a folder that already holds books names only its code; say what
+// it means for these books and the next step. Nothing is changed by a refused restore.
+const portability = localPortability({ database: 'foundation', policyModule: 'scripts/installer/portability.mjs', transient: ['local runtime caches and logs'] });
+const NOT_EMPTY = 'Restore refused (target_not_empty): this folder already holds Pantry books, and a restore only goes into an empty installation. Nothing was changed.\n'
+ + 'To replace these books with the archive, run: rer dev --stop; rer export --output exports/books-before-restore.rer (to keep a copy of them); rer reset --yes; rer import --input <your archive> --yes; rer setup --owner-email <you>.\n'
+ + 'To keep both, restore into a fresh clone of Pantry instead. Steps: https://run-pantry.com/docs/backup';
+const explainedPortability = { ...portability, async import(context) {
+ try { return await portability.import(context); }
+ catch (error) { if (/\(target_not_empty\b/.test(error?.message ?? '')) error.message = NOT_EMPTY; throw error; }
+} };
 const lifecycle = operatorInstaller({
  database: 'foundation', features: model.features,
  async prepare({ root, input, store }) {
@@ -21,7 +32,7 @@ export const adapter = lifecycle;
 export const { install } = lifecycle;
 export const commandAdapter = createCommandAdapter(lifecycle, {
  dev: developmentTarget, preview: previewTarget, verify: ['pnpm', ['run', 'verify:app']], deploy: ownerDeploy('deploy.json', lifecycle),
- portability: localPortability({ database: 'foundation', policyModule: 'scripts/installer/portability.mjs', transient: ['local runtime caches and logs'] }),
+ portability: explainedPortability,
  setup: { manifestFile: 'rer-setup.json' }, browserModule: 'scripts/installer/ui/seed.mjs',
  // The run site (rer build --site, rer deploy --site, RER_SITE): pages from
  // edition identity and Run data, written to an ignored folder; its domain is in deploy-site.json.

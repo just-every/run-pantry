@@ -18,7 +18,7 @@
     "test:runtime": "rer queue test:runtime -- sh -c \"node tests/runtime.mjs\"",
     "onboard": "node scripts/install.mjs",
     "build:app": "rer queue build:app -- sh -c \"vite build\"",
-    "verify:app": "rer queue verify:app -- sh -c \"pnpm run build && pnpm run typecheck && pnpm run test:typecheck && pnpm run test:pantry && pnpm run test:site && pnpm run test:runtime\"",
+    "verify:app": "rer queue verify:app -- sh -c \"pnpm run build && pnpm run typecheck && pnpm run test:typecheck && pnpm run test:pantry && pnpm run test:site && pnpm run test:runtime && pnpm run test:app\"",
     "reset": "rer reset",
     "export": "rer export",
     "import": "rer import",
@@ -29,7 +29,8 @@
     "deps": "rer install",
     "rer": "rer",
     "test:pantry": "node --test --test-concurrency=1 tests/api/*.test.mjs",
-    "test:browser": "node tests/browser/run.mjs",
+    "test:app": "node --test tests/app/*.test.mjs",
+    "test:restore": "node --test tests/restore/*.test.mjs",
     "agent": "node scripts/pantry-agent.mjs",
     "test:site": "node --test tests/site/*.test.mjs"
   },

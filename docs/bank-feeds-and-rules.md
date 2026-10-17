@@ -11,7 +11,7 @@ Transactions after each account's opening date arrive at once, then on their own
 
 Statement files keep working beside a feed. A file line and a feed line for the same day and amount are one line, whichever arrives first.
 
-Live feeds use this installation's own Plaid keys. Set `PLAID_CLIENT_ID` and `PLAID_SECRET` (and `PLAID_ENV=production` once Plaid approves production access) as deploy secrets, or in `.dev.vars` locally. Without them, or on RER Managed until its connection relay ships, **Bank and card feeds** says so in one line and statement files work as before.
+Live feeds come through a Plaid account of your own. Until it is set up, **Bank and card feeds** says so and shows the steps: where to get the keys, what to paste and where. They are also in [Connections and keys](/docs/connections#bank-feeds-plaid). Meanwhile, and on RER Managed until its connection relay ships, statement files work as before.
 
 ## When a connection needs re-linking
 

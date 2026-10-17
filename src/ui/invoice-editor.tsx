@@ -9,7 +9,20 @@ export const blank = (accountId = ''): Line => ({ description: '', quantity: '1'
 export const cents = (v: string) => /^\d+(\.\d{1,2})?$/.test(v.replace(/,/g, '').trim()) ? Math.round(Number(v.replace(/,/g, '')) * 100) : 0
 export const qty = (v: string) => /^\d+(\.\d{1,3})?$/.test(v.trim()) ? Number(v) : 0
 
-export function InvoiceEditor({ invoice, creditFor, onDone, onCancel }: { invoice?: D; creditFor?: D; onDone: (saved: D) => void; onCancel: () => void }) {
+/** The day `days` after a YYYY-MM-DD date, on the calendar. */
+export function addDays(day: string, days: number) {
+  const [y, m, d] = day.split('-').map(Number), t = new Date(Date.UTC(y, m - 1, d + days))
+  return t.toISOString().slice(0, 10)
+}
+
+/** The number the next invoice or credit takes, as the server gives it when the field is left blank. */
+export function nextNumber(invoices: D[], kind: 'invoice' | 'credit') {
+  const prefix = kind === 'invoice' ? 'INV-' : 'CR-'
+  const n = invoices.map(i => String(i.number ?? '')).filter(x => x.startsWith(prefix)).map(x => Number(x.slice(prefix.length))).filter(Number.isInteger).reduce((m, x) => Math.max(m, x), 0)
+  return prefix + String(n + 1).padStart(4, '0')
+}
+
+export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCancel }: { invoice?: D; creditFor?: D; invoices?: D[]; onDone: (saved: D) => void; onCancel: () => void }) {
   const { state } = useShared()
   const income = accountOptions(state.accounts, a => a.type === 'income')
   const source = invoice ?? creditFor
@@ -17,6 +30,11 @@ export function InvoiceEditor({ invoice, creditFor, onDone, onCancel }: { invoic
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const { tax, subtotal, missing } = lineTotals(lines, state.taxCodes)
   const kind = creditFor || invoice?.kind === 'credit' ? 'credit' : 'invoice'
+  // The due date follows the customer's terms from the issue date until the person types one.
+  const [customer, setCustomer] = useState<string>(source?.customer_id ?? ''), [issue, setIssue] = useState<string>(invoice?.issue_date ?? today())
+  const [due, setDue] = useState<string | null>(invoice?.due_date ?? null)
+  const terms = state.contacts.find((c: D) => c.id === customer)?.terms_days
+  const dueShown = due ?? (customer && terms !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(issue) ? addDays(issue, Number(terms)) : '')
   return <form className="invoice-editor" onSubmit={async e => {
     e.preventDefault(); const f = Object.fromEntries(new FormData(e.currentTarget))
     setBusy(true); setError('')
@@ -26,10 +44,10 @@ export function InvoiceEditor({ invoice, creditFor, onDone, onCancel }: { invoic
       <div className="stack">
         <Card title={kind === 'credit' ? `Credit for ${creditFor?.number ?? ''}` : 'Invoice details'}>
           <div className="grid-form">
-            <Field label="Customer" name="customerId" defaultValue={source?.customer_id} required options={contactOptions(state.contacts, 'customer')} />
-            <Field label={kind === 'credit' ? 'Credit number' : 'Invoice number'} name="number" defaultValue={invoice?.number} hint={invoice ? undefined : 'Leave blank for the next number'} />
-            <Field label="Issue date" name="issueDate" type="date" defaultValue={invoice?.issue_date ?? today()} required />
-            <Field label="Due date" name="dueDate" type="date" defaultValue={invoice?.due_date} hint="Blank uses the customer's terms" />
+            <Field label="Customer" name="customerId" value={customer} onChange={(e: any) => setCustomer(e.target.value)} required options={contactOptions(state.contacts, 'customer')} />
+            <Field label={kind === 'credit' ? 'Credit number' : 'Invoice number'} name="number" defaultValue={invoice?.number ?? nextNumber(invoices, kind)} required hint={invoice ? undefined : 'The next number in sequence; change it if you need to'} />
+            <Field label="Issue date" name="issueDate" type="date" value={issue} onChange={(e: any) => setIssue(e.target.value)} required />
+            <Field label="Due date" name="dueDate" type="date" value={dueShown} onChange={(e: any) => setDue(e.target.value)} hint={due === null && customer && terms !== undefined ? `${terms} days after the issue date: the customer's terms` : undefined} />
           </div>
         </Card>
         <ServiceLines lines={lines} setLines={setLines} />
