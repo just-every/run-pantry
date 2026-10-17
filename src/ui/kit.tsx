@@ -1,6 +1,7 @@
 // Shared screen pieces: API calls, money, status chips, forms and tables that
 // stack into label/value blocks on a phone.
 import { Children, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useId, useState, type ReactElement, type ReactNode } from 'react'
+import { Icon } from './icons'
 
 export type D = Record<string, any>
 
@@ -66,8 +67,9 @@ export function Card({ title, actions, children, className = '' }: { title?: Rea
   return <section className={`card ${className}`.trim()}>{(title || actions) && <div className="card-head">{title && <h2>{title}</h2>}{actions && <div className="card-actions">{actions}</div>}</div>}<div className="card-body">{children}</div></section>
 }
 
-export function Metrics({ items }: { items: { label: string; value: ReactNode; note?: ReactNode; tone?: string }[] }) {
-  return <div className="metrics">{items.map(m => <div className="metric" key={m.label}><p>{m.label}</p><strong className={m.tone ? `tone-${m.tone}` : ''}>{m.value}</strong>{m.note && <small>{m.note}</small>}</div>)}</div>
+/** Figure tiles; an `icon` puts a tinted disc beside the label (green for a good tone, apricot for a bad one). */
+export function Metrics({ items }: { items: { label: string; value: ReactNode; note?: ReactNode; tone?: string; icon?: string }[] }) {
+  return <div className="metrics">{items.map(m => <div className={`metric${m.icon ? ' with-icon' : ''}`} key={m.label}>{m.icon && <span className={`metric-icon${m.tone ? ` tone-${m.tone}` : ''}`}><Icon name={m.icon} /></span>}<p>{m.label}</p><strong className={m.tone ? `tone-${m.tone}` : ''}>{m.value}</strong>{m.note && <small>{m.note}</small>}</div>)}</div>
 }
 
 function labelled(row: ReactNode, heads: string[]): ReactNode {
@@ -76,9 +78,9 @@ function labelled(row: ReactNode, heads: string[]): ReactNode {
   return cloneElement(element, {}, Children.toArray(element.props.children).map((cell, i) => isValidElement(cell) ? cloneElement(cell as ReactElement<D>, { 'data-label': heads[i] || undefined }) : cell))
 }
 
-/** The empty state: a small stoneware tile with the glaze double rule over the sentence. */
+/** The empty state: a small stack of blank ledger lines in the mark's colours over the sentence. */
 export function Empty({ children }: { children: ReactNode }) {
-  return <><span className="empty-tile" aria-hidden="true" />{children}</>
+  return <><span className="empty-lines" aria-hidden="true" />{children}</>
 }
 
 /** A ruled table. Numeric columns are named in `figures` and right-align. */

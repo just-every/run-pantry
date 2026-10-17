@@ -2,7 +2,7 @@
 // postings, a match being built (or an agent's proposal to approve), and
 // Finish, which stays unavailable until the proof holds.
 import { useState } from 'react'
-import { Action, Card, Chip, command, Details, Field, Loading, accountOptions, contactOptions, day, monthName, usd, useShared, useView, useWho, type D } from './kit'
+import { Action, Card, Chip, command, Details, Field, Loading, Metrics, accountOptions, contactOptions, day, monthName, usd, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
 
 type NewItem = { type: string; amount: string; accountId?: string; contactId?: string; otherBankAccountId?: string; direction?: string; memo?: string }
@@ -69,12 +69,12 @@ export function Reconcile({ statementId, back }: { statementId: string; back: ()
   return <>
     <div className="page-head"><div><button type="button" className="btn btn-link back" onClick={back}>← Bank</button><h1>Reconcile {r.bank.name} — {monthName(r.statement.end_date.slice(0, 7))}</h1><p className="lead">Statement {day(r.statement.start_date)} to {day(r.statement.end_date)}, imported from {r.statement.source_name}.</p></div></div>
     <div className="proof">
-      <div className="metrics">
-        <div className="metric"><p>Statement opening balance</p><strong>{usd(r.opening)}</strong></div>
-        <div className="metric"><p>Statement closing balance</p><strong>{usd(r.closing)}</strong></div>
-        <div className="metric"><p>Cleared in Pantry</p><strong>{usd(r.cleared)}</strong><small>Book {usd(r.book)} less {usd(r.outstandingTotal)} not yet on a statement</small></div>
-        <div className="metric"><p>Difference</p><strong className={r.difference === 0 ? 'tone-good' : 'tone-bad'}>{usd(r.difference)}</strong></div>
-      </div>
+      <Metrics items={[
+        { label: 'Statement opening balance', value: usd(r.opening), icon: 'bank' },
+        { label: 'Statement closing balance', value: usd(r.closing), icon: 'bank' },
+        { label: 'Cleared in Pantry', value: usd(r.cleared), note: <>Book {usd(r.book)} less {usd(r.outstandingTotal)} not yet on a statement</>, icon: 'ok' },
+        { label: 'Difference', value: usd(r.difference), tone: r.difference === 0 ? 'good' : 'bad', icon: r.difference === 0 ? 'ok' : 'alert' },
+      ]} />
       <div className="finish">
         {finished ? <><Chip tone="good">Reconciled</Chip><p>By {who(r.completed.completed_by)}, {day(r.completed.completed_at)}</p></>
           : <><Action tone="primary" disabled={!r.ready || !shared.state.actor.can.record} run={async () => { await command('reconciliation.complete', { statementId }); await refresh() }}>Finish reconciliation</Action>

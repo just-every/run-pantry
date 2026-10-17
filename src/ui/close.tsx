@@ -33,7 +33,7 @@ export function Close() {
         {s.notes.length > 0 && <Card title="Approved notes">{s.notes.map((n: D) => <div key={n.id} className="note"><strong>{n.kind === 'variance' ? 'Variance explanation' : 'Close packet'}</strong><p>{n.body || JSON.parse(n.evidence).join('; ')}</p><small>Approved by {who(n.approved_by)}, {day(n.approved_at)}</small></div>)}</Card>}
       </div>
       <div className="stack">
-        <Card title={<><Icon name="lock" /> Period lock</>} className={s.status === 'locked' ? undefined : 'card-stone'}>
+        <Card title={<><Icon name="lock" /> Period lock</>}>
           {s.status === 'locked' ? <>
             <div className="lock-note"><span className="lock-disc"><Icon name="lock" /></span><p><strong>Locked by {who(s.period.locked_by)} on {day(s.period.locked_at)}.</strong> Nothing dated {day(s.start)} to {day(s.end)} can change.</p></div>
             {pending ? <div className="callout callout-warn"><strong>Reopening requested</strong><span>{who(pending.requested_by)}: “{pending.reason}”</span>

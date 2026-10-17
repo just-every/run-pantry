@@ -27,7 +27,7 @@ export function Overview() {
       </Card>
       <div className="stack">
         <Card title="Needs attention">
-          <ul className="queue">{work.map(w => <li key={w.label}><Link to={w.to}><strong>{w.n}</strong><span>{w.label}</span></Link></li>)}</ul>
+          <ul className="queue">{work.map(w => <li key={w.label}><Link to={w.to} className={w.n ? 'waiting' : undefined}><strong>{w.n}</strong><span>{w.label}</span></Link></li>)}</ul>
         </Card>
         <Card title="Move in from QuickBooks Online">
           <p>Bring your chart of accounts, customers, vendors, an accountant-approved trial balance, open invoices and bills, and a read-only history archive. Preview first; nothing posts until it is signed off.</p>

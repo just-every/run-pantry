@@ -48,9 +48,11 @@ export function Feeds({ data, onDone }: { data: D | undefined; onDone: () => Pro
   const can = useShared().state.actor.can.record
   if (!data) return null
   const a = data.availability
-  return <Card title="Bank and card feeds" actions={a.available && can && <Link className="btn btn-secondary btn-small" to="/app/bank/connect">Connect a bank or card</Link>}>
+  // With nothing connected yet, connecting is the card's one action, so it leads the body instead of the head.
+  const connect = (primary: boolean) => a.available && can && <Link className={`btn ${primary ? 'btn-primary' : 'btn-secondary btn-small'}`} to="/app/bank/connect">Connect a bank or card</Link>
+  return <Card title="Bank and card feeds" actions={data.connections.length > 0 && connect(false)}>
     {!a.available ? <p className="hint">{a.reason}</p>
-      : !data.connections.length ? <p className="hint">Connect a bank or card once and its transactions arrive on their own. Statement files keep working beside it.</p>
+      : !data.connections.length ? <><p>Connect a bank or card once and its transactions arrive on their own. Statement files keep working beside it.</p>{connect(true)}</>
       : data.connections.map((c: D) => <Connection key={c.id} c={c} onDone={onDone} />)}
   </Card>
 }

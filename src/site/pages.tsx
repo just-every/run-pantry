@@ -4,7 +4,6 @@
 import type { ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { runPageHtml, siteNotFoundHtml, type RunData, type SiteBuild, type SiteContext } from '../base/run-site'
-import type { EditionIdentity } from '../base/identity'
 import { identity } from '../identity'
 import { DocsArticle } from './docs/DocsArticle'
 import { DocsIndex } from './docs/DocsIndex'
@@ -15,8 +14,6 @@ import run from './run.json'
 // Code cards get their Copy button only when script runs; without it the command is still there to select.
 const COPY = "document.querySelectorAll('.docs-copy').forEach(b=>{b.hidden=false;b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(b.closest('.docs-code').querySelector('code').textContent);b.textContent='Copied';setTimeout(()=>{b.textContent='Copy'},1600)}catch{}})})"
 
-/** The run site's own tokens (public/site/theme.css), for Base's Run and not-found pages; no floor art there. */
-const siteIdentity: EditionIdentity = { ...identity, theme: '/site/theme.css', band: undefined }
 const SHARE_IMAGE = `${identity.runSite}/site/share.jpg`
 
 export function sitePages({ styles }: SiteContext): SiteBuild {
@@ -43,7 +40,7 @@ export function sitePages({ styles }: SiteContext): SiteBuild {
         <link rel="preload" href="/fonts/schibsted-grotesk/schibsted-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="preload" href="/fonts/figtree/figtree-latin-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="stylesheet" href="/fonts/fonts.css" />
-        <link rel="stylesheet" href={siteIdentity.theme} />
+        <link rel="stylesheet" href={identity.theme} />
         {styles.map(href => <link key={href} rel="stylesheet" href={href} />)}
       </head>
       <body>{body}{script ? <script dangerouslySetInnerHTML={{ __html: script }} /> : null}</body>
@@ -53,11 +50,11 @@ export function sitePages({ styles }: SiteContext): SiteBuild {
   return {
     pages: [
       { path: '/', html: document('Pantry — Know where every dollar went', identity.tagline, <Landing />) },
-      { path: '/run', html: runPageHtml(siteIdentity, data) },
+      { path: '/run', html: runPageHtml(identity, data) },
       { path: '/docs', html: document(...head(), <DocsIndex />) },
       ...docsPages.map(page => ({ path: `/docs/${page.slug}`, html: document(...head(page.slug), <DocsArticle slug={page.slug} />, COPY) })),
-      { path: '/404', html: siteNotFoundHtml(siteIdentity, data) },
+      { path: '/404', html: siteNotFoundHtml(identity, data) },
     ],
-    assets: ['fonts', 'brand', 'site', 'favicon.ico', 'apple-touch-icon.png'],
+    assets: ['rer-theme.css', 'fonts', 'brand', 'site', 'favicon.ico', 'apple-touch-icon.png'],
   }
 }

@@ -1,94 +1,160 @@
-/* This edition's declared theme. The installer, sign-in, confirmation, /setup,
-   the Lobby and the run site read these --rer-* tokens;
-   the app serves this file and its fonts. Pantry's look: matte stoneware tiles,
-   one aubergine glaze, the accountant's double rule (public/pantry.css). */
+/* Pantry's tokens, defined once. The app (pantry.css), the run site, the
+   installer, sign-in, confirmation, /setup, the Lobby and Base's Run and
+   not-found pages all read this file.
+   Pantry's look (design desk, 16 Oct 2026): pale lavender-white paper, navy
+   ink from the mark, the mark's green and apricot as the accents, Schibsted
+   Grotesk headings over Figtree body text, white cards with hairlines. */
+@import url('/fonts/fonts.css');
+
 :root {
-  --rer-font-body: 'Schibsted Grotesk', 'Schibsted Grotesk Fallback', Arial, sans-serif;
+  --rer-font-body: 'Figtree', 'Schibsted Grotesk Fallback', Arial, sans-serif;
   --rer-font-heading: 'Schibsted Grotesk', 'Schibsted Grotesk Fallback', Arial, sans-serif;
-  --rer-page: #FBFAF8;
-  --rer-surface: #FFFFFF;
-  --rer-text: #1A1A1B;
-  --rer-muted: #5B5753;
-  --rer-border: #8A8580;
-  --rer-focus: #41203C;
-  --rer-link: #41203C;
+  --rer-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --rer-page: #f7f6fb;
+  --rer-surface: #ffffff;
+  --rer-text: #101a33;
+  --rer-muted: #5a6178;
+  --rer-border: #8b90a7;
+  --rer-focus: #0e8659;
+  --rer-link: #101a33;
   --rer-radius: 14px;
-  --rer-accent: #41203C;
-  --rer-accent-text: #FFFFFF;
+  --rer-accent: #101a33;
+  --rer-accent-text: #ffffff;
+  --rer-code-background: #131c38;
+  --rer-code-text: #e7e9f5;
   --rer-wordmark-weight: 700;
+  --rer-wordmark-tracking: -.03em;
   --rer-logo: url('/brand/mark.svg');
 
-  /* Pantry's palette and materials, shared by the app (pantry.css), the run site and the frames below. */
-  --paper: var(--rer-page); --surface: var(--rer-surface); --ink: var(--rer-text); --muted: var(--rer-muted); --field: var(--rer-border);
-  --stone: #E2DFDB; --stone-edge: #CFCBC6; --line: #E3E0DC; --pill: #212122;
-  --glaze: var(--rer-accent); --glaze-hover: #5A2D53; --glaze-tint: #F1E9EF; --on-glaze: var(--rer-accent-text);
-  --warn-ink: #7A4A12; --warn-tint: #F6EEE2; --bad-ink: #8E2430; --bad-tint: #F7E9EA;
-  --texture: url('/brand/stone.png') 0 0 / 256px;
-  --gloss: inset 0 1px 0 rgba(255, 255, 255, .18);
-  --double-rule: linear-gradient(var(--glaze), var(--glaze)) left bottom / 100% 2px no-repeat, linear-gradient(var(--glaze), var(--glaze)) left calc(100% - 5px) / 100% 2px no-repeat;
-  --card-shadow: 0 1px 0 var(--stone-edge), 0 6px 18px rgba(26, 26, 27, .06);
-  --tile-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 4px 0 var(--stone-edge), 0 14px 26px rgba(26, 26, 27, .10);
-  --font: var(--rer-font-body);
+  --paper: var(--rer-page);
+  --surface: var(--rer-surface);
+  --ink: var(--rer-text);
+  --muted: var(--rer-muted);
+  --body: #4f5670;
+  --soft: #737a93;
+  --faint: #a2a7bb;
+  --line: #e7e5f0;
+  --line-strong: #d9d6e6;
+  --field: var(--rer-border);
+  --row: #f1f0f7;
+  --lavender: #eceaf7;
+  --lavender-ink: #6b6fa3;
+  --pill: #e5e8fa;
+  --green: #19a974;
+  --green-ink: #0e8659;
+  --green-tint: #e4f6ee;
+  --apricot: #f2a272;
+  --apricot-ink: #c95f24;
+  --apricot-text: #a3461a;
+  --apricot-tint: #fdeee4;
+  --red-ink: #b4323f;
+  --red-tint: #fbeaec;
+  --blue: #1a6fd8;
+  --terminal: var(--rer-code-background);
+  --terminal-line: #26304f;
+  --button: #0b1226;
+  --button-hover: #1b2647;
+
+  --font-head: var(--rer-font-heading);
+  --font-body: var(--rer-font-body);
+  --font-mono: var(--rer-font-mono);
+
+  --radius-card: 18px;
+  --radius-field: 10px;
+  --radius-chip: 999px;
+  --shadow-card: 0 1px 2px rgba(16, 26, 51, .04), 0 18px 40px -22px rgba(16, 26, 51, .22);
+  --shadow-float: 0 2px 4px rgba(16, 26, 51, .05), 0 24px 48px -20px rgba(16, 26, 51, .28);
+  --ring: 0 0 0 3px rgba(25, 169, 116, .22);
+  --glow: radial-gradient(60% 50% at 88% 8%, rgba(242, 162, 114, .14), transparent 70%), radial-gradient(50% 40% at 4% 30%, rgba(108, 111, 163, .10), transparent 70%);
+  --wrap: 1272px;
+  --gutter: clamp(16px, 5vw, 84px);
 }
 
-/* Sign-in, confirmation and first-run setup: a stoneware card; the sign-in frame
-   (main > .brand) adds three tilted blank tiles around it (decorative).
-   html.rer-themed outranks each frame's own .rer-themed rules. */
-html.rer-themed { background: var(--paper); overflow-x: clip; }
-html.rer-themed body { isolation: isolate; overflow-x: clip; font-family: var(--rer-font-body); -webkit-font-smoothing: antialiased; }
+/* Sign-in, confirmation and first-run setup: one white card centred on the
+   lavender paper between two hairline arcs and the corner glows; sign-in adds a
+   lavender and a green card tilted behind it. The lockup and heading are centred,
+   fields quiet, the action the navy pill. html.rer-themed outranks each frame's own rules. */
+html.rer-themed {
+  min-height: 100%; overflow-x: clip;
+  background:
+    radial-gradient(circle at 100% 0, transparent 0 379px, rgba(107, 111, 163, .2) 380px 381px, transparent 382px),
+    radial-gradient(circle at 0 100%, transparent 0 439px, rgba(107, 111, 163, .2) 440px 441px, transparent 442px),
+    radial-gradient(40% 36% at 100% 0, rgba(242, 162, 114, .16), transparent 70%), radial-gradient(36% 34% at 0 100%, rgba(242, 162, 114, .1), transparent 70%),
+    var(--paper);
+  background-attachment: fixed;
+}
+html.rer-themed body { isolation: isolate; overflow-x: clip; font-family: var(--font-body); color: var(--ink); background: none; -webkit-font-smoothing: antialiased; }
 html.rer-themed main {
-  position: relative; max-width: 500px; padding: 52px 56px 56px; border: 1px solid #D9D5D0; border-radius: 18px;
-  background: var(--texture), #F7F6F3;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 6px 0 #DAD6D1, 0 24px 44px rgba(26, 26, 27, .14);
+  position: relative; max-width: 460px; padding: 40px 44px 44px; border: 1px solid var(--line); border-radius: 20px;
+  background: var(--surface); box-shadow: var(--shadow-float);
 }
-html.rer-themed main:has(> .brand)::before, html.rer-themed main:has(> .brand)::after, html.rer-themed main:has(> .brand) > h1::before {
-  content: ''; position: absolute; z-index: -1; pointer-events: none; border-radius: 22px;
-  background: var(--texture), #ECEAE6; box-shadow: 0 4px 0 #DAD6D1, 0 18px 32px rgba(26, 26, 27, .08);
+html.rer-themed main:has(> .brand)::before, html.rer-themed main:has(> .brand)::after {
+  content: ''; position: absolute; z-index: -1; width: 300px; height: 240px; border-radius: 20px; pointer-events: none;
 }
-html.rer-themed main:has(> .brand)::before { width: 340px; height: 480px; left: -350px; top: 90px; transform: rotate(-12deg); }
-html.rer-themed main:has(> .brand)::after { width: 340px; height: 480px; right: -350px; top: 170px; transform: rotate(12deg); }
-html.rer-themed main:has(> .brand) > h1::before { width: 420px; height: 300px; left: 110px; top: -112px; transform: rotate(8deg); }
-html.rer-themed .brand, html.rer-themed .rer-brand { gap: 18px; margin: 0 0 56px; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
-html.rer-themed .brand::before, html.rer-themed .rer-brand::before { width: 46px; height: 46px; }
-html.rer-themed h1 { font-size: 44px; line-height: 1.08; font-weight: 800; letter-spacing: -.03em; margin: 0 0 36px; color: var(--ink); }
-html.rer-themed .rer-brand + h1 { font-size: 56px; margin-bottom: 20px; }
-html.rer-themed p { color: var(--muted); font-size: 18px; }
-html.rer-themed label { font-size: 17px; font-weight: 500; color: var(--ink); }
-html.rer-themed input:not([type=checkbox]):not([type=radio]):not([type=hidden]) { min-height: 56px; margin-bottom: 28px; border: 1px solid var(--field); border-radius: 10px; background: var(--surface); color: var(--ink); font-size: 17px; }
-html.rer-themed input:focus-visible { outline: 3px solid var(--glaze); outline-offset: 2px; }
-html.rer-themed button, html.rer-themed .action { min-height: 60px; border: 0; border-radius: 999px; background: var(--glaze); color: var(--on-glaze); font-size: 18px; font-weight: 500; box-shadow: var(--gloss); }
-html.rer-themed button:hover, html.rer-themed .action:hover { background: var(--glaze-hover); box-shadow: none; }
-html.rer-themed button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
-html.rer-themed :focus-visible { outline-color: var(--glaze); }
-html.rer-themed .divider::before, html.rer-themed .divider::after { border-color: var(--stone-edge); }
-/* First run lists the owner's name and email as read-only fields. */
-html.rer-themed dl { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 0 0 24px; }
-html.rer-themed main:has(> .rer-brand) { max-width: 580px; margin-top: 56px; }
-html.rer-themed dt { color: var(--ink); font-size: 17px; font-weight: 500; }
-html.rer-themed dd { box-sizing: border-box; margin: 0 0 18px; min-height: 56px; display: flex; align-items: center; padding: 10px 18px; border: 1px solid var(--stone-edge); border-radius: 10px; background: var(--surface); color: var(--ink); font-size: 18px; }
-/* The confirmation checkbox is a round glaze control, as the picks draw it. */
-html.rer-themed input[type=checkbox] { appearance: none; flex: none; width: 22px; height: 22px; margin: 1px 0 0; border: 1.5px solid var(--ink); border-radius: 50%; background: var(--surface); cursor: pointer; }
-html.rer-themed input[type=checkbox]:checked { border-color: var(--glaze); background: var(--glaze); box-shadow: inset 0 0 0 4px var(--surface), var(--gloss); }
-@media (max-width: 1180px) {
-  html.rer-themed main:has(> .brand)::before { left: -250px; }
-  html.rer-themed main:has(> .brand)::after { right: -250px; }
+html.rer-themed main:has(> .brand)::before { left: -148px; top: 22%; background: #ebeaf8; transform: rotate(-13deg); }
+html.rer-themed main:has(> .brand)::after { right: -150px; top: 44%; background: #e6f4ef; transform: rotate(9deg); }
+html.rer-themed main:has(> .rer-brand) { max-width: 560px; margin-top: 10vh; padding: 40px 44px; }
+html.rer-themed .brand, html.rer-themed .rer-brand { display: flex; justify-content: center; align-items: center; gap: 12px; margin: 0 0 30px; font: 700 31px/1 var(--font-head); letter-spacing: -.035em; color: var(--ink); }
+html.rer-themed .brand::before, html.rer-themed .rer-brand::before { width: 34px; height: 34px; margin-top: -4px; }
+html.rer-themed h1 { margin: 0 0 12px; font: 800 38px/1.08 var(--font-head); letter-spacing: -.045em; color: var(--ink); text-align: center; }
+html.rer-themed main > p:not(.brand):not(.rer-brand):not(.notice):not(.secondary-link):not(.credit) { text-align: center; }
+html.rer-themed h1 + form, html.rer-themed h1 + .stack, html.rer-themed h1 + .notice { margin-top: 28px; }
+html.rer-themed h2 { font: 700 20px/1.3 var(--font-head); letter-spacing: -.02em; color: var(--ink); }
+html.rer-themed p { color: var(--muted); font-size: 16px; line-height: 1.55; }
+html.rer-themed label { font-size: 14px; font-weight: 500; color: var(--muted); }
+html.rer-themed input:not([type=checkbox]):not([type=radio]):not([type=hidden]) {
+  min-height: 50px; margin-bottom: 20px; padding: 10px 14px; border: 1px solid var(--field); border-radius: var(--radius-field);
+  background: var(--surface); color: var(--ink); font-size: 16px; transition: border-color .12s ease, box-shadow .12s ease;
 }
+html.rer-themed input:not([type=checkbox]):hover { border-color: var(--ink); }
+html.rer-themed input:focus-visible { outline: none; border-color: var(--green-ink); box-shadow: var(--ring); }
+html.rer-themed button, html.rer-themed .action {
+  min-height: 52px; border: 0; border-radius: var(--radius-chip); background: var(--button); color: #fff; font-size: 16px; font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 12px 24px -14px rgba(11, 18, 38, .7); transition: background-color .12s ease;
+}
+html.rer-themed button:hover, html.rer-themed .action:hover { background: var(--button-hover); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12); }
+html.rer-themed button.secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); box-shadow: none; }
+html.rer-themed button.secondary:hover { border-color: var(--field); background: var(--row); }
+/* Local one-click sign-in: the owner is the navy pill, the other people quiet white pills below it. */
+html.rer-themed .stack > .action ~ .action { min-height: 46px; background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); box-shadow: none; }
+html.rer-themed .stack > .action ~ .action:hover { border-color: var(--field); background: var(--row); }
+html.rer-themed :focus-visible { outline-color: var(--green-ink); }
+html.rer-themed .divider::before, html.rer-themed .divider::after { border-color: var(--line); }
+html.rer-themed .notice { border-left: 3px solid var(--apricot); border-radius: 0 10px 10px 0; background: var(--apricot-tint); color: var(--ink); padding: 10px 14px; }
+html.rer-themed .secondary-link a { color: var(--ink); }
+/* First run lists the owner's name and email as two tinted rows with tracked-caps labels. */
+html.rer-themed dl { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px 0; margin: 26px 0 22px; }
+html.rer-themed dt, html.rer-themed dd { margin: 0; min-height: 0; display: flex; align-items: center; padding: 15px 18px; border: 0; background: var(--row); }
+html.rer-themed dt { border-radius: 12px 0 0 12px; color: var(--lavender-ink); font-size: 12.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+html.rer-themed dd { border-radius: 0 12px 12px 0; color: var(--ink); font-size: 16px; font-weight: 500; }
+/* The confirmation checkbox is a round control that fills green with a tick. */
+html.rer-themed input[type=checkbox] {
+  appearance: none; flex: none; width: 24px; height: 24px; margin: 0; border: 1.5px solid var(--field); border-radius: 50%; background: var(--surface); cursor: pointer;
+}
+html.rer-themed input[type=checkbox]:checked { border-color: var(--green); background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M6.5 11.2l3 3 6-6.4' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat, var(--green); }
+html.rer-themed input[type=checkbox]:focus-visible { outline: none; box-shadow: var(--ring); }
+html.rer-themed label:has(input[type=checkbox]) { align-items: center; gap: 12px; color: var(--muted); font-size: 15px; font-weight: 400; }
 @media (max-width: 480px) {
-  html.rer-themed main { padding: 32px 24px 34px; }
-  html.rer-themed main:has(> .rer-brand) { margin-top: 8px; }
-  html.rer-themed .brand, html.rer-themed .rer-brand { font-size: 22px; margin-bottom: 32px; gap: 14px; }
-  html.rer-themed .brand::before, html.rer-themed .rer-brand::before { width: 36px; height: 36px; }
-  html.rer-themed h1 { font-size: 30px; margin-bottom: 24px; }
-  html.rer-themed .rer-brand + h1 { font-size: 40px; }
-  html.rer-themed p { font-size: 16px; }
-  html.rer-themed input:not([type=checkbox]):not([type=radio]):not([type=hidden]) { min-height: 48px; margin-bottom: 22px; font-size: 16px; }
-  html.rer-themed dd { min-height: 48px; margin-bottom: 14px; padding: 8px 16px; font-size: 16px; }
-  html.rer-themed button, html.rer-themed .action { min-height: 52px; font-size: 17px; }
-  /* Sign-in on a phone: the mark and title centred, three tiles fanned symmetrically behind the card. */
-  html.rer-themed main:has(> .brand) { margin-top: 72px; }
-  html.rer-themed main:has(> .brand) > .brand { justify-content: center; }
-  html.rer-themed main:has(> .brand) > h1 { text-align: center; }
-  html.rer-themed main:has(> .brand)::before { width: 150px; height: 190px; left: 0; top: -58px; transform: rotate(-12deg); }
-  html.rer-themed main:has(> .brand)::after { width: 150px; height: 190px; right: 0; left: auto; top: -58px; transform: rotate(12deg); }
-  html.rer-themed main:has(> .brand) > h1::before { width: 170px; height: 190px; left: calc(50% - 85px); top: -84px; transform: none; }
+  html.rer-themed main { padding: 30px 22px 30px; border-radius: 18px; }
+  html.rer-themed main:has(> .rer-brand) { margin-top: 12px; padding: 30px 22px; }
+  html.rer-themed main:has(> .brand) { margin-top: 10vh; }
+  html.rer-themed main:has(> .brand)::before { left: -40px; top: -46px; width: 200px; height: 150px; }
+  html.rer-themed main:has(> .brand)::after { right: -44px; top: auto; bottom: -50px; width: 200px; height: 150px; }
+  html.rer-themed .brand, html.rer-themed .rer-brand { font-size: 26px; margin-bottom: 24px; }
+  html.rer-themed .brand::before, html.rer-themed .rer-brand::before { width: 29px; height: 29px; }
+  html.rer-themed h1 { font-size: 31px; }
+  /* On a phone each owner fact is one tinted block: the caps label over its value. */
+  html.rer-themed dl { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  html.rer-themed dt { padding: 12px 16px 2px; border-radius: 12px 12px 0 0; }
+  html.rer-themed dd { padding: 2px 16px 12px; margin-bottom: 10px; border-radius: 0 0 12px 12px; }
 }
+
+/* Base's Run page (/run) and not-found page, in the same look: heavier display
+   type, white step cards on the lavender paper, navy numerals. */
+body:has(> main > .intro) h1, body:has(> main > .hero) h1 { font-weight: 800; letter-spacing: -.045em; }
+body:has(> main > .intro) .step { border-radius: 22px; border-color: var(--line); background: var(--surface); box-shadow: var(--shadow-card); }
+body:has(> main > .intro) .num { background: var(--ink); color: #fff; font-weight: 800; }
+body:has(> main > .intro) .step h2 { font-weight: 750; letter-spacing: -.03em; }
+body:has(> main > .intro) .code { background: var(--terminal); }
+body:has(> main) .brand span { font-weight: 700; }
+body:has(> main > .intro), body:has(> main > .hero) { background: var(--glow), var(--paper); }

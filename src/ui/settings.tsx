@@ -1,13 +1,14 @@
 // People & settings: the business, its declared policies, who has which role, and agent access.
 import { useState } from 'react'
 import { Action, Card, Chip, command, Details, Field, Form, PageHead, ROLE_LABEL, Table, day, useShared, type D } from './kit'
+import { Icon } from './icons'
 
 const ENTITY_LABEL: Record<string, string> = { 'sole-proprietorship': 'Sole proprietorship', 'single-member-llc': 'Single-member LLC', 'multi-member-llc': 'Multi-member LLC', 's-corporation': 'S corporation', 'c-corporation': 'C corporation', partnership: 'Partnership' }
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 function Business() {
   const { state, reload } = useShared(), e = state.settings.entity, owner = state.actor.can.owner, choices = state.settings.choices
-  return <Card title="The business">
+  return <Card title={<><Icon name="building" /> The business</>}>
     {!owner && !e && <p>The owner sets up the business.</p>}
     {owner ? <Form label={e ? 'Save business' : 'Set up the business'} submit={b => command('entity.save', { ...b, revision: e?.revision })} onDone={reload} className="grid-form">
       <Field label="Legal name" name="legalName" defaultValue={e?.legal_name} required />
@@ -24,7 +25,7 @@ function Business() {
 function People() {
   const { state, reload } = useShared(), members = state.settings.members
   const [editing, setEditing] = useState<D | null>(null), [invited, setInvited] = useState('')
-  return <Card title="People">
+  return <Card title={<><Icon name="people" /> People</>}>
     <Table heads={['Name', 'Email', 'Role', 'Grants', 'Status', '']} empty="Only the owner so far. Add a bookkeeper or accountant.">
       {members.map((m: D) => <tr key={m.email}><td>{m.name}</td><td>{m.email}</td><td>{ROLE_LABEL[m.role]}</td><td>{[m.can_post && 'Post', m.can_lock && 'Lock', m.can_reopen && 'Reopen'].filter(Boolean).join(', ') || '—'}</td><td>{m.active ? <Chip tone="good">Active</Chip> : <Chip>Inactive</Chip>}</td>
         <td><div className="row-actions"><button type="button" className="btn btn-link" onClick={() => setEditing(m)}>Edit</button>{m.active ? <Action run={async () => { setInvited(''); await command('member.invite', { email: m.email }); setInvited(m.email) }}>Send sign-in invitation</Action> : null}</div></td></tr>)}
@@ -47,7 +48,7 @@ function People() {
 
 function Agents() {
   const { state, reload } = useShared(), [token, setToken] = useState<D | null>(null)
-  return <Card title="Agent access">
+  return <Card title={<><Icon name="agent" /> Agent access</>}>
     <p>An agent reads your books through its token and files proposals. A person approves each one; agents never post, approve or lock.</p>
     {token && <div className="callout callout-warn" role="status"><strong>Copy this token now — it is shown once.</strong><code className="token">{token.token}</code><span>Give it to {token.name} as PANTRY_AGENT_TOKEN.</span></div>}
     <Table heads={['Agent', 'Created', 'Status', '']} empty="No agents yet.">

@@ -26,7 +26,7 @@
       "label": "Brand colour",
       "kind": "colour",
       "required": true,
-      "default": "#41203C",
+      "default": "#101A33",
       "group": "application"
     },
     {

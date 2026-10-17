@@ -2,7 +2,7 @@
 // with how it was filed. Lines filed by a rule name the rule and can be undone;
 // lines still to file can be chosen and filed here; pending ones wait for the bank.
 import { useState } from 'react'
-import { Action, Card, Chip, command, Field, day, usd, useShared, type D } from './kit'
+import { Action, Card, Chip, command, Empty, Field, day, usd, useShared, type D } from './kit'
 import { MatchPanel } from './reconcile'
 import { Icon } from './icons'
 
@@ -44,9 +44,9 @@ export function Transactions({ data, onDone }: { data: D | undefined; onDone: ()
           return <tr key={(l.pending ? 'p-' : '') + l.id} className={picked.includes(l.id) ? 'selected' : ''}>
             <td data-label="Select">{open && <input type="checkbox" aria-label={`Select ${l.description} ${usd(l.amount_cents)}`} checked={picked.includes(l.id)} onChange={() => toggle(l.id)} />}</td>
             <td data-label="Date">{day(l.posted_date)}</td><td data-label="Account">{l.bank_name}</td>
-            <td data-label="Description">{l.description}{l.payee && !l.description.toLowerCase().includes(l.payee.toLowerCase()) && <small className="sub"> · {l.payee}</small>}{l.feed_txn_id && <small className="sub"> · feed</small>}</td>
-            <td data-label="Amount" className="fig">{usd(l.amount_cents)}</td>
-            <td data-label="Filed"><Status l={l} onUndo={onDone} /></td></tr> }) : <tr className="empty"><td colSpan={6}>{data.lines.length ? 'Nothing matches this view.' : 'No transactions yet. Connect a bank or card, or import a statement.'}</td></tr>}</tbody></table></div>
+            <td data-label="Description">{l.description}{l.payee && !l.description.toLowerCase().includes(l.payee.toLowerCase()) && <small className="sub"> · {l.payee}</small>}{l.feed_txn_id && <small className="sub feed-tag">feed</small>}</td>
+            <td data-label="Amount" className={`fig${l.amount_cents > 0 ? ' money-in' : ''}`}>{usd(l.amount_cents)}</td>
+            <td data-label="Filed"><Status l={l} onUndo={onDone} /></td></tr> }) : <tr className="empty"><td colSpan={6}><Empty>{data.lines.length ? 'Nothing matches this view.' : 'No transactions yet. Connect a bank or card, or import a statement.'}</Empty></td></tr>}</tbody></table></div>
     </Card>
     {chosen.length > 0 && <MatchPanel lines={chosen} postings={[]} bankId={chosen[0].bank_account_id} clear={() => setPicked([])} onDone={onDone} />}
   </>
