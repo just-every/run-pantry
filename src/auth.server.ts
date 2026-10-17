@@ -43,6 +43,9 @@ export interface Bindings {
  PLAID_SECRET?: string
  PLAID_ENV?: string
  PLAID_REDIRECT_URI?: string
+ /** Attachments carried over from Xero at move-in: this installation's own Xero app (self-hosted installs). */
+ XERO_CLIENT_ID?: string
+ XERO_CLIENT_SECRET?: string
 }
 
 export const runtimeBindings = (env: Bindings): Bindings => env.RER_DEV_ORIGIN && env.AUTH_LOCAL === 'true' ? { ...env, AUTH_ORIGIN: env.RER_DEV_ORIGIN } : env

@@ -21,7 +21,7 @@ const ACTIONS: Record<string, string> = {
   'journal.draft': 'Drafted a journal entry', 'journal.edit': 'Changed a journal draft', 'journal.discard': 'Discarded a journal draft', 'journal.post': 'Posted a journal entry', 'journal.reverse': 'Reversed a journal entry',
   'match.approve': 'Approved a match', 'match.automatic': 'Matched a deposit automatically', 'match.undo': 'Undid a match',
   'member.invite': 'Invited a person', 'member.save': "Changed a person's role",
-  'move-in.import': 'Imported the move-in', 'move-in.accept': 'Signed off the move-in', 'move-in.undo': 'Undid the move-in import',
+  'move-in.import': 'Imported the move-in', 'move-in.accept': 'Signed off the move-in', 'move-in.undo': 'Undid the move-in import', 'move-in.xero-connect': 'Connected Xero for attachments', 'move-in.xero-attachment': 'Carried an attachment over from Xero', 'move-in.xero-disconnect': 'Disconnected Xero',
   'payment.record': 'Recorded a payment', 'payment.allocate': 'Applied a payment',
   'period.lock': 'Locked the month', 'period.reopen-requested': 'Asked to reopen the month', 'period.reopen': 'Reopened the month', 'period.reopen-declined': 'Declined reopening the month',
   'proposal.file': 'Filed a proposal', 'proposal.approve': "Approved an agent's proposal", 'proposal.reject': "Rejected an agent's proposal", 'proposal.stale': 'A proposal went out of date',

@@ -25,7 +25,7 @@
       "title": "Keep your books",
       "pages": [
         { "slug": "people", "title": "People and roles", "file": "people.md", "summary": "Owner, bookkeeper, accountant and viewer, the post, lock and reopen grants, and who may approve what." },
-        { "slug": "move-in", "title": "Move in from QuickBooks Online", "file": "move-in.md", "summary": "Preview seven QuickBooks Online exports and their tie-outs, import them as staged records, and sign them off." },
+        { "slug": "move-in", "title": "Move in from QuickBooks Online or Xero", "file": "move-in.md", "summary": "Preview your QuickBooks Online or Xero exports and their tie-outs, import them as staged records, carry Xero's attachments over, and sign them off." },
         { "slug": "backup", "title": "Back up and restore", "file": "backup.md", "summary": "Export the whole book to one archive and restore it into an empty installation." }
       ]
     }
