@@ -19,14 +19,16 @@ const saveContact: Command = { need: 'record', async run(c, b) {
   requireThat(!email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email), 'Enter a valid email')
   const terms = b.termsDays === undefined || b.termsDays === '' ? 30 : Number(b.termsDays)
   requireThat(Number.isInteger(terms) && terms >= 0 && terms <= 365, 'Payment terms are 0–365 days')
+  // How the customer's deposits read on the bank statement, for automatic matching.
+  const bankReference = optionalText(b.bankReference, 'Bank statement reference', 120)
   const id = b.id ? text(b.id, 'Contact') : uid(), statements: Sql[] = [authority(c.actor, 'record')]
   if (b.id) {
     const current = await contact(c.db, id)
     requireThat(current.revision === b.revision, 'Record changed; reload', 409)
     requireThat(current.kind === kind, 'A customer stays a customer; add a vendor separately')
     const active = b.active === false || b.active === 'false' ? 0 : 1
-    statements.push(q('UPDATE pt_contacts SET name = ?, email = ?, terms_days = ?, active = ?, revision = ? WHERE id = ? AND revision = ?', name, email, terms, active, uid(), id, b.revision), changed())
-  } else statements.push(q('INSERT INTO pt_contacts (id, kind, name, email, terms_days, external_ref, active, revision) VALUES (?, ?, ?, ?, ?, ?, 1, ?)', id, kind, name, email, terms, '', uid()))
+    statements.push(q('UPDATE pt_contacts SET name = ?, email = ?, terms_days = ?, bank_reference = ?, active = ?, revision = ? WHERE id = ? AND revision = ?', name, email, terms, bankReference, active, uid(), id, b.revision), changed())
+  } else statements.push(q('INSERT INTO pt_contacts (id, kind, name, email, terms_days, external_ref, bank_reference, active, revision) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)', id, kind, name, email, terms, '', bankReference, uid()))
   statements.push(audit(who(c.actor), b.id ? 'contact.update' : 'contact.create', kind, id, { name }))
   await run(c.db, statements)
   return contact(c.db, id)

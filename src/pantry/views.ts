@@ -36,7 +36,9 @@ export async function overview(db: D1Database) {
     invoiceDrafts: await n("SELECT COUNT(*) AS n FROM pt_invoices WHERE status IN ('draft', 'approved')"),
     unmatchedLines: await n('SELECT COUNT(*) AS n FROM pt_bank_lines l WHERE l.removed_at IS NULL AND NOT EXISTS (SELECT 1 FROM pt_match_bank_lines m WHERE m.bank_line_id = l.id AND m.active = 1)'),
     proposals: await n("SELECT COUNT(*) AS n FROM pt_proposals WHERE status = 'proposed'"),
+    receipts: await n("SELECT COUNT(*) AS n FROM pt_receipts WHERE status = 'review'"),
     reopenRequests: await n("SELECT COUNT(*) AS n FROM pt_reopen_requests WHERE status = 'pending'"),
+    questions: await n("SELECT COUNT(*) AS n FROM pt_questions WHERE status IN ('open', 'confirm')"),
   }
   return { entity: e, steps, queue, closing: await closing(db, e?.books_start) }
 }
@@ -54,6 +56,8 @@ async function names(db: D1Database) {
   const rows = await all<{ email: string; name: string }>(db, "SELECT lower(email) AS email, display_name AS name FROM oa_operators UNION ALL SELECT lower(email) AS email, name FROM pt_members UNION ALL SELECT 'agent:' || name AS email, name FROM pt_agents")
   const out: Record<string, string> = {}
   for (const r of rows) if (r.name?.trim()) out[r.email] = r.name.trim()
+  // Pantry acting by itself, named for the job it did.
+  Object.assign(out, { 'pantry:reminders': 'Pantry (reminders)', 'pantry:recurring': 'Pantry (recurring invoices)', 'pantry:auto-match': 'Pantry (matched automatically)', 'pantry:stripe': 'Pantry (Stripe)', 'pantry:customer': 'The customer', 'agent:pantry': 'Pantry' })
   return out
 }
 

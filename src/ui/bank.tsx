@@ -5,7 +5,7 @@ import { Card, Chip, command, Field, Form, Loading, PageHead, Table, Tabs, accou
 import { Reconcile } from './reconcile'
 import { Suggestions, Transactions } from './bank-lines'
 import { Rules, fromSuggestion, type Draft } from './bank-rules'
-import { Feeds } from './bank-feeds'
+import { Feeds, RelinkNotices } from './bank-feeds'
 
 function Import({ accounts, onDone }: { accounts: D[]; onDone: () => Promise<void> }) {
   const file = useRef<HTMLInputElement>(null), [result, setResult] = useState<D | null>(null)
@@ -22,7 +22,17 @@ function Import({ accounts, onDone }: { accounts: D[]; onDone: () => Promise<voi
       </div>
     </Form>
     {result && <div className={`callout ${result.duplicate ? 'callout-warn' : 'callout-good'}`} role="status"><strong>{result.duplicate ? 'This file was already imported' : `Imported ${result.added} line${result.added === 1 ? '' : 's'}`}</strong><span>{result.duplicate ? 'No lines were added.' : `${result.duplicates} already in Pantry were skipped.${result.fromFeed ? ` ${result.fromFeed} came in from the feed already and joined this statement.` : ''}${result.filedByRule ? ` ${result.filedByRule} filed by your rules.` : ''}`}{result.fileBalances && !result.fileBalances.agrees ? ` The file's lines total ${usd(result.fileBalances.lineTotal)}, which does not match its balances; reconciliation will show the difference.` : ''}</span></div>}
+    {result && <AutomaticResult automatic={result.automatic} />}
   </Card>
+}
+
+/** What the import matched by itself, and the deposits it left for a person. */
+function AutomaticResult({ automatic }: { automatic?: D }) {
+  if (!automatic) return null
+  return <>
+    {automatic.matched.length > 0 && <div className="callout callout-good" role="status"><strong>{automatic.matched.length} deposit{automatic.matched.length === 1 ? '' : 's'} matched automatically</strong><span>{automatic.matched.map((m: D) => `${usd(m.amount)} from ${m.customer} paid ${m.invoice}`).join('; ')}. Each can be undone on the reconciliation screen.</span></div>}
+    {automatic.needsPerson.length > 0 && <div className="callout callout-warn" role="status"><strong>{automatic.needsPerson.length} deposit{automatic.needsPerson.length === 1 ? '' : 's'} need{automatic.needsPerson.length === 1 ? 's' : ''} you</strong><span>{automatic.needsPerson.map((m: D) => `${m.description}: ${m.reason}`).join(' · ')}</span></div>}
+  </>
 }
 
 function NewBankAccount({ onDone }: { onDone: () => Promise<void> }) {
@@ -68,6 +78,7 @@ export function Bank() {
   const refresh = async () => { await Promise.all([reload(), lines.reload(), rules.reload(), feeds.reload(), shared.reload()]) }
   return <>
     <PageHead title="Bank" lead="Transactions arrive from your bank and card feeds or statement files. Rules file the routine ones; you file the rest and reconcile to the statement." />
+    <RelinkNotices data={feeds.data} onDone={refresh} />
     <Tabs tabs={[...TABS]} current={tab} onChange={go} />
     {tab === 'Transactions' && <div className="split split-wide-left split-bank">
       <div className="stack"><Suggestions items={rules.data?.suggestions ?? []} onPick={s => { setDraft(fromSuggestion(s)); go('Rules') }} /><Transactions data={lines.data} onDone={refresh} /></div>

@@ -3,8 +3,9 @@
 // edits) and are corrected only by a linked reversal.
 import { authority, who, type Actor } from './access'
 import { cents, date, now, optionalText, requireThat, text, uid, list, type Data } from './core'
-import { all, approval, assertOpen, audit, changed, one, q, run, type Sql } from './db'
+import { all, approval, assertOpen, audit, changed, one, q, run, type AuditActor, type Sql } from './db'
 import type { Command } from './context'
+import { entryDocuments } from './receipts/attachments'
 
 export type Line = { accountId: string; debit: number; credit: number; memo?: string; contactId?: string | null }
 export type Entry = {
@@ -106,7 +107,7 @@ const post: Command = { need: 'post', async run(c, b) {
 } }
 
 /** `unmatching`: the same batch ends the entry's match first (undoing a filing by rule). */
-export async function reversalStatements(db: D1Database, actor: Actor, original: Data, day: string, memo: string, { unmatching = false } = {}) {
+export async function reversalStatements(db: D1Database, actor: AuditActor, original: Data, day: string, memo: string, { unmatching = false } = {}) {
   requireThat(original.status === 'posted', 'Only posted entries are reversed; edit or discard a draft', 409)
   requireThat(!original.reversed_by_id, 'Entry is already reversed', 409)
   requireThat(day >= original.entry_date, 'A reversal is dated on or after the original entry')
@@ -151,6 +152,7 @@ export async function journalView(db: D1Database) {
   const entries = await all(db, 'SELECT * FROM pt_journal_entries ORDER BY CASE status WHEN \'draft\' THEN 0 ELSE 1 END, entry_date DESC, number DESC, created_at DESC, id LIMIT 300')
   const ids = entries.map(e => e.id)
   const lines = ids.length ? await all(db, `SELECT l.*, a.code AS account_code, a.name AS account_name FROM pt_journal_lines l JOIN pt_accounts a ON a.id = l.account_id WHERE l.entry_id IN (${ids.map(() => '?').join(',')}) ORDER BY l.line_no`, ...ids) : []
-  for (const e of entries) e.lines = lines.filter(l => l.entry_id === e.id)
+  const docs = await entryDocuments(db)
+  for (const e of entries) { e.lines = lines.filter(l => l.entry_id === e.id); e.documents = docs[e.id] ?? [] }
   return entries
 }

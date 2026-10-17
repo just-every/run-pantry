@@ -1,7 +1,9 @@
 // The real Pantry Worker (its auth and API) on Miniflare with a real D1
 // database, every migration applied, and genuine sign-ins: the owner by the
 // bootstrap token, everyone else by an emailed invitation link. Mail leaves
-// through the real Resend adapter; only its HTTP endpoint is faked here.
+// through the real Resend adapter; only its HTTP endpoint is faked here, as is
+// the AI model's (`model`) when a test reads receipts, and any other provider
+// edge (Stripe) a test answers with `outbound`.
 import { createServer } from 'node:net'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -31,7 +33,7 @@ export async function harness({ bindings = {}, outbound } = {}) {
   const bundle = await build({ entryPoints: ['tests/api/worker.ts'], bundle: true, write: false, format: 'esm', platform: 'neutral', conditions: ['workerd', 'worker', 'browser'], external: ['node:*', 'cloudflare:*'], target: 'es2023', logLevel: 'error' })
   const mf = new Miniflare({ ...convertV4MiniflareOptions({
     host: '127.0.0.1', port, modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'],
-    d1Databases: { DB: 'pantry' },
+    d1Databases: { DB: 'pantry' }, unsafeTriggerHandlers: true,
     bindings: { AUTH_ORIGIN: origin, AUTH_LOCAL: 'true', OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: 'local-test-secret-not-production-0123456789', SETUP_TOKEN: BOOTSTRAP, MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'test-resend-key', MAIL_FROM: 'Pantry <pantry@example.test>', ...bindings },
     async outboundService(request) {
       if (outbound && new URL(request.url).hostname !== 'api.resend.com') return outbound(request)
@@ -45,8 +47,9 @@ export async function harness({ bindings = {}, outbound } = {}) {
     for (const file of (await readdir('migrations/core')).filter(f => f.endsWith('.sql')).sort())
       await db.batch(unstable_splitSqlQuery(await readFile('migrations/core/' + file, 'utf8')).map(sql => db.prepare(sql)))
 
-    async function send(path, body, { cookie = '', method, headers = {} } = {}) {
-      const r = await mf.dispatchFetch(origin + path, { method: method ?? (body === undefined ? 'GET' : 'POST'), headers: { host: new URL(origin).host, origin, 'content-type': 'application/json', cookie, ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'manual' })
+    /** A request through the public door; `raw` sends a body as given (a form post) instead of JSON. */
+    async function send(path, body, { cookie = '', method, headers = {}, raw } = {}) {
+      const r = await mf.dispatchFetch(origin + path, { method: method ?? (body === undefined && raw === undefined ? 'GET' : 'POST'), headers: { host: new URL(origin).host, origin, 'content-type': 'application/json', cookie, ...headers }, ...(raw !== undefined ? { body: raw } : body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'manual' })
       const text = await r.text()
       let value; try { value = JSON.parse(text) } catch { value = text }
       return { status: r.status, value, cookie: r.headers.get('set-cookie')?.split(';')[0], headers: r.headers }
@@ -90,10 +93,15 @@ export async function harness({ bindings = {}, outbound } = {}) {
       }
       return { token, call }
     }
+    /** Deliver one email to the Worker's email handler, as Cloudflare Email Routing does. */
+    async function email(raw, { from, to }) {
+      const r = await mf.dispatchFetch(`${origin}/cdn-cgi/local/email?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { method: 'POST', body: raw })
+      return { status: r.status, text: await r.text() }
+    }
     /** Fire the Worker's Cron trigger. */
     const cron = async () => (await mf.getWorker()).scheduled({ cron: '*/30 * * * *' })
     const close = async () => { await mf.dispose(); await rm(dir, { recursive: true, force: true }) }
-    return { db, origin, owner, send, command, view, member, agent, confirmMail, cron, close }
+    return { db, origin, owner, mail, send, command, view, member, agent, confirmMail, email, cron, close }
   } catch (error) {
     await mf.dispose(); await rm(dir, { recursive: true, force: true })
     throw error

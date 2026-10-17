@@ -324,8 +324,8 @@ ul.plain li:last-child { border-bottom: 0; }
 /* Bank feeds, transactions filed by rule, rules and the connect page. */
 .feed + .feed { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
 .feed-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
-.feed .callout { margin: 8px 0 12px; }
-.feed .callout > div { flex: 1 1 220px; }
+.callout.relink > div { flex: 1 1 220px; }
+.callout.relink > .action { align-self: center; }
 .feed-accounts { list-style: none; margin: 0; padding: 0; }
 .feed-accounts li { display: flex; flex-direction: column; padding: 8px 0; border-top: 1px solid var(--line); }
 .feed-accounts li:first-child { border-top: 0; }
@@ -352,3 +352,86 @@ ul.plain li:last-child { border-bottom: 0; }
   .ledger td .filed { display: inline-flex; max-width: 70%; }
   .preview-lines li { flex-direction: column; gap: 2px; }
 }
+
+/* Receipts: the camera and file buttons, a receipt beside what was read, and the transactions it may belong to. */
+.capture { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; margin-bottom: 12px; }
+.capture label.btn { cursor: pointer; white-space: nowrap; }
+.capture label.btn[aria-disabled='true'] { opacity: .55; pointer-events: none; }
+.capture input:focus-visible + label, .capture label:focus-within { outline: 3px solid var(--glaze); outline-offset: 2px; }
+.capture-compact { margin: 0; gap: 6px; }
+.capture-compact .hint, .capture-compact .error { flex-basis: 100%; }
+.receipt-body { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.receipt-preview { display: flex; flex-direction: column; gap: 8px; }
+.receipt-preview img { display: block; width: 100%; max-height: 320px; object-fit: contain; background: var(--stone); border: 1px solid var(--line); border-radius: 10px; }
+.receipt-file { display: flex; align-items: center; gap: 10px; padding: 18px 14px; border: 1px dashed var(--stone-edge); border-radius: 10px; background: var(--stone); overflow-wrap: anywhere; }
+.receipt-fields { min-width: 0; }
+.read-line { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.match-choices label { align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.match-choices label.chosen { border-color: var(--glaze); background: color-mix(in srgb, var(--glaze-tint) 45%, transparent); }
+.match-choices input[type='radio'] { width: 20px; height: 20px; min-height: 0; padding: 0; margin-top: 2px; accent-color: var(--glaze); flex: none; }
+.match-choices label > span { display: flex; flex-wrap: wrap; gap: 2px 10px; min-width: 0; overflow-wrap: anywhere; }
+.match-choices small.sub { flex-basis: 100%; }
+.forward-line { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0 0; overflow-wrap: anywhere; }
+.forward-line code.token, #receipt-address code.token { font-size: 14px; padding: 2px 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; word-break: break-all; }
+.entry-receipts { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 4px 0 14px; }
+.entry-receipts .doc-link { display: inline; }
+.setup-steps { margin: 0 0 14px; padding-left: 20px; }
+.setup-steps li { margin-bottom: 6px; }
+details.setup-steps { padding-left: 0; }
+details.setup-steps ol { padding-left: 20px; }
+@media (max-width: 720px) {
+  .receipt-body { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .receipt-preview img { max-height: 240px; }
+  .capture:not(.capture-compact) label.btn { flex: 1 1 140px; padding-inline: 14px; }
+}
+
+/* Invoices out: the sending panel, its delivery log and setup instructions. */
+.send-panel { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.send-panel h3, .card h3 { margin: 18px 0 8px; font-size: 15px; }
+.send-panel > h3:first-child { margin-top: 0; }
+.send-panel .action { display: inline-flex; margin: 4px 0 8px; }
+.send-log { list-style: none; margin: 0; padding: 0; }
+.send-log li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.send-log li small { grid-column: 1 / -1; color: var(--muted); }
+.send-log li > span { min-width: 0; overflow-wrap: anywhere; }
+ol.how-to { margin: 0 0 16px; padding-left: 22px; display: grid; gap: 8px; }
+.sub.block { display: block; margin-top: 2px; }
+
+/* Questions from Pantry: the record, the answers with what each changes, and the thread. */
+.question.focused { border-color: var(--glaze); box-shadow: 0 0 0 2px var(--glaze-tint), var(--card-shadow, none); }
+.question .ask { font-size: 18px; margin-top: 4px; }
+.facts.record { margin: 14px 0 6px; padding: 14px 16px; border-radius: 10px; background: var(--paper); border: 1px solid var(--line); }
+.facts.record dd { overflow-wrap: anywhere; }
+.choices { border: 0; margin: 16px 0 8px; padding: 0; display: grid; gap: 8px; }
+.choices legend { margin-bottom: 8px; }
+.choice { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--surface); }
+.choice:hover { border-color: var(--glaze); }
+.choice.picked { border-color: var(--glaze); background: var(--glaze-tint); }
+.choice strong { display: block; font-weight: 600; }
+.choice small { display: block; color: var(--ink); font-size: 14px; margin-top: 4px; }
+.change { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 8px; }
+.remember { display: flex; gap: 10px; align-items: center; font-size: 15px; }
+.remember input { accent-color: var(--glaze); width: 18px; height: 18px; }
+.own-words { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.own-words .field { flex: 1 1 260px; }
+.own-words textarea { min-height: 64px; }
+.receipt-upload { margin: 10px 0; }
+.thread { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.bubble { max-width: 88%; align-self: flex-start; padding: 10px 14px; border-radius: 14px 14px 14px 4px; background: var(--glaze-tint); color: var(--ink); }
+.bubble.mine { align-self: flex-end; border-radius: 14px 14px 4px 14px; background: var(--surface); border: 1px solid var(--stone-edge); }
+.bubble p { margin: 0 0 4px; font-size: 15px; white-space: pre-line; overflow-wrap: anywhere; }
+.bubble small { color: var(--muted); font-size: 12px; }
+.answered { list-style: none; margin: 0; padding: 0; }
+.answered li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.answered li:first-child { border-top: 0; }
+.answered li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.answered li .hint { overflow-wrap: anywhere; }
+.answered-end { display: flex; gap: 12px; align-items: center; flex: none; }
+.month-thread { margin-top: 8px; }
+.card .card .card-head { padding-top: 18px; }
+@media (max-width: 720px) {
+  .answered li { flex-direction: column; align-items: flex-start; }
+  .bubble { max-width: 96%; }
+  .own-words .action, .own-words .btn { width: 100%; }
+}
+.choice input[type='radio'] { accent-color: var(--glaze); flex: none; width: 18px; height: 18px; min-height: 0; padding: 0; margin: 3px 0 0; }

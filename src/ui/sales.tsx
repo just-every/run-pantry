@@ -1,8 +1,11 @@
-// Sales & bills: invoices and credits, bills with their evidence, payments
-// recorded from outside Pantry, and the customers and vendors behind them.
+// Sales & bills: invoices and credits (sent, viewed, reminded, paid online),
+// recurring invoices, bills with their evidence, payments recorded from outside
+// Pantry, every delivery, and the customers and vendors behind them.
 import { useRef, useState } from 'react'
 import { Action, Card, Chip, command, contactOptions, Details, Field, Form, Loading, Metrics, PageHead, Table, Tabs, accountOptions, day, readFileBase64, today, usd, useShared, useView, useWho, type D } from './kit'
 import { InvoiceEditor } from './invoice-editor'
+import { Deliveries, SendPanel } from './invoice-delivery'
+import { Recurring } from './recurring'
 
 function invoiceStatus(i: D): [string, 'good' | 'warn' | 'info' | 'neutral'] {
   if (i.status === 'draft') return ['Draft', 'neutral']
@@ -13,7 +16,7 @@ function invoiceStatus(i: D): [string, 'good' | 'warn' | 'info' | 'neutral'] {
   return [i.opening ? 'Open (moved in)' : 'Issued', 'info']
 }
 
-function InvoicePanel({ i, onChange, onEdit, onCredit }: { i: D; onChange: () => Promise<void>; onEdit: () => void; onCredit: () => void }) {
+function InvoicePanel({ i, data, onChange, onEdit, onCredit }: { i: D; data: D; onChange: () => Promise<void>; onEdit: () => void; onCredit: () => void }) {
   const { state } = useShared(), who = useWho(), [label, tone] = invoiceStatus(i)
   const mayApprove = state.actor.can.post && (state.actor.role === 'owner' || i.prepared_by !== state.actor.email)
   const untaxed = i.lines.filter((l: D) => !l.tax_code).length
@@ -27,7 +30,8 @@ function InvoicePanel({ i, onChange, onEdit, onCredit }: { i: D; onChange: () =>
       {i.status === 'approved' && state.actor.can.record && <Action tone="primary" run={async () => { await command('invoice.issue', { id: i.id }); await onChange() }}>Issue</Action>}
       {i.kind === 'invoice' && i.status === 'issued' && !i.opening && state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={onCredit}>Issue a credit</button>}
     </div>
-    <Details facts={{ id: i.id, revision: i.revision, 'prepared by': who(i.prepared_by), 'approved by': i.approved_by && who(i.approved_by), 'issued by': i.issued_by && who(i.issued_by), journal: i.journal_id }} />
+    {i.kind === 'invoice' && i.status === 'issued' && <SendPanel i={i} data={data} onChange={onChange} />}
+    <Details facts={{ id: i.id, revision: i.revision, 'prepared by': who(i.prepared_by), 'approved by': i.approved_by && who(i.approved_by), 'issued by': i.issued_by && who(i.issued_by), journal: i.journal_id, ...(i.recurring_id ? { 'recurring invoice': (data.recurring as D[]).find(t => t.id === i.recurring_id)?.number } : {}) }} />
   </Card>
 }
 
@@ -45,10 +49,10 @@ function Invoices({ data, reload }: { data: D; reload: () => Promise<void> }) {
       <Card title="Invoices" actions={state.actor.can.record && <button type="button" className="btn btn-primary" onClick={() => setEditing({})}>Create invoice</button>}>
         <Table heads={['Customer', 'Number', 'Issue date', 'Due date', 'Amount', 'Open balance', 'Status']} figures={[4, 5]} empty={state.contacts.some((c: D) => c.kind === 'customer') ? 'No invoices yet.' : 'Add a customer first, then create an invoice.'}>
           {invoices.map(i => { const [label, tone] = invoiceStatus(i); return <tr key={i.id} className={selected === i.id ? 'selected' : ''} tabIndex={0} onClick={() => setSelected(i.id)} onKeyDown={k => { if (k.key === 'Enter') setSelected(i.id) }}>
-            <td>{i.customer_name}</td><td className="nowrap">{i.number}</td><td>{day(i.issue_date)}</td><td>{day(i.due_date)}</td><td className="fig">{i.kind === 'credit' ? '−' : ''}{usd(i.total_cents)}</td><td className="fig">{i.status === 'issued' ? usd(i.open_cents) : '—'}</td><td><Chip tone={tone}>{label}</Chip></td></tr> })}
+            <td>{i.customer_name}</td><td className="nowrap">{i.number}</td><td>{day(i.issue_date)}</td><td>{day(i.due_date)}</td><td className="fig">{i.kind === 'credit' ? '−' : ''}{usd(i.total_cents)}</td><td className="fig">{i.status === 'issued' ? usd(i.open_cents) : '—'}</td><td><Chip tone={tone}>{label}</Chip>{i.viewed_at ? <small className="sub"> · Viewed</small> : i.sent_at ? <small className="sub"> · Sent</small> : null}</td></tr> })}
         </Table>
       </Card>
-      {current ? <InvoicePanel key={current.id + current.revision} i={current} onChange={reload} onEdit={() => setEditing({ invoice: current })} onCredit={() => setEditing({ creditFor: current })} /> : <Card title="Invoice"><p>Choose an invoice to review, approve or issue it.</p></Card>}
+      {current ? <InvoicePanel key={current.id + current.revision} i={current} data={data} onChange={reload} onEdit={() => setEditing({ invoice: current })} onCredit={() => setEditing({ creditFor: current })} /> : <Card title="Invoice"><p>Choose an invoice to review, approve or issue it.</p></Card>}
     </div>
   </>
 }
@@ -106,7 +110,7 @@ function Payments({ data, reload }: { data: D; reload: () => Promise<void> }) {
   const [alloc, setAlloc] = useState<Record<string, string>>({})
   return <div className="split split-wide-left">
     <Card title="Payments recorded">
-      <p className="hint">Pantry records payments that happened at your bank or card processor. It never moves money.</p>
+      <p className="hint">Payments received at your bank, paid online from an invoice link through your Stripe account, or made to vendors. Pantry records them; it never moves money itself.</p>
       <Table heads={['Date', 'Direction', 'Customer or vendor', 'Bank', 'Amount', 'Unallocated']} figures={[4, 5]} empty="No payments recorded yet.">
         {(data.payments as D[]).map(p => <tr key={p.id} className={p.reversal_id ? 'muted' : ''}><td>{day(p.payment_date)}</td><td>{p.direction === 'received' ? 'Received' : 'Paid'}{p.reversal_id ? ' (reversed)' : ''}</td><td>{p.contact_name}</td><td>{p.bank_name}</td><td className="fig">{usd(p.amount_cents)}</td><td className="fig">{usd(p.unallocated_cents)}</td></tr>)}
       </Table>
@@ -142,6 +146,7 @@ function Contacts() {
         <Field label="Name" name="name" defaultValue={editing?.name} required />
         <Field label="Email" name="email" type="email" defaultValue={editing?.email} />
         <Field label="Payment terms (days)" name="termsDays" type="number" defaultValue={editing?.terms_days ?? 30} min={0} max={365} />
+        {(editing ? editing.kind === 'customer' : true) && <Field label="How their payments read on your bank statement (customers)" name="bankReference" defaultValue={editing?.bank_reference} hint="For example CEDAR STUDIO LLC. A deposit naming this, or the invoice number, for exactly an open invoice's amount matches itself." />}
         {editing && <Field label="Status" name="active" defaultValue={editing.active ? 'yes' : 'no'} options={[{ value: 'yes', label: 'Active' }, { value: 'no', label: 'Inactive' }]} />}
       </Form>
     </Card>}
@@ -152,8 +157,9 @@ export function Sales() {
   const [tab, setTab] = useState('Invoices'), { data, error, reload } = useView<D>('sales'), shared = useShared()
   const refresh = async () => { await reload(); await shared.reload() }
   return <>
-    <PageHead title="Sales & bills" lead="Invoices and credits, bills and their evidence, and payments that happened outside Pantry." />
-    <Tabs tabs={['Invoices', 'Bills', 'Payments', 'Customers & vendors']} current={tab} onChange={setTab} />
-    {tab === 'Customers & vendors' ? <Contacts /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Bills' ? <Bills data={data} reload={refresh} /> : <Payments data={data} reload={refresh} />}
+    <PageHead title="Sales & bills" lead="Invoices you send and follow up, recurring invoices, bills and their evidence, and payments." />
+    <Tabs tabs={['Invoices', 'Recurring', 'Bills', 'Payments', 'Deliveries', 'Customers & vendors']} current={tab} onChange={setTab} pick="Show" />
+    {tab === 'Customers & vendors' ? <Contacts /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
+      : tab === 'Bills' ? <Bills data={data} reload={refresh} /> : tab === 'Deliveries' ? <Card title="Deliveries"><p className="hint">Every invoice and reminder Pantry has sent, with the mail provider's answer. Accepted means the provider took the message, not that the customer read it; "Viewed" on an invoice means the customer opened its link.</p><Deliveries data={data} /></Card> : <Payments data={data} reload={refresh} />}
   </>
 }

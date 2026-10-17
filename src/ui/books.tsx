@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Action, Card, Chip, command, Details, Field, Form, PageHead, Table, Tabs, Loading, accountOptions, day, today, usd, useShared, useView, useWho, type D } from './kit'
 import { JournalEditor } from './journal-editor'
 import { Icon } from './icons'
+import { CaptureButtons } from './receipt-capture'
 
 const TYPE: Record<string, string> = { asset: 'Asset', liability: 'Liability', equity: 'Equity', income: 'Income', expense: 'Expense' }
 const ROLE: Record<string, string> = { bank: 'Bank', receivable: 'Receivables control', payable: 'Payables control', tax: 'Sales tax', retained: 'Retained earnings', other: '' }
@@ -62,6 +63,8 @@ function EntryPanel({ e, onChange }: { e: D; onChange: () => Promise<void> }) {
       {e.lines.map((l: D) => <tr key={l.id}><td>{l.line_no}</td><td>{l.account_code} · {l.account_name}</td><td>{l.memo}</td><td className="fig">{l.debit_cents ? usd(l.debit_cents) : '—'}</td><td className="fig">{l.credit_cents ? usd(l.credit_cents) : '—'}</td></tr>)}
     </Table>
     <p className={`balance-line ${debit === credit ? 'tone-good' : 'tone-bad'}`}>Debits {usd(debit)} {debit === credit ? '=' : '≠'} Credits {usd(credit)}</p>
+    <div className="entry-receipts"><strong><Icon name="receipt" /> Receipt</strong> {e.documents.length ? e.documents.map((d: D) => <a key={d.id} className="doc-link" href={`/api/pantry/documents/${d.id}${/^image\//.test(d.media_type) ? '?view=1' : ''}`} target="_blank" rel="noreferrer">{d.name}</a>)
+      : e.status === 'posted' && state.actor.can.record ? <><span className="hint">None yet.</span> <CaptureButtons compact target={{ kind: 'journal', id: e.id }} onDone={onChange} /></> : <span className="hint">None</span>}</div>
     <div className="row-actions">
       {e.status === 'draft' && e.source_kind === 'manual' && state.actor.can.record && <><button type="button" className="btn btn-secondary" onClick={() => setEditing(true)}>Edit</button><Action tone="danger" run={async () => { await command('journal.discard', { id: e.id, revision: e.revision }); await onChange() }}>Discard draft</Action></>}
       {e.status === 'draft' && e.source_kind === 'manual' && (mayPost ? <Action tone="primary" run={async () => { await command('journal.post', { id: e.id, revision: e.revision }); await onChange() }}>Post entry</Action> : <span className="hint">Waiting for someone with the posting grant, other than the preparer.</span>)}

@@ -65,3 +65,18 @@ instructions under `node_modules/@runeditrun/rer/modules/deploy-kit`; account sc
 resource ownership, migrations, receipt and health checks are defined there.
 Local validation does not prove hosted acceptance, provider delivery or remote
 health.
+
+## Receipts: AI reading and the Pantry address
+
+Both are set up by the owner on **People & settings**; no deploy setting is
+needed. The AI key is stored in the installation's database sealed with a key
+derived from `SESSION_SECRET`: rotating that secret, or importing the books
+into another installation, leaves the key unreadable and the card asks for it
+again. The Pantry address needs a domain in the same Cloudflare account: turn
+on Email Routing for it, add a routing rule for the receiving address with the
+action **Send to a Worker** (this installation's Worker, whose `email` handler
+is in `src/server.ts`), turn on **Subaddressing**, then enter the address on the
+page. A domain that keeps Subaddressing off routes the dash spelling the card
+shows (`receipts-<tag>@`) with a rule of its own instead. Mail to anything but the tagged address is refused unread. RER Managed
+hosting (`MAIL_PROVIDER=rer`) has neither an outbound connection for AI
+providers nor a domain for mail yet; both cards say so in one line.
