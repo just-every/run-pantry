@@ -15,6 +15,7 @@ const MAIN = [
 ] as const
 const MORE = [
   { to: '/app', label: 'Overview' },
+  { to: '/app/receipts', label: 'Receipts' },
   { to: '/app/move-in', label: 'Move in from QuickBooks' },
   { to: '/app/agents', label: 'Agent work' },
   { to: '/app/documents', label: 'Documents' },

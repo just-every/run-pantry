@@ -18,6 +18,7 @@ import { Route as AppBooksRouteImport } from './routes/app.books'
 import { Route as AppCloseRouteImport } from './routes/app.close'
 import { Route as AppDocumentsRouteImport } from './routes/app.documents'
 import { Route as AppMoveInRouteImport } from './routes/app.move-in'
+import { Route as AppReceiptsRouteImport } from './routes/app.receipts'
 import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppSalesRouteImport } from './routes/app.sales'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
@@ -68,6 +69,11 @@ const AppMoveInRoute = AppMoveInRouteImport.update({
   path: '/move-in',
   getParentRoute: () => AppRoute,
 } as any)
+const AppReceiptsRoute = AppReceiptsRouteImport.update({
+  id: '/receipts',
+  path: '/receipts',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppReportsRoute = AppReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/app/close': typeof AppCloseRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/move-in': typeof AppMoveInRoute
+  '/app/receipts': typeof AppReceiptsRoute
   '/app/reports': typeof AppReportsRoute
   '/app/sales': typeof AppSalesRoute
   '/app/settings': typeof AppSettingsRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/app/close': typeof AppCloseRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/move-in': typeof AppMoveInRoute
+  '/app/receipts': typeof AppReceiptsRoute
   '/app/reports': typeof AppReportsRoute
   '/app/sales': typeof AppSalesRoute
   '/app/settings': typeof AppSettingsRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/app/close': typeof AppCloseRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/move-in': typeof AppMoveInRoute
+  '/app/receipts': typeof AppReceiptsRoute
   '/app/reports': typeof AppReportsRoute
   '/app/sales': typeof AppSalesRoute
   '/app/settings': typeof AppSettingsRoute
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
     | '/app/close'
     | '/app/documents'
     | '/app/move-in'
+    | '/app/receipts'
     | '/app/reports'
     | '/app/sales'
     | '/app/settings'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/app/close'
     | '/app/documents'
     | '/app/move-in'
+    | '/app/receipts'
     | '/app/reports'
     | '/app/sales'
     | '/app/settings'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/app/close'
     | '/app/documents'
     | '/app/move-in'
+    | '/app/receipts'
     | '/app/reports'
     | '/app/sales'
     | '/app/settings'
@@ -250,6 +262,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMoveInRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/receipts': {
+      id: '/app/receipts'
+      path: '/receipts'
+      fullPath: '/app/receipts'
+      preLoaderRoute: typeof AppReceiptsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/reports': {
       id: '/app/reports'
       path: '/reports'
@@ -289,6 +308,7 @@ interface AppRouteChildren {
   AppCloseRoute: typeof AppCloseRoute
   AppDocumentsRoute: typeof AppDocumentsRoute
   AppMoveInRoute: typeof AppMoveInRoute
+  AppReceiptsRoute: typeof AppReceiptsRoute
   AppReportsRoute: typeof AppReportsRoute
   AppSalesRoute: typeof AppSalesRoute
   AppSettingsRoute: typeof AppSettingsRoute
@@ -304,6 +324,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCloseRoute: AppCloseRoute,
   AppDocumentsRoute: AppDocumentsRoute,
   AppMoveInRoute: AppMoveInRoute,
+  AppReceiptsRoute: AppReceiptsRoute,
   AppReportsRoute: AppReportsRoute,
   AppSalesRoute: AppSalesRoute,
   AppSettingsRoute: AppSettingsRoute,

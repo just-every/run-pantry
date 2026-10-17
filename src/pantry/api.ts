@@ -34,11 +34,14 @@ import { feedCommands, feedsView } from './feeds/commands'
 import { anyDue, runDue, syncItem } from './feeds/sync'
 import { receive, verify } from './feeds/webhook'
 import { availability } from './feeds/plaid'
+import { documentFile } from './documents'
+import { receiptCommands, receiptRoutes } from './receipts/routes'
 
 const commands: Record<string, Command> = {
   ...settingsCommands, ...accountCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands,
   ...bankCommands, ...matchCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
+  ...receiptCommands,
 }
 
 type C = HonoContext<{ Bindings: Bindings }>
@@ -103,10 +106,14 @@ api.get('/api/pantry/reports/contractors/:year/1099-nec.csv', async c => {
 
 api.get('/api/pantry/documents/:id', async c => {
   const ctx = await reader(c)
-  const doc = await one<{ name: string; media_type: string; content: ArrayBuffer }>(ctx.db, 'SELECT name, media_type, content FROM pt_documents WHERE id = ?', c.req.param('id'))
+  const doc = await documentFile(ctx.db, c.req.param('id'))
   requireThat(doc, 'Document not found', 404)
-  return new Response(new Uint8Array(doc.content as any), { headers: { 'content-type': doc.media_type, 'content-disposition': `attachment; filename="${doc.name.replace(/[^\w.-]+/g, '_')}"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox" } })
+  // ?view=1 shows a photo in the page; everything else downloads.
+  const inline = c.req.query('view') === '1' && /^image\/(png|jpeg|webp|gif)$/.test(doc.mediaType)
+  return new Response(doc.bytes, { headers: { 'content-type': doc.mediaType, 'content-disposition': `${inline ? 'inline' : 'attachment'}; filename="${doc.name.replace(/[^\w.-]+/g, '_')}"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox" } })
 })
+
+receiptRoutes(api)
 
 // Exports name their basis: in the file name (cash only, so accrual names stay as they were) and inside the file.
 const suffix = (basis: string) => basis === 'cash' ? '-cash' : ''

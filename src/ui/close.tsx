@@ -1,8 +1,27 @@
 // Close: calculated checks, reviewed tasks, the lock, and reopening by request and approval.
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Action, Card, Chip, command, Field, Form, Loading, PageHead, Table, day, monthName, thisMonth, useShared, useView, useWho, type D } from './kit'
+import { Action, Card, Chip, command, Field, Form, Loading, PageHead, Table, day, monthName, thisMonth, usd, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
+import { CaptureButtons } from './receipt-capture'
+
+/** Every entry keeps its receipt: spending and bills without one, each with "add receipt" right here. */
+function ReceiptsCard({ s, onChange }: { s: D; onChange: () => Promise<void> }) {
+  const can = useShared().state.actor.can, [waiving, setWaiving] = useState<string | null>(null), open = s.status !== 'locked'
+  const bills = s.checks.find((c: D) => c.key === 'evidence')?.items ?? []
+  const count = s.receipts.missing.length + bills.length
+  return <Card title={<><Icon name="receipt" /> Receipts</>} actions={count ? <Chip tone="warn">{count} without a receipt</Chip> : <Chip tone="good">Every entry has its receipt</Chip>}>
+    <Table heads={['Date', 'Entry', 'Amount', '']} figures={[2]} empty={s.receipts.waived.length ? `Every entry in ${monthName(s.id)} has its receipt or a recorded reason.` : `Every entry in ${monthName(s.id)} has its receipt.`}>
+      {s.receipts.missing.map((m: D) => <tr key={m.id}><td>{day(m.entry_date)}</td><td>{m.memo}{m.number ? <small className="sub"> · entry {m.number}</small> : null}</td><td className="fig">{usd(m.amount_cents)}</td>
+        <td>{open && can.record && <div className="row-actions"><span className="hint">Add receipt</span><CaptureButtons compact target={{ kind: 'journal', id: m.id }} onDone={onChange} />
+          {can.post && (waiving === m.id
+            ? <Form label="Save reason" submit={b => command('receipt.not-needed', { entryId: m.id, ...b })} onDone={async () => { setWaiving(null); await onChange() }} className="inline-form"><Field label="Why no receipt" name="reason" required /></Form>
+            : <button type="button" className="btn btn-link" onClick={() => setWaiving(m.id)}>No receipt needed</button>)}</div>}</td></tr>)}
+      {bills.map((b: D) => <tr key={b.id}><td>—</td><td>Bill {b.label}</td><td className="fig">—</td><td>{open && can.record && <div className="row-actions"><span className="hint">Add receipt</span><CaptureButtons compact target={{ kind: 'bill', id: b.id }} onDone={onChange} /></div>}</td></tr>)}
+    </Table>
+    {s.receipts.waived.length > 0 && <p className="hint">No receipt needed: {s.receipts.waived.map((w: D) => `${w.memo} (${w.reason})`).join('; ')}.</p>}
+  </Card>
+}
 
 const LINK: Record<string, string> = { bank: '/app/bank', drafts: '/app/books', evidence: '/app/sales', subledgers: '/app/reports', 'trial-balance': '/app/reports', proposals: '/app/agents' }
 
@@ -30,6 +49,7 @@ export function Close() {
           </Table>
           {s.status !== 'locked' && can.record && <Form label="Add task" submit={b => command('close.tasks', { period, ...b })} onDone={reload} className="inline-form"><Field label="New review task" name="title" required /></Form>}
         </Card>
+        <ReceiptsCard s={s} onChange={async () => { await reload(); await shared.reload() }} />
         {s.notes.length > 0 && <Card title="Approved notes">{s.notes.map((n: D) => <div key={n.id} className="note"><strong>{n.kind === 'variance' ? 'Variance explanation' : 'Close packet'}</strong><p>{n.body || JSON.parse(n.evidence).join('; ')}</p><small>Approved by {who(n.approved_by)}, {day(n.approved_at)}</small></div>)}</Card>}
       </div>
       <div className="stack">

@@ -6,6 +6,7 @@ import { longDay, monthBounds, monthName, now, optionalText, requireThat, text, 
 import { all, approval, audit, changed, guard, one, q, run, type Sql } from './db'
 import { ageing, trialBalance } from './reports'
 import { requireEntity } from './settings'
+import { missingReceipts } from './receipts/attachments'
 import type { Command } from './context'
 
 const DEFAULT_TASKS = ['Review the trial balance', 'Review receivables and payables aging', 'Review adjusting entries']
@@ -53,7 +54,9 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
   const approvals = await all(db, "SELECT * FROM pt_approvals WHERE subject_kind = 'period' AND subject_id = ? ORDER BY at DESC, id", id)
   const notes = await all(db, 'SELECT * FROM pt_notes WHERE period = ? ORDER BY approved_at DESC, id', id)
   const ready = checks.every(x => x.ok) && tasks.length > 0 && tasks.every(t => t.status === 'done')
-  return { id, start, end, status: p?.status ?? 'open', period: p, checks, tasks, requests, approvals, notes, ready }
+  // Every entry keeps its receipt: spending without one is listed here, to add one or say why none is needed.
+  const receipts = { missing: await missingReceipts(db, start, end), waived: await all(db, 'SELECT w.*, e.memo, e.entry_date FROM pt_receipt_waivers w JOIN pt_journal_entries e ON e.id = w.entry_id WHERE e.entry_date BETWEEN ? AND ? ORDER BY e.entry_date', start, end) }
+  return { id, start, end, status: p?.status ?? 'open', period: p, checks, tasks, requests, approvals, notes, ready, receipts }
 }
 
 const ensureTasks: Command = { need: 'record', async run(c, b) {

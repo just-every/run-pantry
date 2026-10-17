@@ -10,6 +10,7 @@ export function Overview() {
   const work = [
     { n: queue.journalDrafts + queue.invoiceDrafts, label: 'Drafts to review or post', to: '/app/books' },
     { n: queue.unmatchedLines, label: 'Unmatched statement lines', to: '/app/bank' },
+    { n: queue.receipts, label: 'Receipts to review', to: '/app/receipts' },
     { n: queue.proposals, label: 'Agent proposals waiting', to: '/app/agents' },
     { n: queue.reopenRequests, label: 'Reopening requests', to: '/app/close' },
   ]

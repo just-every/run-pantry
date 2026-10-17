@@ -1,7 +1,8 @@
 // The real Pantry Worker (its auth and API) on Miniflare with a real D1
 // database, every migration applied, and genuine sign-ins: the owner by the
 // bootstrap token, everyone else by an emailed invitation link. Mail leaves
-// through the real Resend adapter; only its HTTP endpoint is faked here.
+// through the real Resend adapter; only its HTTP endpoint is faked here, as is
+// the AI model's (`model`), when a test reads receipts.
 import { createServer } from 'node:net'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -31,7 +32,7 @@ export async function harness({ bindings = {}, outbound } = {}) {
   const bundle = await build({ entryPoints: ['tests/api/worker.ts'], bundle: true, write: false, format: 'esm', platform: 'neutral', conditions: ['workerd', 'worker', 'browser'], external: ['node:*', 'cloudflare:*'], target: 'es2023', logLevel: 'error' })
   const mf = new Miniflare({ ...convertV4MiniflareOptions({
     host: '127.0.0.1', port, modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'],
-    d1Databases: { DB: 'pantry' },
+    d1Databases: { DB: 'pantry' }, unsafeTriggerHandlers: true,
     bindings: { AUTH_ORIGIN: origin, AUTH_LOCAL: 'true', OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: 'local-test-secret-not-production-0123456789', SETUP_TOKEN: BOOTSTRAP, MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'test-resend-key', MAIL_FROM: 'Pantry <pantry@example.test>', ...bindings },
     async outboundService(request) {
       if (outbound && new URL(request.url).hostname !== 'api.resend.com') return outbound(request)

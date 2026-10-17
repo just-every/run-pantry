@@ -13,6 +13,8 @@ const PATHS: Record<string, string> = {
   upload: 'M12 16V4M7 9l5-5 5 5M4 20h16',
   building: 'M5 21V5.5L13 3v18M13 9h6v12M3 21h18M8.5 8h1.5M8.5 12h1.5M8.5 16h1.5M16 13h.5M16 17h.5',
   people: 'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3 20c.6-3.4 3-5.5 6-5.5s5.4 2.1 6 5.5M16 4.3a3.5 3.5 0 0 1 0 6.4M18 14.8c1.6.8 2.7 2.6 3 5.2',
+  camera: 'M4 8h3.5L9 5.5h6L16.5 8H20v11H4zM12 10.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+  receipt: 'M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21zM9 8h6M9 12h6M9 16h3',
 }
 
 export function Icon({ name }: { name: string }) {

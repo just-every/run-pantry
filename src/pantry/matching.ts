@@ -84,7 +84,7 @@ export async function matchPlan(db: D1Database, actor: Actor, input: MatchInput)
     ...created.map(x => q('INSERT INTO pt_match_postings (match_id, journal_line_id, active) SELECT ?, id, 1 FROM pt_journal_lines WHERE entry_id = ? AND account_id = ?', id, x.entryId, bank.account_id)),
     audit(who(actor), 'match.approve', 'match', id, { statementLines: lines.length, postings: postings.length, created: created.map(x => x.kind), amount: statementTotal, proposal: input.proposalId ?? null }),
   )
-  return { id, statements, statementTotal }
+  return { id, statements, statementTotal, entryIds: created.map(x => x.entryId) }
 }
 
 const approveMatch: Command = { need: 'record', async run(c, b) {
