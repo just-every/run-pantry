@@ -57,7 +57,7 @@
 
 /* Base's Run page (/run) and not-found page, in the same look: heavier display
    type, white step cards on the lavender paper, the mark's green numerals. */
-body:has(> main > .intro) h1, body:has(> main > .hero) h1 { font-weight: 800; letter-spacing: -.045em; }
+body:has(> main > .intro) h1, body:has(> main > .hero) h1 { font-weight: 800; letter-spacing: -.045em; word-spacing: .04em; }
 body:has(> main > .intro) .step { border-radius: 22px; border-color: var(--line); background: var(--surface); box-shadow: var(--shadow-card); }
 body:has(> main > .intro) .num { background: var(--ink); color: #fff; font-weight: 800; }
 body:has(> main > .intro) .step h2 { font-weight: 750; letter-spacing: -.03em; }
