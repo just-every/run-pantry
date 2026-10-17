@@ -29,19 +29,26 @@ function Connection({ c, onDone }: { c: D; onDone: () => Promise<void> }) {
   const brought = c.accounts.filter((a: D) => a.bank_account_id)
   return <div className="feed">
     <div className="feed-head"><strong>{c.institution_name}</strong>{c.status === 'relink' ? <Chip tone="warn">Needs re-link</Chip> : <Chip tone="good">Live</Chip>}</div>
-    {c.status === 'relink' && <div className="callout callout-warn" role="status"><Icon name="alert" /><div><strong>{c.institution_name} needs you to sign in again to stay current.</strong><span>{c.error_message} Nothing new arrives until then.</span></div>
-      {can && <Action tone="primary" run={async () => { await relink(c); await onDone() }}>Re-link</Action>}</div>}
     <ul className="feed-accounts">{c.accounts.map((a: D) => <li key={a.id}>
       <span>{a.name} <small className="sub">••{a.mask}</small></span>
       {a.bank_account_id ? <small>→ {a.bank_name} · {a.last_synced_at ? <>synced {ago(a.last_synced_at)}</> : 'not synced yet'}{a.pending ? ` · ${a.pending} pending` : ''}{a.balance_cents !== null ? ` · bank shows ${usd(a.balance_cents)}${a.kind.startsWith('credit') ? ' owed' : ''}` : ''}</small> : <small className="sub">Not brought in</small>}
     </li>)}</ul>
     {c.status === 'active' && c.last_sync_error && <p className="hint">Last try: {c.last_sync_error}. Pantry tries again within the hour.</p>}
     {can && <div className="row-actions small">
+      {c.status === 'relink' && <Action tone="primary" run={async () => { await relink(c); await onDone() }}>Re-link</Action>}
       {!brought.length && <Link className="btn btn-primary btn-small" to="/app/bank/connect" search={{ connection: c.id }}>Choose accounts</Link>}
       {c.status === 'active' && brought.length > 0 && <Action run={async () => { await command('feed.sync', { itemId: c.id }); await onDone() }}>Sync now</Action>}
       <Action tone="danger" run={async () => { if (window.confirm(`Disconnect ${c.institution_name}? Lines already in Pantry stay.`)) { await command('feed.disconnect', { itemId: c.id }); await onDone() } }}>Disconnect</Action>
     </div>}
   </div>
+}
+
+/** A connection the bank stopped sharing, said plainly at the top of Bank where it cannot be missed. */
+export function RelinkNotices({ data, onDone }: { data: D | undefined; onDone: () => Promise<void> }) {
+  const can = useShared().state.actor.can.record
+  return <>{(data?.connections ?? []).filter((c: D) => c.status === 'relink').map((c: D) => <div key={c.id} className="callout callout-warn relink" role="status"><Icon name="alert" />
+    <div><strong>{c.institution_name} needs you to sign in again to stay current.</strong><span>{c.error_message} Nothing new arrives until then.</span></div>
+    {can && <Action tone="primary" run={async () => { await relink(c); await onDone() }}>Re-link</Action>}</div>)}</>
 }
 
 export function Feeds({ data, onDone }: { data: D | undefined; onDone: () => Promise<void> }) {

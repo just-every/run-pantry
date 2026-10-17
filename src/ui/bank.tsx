@@ -5,7 +5,7 @@ import { Card, Chip, command, Field, Form, Loading, PageHead, Table, Tabs, accou
 import { Reconcile } from './reconcile'
 import { Suggestions, Transactions } from './bank-lines'
 import { Rules, fromSuggestion, type Draft } from './bank-rules'
-import { Feeds } from './bank-feeds'
+import { Feeds, RelinkNotices } from './bank-feeds'
 
 function Import({ accounts, onDone }: { accounts: D[]; onDone: () => Promise<void> }) {
   const file = useRef<HTMLInputElement>(null), [result, setResult] = useState<D | null>(null)
@@ -68,6 +68,7 @@ export function Bank() {
   const refresh = async () => { await Promise.all([reload(), lines.reload(), rules.reload(), feeds.reload(), shared.reload()]) }
   return <>
     <PageHead title="Bank" lead="Transactions arrive from your bank and card feeds or statement files. Rules file the routine ones; you file the rest and reconcile to the statement." />
+    <RelinkNotices data={feeds.data} onDone={refresh} />
     <Tabs tabs={[...TABS]} current={tab} onChange={go} />
     {tab === 'Transactions' && <div className="split split-wide-left split-bank">
       <div className="stack"><Suggestions items={rules.data?.suggestions ?? []} onPick={s => { setDraft(fromSuggestion(s)); go('Rules') }} /><Transactions data={lines.data} onDone={refresh} /></div>

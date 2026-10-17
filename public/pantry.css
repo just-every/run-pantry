@@ -378,8 +378,8 @@ ul.plain li:last-child { border-bottom: 0; }
 .feed-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
 .feed-head strong { display: flex; align-items: center; gap: 10px; font: 700 16px/1.2 var(--font-head); letter-spacing: -.02em; }
 .feed-head strong::before { content: ''; flex: none; width: 30px; height: 30px; border-radius: 9px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 18px no-repeat, linear-gradient(145deg, #2b84e6, #0f5fc2); }
-.feed .callout { margin: 8px 0 12px; }
-.feed .callout > div { flex: 1 1 200px; }
+.callout.relink > div { flex: 1 1 220px; }
+.callout.relink > .action { align-self: center; }
 .feed-accounts { margin: 0; padding: 0; list-style: none; }
 .feed-accounts li { display: flex; flex-direction: column; padding: 9px 0; border-top: 1px solid var(--line); }
 .feed-accounts li:first-child { border-top: 0; }
