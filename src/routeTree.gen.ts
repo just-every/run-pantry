@@ -18,6 +18,7 @@ import { Route as AppBooksRouteImport } from './routes/app.books'
 import { Route as AppCloseRouteImport } from './routes/app.close'
 import { Route as AppDocumentsRouteImport } from './routes/app.documents'
 import { Route as AppMoveInRouteImport } from './routes/app.move-in'
+import { Route as AppQuestionsRouteImport } from './routes/app.questions'
 import { Route as AppReceiptsRouteImport } from './routes/app.receipts'
 import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppSalesRouteImport } from './routes/app.sales'
@@ -69,6 +70,11 @@ const AppMoveInRoute = AppMoveInRouteImport.update({
   path: '/move-in',
   getParentRoute: () => AppRoute,
 } as any)
+const AppQuestionsRoute = AppQuestionsRouteImport.update({
+  id: '/questions',
+  path: '/questions',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppReceiptsRoute = AppReceiptsRouteImport.update({
   id: '/receipts',
   path: '/receipts',
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/app/close': typeof AppCloseRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/move-in': typeof AppMoveInRoute
+  '/app/questions': typeof AppQuestionsRoute
   '/app/receipts': typeof AppReceiptsRoute
   '/app/reports': typeof AppReportsRoute
   '/app/sales': typeof AppSalesRoute
@@ -119,6 +126,7 @@ export interface FileRoutesByTo {
   '/app/close': typeof AppCloseRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/move-in': typeof AppMoveInRoute
+  '/app/questions': typeof AppQuestionsRoute
   '/app/receipts': typeof AppReceiptsRoute
   '/app/reports': typeof AppReportsRoute
   '/app/sales': typeof AppSalesRoute
@@ -136,6 +144,7 @@ export interface FileRoutesById {
   '/app/close': typeof AppCloseRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/move-in': typeof AppMoveInRoute
+  '/app/questions': typeof AppQuestionsRoute
   '/app/receipts': typeof AppReceiptsRoute
   '/app/reports': typeof AppReportsRoute
   '/app/sales': typeof AppSalesRoute
@@ -154,6 +163,7 @@ export interface FileRouteTypes {
     | '/app/close'
     | '/app/documents'
     | '/app/move-in'
+    | '/app/questions'
     | '/app/receipts'
     | '/app/reports'
     | '/app/sales'
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | '/app/close'
     | '/app/documents'
     | '/app/move-in'
+    | '/app/questions'
     | '/app/receipts'
     | '/app/reports'
     | '/app/sales'
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | '/app/close'
     | '/app/documents'
     | '/app/move-in'
+    | '/app/questions'
     | '/app/receipts'
     | '/app/reports'
     | '/app/sales'
@@ -262,6 +274,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMoveInRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/questions': {
+      id: '/app/questions'
+      path: '/questions'
+      fullPath: '/app/questions'
+      preLoaderRoute: typeof AppQuestionsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/receipts': {
       id: '/app/receipts'
       path: '/receipts'
@@ -308,6 +327,7 @@ interface AppRouteChildren {
   AppCloseRoute: typeof AppCloseRoute
   AppDocumentsRoute: typeof AppDocumentsRoute
   AppMoveInRoute: typeof AppMoveInRoute
+  AppQuestionsRoute: typeof AppQuestionsRoute
   AppReceiptsRoute: typeof AppReceiptsRoute
   AppReportsRoute: typeof AppReportsRoute
   AppSalesRoute: typeof AppSalesRoute
@@ -324,6 +344,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCloseRoute: AppCloseRoute,
   AppDocumentsRoute: AppDocumentsRoute,
   AppMoveInRoute: AppMoveInRoute,
+  AppQuestionsRoute: AppQuestionsRoute,
   AppReceiptsRoute: AppReceiptsRoute,
   AppReportsRoute: AppReportsRoute,
   AppSalesRoute: AppSalesRoute,

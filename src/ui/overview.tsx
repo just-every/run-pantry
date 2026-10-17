@@ -8,6 +8,7 @@ export function Overview() {
   const { state } = useShared(), { steps, queue, entity } = state.overview
   const done = steps.filter((s: D) => s.done).length
   const work = [
+    { n: queue.questions, label: 'Questions from Pantry', to: '/app/questions' },
     { n: queue.journalDrafts + queue.invoiceDrafts, label: 'Drafts to review or post', to: '/app/books' },
     { n: queue.unmatchedLines, label: 'Unmatched statement lines', to: '/app/bank' },
     { n: queue.receipts, label: 'Receipts to review', to: '/app/receipts' },

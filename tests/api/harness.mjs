@@ -93,10 +93,15 @@ export async function harness({ bindings = {}, outbound } = {}) {
       }
       return { token, call }
     }
+    /** Deliver one email to the Worker's email handler, as Cloudflare Email Routing does. */
+    async function email(raw, { from, to }) {
+      const r = await mf.dispatchFetch(`${origin}/cdn-cgi/local/email?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { method: 'POST', body: raw })
+      return { status: r.status, text: await r.text() }
+    }
     /** Fire the Worker's Cron trigger. */
     const cron = async () => (await mf.getWorker()).scheduled({ cron: '*/30 * * * *' })
     const close = async () => { await mf.dispose(); await rm(dir, { recursive: true, force: true }) }
-    return { db, origin, owner, mail, send, command, view, member, agent, confirmMail, cron, close }
+    return { db, origin, owner, mail, send, command, view, member, agent, confirmMail, email, cron, close }
   } catch (error) {
     await mf.dispose(); await rm(dir, { recursive: true, force: true })
     throw error

@@ -177,9 +177,19 @@ const previewRule: Command = { need: 'record', async run(c, b) {
   return { ...p, files: p.files.slice(0, 200), held: p.held.slice(0, 50), earlier: p.earlier.slice(0, 50), count: p.files.length }
 } }
 
+const ruleFields = (input: Awaited<ReturnType<typeof ruleInput>>) => [input.name, input.bankAccountId, input.direction, input.payee, input.descriptionContains, input.amountMin, input.amountMax, JSON.stringify(input.splits), input.contactId, input.taxCodeId, input.memo]
+const ruleInsert = (id: string, fields: unknown[], by: string) =>
+  q('INSERT INTO pt_bank_rules (id, name, bank_account_id, direction, payee, description_contains, amount_min_cents, amount_max_cents, splits, contact_id, tax_code_id, memo, position, active, created_by, created_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM pt_bank_rules), 1, ?, ?, ?)', id, ...fields, by, now(), uid())
+
+/** A new rule from rule input (the same checks as a saved one), for a write the caller authorises. */
+export async function newRuleStatements(db: D1Database, b: Data, by: AuditActor) {
+  const input = await ruleInput(db, b), id = uid()
+  return { id, statements: [ruleInsert(id, ruleFields(input), by.email), audit(by, 'bank-rule.create', 'bank-rule', id, { name: input.name })] }
+}
+
 const saveRule: Command = { need: 'record', async run(c, b) {
   const input = await ruleInput(c.db, b)
-  const fields = [input.name, input.bankAccountId, input.direction, input.payee, input.descriptionContains, input.amountMin, input.amountMax, JSON.stringify(input.splits), input.contactId, input.taxCodeId, input.memo]
+  const fields = ruleFields(input)
   let id: string
   if (b.id) {
     const current = await one(c.db, 'SELECT * FROM pt_bank_rules WHERE id = ?', text(b.id, 'Rule'))
@@ -191,9 +201,7 @@ const saveRule: Command = { need: 'record', async run(c, b) {
       audit(who(c.actor), 'bank-rule.edit', 'bank-rule', id, { name: input.name })])
   } else {
     id = uid()
-    await run(c.db, [authority(c.actor, 'record'),
-      q('INSERT INTO pt_bank_rules (id, name, bank_account_id, direction, payee, description_contains, amount_min_cents, amount_max_cents, splits, contact_id, tax_code_id, memo, position, active, created_by, created_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM pt_bank_rules), 1, ?, ?, ?)', id, ...fields, c.actor.email, now(), uid()),
-      audit(who(c.actor), 'bank-rule.create', 'bank-rule', id, { name: input.name })])
+    await run(c.db, [authority(c.actor, 'record'), ruleInsert(id, fields, c.actor.email), audit(who(c.actor), 'bank-rule.create', 'bank-rule', id, { name: input.name })])
   }
   // Filing what the preview showed is the person's choice, made with the save.
   let filed = { filed: 0, skipped: 0 }

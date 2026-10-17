@@ -42,12 +42,13 @@ import { stripeCommands, stripeView } from './stripe'
 import { depositNotes } from './automatch'
 import { customer } from './customer-page'
 import { runDueWork } from './due'
+import { questionCommands, questionsView } from './questions/commands'
 
 const commands: Record<string, Command> = {
   ...settingsCommands, ...accountCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands,
   ...bankCommands, ...matchCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
-  ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands,
+  ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands,
 }
 
 type C = HonoContext<{ Bindings: Bindings }>
@@ -85,6 +86,7 @@ view('bank/feeds', async ctx => feedsView(ctx))
 view('reconciliation/:statement', async (ctx, c) => { const r = await reconciliationState(ctx.db, c.req.param('statement')!); return { ...r, depositNotes: await depositNotes(ctx.db, r.lines) } })
 view('close/:period', async (ctx, c) => closeState(ctx.db, c.req.param('period')!))
 view('proposals', async ctx => ({ proposals: await proposalsView(ctx.db) }))
+view('questions', async (ctx, c) => questionsView(ctx, c.req.query('q') || undefined))
 view('move-in', async ctx => moveInView(ctx))
 view('activity', async ctx => activity(ctx.db))
 view('documents', async ctx => ({ documents: await documents(ctx.db) }))

@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router'
 import { Action, Card, Chip, command, Field, Form, Loading, PageHead, Table, day, monthName, thisMonth, usd, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
 import { CaptureButtons } from './receipt-capture'
+import { MonthQuestions } from './questions'
 
 /** Every entry keeps its receipt: spending and bills without one, each with "add receipt" right here. */
 function ReceiptsCard({ s, onChange }: { s: D; onChange: () => Promise<void> }) {
@@ -23,7 +24,7 @@ function ReceiptsCard({ s, onChange }: { s: D; onChange: () => Promise<void> }) 
   </Card>
 }
 
-const LINK: Record<string, string> = { bank: '/app/bank', drafts: '/app/books', evidence: '/app/sales', subledgers: '/app/reports', 'trial-balance': '/app/reports', proposals: '/app/agents' }
+const LINK: Record<string, string> = { bank: '/app/bank', drafts: '/app/books', evidence: '/app/sales', subledgers: '/app/reports', 'trial-balance': '/app/reports', proposals: '/app/agents', questions: '/app/questions' }
 
 export function Close() {
   const shared = useShared(), who = useWho(), [period, setPeriod] = useState(() => new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('period') ?? shared.state.overview.closing ?? thisMonth())
@@ -42,6 +43,7 @@ export function Close() {
             {s.checks.map((c: D) => <tr key={c.key}><td><strong>{c.title}</strong></td><td>{c.ok ? <Chip tone="good">Passed</Chip> : <Chip tone="bad">Not yet</Chip>}</td><td>{c.detail} {!c.ok && <Link to={LINK[c.key]}>Open</Link>}</td></tr>)}
           </Table>
         </Card>
+        <MonthQuestions questions={s.questions} month={monthName(period)} onDone={refresh} />
         <Card title="Review tasks" actions={s.status !== 'locked' && can.record && !s.tasks.length && <Action tone="primary" run={async () => { await command('close.tasks', { period }); await reload() }}>Add the standard review tasks</Action>}>
           <Table heads={['Task', 'Status', 'Completed by', '']} empty="No review tasks yet. Add the standard ones, or your own.">
             {s.tasks.map((t: D) => <tr key={t.id}><td>{t.title}{t.note && <small className="sub"> — {t.note}</small>}</td><td>{t.status === 'done' ? <Chip tone="good">Done</Chip> : <Chip tone="warn">Open</Chip>}</td><td>{t.done_by ? <>{who(t.done_by)}, {day(t.done_at)}</> : '—'}</td>
