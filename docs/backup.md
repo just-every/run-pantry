@@ -16,7 +16,7 @@ The archive is saved in the `exports` folder, with its checksums inside it: `rer
 `rer export` saves only the books on this computer, and refuses when you name a hosted address. To keep the hosted books, run this in the `run-pantry` folder you deploy from:
 
 ```sh
-rer queue hosted-backup -- node scripts/hosted-backup.mjs --env-file .env.pantry
+rer run hosted-backup --env-file .env.pantry
 ```
 
 Add `--environment NAME` if you deployed with one. It saves the hosted database, every table plus every receipt, bill PDF and statement file stored in it, as one SQL file such as `exports/pantry-production-db-2026-10-17.sql`, and prints its size, fingerprint and how many journal entries, invoices, bills, bank lines and stored files it holds. It uses the Cloudflare account ID and token in `.env.pantry`; the hosted Pantry pauses for the few seconds the export takes. The file is readable only by you, since it holds the whole book. Pantry keeps receipts and documents inside the database, not in separate file storage, so this one file is the complete backup. Underneath, it runs Cloudflare's own export, `npx wrangler d1 export pantry-production-db --remote --output exports/pantry-production-db.sql`, with that account ID and token. Keep the file somewhere safe; it is a complete copy you can open with any SQLite tool (`sqlite3 books.db < exports/pantry-production-db-2026-10-17.sql`). `rer import` does not read it yet.

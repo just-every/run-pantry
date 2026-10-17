@@ -2,9 +2,12 @@
 
 ## Unreleased (next minor)
 
+- Use the published rer 0.2.51 package. Current package scripts and command guides replace removed queue/copy paths.
+
 - run-pantry.com's homepage follows one month of one business's books, on the owner-approved page structure (17 Oct 2026): October on one ribbon, moving in from QuickBooks Online, the ledger, receipts, invoices, a feed that breaks and is re-linked, the books agent, the close with the accountant and the reports, between the unchanged hero, interlude and closing. The old twelve-section page and its styles are removed; the painted bands gain 2304 and 3072 px plates for wide screens. `docs/CLAIMS.md` and the contract's homepage claims map every claim on the new page.
 - Owners can give each sibling book a named, scoped integration credential in People & settings, copy it once, revoke it and inspect its calls. Credentials do not sign in and do not expire with the owner's session.
 - The versioned integration API upserts contacts, creates bills, invoices, credits and journals once per idempotency key, attaches documents, records bill receipt/readiness and reads payments and the trial balance. Posting needs a separate grant; period locks still apply. See [Sibling integrations](/docs/integrations).
+- Scoped siblings can record external payments and their allocations with `payments:write` plus `post`. Payment writes are idempotent, return allocations and respect native accounting and period checks. Payment readers and writers can select an existing bank or clearing account from `state` and recover an uncertain payment through an exact reference lookup.
 - Migration `0024_integrations.sql` adds credential hashes, request identities, call history and bill readiness flags. Existing books and sign-ins stay in place.
 
 ## 0.2.1 (17 Oct 2026)

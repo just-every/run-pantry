@@ -18,12 +18,13 @@ The credential cannot sign in as a person. It keeps working after the owner sign
 | `journals:write` | Read and create journal entries. |
 | `documents:write` | Read document records and upload documents. |
 | `payments:read` | Read payments and their allocations to bills or invoices. |
+| `payments:write` | Read payments and record external payments and their allocations, with the additional `post` grant. |
 | `reports:read` | Read the trial balance. |
-| `post` | In addition to a record's write scope, post bills or journals, or issue invoices and credits. |
+| `post` | In addition to a record's write scope, post bills, journals or external payments, or issue invoices and credits. |
 
 A `:write` scope includes reading that record type. It does not grant access to the other record types. The `post` scope alone grants no record access. Without `post`, created bills, invoices and journals stay drafts for a person to review and post or issue in Pantry.
 
-There is no payment-writing permission. These credentials cannot move money, sign in, manage users, lock a period or reopen one. A sibling book still needs to map its records to Pantry's accounts, tax codes and contact IDs; this API does not supply an item catalogue or match suppliers for it.
+Payment recording needs both `payments:write` and `post`: it records money that already moved outside Pantry. Payments have no draft state. These credentials cannot move money, sign in, manage users, lock a period or reopen one. A sibling book still needs to map its records to Pantry's accounts, bank accounts, tax codes and contact IDs; this API does not supply an item catalogue or match suppliers for it.
 
 ## Send a request
 
@@ -47,17 +48,19 @@ All paths below follow `/api/pantry/integration/v1/`. List responses contain the
 
 | GET path | Scope | Response |
 | --- | --- | --- |
-| `state` | A granted record scope | `accounts`, `taxCodes`; also `contacts` when `contacts:write` is granted. |
+| `state` | A granted record scope | `accounts`, `taxCodes`; also `contacts` when `contacts:write` is granted and `bankAccounts` when `payments:read` or `payments:write` is granted. |
 | `contacts?name=…` or `contacts?id=…` | `contacts:write` | `{ "contacts": […], "nextCursor": … }` |
 | `bills?reference=…` or `bills?id=…` | `bills:write` | `{ "bills": […], "nextCursor": … }` |
 | `invoices?number=…` or `invoices?id=…` | `invoices:write` | `{ "invoices": […], "nextCursor": … }` |
 | `journals?memo=…` or `journals?id=…` | `journals:write` | `{ "entries": […], "nextCursor": … }` |
 | `documents?name=…` | `documents:write` | `{ "documents": […], "nextCursor": … }` |
 | `documents/:id` | `documents:write` | The original document bytes, as a download. |
-| `payments?billId=…` or `payments?invoiceId=…` | `payments:read` | `{ "payments": […], "nextCursor": … }`, including allocations and `reversal_id`. |
+| `payments?billId=…`, `payments?invoiceId=…`, `payments?id=…` or `payments?reference=…` | `payments:read` or `payments:write` | `{ "payments": […], "nextCursor": … }`, including allocations and `reversal_id`. |
 | `reports/trial-balance?to=YYYY-MM-DD` | `reports:read` | The trial-balance rows through that date. |
 
 Bill and invoice readbacks include `open_cents`. Read payment allocations to see which payment was applied to which record. A reversed payment has a `reversal_id`; its allocations no longer reduce the open balance, so the bill or invoice reopens for that amount. Do not infer payment from a bill's readiness flag.
+
+Each `bankAccounts` row contains `id`, `name`, `account_id`, `institution`, `number_last4`, `ledger_code` and `ledger_name`. Have the owner select the existing bank or Stripe clearing account that received the money, then use its `id` as `bankAccountId`. This route does not create accounts or expose routing details.
 
 ## Write records
 
@@ -71,8 +74,13 @@ Every POST below needs its own `Idempotency-Key`.
 | `journals` | `date`, `memo`, `post`, `lines[{accountId, debit}]` and `lines[{accountId, credit}]`; debits and credits must balance. |
 | `documents` | `name`, `mediaType`, `base64`, `linkedKind` (for example `bill`), `linkedId`, `note` |
 | `bills/:id/readiness` | `received` and `readyToPay` booleans |
+| `payments` | `direction` (`received` or `paid`), `contactId`, `date`, `amount`, `bankAccountId`, `reference`, `allocations[{targetId, amount}]`; optional `method`, `memo`, `post: true` |
 
 Each write needs the corresponding `:write` scope. Set `post: true` to post or issue at creation, with the additional `post` scope. Use decimal strings for bill amounts, invoice quantities and rates, and journal debits and credits. Invoice `taxCode` is `"exempt"` or a tax-code ID from `state`.
+
+`payments` always needs `payments:write` and `post`, even when the body omits `post`. `post: false` is refused because payments cannot be drafts. Use decimal strings for the payment and allocation amounts. A received payment allocates to issued invoices belonging to the customer; a paid payment allocates to posted bills belonging to the vendor. Allocations cannot exceed the payment or each item's open balance. Payment writes use Pantry's native balanced posting and locked-period checks. Successful writes and replays return the payment itself, including its allocations.
+
+Keep a stable reference such as the Stripe payment intent ID and keep the original idempotency key. If a response is lost, retry with that key and unchanged body, or find the payment through the exact `reference` filter and check its allocations. References are not unique; a reference lookup does not replace the idempotency key. Inspect all pages and verify the contact, amount and allocated invoice before adopting a recovered record.
 
 Contact upserts remember the sibling's `externalId`. On the first upsert from a connection or replacement credential, Pantry links an existing contact with the same kind and exact name. Omitted email and payment terms stay as they are; an inactive contact waits for the owner to reactivate it.
 
@@ -141,7 +149,26 @@ curl --fail-with-body --silent --show-error --get \
   "$API/payments" | jq .
 ```
 
-Follow `nextCursor` to read further payment pages. A new bill can have no payments and its full amount still open. Paying it happens outside this integration API; read it again after the payment is recorded in Pantry.
+Follow `nextCursor` to read further payment pages. A new bill can have no payments and its full amount still open. Paying it happens outside Pantry; a credential with `payments:write` and `post` can record that external payment, or a person can record it in Pantry.
+
+## Record a Stripe receipt against an invoice
+
+Give the connection `payments:write` and `post`, along with the contact and invoice scopes it needs. Once Stripe confirms the payment, POST a body such as this to `payments` with a stable `Idempotency-Key` for that Stripe payment. Replace the contact, invoice and bank account IDs with real Pantry IDs; choose the Stripe clearing account through `state`.
+
+```json
+{
+  "direction": "received",
+  "contactId": "the-pantry-customer-id",
+  "date": "2026-10-18",
+  "amount": "40.00",
+  "bankAccountId": "the-selected-stripe-clearing-bank-account-id",
+  "reference": "the-stripe-payment-intent-id",
+  "method": "card",
+  "allocations": [{ "targetId": "the-pantry-invoice-id", "amount": "40.00" }]
+}
+```
+
+The response includes the allocation. Read the invoice again to confirm its `open_cents` is zero. Stripe fees and payout reconciliation are separate accounting records; this receipt records the gross invoice payment.
 
 ## Errors and connectivity
 

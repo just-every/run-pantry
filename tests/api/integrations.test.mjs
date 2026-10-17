@@ -6,7 +6,7 @@ test('a scoped sibling posts once, readies its bill, reads payment after owner e
   const h = await harness(); t.after(h.close)
   const { acct } = await books(h)
   const bank = await h.command('bank-account.save', { name: 'Operating checking', institution: 'Community Bank', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-10-01', openingBalance: '0.00' })
-  const scopes = ['contacts:write', 'bills:write', 'invoices:write', 'journals:write', 'documents:write', 'payments:read', 'reports:read', 'post']
+  const scopes = ['contacts:write', 'bills:write', 'invoices:write', 'journals:write', 'documents:write', 'payments:read', 'payments:write', 'reports:read', 'post']
   const credential = await h.command('integration.create', { name: 'Pier warehouse', scopes })
   const call = async (path, body, key, status = 200, token = credential.token) => {
     const r = await h.send('/api/pantry/integration/v1/' + path, body, { headers: { authorization: `Bearer ${token}`, ...(key ? { 'idempotency-key': key } : {}) } })
@@ -44,11 +44,39 @@ test('a scoped sibling posts once, readies its bill, reads payment after owner e
   const invoice = await call('invoices', invoiceBody, 'invoice')
   assert.equal(invoice.status, 'issued')
   assert.equal((await call('invoices', invoiceBody, 'invoice')).id, invoice.id)
+  const writer = await h.command('integration.create', { name: 'Pier Stripe receipts', scopes: ['payments:write', 'post'] })
+  const readOnly = await h.command('integration.create', { name: 'Payment readback', scopes: ['payments:read', 'post'] })
+  const noPost = await h.command('integration.create', { name: 'Payments without posting', scopes: ['payments:write'] })
+  assert.equal((await call('state', undefined, undefined, 200, writer.token)).bankAccounts[0].id, bank.id)
+  assert.equal((await call('state', undefined, undefined, 200, readOnly.token)).bankAccounts[0].id, bank.id)
+  const receiptBody = { direction: 'received', contactId: customer.id, date: '2026-10-17', amount: '40.00', bankAccountId: bank.id, reference: 'stripe:payment-intent-cedar', allocations: [{ targetId: invoice.id, amount: '40.00' }] }
+  await call('payments', receiptBody, 'read-only-payment', 403, readOnly.token)
+  await call('payments', receiptBody, 'unapproved-payment', 403, noPost.token)
+  await call('payments', { ...receiptBody, post: false }, 'draft-payment', 400, writer.token)
+  await call('payments', receiptBody, undefined, 400, writer.token)
+  // Parallel delivery and an unchanged replay must not allocate the receipt twice.
+  const [receipt, duplicate] = await Promise.all([call('payments', receiptBody, 'stripe-receipt', 200, writer.token), call('payments', receiptBody, 'stripe-receipt', 200, writer.token)])
+  assert.equal(duplicate.id, receipt.id)
+  assert.equal(receipt.allocations[0].target_id, invoice.id)
+  assert.equal(receipt.allocations[0].amount_cents, 4000)
+  assert.equal((await call('invoices?id=' + invoice.id)).invoices[0].open_cents, 0)
+  assert.equal((await call('payments', receiptBody, 'stripe-receipt', 200, writer.token)).id, receipt.id)
+  await call('payments', { ...receiptBody, reference: 'different-payment' }, 'stripe-receipt', 409, writer.token)
+  // A caller that lost its response can locate the exact reference without a session.
+  const recovered = await call('payments?reference=' + encodeURIComponent(receiptBody.reference), undefined, undefined, 200, writer.token)
+  assert.deepEqual(recovered.payments.map(p => p.id), [receipt.id])
+  assert.equal(recovered.payments[0].allocations[0].target_id, invoice.id)
+  assert.equal((await call('payments?id=' + receipt.id, undefined, undefined, 200, readOnly.token)).payments[0].id, receipt.id)
+  assert.equal((await call('payments?reference=stripe%3Apayment-intent', undefined, undefined, 200, writer.token)).payments.length, 0)
+  await h.command('integration.revoke', { id: writer.id })
+  await call('payments', receiptBody, 'stripe-receipt', 401, writer.token)
+  await call('payments', { ...receiptBody, reference: 'revoked-payment' }, 'revoked-receipt', 401, writer.token)
   const journalBody = { date: '2026-10-17', memo: 'Pier COGS', post: true, lines: [{ accountId: acct['6100'], debit: '10.00' }, { accountId: acct['1000'], credit: '10.00' }] }
   const journal = await call('journals', journalBody, 'cogs')
   assert.equal(journal.status, 'posted')
   assert.equal((await call('journals', journalBody, 'cogs')).id, journal.id)
   const limited = await h.command('integration.create', { name: 'Pier replacement without posting', scopes: ['bills:write', 'contacts:write'] })
+  assert.equal((await call('state', undefined, undefined, 200, limited.token)).bankAccounts, undefined)
   const linked = await call('contacts', { externalId: 'harbor-ceramics', kind: 'vendor', name: 'Harbor Ceramics LLC' }, 'vendor-link', 200, limited.token)
   assert.equal(linked.id, vendor.id)
   assert.equal(linked.terms_days, 15)
@@ -62,6 +90,7 @@ test('a scoped sibling posts once, readies its bill, reads payment after owner e
   await h.db.prepare("INSERT INTO pt_periods (id,start_date,end_date,status,revision) VALUES ('2026-11','2026-11-01','2026-11-30','locked','locked')").run()
   const locked = await call('bills', { ...body, billDate: '2026-11-01' }, 'locked', 409)
   assert.match(locked.error, /locked/i)
+  await call('payments', { ...receiptBody, date: '2026-11-01' }, 'locked-payment', 409)
   // The bearer remains useful when the same owner's ordinary session has expired.
   await h.db.prepare('UPDATE oa_sessions SET expires_at = 0').run()
   await h.view('state', h.owner, 401)

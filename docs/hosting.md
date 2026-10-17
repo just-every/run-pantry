@@ -61,11 +61,11 @@ The hosted Pantry starts with its own, empty books, and you set the business up 
 - **Update Pantry**: in the `run-pantry` folder, `git pull`, then `rer deploy --env-file .env.pantry` again. Your books stay.
 - **Change one key**: put the new value in `.env.pantry`, then `rer deploy --set-secret NAME --env-file .env.pantry`.
 - **Keep the `.rer` folder.** It records what `rer deploy` created on your account, so later deploys update the same Pantry. Deploy from the same folder each time.
-- **Back up the hosted books**: `rer queue hosted-backup -- node scripts/hosted-backup.mjs --env-file .env.pantry` saves the hosted database, with every receipt and document in it, to the `exports` folder ([Back up and restore](/docs/backup#back-up-a-hosted-pantry)). Add `--environment NAME` if you deployed with one. `rer export` does not do this: it saves only the books on this computer.
+- **Back up the hosted books**: `rer run hosted-backup --env-file .env.pantry` saves the hosted database, with every receipt and document in it, to the `exports` folder ([Back up and restore](/docs/backup#back-up-a-hosted-pantry)). Add `--environment NAME` if you deployed with one. `rer export` does not do this: it saves only the books on this computer.
 - **Take it down**: export your hosted books first, because taking it down deletes them:
 
   ```sh
-  rer queue hosted-backup -- node scripts/hosted-backup.mjs --env-file .env.pantry
+  rer run hosted-backup --env-file .env.pantry
   rer deploy --remove --yes --env-file .env.pantry
   ```
 

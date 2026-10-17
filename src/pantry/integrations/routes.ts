@@ -12,7 +12,8 @@ import { bill } from '../payables'
 import { trialBalance } from '../reports'
 import { identify } from './credentials'
 import { idempotent, type Prepared } from './idempotency'
-import { prepareBill, prepareContact, prepareDocument, prepareInvoice, prepareJournal, prepareReadiness } from './postings'
+import { payment } from './payments'
+import { prepareBill, prepareContact, prepareDocument, prepareInvoice, prepareJournal, preparePayment, prepareReadiness } from './postings'
 
 type Env = { Bindings: Bindings; Variables: { integration: Integration & { scopes: string[] } } }
 type C = HonoContext<Env>
@@ -61,8 +62,11 @@ integrations.get('/state', async c => {
   const ctx = context(c, readable)
   await run(ctx.db, [authority(ctx.actor, 'read')])
   const contacts = credential.scopes.includes('contacts:write') ? await page(c, 'pt_contacts', { id: 'id', name: 'name' }) : null
+  const bankAccounts = credential.scopes.some(s => s === 'payments:read' || s === 'payments:write')
+    ? await all(ctx.db, 'SELECT b.id,b.name,b.account_id,b.institution,b.number_last4,a.code AS ledger_code,a.name AS ledger_name FROM pt_bank_accounts b JOIN pt_accounts a ON a.id = b.account_id ORDER BY b.name,b.id') : null
   return c.json({ accounts: await all(ctx.db, 'SELECT id,code,name,type,subtype,active FROM pt_accounts ORDER BY code'),
     taxCodes: await all(ctx.db, 'SELECT id,name,rate_milli_percent FROM pt_tax_codes WHERE active = 1 ORDER BY name'),
+    ...(bankAccounts ? { bankAccounts } : {}),
     ...(contacts ? { contacts: contacts.rows, nextCursor: contacts.nextCursor } : {}) })
 })
 
@@ -89,12 +93,11 @@ integrations.get('/documents/:id', async c => {
   return new Response(doc.bytes, { headers: { 'content-type': doc.mediaType, 'content-disposition': `attachment; filename="${doc.name.replace(/[^\w.-]+/g, '_')}"`, 'content-security-policy': "default-src 'none'; sandbox" } })
 })
 integrations.get('/payments', async c => {
-  const ctx = context(c, 'payments:read'), target = c.req.query('billId') ?? c.req.query('invoiceId')
+  const ctx = context(c, c.get('integration').scopes.includes('payments:write') ? 'payments:write' : 'payments:read'), target = c.req.query('billId') ?? c.req.query('invoiceId')
   const kind = c.req.query('billId') ? 'bill' : 'invoice'
-  const p = await page(c, 'pt_payments', { id: 'id' }, target ? "EXISTS (SELECT 1 FROM pt_allocations a WHERE a.source_kind = 'payment' AND a.source_id = pt_payments.id AND a.target_kind = ? AND a.target_id = ?)" : '', target ? [kind, target] : [])
-  for (const payment of p.rows) payment.allocations = await all(ctx.db, "SELECT * FROM pt_allocations WHERE source_kind = 'payment' AND source_id = ? ORDER BY id", payment.id)
+  const p = await page(c, 'pt_payments', { id: 'id', reference: 'reference' }, target ? "EXISTS (SELECT 1 FROM pt_allocations a WHERE a.source_kind = 'payment' AND a.source_id = pt_payments.id AND a.target_kind = ? AND a.target_id = ?)" : '', target ? [kind, target] : [])
   await run(ctx.db, [authority(ctx.actor, 'read')])
-  return c.json({ payments: p.rows, nextCursor: p.nextCursor })
+  return c.json({ payments: await Promise.all(p.rows.map(p => payment(ctx.db, p.id))), nextCursor: p.nextCursor })
 })
 integrations.get('/reports/trial-balance', async c => {
   const ctx = context(c, 'reports:read'), to = date(c.req.query('to') ?? new Date().toISOString().slice(0, 10))
@@ -109,6 +112,7 @@ for (const spec of [
   { path: '/invoices', scope: 'invoices:write', prepare: prepareInvoice, read: invoice },
   { path: '/journals', scope: 'journals:write', prepare: prepareJournal, read: entry },
   { path: '/documents', scope: 'documents:write', prepare: prepareDocument, read: document },
+  { path: '/payments', scope: 'payments:write', prepare: preparePayment, read: payment },
   { path: '/bills/:id/readiness', scope: 'bills:write', prepare: (ctx: Context, b: Data, c: C) => prepareReadiness(ctx, b, c.req.param('id')!), read: bill },
 ]) integrations.post(spec.path, async c => {
   const ctx = context(c, spec.scope)
@@ -118,11 +122,13 @@ for (const spec of [
   try { body = JSON.parse(raw) } catch { throw new Fault(400, 'Send a JSON object') }
   requireThat(body && typeof body === 'object' && !Array.isArray(body), 'Send a JSON object')
   requireThat(body.post === undefined || typeof body.post === 'boolean', 'post is true or false')
-  if (body.post === true) requireThat(c.get('integration').scopes.includes('post'), 'This credential needs the post grant; omit post or send false to save a draft', 403)
+  const postsPayment = spec.scope === 'payments:write'
+  if (postsPayment) requireThat(body.post !== false, 'Payments record money already moved and cannot be saved as drafts')
+  if (postsPayment || body.post === true) requireThat(c.get('integration').scopes.includes('post'), postsPayment ? 'Recording an external payment needs the post grant' : 'This credential needs the post grant; omit post or send false to save a draft', 403)
   const operation = c.req.path
   return c.json(await idempotent(ctx, operation, body, async () => {
     const p: Prepared = await spec.prepare(ctx, body, c)
-    if (body.post === true) p.statements.unshift(authority(ctx.actor, 'post'))
+    if (postsPayment || body.post === true) p.statements.unshift(authority(ctx.actor, 'post'))
     return p
   }, id => spec.read(ctx.db, id)))
 })

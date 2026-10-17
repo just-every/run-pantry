@@ -29,7 +29,7 @@ For the current shell, run `export PATH="$HOME/.local/bin:$PATH"` after installi
 This guide ships with a composed, runnable foundation edition. To install for a
 real owner instead of a review launch, run the verbs yourself from that
 edition's checkout root. `rer` runs each verb with this checkout's own pinned
-copy (`scripts/rer.mjs`).
+published package (`@runeditrun/rer`).
 
 ```sh
 rer install

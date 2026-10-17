@@ -25,14 +25,16 @@ export async function idempotent(c: Context & { actor: Integration }, operation:
   }
   const found = await previous()
   if (found) return found
-  const p = await prepare()
+  let p: Prepared
   try {
+    p = await prepare()
     await run(c.db, [authority(c.actor, 'record'),
       q('INSERT INTO pt_integration_requests (credential_id,request_key,operation,request_hash,target_kind,target_id,created_at) VALUES (?,?,?,?,?,?,?)', c.actor.id, key, operation, hash, p.kind, p.id, now()),
       ...p.statements])
   } catch (error) {
-    // A concurrent winner is read only after the losing atomic batch rolls back.
-    if (error instanceof Fault && error.status === 409) {
+    // A winner may commit during preparation (closing the allocated invoice),
+    // or during our atomic batch. Its identity also resolves that validation race.
+    if (error instanceof Fault && (error.status === 400 || error.status === 409)) {
       const winner = await previous()
       if (winner) return winner
     }

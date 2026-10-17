@@ -6,7 +6,7 @@ import { date, now, optionalText, requireThat, text, uid, type Data } from '../c
 import { approval, assertOpen, audit, changed, one, periodOpen, q, type Sql } from '../db'
 import { invoice, issueStatements, lineStatements, nextNumber, parseInvoice } from '../invoices'
 import { entryStatements, parseLines } from '../journal'
-import { bill, billStatements } from '../payables'
+import { bill, billStatements, paymentStatements } from '../payables'
 import type { Prepared } from './idempotency'
 
 export async function prepareContact(c: Context, b: Data): Promise<Prepared> {
@@ -34,6 +34,11 @@ export async function prepareContact(c: Context, b: Data): Promise<Prepared> {
 export async function prepareBill(c: Context, b: Data): Promise<Prepared> {
   const p = await billStatements(c, b)
   return { ...p, kind: 'bill' }
+}
+
+export async function preparePayment(c: Context, b: Data): Promise<Prepared> {
+  const p = await paymentStatements(c.db, who(c.actor), b)
+  return { id: p.id, kind: 'payment', statements: [periodOpen(date(b.date)), ...p.statements] }
 }
 
 export async function prepareInvoice(c: Context, b: Data): Promise<Prepared> {
