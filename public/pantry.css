@@ -395,6 +395,7 @@ details.setup-steps ol { padding-left: 20px; }
 .send-log li small { grid-column: 1 / -1; color: var(--muted); }
 .send-log li > span { min-width: 0; overflow-wrap: anywhere; }
 ol.how-to { margin: 0 0 16px; padding-left: 22px; display: grid; gap: 8px; }
+ol.how-to code { overflow-wrap: anywhere; }
 .sub.block { display: block; margin-top: 2px; }
 
 /* Questions from Pantry: the record, the answers with what each changes, and the thread. */

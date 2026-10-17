@@ -30,7 +30,8 @@ export async function paymentBlock(env: Bindings, db: D1Database) {
   return null
 }
 
-async function nextCode(db: D1Database, from: number) {
+/** The first free account code from `from` up. */
+export async function nextCode(db: D1Database, from: number) {
   const codes = new Set((await all<{ code: string }>(db, 'SELECT code FROM pt_accounts')).map(a => a.code))
   let n = from
   while (codes.has(String(n))) n++

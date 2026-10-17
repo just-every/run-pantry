@@ -46,6 +46,10 @@ export interface Bindings {
  /** Attachments carried over from Xero at move-in: this installation's own Xero app (self-hosted installs). */
  XERO_CLIENT_ID?: string
  XERO_CLIENT_SECRET?: string
+ /** Payroll from Gusto: this installation's own Gusto app (self-hosted installs). */
+ GUSTO_CLIENT_ID?: string
+ GUSTO_CLIENT_SECRET?: string
+ GUSTO_ENV?: string
 }
 
 export const runtimeBindings = (env: Bindings): Bindings => env.RER_DEV_ORIGIN && env.AUTH_LOCAL === 'true' ? { ...env, AUTH_ORIGIN: env.RER_DEV_ORIGIN } : env

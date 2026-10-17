@@ -1,0 +1,11 @@
+{
+ "scope": "companies:read payrolls:read",
+ "resource": {
+  "type": "Company",
+  "uuid": "c3a1b7e2-5d4f-4e8a-9b2c-6f1d0e7a8b90"
+ },
+ "resource_owner": {
+  "type": "CompanyAdmin",
+  "uuid": "7d0b2c55-0e8f-4a71-a3c4-5b9e2f6d1c08"
+ }
+}

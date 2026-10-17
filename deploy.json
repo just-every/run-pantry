@@ -62,6 +62,21 @@
       "optional": true
     },
     {
+      "binding": "GUSTO_CLIENT_ID",
+      "environment": "GUSTO_CLIENT_ID",
+      "optional": true
+    },
+    {
+      "binding": "GUSTO_CLIENT_SECRET",
+      "environment": "GUSTO_CLIENT_SECRET",
+      "optional": true
+    },
+    {
+      "binding": "GUSTO_ENV",
+      "environment": "GUSTO_ENV",
+      "optional": true
+    },
+    {
       "binding": "MAIL_PROVIDER",
       "environment": "MAIL_PROVIDER"
     },
