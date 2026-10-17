@@ -56,7 +56,7 @@ function Panel({ t, onChange, onEdit }: { t: D; onChange: () => Promise<void>; o
     <dl className="facts">
       <div><dt>Next invoice</dt><dd>{t.next_date && t.status !== 'ended' ? day(t.next_date) : '—'}</dd></div>
       <div><dt>Prepared by</dt><dd>{who(t.prepared_by)}</dd></div>
-      {t.mode === 'send' && <div><dt>Approved by</dt><dd>{t.approved_by ? who(t.approved_by) : 'Not yet: someone other than the preparer, with the posting grant'}</dd></div>}
+      {t.mode === 'send' && <div><dt>Approved by</dt><dd>{t.approved_by ? who(t.approved_by) : 'Not yet: the owner, or someone else with the posting grant'}</dd></div>}
     </dl>
     <div className="row-actions">
       {t.status === 'awaiting-approval' && (mayApprove ? <Action tone="primary" run={async () => { await command('recurring.approve', { id: t.id, revision: t.revision }); await onChange() }}>Approve automatic sending</Action> : <span className="hint">Approval needs the posting grant and a different person from the preparer.</span>)}

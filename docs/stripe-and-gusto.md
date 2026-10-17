@@ -18,7 +18,7 @@ Payouts are read again every few hours and when you choose **Read payouts now**;
 
 Each processed payroll posts as one balanced entry on its check date: gross wages to **Wages and salaries**, the employer's taxes to **Payroll taxes**, company benefit contributions and reimbursements to their expense accounts; out of the bank, Gusto's net pay debit and its tax debit (the taxes withheld from employees and the employer's taxes, each on its own line); and what you still owe others (paper checks, benefit and other deductions) to **Payroll liabilities**. Pantry matches the entry to Gusto's debits when they arrive, whether Gusto took them as one debit or one per kind. A payroll whose totals do not add up waits for you with the difference named. Payrolls entered in Gusto only for its records (external payrolls) are not posted.
 
-Gusto uses this installation's own Gusto app. Set `GUSTO_CLIENT_ID` and `GUSTO_CLIENT_SECRET` (and `GUSTO_ENV=production` once Gusto approves the app; `demo` is the default) as deploy secrets, or in `.dev.vars` locally, and add the redirect address the card shows to the app in Gusto's developer portal.
+Gusto works through a Gusto developer app of your own, separate from your payroll account. Until it is set up, the **Payroll (Gusto)** card says so and shows the steps, with your Pantry's redirect address filled in; they are also in [Connections and keys](/docs/connections#payroll-gusto).
 
 ## On RER Managed
 

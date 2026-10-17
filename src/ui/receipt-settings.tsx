@@ -69,10 +69,11 @@ function AddressCard({ inbox, onChange }: { inbox: D; onChange: () => Promise<vo
         <Action tone="danger" run={async () => { await command('receipt-address.remove', {}); await onChange() }}>Stop receiving by email</Action>
       </details>
     </> : <>
-      <p>Do this once, with a domain in the Cloudflare account this Pantry runs on (about five minutes){inbox.host.endsWith('.workers.dev') ? <>; {inbox.host} itself cannot receive mail</> : null}:</p>
+      {inbox.hosting === 'local' && <p className="hint">Pantry on this computer cannot receive mail from the internet, so these steps are for once it is <a href="https://run-pantry.com/docs/hosting" target="_blank" rel="noreferrer">online on your Cloudflare account</a>. Until then, take a photo or upload the receipt in Receipts.</p>}
+      <p>Do this once, with a domain you have on {inbox.hosting === 'local' ? 'your' : 'the'} Cloudflare account {inbox.hosting === 'local' ? 'Pantry is deployed to' : 'this Pantry runs on'} (about five minutes){inbox.host.endsWith('.workers.dev') ? <>; {inbox.host} itself cannot receive mail</> : null}:</p>
       <ol className="setup-steps">
         <li>In Cloudflare, open your domain, then <strong>Email</strong> › <strong>Email Routing</strong>, and turn it on (a spare subdomain such as <code>books.example.com</code> keeps your normal mail as it is).</li>
-        <li>Under <strong>Routing rules</strong>, create the address <code>receipts@</code> your domain with the action <strong>Send to a Worker</strong>, and choose the Worker that serves {inbox.host}.</li>
+        <li>Under <strong>Routing rules</strong>, create the address <code>receipts@</code> your domain with the action <strong>Send to a Worker</strong>, and choose {inbox.hosting === 'local' ? <>your hosted Pantry's Worker (<code>pantry-production</code>, unless you deployed another environment)</> : <>the Worker that serves {inbox.host}</>}.</li>
         <li>Under <strong>Settings</strong>, turn on <strong>Subaddressing</strong>, so the private <code>receipts+tag@</code> address reaches the same rule. (To leave it off, skip this: once the address exists, this card shows a <code>receipts-tag@</code> spelling to route with its own rule.)</li>
         <li>Enter the address here and create your Pantry address.</li>
       </ol>

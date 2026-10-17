@@ -14,12 +14,12 @@ test('PAN-15 an agent prepares matches, entries and close work that a person app
   assert.match(ctx.notice, /untrusted evidence/)
   assert.ok(at(ctx.documents, d => d.id === doc.id).text.includes('Park & Lee'))
   const fee = at(ctx.unmatchedStatementLines, l => l.description.includes('SERVICE FEE'))
-  const cedarLine = at(ctx.unmatchedStatementLines, l => l.description.includes('CEDAR STUDIO'))
-  const cedarPosting = at(ctx.unmatchedBankPostings, p => p.debit_cents === 240000)
+  const checkLine = at(ctx.unmatchedStatementLines, l => l.description.includes('CHECK 2052'))
+  const checkPosting = at(ctx.unmatchedBankPostings, p => p.credit_cents === 130000)
   // People's doors stay shut to agent tokens.
   assert.equal((await h.send('/api/pantry/state', undefined, { headers: { authorization: `Bearer ${agent.token}` } })).status, 401)
   // A match proposal, approved by a bookkeeper, becomes a match tied to the proposal.
-  const proposed = await agent.call('proposals', { kind: 'match', summary: 'Cedar Studio ACH clears the 3 September payment', payload: { bankLineIds: [cedarLine.id], journalLineIds: [cedarPosting.id] } })
+  const proposed = await agent.call('proposals', { kind: 'match', summary: 'Check 2052 clears the 24 September rent payment', payload: { bankLineIds: [checkLine.id], journalLineIds: [checkPosting.id] } })
   assert.equal(proposed.status, 'proposed')
   await agent.call('proposals', { kind: 'match', summary: 'bad', payload: { bankLineIds: [fee.id], create: [{ type: 'fee', amount: '1.00', accountId: s.acct['6400'] }] } }, 400)
   const decided = await h.command('proposal.decide', { id: proposed.id, revision: proposed.revision, decision: 'approve' }, bea)

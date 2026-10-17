@@ -5,6 +5,7 @@ import { Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { Card, Chip, command, Field, Loading, PageHead, accountOptions, today, usd, useShared, useView, type D } from './kit'
 import { openLink, pendingLink } from './plaid-link'
+import { SetupSteps } from './provider-guides'
 
 type Choice = { target: string; name: string; ledger: string; openingDate: string; openingBalance: string }
 const CREATE = 'create'
@@ -65,7 +66,7 @@ function Choose({ connection, onDone }: { connection: D; onDone: (r: D) => void 
 }
 
 export function Connect() {
-  const feeds = useView<D>('bank/feeds')
+  const feeds = useView<D>('bank/feeds'), shared = useShared()
   const [connection, setConnection] = useState<D | null>(null), [result, setResult] = useState<D | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const start = async (resume?: { token: string; purpose: string }) => {
     setBusy(true); setError('')
@@ -92,7 +93,7 @@ export function Connect() {
   const a = feeds.data.availability
   return <>
     <PageHead title="Connect a bank or card" lead="Sign in to your bank once, through Plaid. Pantry never sees your bank password, and transactions arrive on their own from then on." actions={<Link to="/app/bank" className="btn btn-secondary">Back to Bank</Link>} />
-    {!a.available ? <Card title="Not available on this installation"><p>{a.reason}</p><p><Link to="/app/bank" search={{ tab: 'statements' }}>Import a statement file</Link></p></Card> : <div className="connect stack">
+    {!a.available ? <Card title={a.needsKeys ? 'Set up live bank feeds' : 'Not available on this installation'}>{a.needsKeys ? <SetupSteps provider="plaid" reason={a.reason} summary="How to set up live bank feeds" owner={shared.state.actor.can.owner} open /> : <p>{a.reason}</p>}<p><Link to="/app/bank" search={{ tab: 'statements' }}>Import a statement file</Link> meanwhile.</p></Card> : <div className="connect stack">
       <Card title="1 · Sign in to your bank" actions={connection && <Chip tone="good">{connection.institution_name}</Chip>}>
         {connection ? <p className="hint">Connected to {connection.institution_name} with {connection.accounts.length} account{connection.accounts.length === 1 ? '' : 's'}.</p>
           : <><p className="hint">Plaid opens in a window over this page. Choose your bank or card issuer and sign in there.{a.environment === 'sandbox' ? ' This installation uses Plaid’s sandbox: sign in with user_good / pass_good.' : ''}</p>

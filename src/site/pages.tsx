@@ -1,8 +1,9 @@
 // The run site (run-pantry.com) `rer build --site` writes: the homepage with its
-// Run action, /run, the docs from docs/*.md, and the not-found page. Every Run
+// Run action, /run, the docs from docs/*.md, /contract from CONTRACT.md, and the not-found page. Every Run
 // page string and command is in run.json; nothing here reads installation data.
 import type { ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { contractPageHtml } from '../base/contract-page'
 import { runPageHtml, siteNotFoundHtml, type RunData, type SiteBuild, type SiteContext } from '../base/run-site'
 import { identity } from '../identity'
 import { DocsArticle } from './docs/DocsArticle'
@@ -20,7 +21,7 @@ const SHARE_IMAGE = `${identity.runSite}/site/share.jpg`
 // Pantry is a US product, so its /run says "license".
 const usSpelling = (html: string) => html.replaceAll(`${run.licence} licence<`, `${run.licence} license<`)
 
-export function sitePages({ styles }: SiteContext): SiteBuild {
+export function sitePages({ styles, contract }: SiteContext): SiteBuild {
   const data: RunData = run
   const document = (title: string, description: string, body: ReactElement, script = '') => '<!doctype html>' + renderToStaticMarkup(
     <html lang="en">
@@ -54,10 +55,11 @@ export function sitePages({ styles }: SiteContext): SiteBuild {
   return {
     pages: [
       { path: '/', html: document('Pantry — Know where every dollar went', identity.tagline, <Landing />) },
-      { path: '/run', html: usSpelling(runPageHtml(identity, data)) },
+      { path: '/run', html: usSpelling(runPageHtml(siteIdentity, data, contract)) },
+      ...(contract ? [{ path: '/contract', html: contractPageHtml(siteIdentity, data, contract) }] : []),
       { path: '/docs', html: document(...head(), <DocsIndex />) },
       ...docsPages.map(page => ({ path: `/docs/${page.slug}`, html: document(...head(page.slug), <DocsArticle slug={page.slug} />, COPY) })),
-      { path: '/404', html: siteNotFoundHtml(identity, data) },
+      { path: '/404', html: siteNotFoundHtml(siteIdentity, data, contract) },
     ],
     assets: ['rer-theme.css', 'fonts', 'brand', 'site', 'favicon.ico', 'apple-touch-icon.png'],
   }

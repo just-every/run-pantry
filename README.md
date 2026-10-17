@@ -1,144 +1,49 @@
 # Pantry
 
-Books and close for one US service business: a USD accrual ledger kept by the owner, a bookkeeper and an outside accountant, reconciled to bank statements, closed each month and handed over as an accountant package. Your own agent can prepare matches, entries and close work; a person approves each one. MIT licensed.
+Books and close for one US service business: a USD ledger kept by the owner, a bookkeeper and an outside accountant, fed by your bank, reconciled to statements, closed each month and handed over as an accountant package. Invoices send and follow up; payments match themselves; every report opens to the records behind it, on the cash or accrual basis. Your own agent can prepare matches, entries and close work; a person approves each one. MIT licensed: nothing to buy, no account to create.
 
-- What it does and the rules it keeps: [CONTRACT.md](CONTRACT.md); proof of each clause: [ACCEPTANCE.md](ACCEPTANCE.md).
-- Moving in from QuickBooks Online: [MOVE-IN.md](MOVE-IN.md). HTTP and agent commands: [API.md](API.md) and `node scripts/pantry-agent.mjs`.
-- Synthetic example files: [fixtures/](fixtures/README.md).
-- Source code: [just-every/run-pantry](https://github.com/just-every/run-pantry).
-- Website: [run-pantry.com](https://run-pantry.com).
+Website and guides: [run-pantry.com](https://run-pantry.com) · [docs](https://run-pantry.com/docs).
 
-Tests: `pnpm run test:pantry` (one flow per clause on the real Worker and D1), `pnpm run test:browser` (fresh clones, the screens at 1440 and 390 wide, export and restore), and `rer verify` for the full wall.
+## Start Pantry on your computer
 
-# Run it locally
-
-One line clones Pantry, installs it, sets up a local owner and starts it:
+You need macOS, Linux or Windows with WSL2, and git. One line gets Pantry and starts it:
 
 ```sh
 npx -y @runeditrun/rer dev just-every/run-pantry
 ```
 
-Without Node, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-pantry` does the same. To start it again later, run `cd run-pantry && rer dev`.
-This edition is runnable after composition. From the composed edition's
-checkout root, `rer dev` alone launches it for review: it installs pinned
-dependencies, sets up a local owner on a free port, starts the real app and
-prints `RER_READY` and a sign-in link. To install for a real owner, run the
-verbs yourself:
+Without Node, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-pantry` does the same and brings its own Node. `rer` is the Run Edit Run command that installs, starts, backs up and restores Pantry.
+
+It clones Pantry into a `run-pantry` folder, installs it (a few minutes the first time) and starts it in the background. When it is ready it prints:
+
+- `RER_READY` with the address Pantry answers on, such as `http://127.0.0.1:8787`;
+- `RER_OPEN` with a link that opens Pantry signed in as you, the owner. Open it in your browser on the same computer, and treat it like a password.
+
+The first time, confirm the owner on **Finish setup**, and Pantry opens **Overview** with five setup steps: the business, the chart and opening balances, customers and vendors, your bank, and your first close ([Your first month](https://run-pantry.com/docs/first-month)).
+
+Stop Pantry with `rer dev --stop`. To start it again, run `cd run-pantry && rer dev`. If the first start says it could not find a free port, run `cd run-pantry && rer dev` again.
+
+## Working with others
+
+Add your bookkeeper and accountant in **People & settings**, with their role and grants ([People and roles](https://run-pantry.com/docs/people)). Pantry on your own computer sends no email: to work as another person here, choose **Sign in as** them on the sign-in page, or run `rer dev --as their.email@example.com`. To let them sign in from anywhere and to email invoices, [put Pantry online](https://run-pantry.com/docs/hosting) on your own Cloudflare account with `rer deploy`.
+
+## Bank feeds, payroll, Xero and email
+
+Each works through an account of your own with that provider (Plaid, Gusto, Xero, Resend or SendGrid). The card in Pantry says when one is not set up yet and shows where to get the keys and where to put them: [Connections and keys](https://run-pantry.com/docs/connections). Stripe and the AI receipt reader are set up inside Pantry, in **People & settings**.
+
+## Back up and restore
 
 ```sh
-rer install
-rer setup --owner-email you@example.com
-rer dev
+rer dev --stop
+rer export --output exports/pantry-books.rer
 ```
 
-Commands that run project work select the exact Node version declared by the
-project. They use an exact matching installed runtime or a checksum-verified
-copy cached at `~/.rer/node/node-vVERSION-PLATFORM-ARCH/`; when needed on
-supported platforms, the runner retrieves the official Node release and checks
-its SHA-256 against `SHASUMS256.txt`. It does not change global Node installations.
-Set `RER_NODE_AUTO=0` to disable automatic selection. If selection is disabled
-or acquisition fails, the command reports a repair invocation in this form:
-`npm exec --yes --package=node@VERSION -- node SCRIPT VERB --cwd PROJECT`.
-Help, check, describe, doctor and stop do not select or acquire Node.
+The archive holds the whole book, documents included. Restore it into a fresh clone, or start over in the same folder: [Back up and restore](https://run-pantry.com/docs/backup).
 
-After `RER_READY`, `dev` prints `RER_SIGNED_IN EMAIL` and `RER_OPEN URL`.
-Open that URL on this computer: the app opens signed in as the owner and
-finishes first-run setup at `/setup`. Treat the line as a credential.
-`dev --as PERSONA` starts as a persona or signed out. Until first-run
-completion is stored durably, app routes send the signed-in owner to `/setup`;
-signed-out visitors sign in and return there. Once complete, `/setup` opens the
-app or settings. Local runs send no email: invitations and sign-in links are
-suppressed until a mail provider is set up.
+## For developers
 
-The saved local port is used; a first setup saves the first free port from 8787. Explicit ports are decimal
-integers from 1 through 65535 and must be free; a busy requested port fails
-instead of silently moving. Only `127.0.0.1`, `localhost` and `::1` are allowed.
-Dev applies the selected host and port to both the listener and runtime bindings;
-readiness is bounded and failure stops the owned processes.
-
-Missing non-interactive setup answers exit 3 and name the manifest fields.
-Read `rer-setup.json` and pass a private, mode-0600 JSON object keyed by those
-names using `rer setup --answers PATH --non-interactive`,
-for example `{"OWNER_EMAIL":"owner@example.com"}`. Secret values stay in
-private inputs and never go in command arguments. A setup rerun with the saved
-owner and origin preserves existing owner/data and exact private settings.
-Conflicting saved identity or origin reports an actionable recovery path.
-Review reset's exact removal inventory before confirmation; export domain data
-first if it should be restored, and import only into an empty destination.
-
-Queue waits report immediately with a reason and numeric one-based position,
-then refresh about every 15 seconds while waiting. Package mode has no queue status command; a waiting command reports its live position.
-
-Use the setup prompt instead of `--owner-email` when entering the real owner
-mailbox. Open the `RER_OPEN` URL printed by `dev` on this computer; the app opens
-signed in as the owner. No email is sent. `dev` serves
-live editing with HMR and stays in the foreground on its first invocation; a
-compatible repeated invocation reuses the server and exits. Stop `dev` with
-`rer dev --stop` or Ctrl-C, and stop `preview` with
-`rer preview --stop` before build or verification.
-
-```sh
-rer verify
-rer reset --yes
-rer export --output exports/installation.rer
-rer import --input exports/installation.rer --yes
-rer deploy
-rer describe
-```
-
-`verify` ends by loading each public page of the production build in Chromium to
-prove its sections hydrate as separate units (`src/base/hydration/README.md`); run
-`pnpm exec playwright install chromium` once on a new machine.
-
-Reset is destructive local cleanup. Import requires an empty destination and
-explicit confirmation. Use `rer describe` to inspect the
-checkout's actual commands and flags. The maintained pins are Node 22.20.0 and
-pnpm 10.12.4. Read `RUN-LOCALLY.md` for data custody, deploy requirements and
-remote-transfer support.
-
-## Foundation scope
-
-This is a technical foundation, not a finished product. It includes Hono,
-TanStack Start, Vite, React, Cloudflare, D1 and real owner/operator
-authentication, with no precreated owner, product domain or background jobs.
-The edition owns its complete product experience and may change its source,
-schema, UI, framework, infrastructure and integration method.
-
-Private HTTP routes and Start functions must authorize native sessions inside
-every server function, including direct transport calls. Route guards alone are
-insufficient. Keep server-only modules and secrets out of client bundles.
-Unknown documents and missing assets return real 404s. Keep Queue/Cron handlers
-and named Worker exports in `src/server.ts`; the dispatcher only selects HTTP
-ownership.
-
-The edition has two homepages. An installed instance's `/` is the Lobby, served
-by `src/server.ts` from `src/base/lobby.ts` with `GET /setup/state`: Sign in, or
-Finish setup until the owner confirms first-run setup. `src/identity.ts` holds
-its edition identity (the name from `src/branding.json`, its purpose, tagline,
-sign-in route and run site origin). The run site (`src/site/pages.ts`, every Run
-page string in `src/site/run.json`, the domain in `deploy-site.json`) is a small
-homepage whose action is Run <name>, `/run` and a not-found page:
-`rer build --site` writes it to `dist/site`, `rer dev` serves it as `RER_SITE`,
-and `rer deploy --site` publishes it (`--dry-run` prints the plan). Replace the
-homepage with the product's own when it has one; see `HOMEPAGE-VARIANTS.md`.
-
-The edition owns `rer-setup.json`, application branding and its installer
-adapter. Keep one setup manifest and declare actual answers, defaults, managed
-secrets, migrations, build targets, health checks and owner behavior there and
-in the adapter. Setup must preserve existing local owner/data and exact private
-settings on reruns. Never create a second owner or rotate secrets implicitly.
-
-Local durable data lives in `.wrangler/state`; private settings default to
-`.dev.vars` with mode 0600. Local export/import covers declared supported
-resources and excludes owner/auth, private settings and transient
-runtime state. Every first-party seed verifies local export/import/export
-equivalence across its supported resources. Preserve applied migration history
-and require forward migrations for schema changes. Remote transfer is supported
-only when the adapter covers all required resources.
-
-`deploy --dry-run` builds and validates locally without provider requests. Real
-deployment uses the owner-account procedure and requires its private account
-credentials, declared migrations and a real verified mail configuration. Local
-verification does not establish hosted acceptance, remote health or mail
-delivery. See `OPERATIONS.md`, `ONBOARDING.md`, `SEED-COMMAND-CONTRACT.md` and
-`RUN-LOCALLY.md` for the implemented requirements.
+- What Pantry does and the rules it keeps: [CONTRACT.md](CONTRACT.md); proof of each clause: [ACCEPTANCE.md](ACCEPTANCE.md).
+- HTTP and agent commands: [API.md](API.md) and `node scripts/pantry-agent.mjs`. Moving in from QuickBooks Online or Xero: [MOVE-IN.md](MOVE-IN.md). Synthetic example files: [fixtures/](fixtures/README.md).
+- Every `rer` command, local data custody, ports and personas: [RUN-LOCALLY.md](RUN-LOCALLY.md). Deployment and operations: [OPERATIONS.md](OPERATIONS.md).
+- Tests: `pnpm run test:pantry` (one flow per clause on the real Worker and D1), `pnpm run test:app` (the built app in a browser at 1440 and 390 wide), and `rer verify` for the full wall.
+- Built with Hono, TanStack Start, Vite, React and Cloudflare Workers with D1. Source: [just-every/run-pantry](https://github.com/just-every/run-pantry).

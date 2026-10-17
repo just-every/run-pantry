@@ -2,7 +2,7 @@
 // accountant package download. Every figure on the profit and loss and the
 // balance sheet opens to the records behind it (report-detail.tsx).
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
-import { Card, Chip, Loading, PageHead, Table, Tabs, day, today, usd, useShared, useView, type D } from './kit'
+import { Card, Chip, Loading, PageHead, Table, Tabs, day, monthName, today, usd, useShared, useView, type D } from './kit'
 import { BASIS_NAME, FigureDetail, RecordView } from './report-detail'
 import { SalesTax } from './sales-tax'
 import { Contractors } from './contractors'
@@ -99,11 +99,12 @@ export function Reports() {
   // The declared tax method picks the basis a report opens on; the switch changes only what is shown.
   const basis: Basis = search.basis === 'cash' || search.basis === 'accrual' ? search.basis : state.settings?.entity?.tax_method === 'cash' ? 'cash' : 'accrual'
   const to = search.to && isDay(search.to) ? search.to : today(), from = search.from && isDay(search.from) ? search.from : to.slice(0, 8) + '01'
-  const period = periodOf(to), q = basis === 'cash' ? '?basis=cash' : ''
+  // The package is for a closed month: the one the dates point at once someone chooses them, else the last month locked.
+  const period = !search.to && state.overview?.lastLocked ? state.overview.lastLocked : periodOf(to), q = basis === 'cash' ? '?basis=cash' : ''
   const detail = (slug === 'profit-and-loss' || slug === 'balance-sheet') && search.line
   return <>
     <PageHead title="Reports" lead="Every report is calculated from the same posted ledger, on the cash or the accrual basis."
-      actions={<><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv${q}`} download>General ledger CSV · {basis === 'cash' ? 'cash' : 'accrual'}</a><a className="btn btn-primary" href={`/api/pantry/package/${period}${q}`} download>Download accountant package</a></>} />
+      actions={<><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv${q}`} download>General ledger CSV · {basis === 'cash' ? 'cash' : 'accrual'}</a><a className="btn btn-primary" href={`/api/pantry/package/${period}/accountant-package.zip${q}`} download title="A ZIP of CSV reports, the close checklist and a README">Accountant package · {monthName(period)}</a></>} />
     <Tabs tabs={KINDS.map(k => k[0])} current={label} onChange={t => set({ report: KINDS.find(k => k[0] === t)![1], line: undefined, record: undefined })} pick="Report" />
     {slug === 'contractors' ? <Contractors year={Number(search.year) || Number(today().slice(0, 4))} onYear={y => set({ year: String(y) })} />
       : search.record ? <RecordView record={search.record} reportLabel={label} />

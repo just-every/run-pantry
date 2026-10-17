@@ -7,7 +7,7 @@ import { Icon } from './icons'
 import { CaptureButtons } from './receipt-capture'
 
 const TYPE: Record<string, string> = { asset: 'Asset', liability: 'Liability', equity: 'Equity', income: 'Income', expense: 'Expense' }
-const ROLE: Record<string, string> = { bank: 'Bank', receivable: 'Receivables control', payable: 'Payables control', tax: 'Sales tax', retained: 'Retained earnings', other: '' }
+const ROLE: Record<string, string> = { bank: 'Bank or card', receivable: 'Receivables control', payable: 'Payables control', tax: 'Sales tax', retained: 'Retained earnings', other: '' }
 // Balances show in each account's natural sign: debit-normal accounts as debits, credit-normal accounts as credits.
 const CREDIT_NORMAL = new Set(['liability', 'equity', 'income'])
 const SOURCE: Record<string, string> = { manual: 'Journal', opening: 'Opening balances', invoice: 'Invoice', credit: 'Credit', bill: 'Bill', payment: 'Payment', bank: 'Bank item', reversal: 'Reversal' }
@@ -58,7 +58,7 @@ function EntryPanel({ e, onChange }: { e: D; onChange: () => Promise<void> }) {
   if (editing) return <Card title="Edit draft"><JournalEditor entry={e} onDone={async () => { setEditing(false); await onChange() }} /></Card>
   return <Card title={<>{e.number ? `Entry ${e.number}` : 'Draft entry'} — {e.memo}</>} actions={e.status === 'posted' ? <Chip tone="good">Posted</Chip> : <Chip tone="warn">Draft</Chip>}>
     {e.status === 'posted' && <div className="callout callout-good"><Icon name="ok" /><div><strong>{e.reversed_by_id ? 'Posted and reversed' : 'Posted — reverse to correct'}</strong><span>{e.reverses_id ? 'This entry reverses an earlier one. ' : ''}Posted entries never change; a reversal keeps both in the history.</span></div></div>}
-    <dl className="facts"><div><dt>Date</dt><dd>{day(e.entry_date)}</dd></div><div><dt>Source</dt><dd>{SOURCE[e.source_kind]}</dd></div><div><dt>Prepared by</dt><dd>{e.prepared_kind === 'agent' && <Icon name="agent" />}{who(e.prepared_by)}</dd></div><div><dt>{e.status === 'posted' ? 'Posted by' : 'Approver'}</dt><dd>{e.posted_by ? who(e.posted_by) : 'Someone with the posting grant, other than the preparer'}</dd></div></dl>
+    <dl className="facts"><div><dt>Date</dt><dd>{day(e.entry_date)}</dd></div><div><dt>Source</dt><dd>{SOURCE[e.source_kind]}</dd></div><div><dt>Prepared by</dt><dd>{e.prepared_kind === 'agent' && <Icon name="agent" />}{who(e.prepared_by)}</dd></div><div><dt>{e.status === 'posted' ? 'Posted by' : 'Approver'}</dt><dd>{e.posted_by ? who(e.posted_by) : 'The owner, or someone else with the posting grant'}</dd></div></dl>
     <Table heads={['#', 'Account', 'Description', 'Debit', 'Credit']} figures={[3, 4]}>
       {e.lines.map((l: D) => <tr key={l.id}><td>{l.line_no}</td><td>{l.account_code} · {l.account_name}</td><td>{l.memo}</td><td className="fig">{l.debit_cents ? usd(l.debit_cents) : '—'}</td><td className="fig">{l.credit_cents ? usd(l.credit_cents) : '—'}</td></tr>)}
     </Table>
@@ -67,7 +67,7 @@ function EntryPanel({ e, onChange }: { e: D; onChange: () => Promise<void> }) {
       : e.status === 'posted' && state.actor.can.record ? <><span className="hint">None yet.</span> <CaptureButtons compact target={{ kind: 'journal', id: e.id }} onDone={onChange} /></> : <span className="hint">None</span>}</div>
     <div className="row-actions">
       {e.status === 'draft' && e.source_kind === 'manual' && state.actor.can.record && <><button type="button" className="btn btn-secondary" onClick={() => setEditing(true)}>Edit</button><Action tone="danger" run={async () => { await command('journal.discard', { id: e.id, revision: e.revision }); await onChange() }}>Discard draft</Action></>}
-      {e.status === 'draft' && e.source_kind === 'manual' && (mayPost ? <Action tone="primary" run={async () => { await command('journal.post', { id: e.id, revision: e.revision }); await onChange() }}>Post entry</Action> : <span className="hint">Waiting for someone with the posting grant, other than the preparer.</span>)}
+      {e.status === 'draft' && e.source_kind === 'manual' && (mayPost ? <Action tone="primary" run={async () => { await command('journal.post', { id: e.id, revision: e.revision }); await onChange() }}>Post entry</Action> : <span className="hint">Waiting for the owner or someone else with the posting grant to post it.</span>)}
       {e.status === 'draft' && e.source_kind === 'opening' && <span className="hint">Opening balances post when the accountant signs off the move-in.</span>}
       {e.status === 'posted' && !e.reversed_by_id && !['invoice', 'credit', 'reversal'].includes(e.source_kind) && state.actor.can.post && (reversing
         ? <Form label="Post reversal" submit={b => command('journal.reverse', { id: e.id, ...b })} onDone={async () => { setReversing(false); await onChange() }} className="grid-form"><Field label="Reversal date" name="date" type="date" defaultValue={today()} required /><Field label="Reason" name="memo" required /></Form>

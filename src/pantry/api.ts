@@ -28,6 +28,7 @@ import { recordView } from './records'
 import { salesTax } from './sales-tax'
 import { contractorCommands, contractors, necCsv } from './contractors'
 import { accountantPackage, ledgerCsv } from './package'
+import { packageZip } from './package-files'
 import { activity, actorView, documents, lookups, overview } from './views'
 import { ruleCommands, rulesView } from './rules'
 import { bankLinesView } from './bank-lines'
@@ -143,6 +144,13 @@ api.get('/api/pantry/package/:period', async c => {
   const ctx = await reader(c), period = c.req.param('period'), basis = basisOf(c.req.query('basis'))
   const body = JSON.stringify(await accountantPackage(ctx.db, period, basis), null, 2)
   return new Response(body, { headers: { 'content-type': 'application/json', 'content-disposition': `attachment; filename="pantry-close-${period}${suffix(basis)}.json"`, 'cache-control': 'no-store' } })
+})
+
+// The same package as an accountant opens it: a ZIP of CSV reports, the checklist, a README and the JSON.
+api.get('/api/pantry/package/:period/accountant-package.zip', async c => {
+  const ctx = await reader(c), period = c.req.param('period'), basis = basisOf(c.req.query('basis'))
+  const { bytes } = await packageZip(ctx.db, period, basis)
+  return new Response(bytes, { headers: { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="pantry-close-${period}${suffix(basis)}.zip"`, 'x-pantry-basis': BASIS_LABEL[basis], 'cache-control': 'no-store' } })
 })
 
 api.get('/api/pantry/package/:period/general-ledger.csv', async c => {

@@ -15,7 +15,7 @@ Open an issued invoice and choose **Send invoice**. Pantry emails it to the cust
 
 Reminders follow the schedule in **People & settings → Sending invoices and reminders**, for example 3 days before the due date, on the due date and 7 days after (`-3, 0, 7`). Each step goes once, at most one a day, and they stop as soon as the invoice is paid. Pause them for one invoice from its panel. Every invoice and reminder Pantry sends is listed under **Deliveries** with the mail provider's answer; "accepted" means the provider took the message, not that the customer read it.
 
-A computer-local Pantry sends no email; deploy it with a mail provider (`MAIL_PROVIDER`, `MAIL_API_KEY`, `MAIL_FROM`) to send invoices.
+Pantry on your own computer sends no email. Once it is [online](/docs/hosting) with a mail provider account of your own ([Connections and keys](/docs/connections#mail)), invoices and reminders are emailed.
 
 ## Recurring invoices
 

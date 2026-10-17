@@ -13,3 +13,6 @@ dist/
 
 .rer/demo/
 .rer/demo-host/
+
+# Book archives from rer export stay on this computer.
+exports/

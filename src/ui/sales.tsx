@@ -41,7 +41,7 @@ function Invoices({ data, reload }: { data: D; reload: () => Promise<void> }) {
   const invoices = data.invoices as D[], current = invoices.find(i => i.id === selected)
   const sum = (f: (i: D) => boolean) => invoices.filter(i => i.kind === 'invoice' && f(i)).reduce((s, i) => s + i.total_cents, 0)
   const count = (f: (i: D) => boolean) => invoices.filter(i => i.kind === 'invoice' && f(i)).length
-  if (editing) return <InvoiceEditor {...editing} onCancel={() => setEditing(null)} onDone={async saved => { setEditing(null); await reload(); setSelected(saved.id) }} />
+  if (editing) return <InvoiceEditor {...editing} invoices={invoices} onCancel={() => setEditing(null)} onDone={async saved => { setEditing(null); await reload(); setSelected(saved.id) }} />
   const groups: [string, (i: D) => boolean][] = [['Draft', i => i.status === 'draft'], ['Approved', i => i.status === 'approved'], ['Issued', i => i.status === 'issued' && i.open_cents === i.total_cents], ['Part paid', i => i.status === 'issued' && i.open_cents > 0 && i.open_cents < i.total_cents], ['Paid', i => i.status === 'issued' && i.open_cents === 0]]
   return <>
     <Metrics items={groups.map(([label, f]) => ({ label, value: usd(sum(f)), note: `${count(f)} invoice${count(f) === 1 ? '' : 's'}` }))} />
@@ -104,19 +104,46 @@ function Bills({ data, reload }: { data: D; reload: () => Promise<void> }) {
   </div>
 }
 
+/** A customer's open invoices or a vendor's open bills, the items a payment can pay. */
+const openFor = (data: D, direction: string, contact: string): D[] => direction === 'received'
+  ? (data.invoices as D[]).filter(i => i.kind === 'invoice' && i.status === 'issued' && i.open_cents > 0 && i.customer_id === contact)
+  : (data.bills as D[]).filter(b => b.status !== 'void' && b.status !== 'draft' && b.open_cents > 0 && b.vendor_id === contact)
+
+function OpenItems({ open, alloc, setAlloc, legend = 'Apply to open items' }: { open: D[]; alloc: Record<string, string>; setAlloc: (f: (a: Record<string, string>) => Record<string, string>) => void; legend?: string }) {
+  return <fieldset className="allocations"><legend>{legend}</legend>{open.map(o => <div className="field" key={o.id}><label htmlFor={`al-${o.id}`}>{o.number ?? o.reference} — {usd(o.open_cents)} open</label><input id={`al-${o.id}`} inputMode="decimal" value={alloc[o.id] ?? ''} onChange={e => setAlloc(a => ({ ...a, [o.id]: e.target.value }))} /></div>)}</fieldset>
+}
+
+/** Apply what is still unapplied of a recorded payment (one recorded from a bank line, say) to open invoices or bills. */
+function ApplyPayment({ p, data, onDone }: { p: D; data: D; onDone: () => Promise<void> }) {
+  const open = openFor(data, p.direction, p.contact_id), [alloc, setAlloc] = useState<Record<string, string>>(() => {
+    const exact = open.filter(o => o.open_cents === p.unallocated_cents)
+    return exact.length === 1 ? { [exact[0].id]: (p.unallocated_cents / 100).toFixed(2) } : {}
+  })
+  const what = p.direction === 'received' ? 'invoices' : 'bills'
+  return <Card title={`Apply the ${usd(p.amount_cents)} payment ${p.direction === 'received' ? 'from' : 'to'} ${p.contact_name}`}>
+    <p>{usd(p.unallocated_cents)} of it is not applied to any of their {what} yet{p.allocations.length ? `; ${usd(p.amount_cents - p.unallocated_cents)} already is` : ''}.</p>
+    {open.length ? <Form label="Apply payment" submit={() => command('payment.allocate', { paymentId: p.id, allocations: Object.entries(alloc).filter(([, v]) => v).map(([targetId, amount]) => ({ targetId, amount })) })} onDone={onDone}>
+      <OpenItems open={open} alloc={alloc} setAlloc={setAlloc} legend={`Pays these open ${what}`} />
+    </Form> : <p className="hint">{p.contact_name} has no open {what}. Record the {p.direction === 'received' ? 'invoice' : 'bill'} first, then apply this payment to it here.</p>}
+  </Card>
+}
+
 function Payments({ data, reload }: { data: D; reload: () => Promise<void> }) {
-  const { state } = useShared(), [direction, setDirection] = useState('received'), [contact, setContact] = useState('')
-  const open = direction === 'received' ? (data.invoices as D[]).filter(i => i.kind === 'invoice' && i.status === 'issued' && i.open_cents > 0 && i.customer_id === contact) : (data.bills as D[]).filter(b => b.status !== 'void' && b.status !== 'draft' && b.open_cents > 0 && b.vendor_id === contact)
-  const [alloc, setAlloc] = useState<Record<string, string>>({})
+  const { state } = useShared(), [direction, setDirection] = useState('received'), [contact, setContact] = useState(''), [selected, setSelected] = useState<string | null>(null)
+  const open = openFor(data, direction, contact)
+  const [alloc, setAlloc] = useState<Record<string, string>>({}), [formKey, setFormKey] = useState(0)
+  const current = (data.payments as D[]).find(p => p.id === selected && !p.reversal_id && p.unallocated_cents > 0)
   return <div className="split split-wide-left">
     <Card title="Payments recorded">
-      <p className="hint">Payments received at your bank, paid online from an invoice link through your Stripe account, or made to vendors. Pantry records them; it never moves money itself.</p>
-      <Table heads={['Date', 'Direction', 'Customer or vendor', 'Bank', 'Amount', 'Unallocated']} figures={[4, 5]} empty="No payments recorded yet.">
-        {(data.payments as D[]).map(p => <tr key={p.id} className={p.reversal_id ? 'muted' : ''}><td>{day(p.payment_date)}</td><td>{p.direction === 'received' ? 'Received' : 'Paid'}{p.reversal_id ? ' (reversed)' : ''}</td><td>{p.contact_name}</td><td>{p.bank_name}</td><td className="fig">{usd(p.amount_cents)}</td><td className="fig">{usd(p.unallocated_cents)}</td></tr>)}
+      <p className="hint">Payments received at your bank, paid online from an invoice link through your Stripe account, or made to vendors. Pantry records them; it never moves money itself. Choose a payment with an unapplied amount to apply it to an invoice or bill.</p>
+      <Table heads={['Date', 'Direction', 'Customer or vendor', 'Bank', 'Amount', 'Unapplied']} figures={[4, 5]} empty="No payments recorded yet.">
+        {(data.payments as D[]).map(p => <tr key={p.id} className={p.reversal_id ? 'muted' : selected === p.id ? 'selected' : ''} tabIndex={0} onClick={() => setSelected(p.id)} onKeyDown={k => { if (k.key === 'Enter') setSelected(p.id) }}><td>{day(p.payment_date)}</td><td>{p.direction === 'received' ? 'Received' : 'Paid'}{p.reversal_id ? ' (reversed)' : ''}</td><td>{p.contact_name}</td><td>{p.bank_name}</td><td className="fig">{usd(p.amount_cents)}</td><td className="fig">{usd(p.unallocated_cents)}{!p.reversal_id && p.unallocated_cents > 0 && state.actor.can.record && <> <button type="button" className="btn btn-link" onClick={() => setSelected(p.id)}>Apply</button></>}</td></tr>)}
       </Table>
     </Card>
+    <div className="stack">
+    {current && state.actor.can.record && <ApplyPayment key={current.id + current.unallocated_cents} p={current} data={data} onDone={async () => { setSelected(null); await reload() }} />}
     {state.actor.can.record && <Card title="Record a payment">
-      <Form label="Record payment" submit={b => command('payment.record', { ...b, allocations: Object.entries(alloc).filter(([, v]) => v).map(([targetId, amount]) => ({ targetId, amount })) })} onDone={async () => { setAlloc({}); await reload() }}>
+      <Form key={formKey} label="Record payment" submit={b => command('payment.record', { ...b, allocations: Object.entries(alloc).filter(([, v]) => v).map(([targetId, amount]) => ({ targetId, amount })) })} onDone={async () => { setAlloc({}); setContact(''); setFormKey(k => k + 1); await reload() }}>
         <div className="grid-form">
           <Field label="Direction" name="direction" value={direction} onChange={(e: any) => { setDirection(e.target.value); setContact(''); setAlloc({}) }} required options={[{ value: 'received', label: 'Received from a customer' }, { value: 'paid', label: 'Paid to a vendor' }]} />
           <Field label={direction === 'received' ? 'Customer' : 'Vendor'} name="contactId" value={contact} onChange={(e: any) => { setContact(e.target.value); setAlloc({}) }} required options={contactOptions(state.contacts, direction === 'received' ? 'customer' : 'vendor')} />
@@ -126,14 +153,15 @@ function Payments({ data, reload }: { data: D; reload: () => Promise<void> }) {
           <Field label="Reference" name="reference" />
           <Field label="How it was paid" name="method" options={[{ value: 'check', label: 'Check' }, { value: 'ach', label: 'ACH' }, { value: 'wire', label: 'Wire' }, { value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }, { value: 'payment-network', label: 'Payment network (e.g. PayPal)' }]} hint="Card and payment-network payments stay out of 1099-NEC totals" />
         </div>
-        {open.length > 0 && <fieldset className="allocations"><legend>Apply to open items</legend>{open.map(o => <div className="field" key={o.id}><label htmlFor={`al-${o.id}`}>{o.number ?? o.reference} — {usd(o.open_cents)} open</label><input id={`al-${o.id}`} inputMode="decimal" value={alloc[o.id] ?? ''} onChange={e => setAlloc(a => ({ ...a, [o.id]: e.target.value }))} /></div>)}</fieldset>}
+        {open.length > 0 && <OpenItems open={open} alloc={alloc} setAlloc={setAlloc} />}
       </Form>
     </Card>}
+    </div>
   </div>
 }
 
 function Contacts() {
-  const { state, reload } = useShared(), [editing, setEditing] = useState<D | null>(null)
+  const { state, reload } = useShared(), [editing, setEditing] = useState<D | null>(null), [added, setAdded] = useState(0)
   return <div className="split split-wide-left">
     <Card title="Customers and vendors">
       <Table heads={['Name', 'Kind', 'Email', 'Terms', 'Status']} empty="No customers or vendors yet.">
@@ -141,7 +169,7 @@ function Contacts() {
       </Table>
     </Card>
     {state.actor.can.record && <Card title={editing ? `Edit ${editing.name}` : 'Add a customer or vendor'}>
-      <Form key={editing?.id ?? 'new'} label={editing ? 'Save' : 'Add'} submit={b => command('contact.save', { ...b, id: editing?.id, revision: editing?.revision, kind: editing?.kind ?? b.kind, active: b.active !== 'no' })} onDone={async () => { setEditing(null); await reload() }} secondary={editing && <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>Cancel</button>}>
+      <Form key={editing?.id ?? `new-${added}`} label={editing ? 'Save' : 'Add'} submit={b => command('contact.save', { ...b, id: editing?.id, revision: editing?.revision, kind: editing?.kind ?? b.kind, active: b.active !== 'no' })} onDone={async () => { setEditing(null); setAdded(n => n + 1); await reload() }} secondary={editing && <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>Cancel</button>}>
         {!editing && <Field label="Kind" name="kind" required options={[{ value: 'customer', label: 'Customer' }, { value: 'vendor', label: 'Vendor' }]} />}
         <Field label="Name" name="name" defaultValue={editing?.name} required />
         <Field label="Email" name="email" type="email" defaultValue={editing?.email} />

@@ -35,20 +35,19 @@ test('PAN-07 CSV and OFX statements import against the right bank account, and r
 
 test('PAN-08 statement lines match to the books through splits, fees, transfers and partial settlements, never posting a recorded payment twice', async t => {
   const h = await harness(); t.after(() => h.close())
-  const s = await september(h), st = await importStatements(h, s)
+  const entries = () => count(h, "SELECT COUNT(*) AS n FROM pt_journal_entries WHERE status = 'posted'")
+  const s = await september(h), before = await entries(), st = await importStatements(h, s)
   const r = await h.view(`reconciliation/${st.checking.id}`)
   const ln = text => at(r.lines, l => l.description.includes(text))
-  const entries = () => count(h, "SELECT COUNT(*) AS n FROM pt_journal_entries WHERE status = 'posted'")
-  // The Cedar payment recorded on 3 September is cleared by its bank line: no new posting.
-  const before = await entries()
+  // The Cedar payment recorded on 3 September meets its bank line, which names Cedar, as the statement arrives: no new posting.
   const cedar = at(r.postings, p => p.memo.includes('Payment from Cedar Studio') && p.entry_date === '2026-09-03')
-  await h.command('match.approve', { bankLineIds: [ln('CEDAR STUDIO').id], journalLineIds: [cedar.id] })
+  assert.ok(ln('CEDAR STUDIO').automatic); assert.equal(ln('CEDAR STUDIO').match_id, cedar.match_id)
   assert.equal(await entries(), before)
   await h.command('match.approve', { bankLineIds: [ln('CEDAR STUDIO').id], journalLineIds: [cedar.id] }, h.owner, 409)
   const unbalanced = await h.send('/api/pantry/command/match.approve', { bankLineIds: [ln('SERVICE FEE').id], create: [{ type: 'fee', amount: '10.00', accountId: s.acct['6400'] }] }, { cookie: h.owner })
   assert.equal(unbalanced.status, 400); assert.match(unbalanced.value.error, /does not balance/)
   // A fee and a vendor payment the books lack, a partial customer receipt, a transfer, a split deposit and a cheque.
-  await matchSeptember(h, s, st, { skip: ['cedar'] })
+  await matchSeptember(h, s, st)
   const after = await h.view(`reconciliation/${st.checking.id}`)
   assert.equal(after.lines.filter(l => !l.match_id).length, 0, 'every checking line is matched')
   const fee = await h.db.prepare("SELECT e.memo, l.debit_cents FROM pt_journal_entries e JOIN pt_journal_lines l ON l.entry_id = e.id JOIN pt_accounts a ON a.id = l.account_id WHERE e.source_kind = 'bank' AND a.code = '6400'").first()
@@ -94,4 +93,38 @@ test('PAN-09 a statement reconciles only when its balances are proven, and every
   assert.ok(r.blockers.some(b => b.kind === 'unmatched'))
   await h.command('match.approve', { bankLineIds: [r.lines[0].id], journalLineIds: [at(r.postings, p => p.memo.includes('Payment to Harbor') && p.entry_date === '2026-09-29').id] })
   assert.equal((await h.view(`reconciliation/${next.statement.id}`)).ready, true)
+})
+
+test('PAN-08 a payment recorded from its bank line is applied to its bill, and a payment recorded first meets its own bank line', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const s = await september(h)
+  // The starter chart's credit card is a bank or card account from the start.
+  const card = await h.command('bank-account.save', { name: 'Business card', institution: 'Chase', accountId: s.acct['2100'], numberLast4: '5555', routing: '', openingDate: '2026-08-31', openingBalance: '0.00' })
+  const acme = await h.command('contact.save', { kind: 'vendor', name: 'Acme Contractors', termsDays: 30 })
+  const bill = await h.command('bill.save', { vendorId: acme.id, reference: 'A-778', billDate: '2026-09-10', lines: [{ description: 'Contract design', accountId: s.acct['6000'], amount: '1500.00' }], post: true })
+  // Recorded before the statement arrives: the check meets its line by itself, with nothing posted twice.
+  const check = await h.command('payment.record', { direction: 'paid', contactId: s.c['Harbor Office Rentals'].id, date: '2026-09-25', amount: '75.00', bankAccountId: card.id, reference: '2061', method: 'check' })
+  const csv = 'Posting Date,Description,Amount\n09/24/2026,ACH DEBIT ACME CONTRACTORS A-778,-1500.00\n09/26/2026,CHECK 2061,-75.00\n'
+  const imported = await h.command('statement.import', { bankAccountId: card.id, fileName: 'card-2026-09.csv', content: csv, opening: '0', closing: '-1575.00', start: '2026-09-01', end: '2026-09-30', confirmLast4: '5555' })
+  assert.deepEqual(imported.recorded.map(m => [m.payment, m.amount]), [[check.id, -7500]])
+  const r = await h.view(`reconciliation/${imported.statement.id}`)
+  assert.ok(at(r.lines, l => l.description === 'CHECK 2061').automatic)
+  // Paid from the bank line without saying what it pays, as a person might: the bill stays open and close says so.
+  const acmeLine = at(r.lines, l => l.description.includes('ACME'))
+  await h.command('match.approve', { bankLineIds: [acmeLine.id], create: [{ type: 'payment', amount: '1500.00', contactId: acme.id }] })
+  let close = await h.view('close/2026-09')
+  const unapplied = at(close.checks, c => c.key === 'unapplied')
+  assert.equal(unapplied.ok, false); assert.match(unapplied.detail, /\$1,500\.00 paid to Acme Contractors/)
+  const cashBefore = await h.view('reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=cash')
+  assert.equal(cashBefore.expenses.find(e => e.code === '6000'), undefined, 'an unapplied payment pays no expense yet')
+  // Applied afterwards from Payments: the bill is paid and the cash basis counts it in September.
+  const payment = at((await h.view('sales')).payments, p => p.contact_id === acme.id)
+  await h.command('payment.allocate', { paymentId: payment.id, allocations: [{ targetId: bill.id, amount: '1500.00' }] })
+  assert.equal(at((await h.view('sales')).bills, b => b.id === bill.id).open_cents, 0)
+  const cash = await h.view('reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=cash')
+  assert.equal(at(cash.expenses, e => e.code === '6000').amount, 150000)
+  assert.equal(cash.netIncome, cashBefore.netIncome - 150000)
+  close = await h.view('close/2026-09')
+  assert.equal(at(close.checks, c => c.key === 'unapplied').ok, true)
+  assert.ok(!(await h.view('reports/payables?to=2026-09-30')).items.some(i => i.ref === 'A-778'), 'A-778 leaves the payables aging')
 })

@@ -5,10 +5,37 @@ import { useState } from 'react'
 import { Action, Card, Chip, command, Details, Field, Loading, Metrics, accountOptions, contactOptions, day, monthName, usd, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
 
-type NewItem = { type: string; amount: string; accountId?: string; contactId?: string; otherBankAccountId?: string; direction?: string; memo?: string }
+type NewItem = { type: string; amount: string; accountId?: string; contactId?: string; otherBankAccountId?: string; direction?: string; memo?: string; allocations?: Record<string, string> }
+
+// The buttons that add what the books lack, and the name each new item goes by.
+const KINDS: [string, string, string][] = [['fee', '+ Expense or fee', 'New expense, charge or bank fee'], ['income', '+ Bank income', 'New bank income'], ['transfer', '+ Transfer', 'New transfer'],
+  ['receipt', '+ Customer payment', 'New payment from a customer'], ['payment', '+ Vendor payment', 'New payment to a vendor']]
+
+const plain = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]+/g, '')
+const plainRef = (o: D) => plain(o.number ?? o.reference ?? '')
+
+/** Open invoices (for a customer payment) or bills (for a vendor payment) of the chosen contact. */
+function openItems(sales: D | undefined, it: NewItem): D[] {
+  if (!sales || !it.contactId) return []
+  return it.type === 'receipt' ? sales.invoices.filter((i: D) => i.kind === 'invoice' && i.status === 'issued' && i.open_cents > 0 && i.customer_id === it.contactId)
+    : sales.bills.filter((b: D) => b.status !== 'void' && b.status !== 'draft' && b.open_cents > 0 && b.vendor_id === it.contactId)
+}
+
+/** What a payment pays, before the person changes it: the one open item the statement line names or whose balance is exactly the amount. */
+function suggested(open: D[], amount: string, lines: D[]): Record<string, string> {
+  const cents = /^\d+(\.\d{1,2})?$/.test(amount) ? Math.round(Number(amount) * 100) : 0
+  const words = plain(lines.map(l => `${l.description} ${l.reference ?? ''}`).join(' '))
+  const named = open.filter(o => plainRef(o).length >= 3 && words.includes(plainRef(o)) && o.open_cents <= cents)
+  const exact = open.filter(o => o.open_cents === cents)
+  const pick = named.length === 1 ? named[0] : exact.length === 1 ? exact[0] : null
+  return pick ? { [pick.id]: (Math.min(pick.open_cents, cents) / 100).toFixed(2) } : {}
+}
 
 export function MatchPanel({ lines, postings, bankId, clear, onDone }: { lines: D[]; postings: D[]; bankId: string; clear: () => void; onDone: () => Promise<void> }) {
   const { state } = useShared(), [items, setItems] = useState<NewItem[]>([]), [error, setError] = useState(''), [busy, setBusy] = useState(false)
+  const sales = useView<D>(items.some(i => i.type === 'receipt' || i.type === 'payment') ? 'sales' : null).data
+  // Until the person types what a payment pays, it pays what Pantry suggests from the line and the open items.
+  const applies = (it: NewItem) => it.allocations ?? suggested(openItems(sales, it), it.amount, lines)
   const statement = lines.reduce((s, l) => s + l.amount_cents, 0)
   const signed = (i: NewItem) => { const c = /^\d+(\.\d{1,2})?$/.test(i.amount) ? Math.round(Number(i.amount) * 100) : 0; return i.type === 'payment' || ((i.type === 'fee' || i.type === 'transfer') && i.direction !== 'in') ? -c : c }
   const ledger = postings.reduce((s, p) => s + Number(p.amount), 0) + items.reduce((s, i) => s + signed(i), 0)
@@ -19,29 +46,43 @@ export function MatchPanel({ lines, postings, bankId, clear, onDone }: { lines: 
       <div><h3>Statement line{lines.length === 1 ? '' : 's'}</h3>{lines.length ? lines.map(l => <p key={l.id} className="pair"><span>{day(l.posted_date)} {l.description}</span><strong>{usd(l.amount_cents)}</strong></p>) : <p className="hint">Choose statement lines on the left.</p>}</div>
       <div><h3>Ledger postings</h3>{postings.map(p => <p key={p.id} className="pair"><span>{day(p.entry_date)} {p.memo}</span><strong>{usd(Number(p.amount))}</strong></p>)}
         {items.map((it, k) => <div className="new-item" key={k}>
-          <strong>New {it.type === 'fee' ? 'bank fee or charge' : it.type === 'income' ? 'bank income' : it.type}</strong>
+          <strong>{KINDS.find(k => k[0] === it.type)![2]}</strong>
           <div className="grid-form">
             <Field label="Amount" name={`amount-${k}`} value={it.amount} onChange={(e: any) => set(k, { amount: e.target.value })} inputMode="decimal" />
             {(it.type === 'fee' || it.type === 'income') && <Field label="Account" name={`account-${k}`} value={it.accountId ?? ''} onChange={(e: any) => set(k, { accountId: e.target.value })} options={accountOptions(state.accounts, a => !['bank', 'receivable', 'payable'].includes(a.subtype))} />}
             {it.type === 'transfer' && <><Field label="Other bank account" name={`other-${k}`} value={it.otherBankAccountId ?? ''} onChange={(e: any) => set(k, { otherBankAccountId: e.target.value })} options={state.bankAccounts.filter((b: D) => b.id !== bankId).map((b: D) => ({ value: b.id, label: b.name }))} /><Field label="Money" name={`dir-${k}`} value={it.direction ?? 'out'} onChange={(e: any) => set(k, { direction: e.target.value })} options={[{ value: 'in', label: 'Came in' }, { value: 'out', label: 'Went out' }]} /></>}
-            {(it.type === 'receipt' || it.type === 'payment') && <Field label={it.type === 'receipt' ? 'Customer' : 'Vendor'} name={`contact-${k}`} value={it.contactId ?? ''} onChange={(e: any) => set(k, { contactId: e.target.value })} options={contactOptions(state.contacts, it.type === 'receipt' ? 'customer' : 'vendor')} />}
+            {(it.type === 'receipt' || it.type === 'payment') && <Field label={it.type === 'receipt' ? 'Customer' : 'Vendor'} name={`contact-${k}`} value={it.contactId ?? ''} onChange={(e: any) => set(k, { contactId: e.target.value, allocations: undefined })} options={contactOptions(state.contacts, it.type === 'receipt' ? 'customer' : 'vendor')} />}
           </div>
+          {(it.type === 'receipt' || it.type === 'payment') && <Applies it={it} open={openItems(sales, it)} applied={applies(it)} onChange={allocations => set(k, { allocations })} />}
           <button type="button" className="btn btn-link" onClick={() => setItems(xs => xs.filter((_, j) => j !== k))}>Remove</button>
         </div>)}
-        <div className="row-actions small">{['fee', 'income', 'transfer', 'receipt', 'payment'].map(t => <button key={t} type="button" className="btn btn-secondary btn-small" onClick={() => add(t)}>+ {t === 'fee' ? 'Fee' : t === 'income' ? 'Bank income' : t[0].toUpperCase() + t.slice(1)}</button>)}</div>
+        <div className="row-actions small">{KINDS.map(([t, label]) => <button key={t} type="button" className="btn btn-secondary btn-small" onClick={() => add(t)}>{label}</button>)}</div>
       </div>
       <div className="match-totals">
         <p className="pair"><span>Statement</span><strong>{usd(statement)}</strong></p><p className="pair"><span>Ledger</span><strong>{usd(ledger)}</strong></p>
         <p className={`pair ${statement === ledger ? 'tone-good' : 'tone-bad'}`}><span>Difference</span><strong>{usd(statement - ledger)}</strong></p>
         <button type="button" className="btn btn-primary btn-block" disabled={busy || !lines.length || statement !== ledger} onClick={async () => {
           setBusy(true); setError('')
-          try { await command('match.approve', { bankLineIds: lines.map(l => l.id), journalLineIds: postings.map(p => p.id), create: items }); setItems([]); clear(); await onDone() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+          const create = items.map(({ allocations, ...i }) => ({ ...i, allocations: Object.entries(i.type === 'receipt' || i.type === 'payment' ? applies({ ...i, allocations }) : {}).filter(([, v]) => v).map(([targetId, amount]) => ({ targetId, amount })) }))
+          try { await command('match.approve', { bankLineIds: lines.map(l => l.id), journalLineIds: postings.map(p => p.id), create }); setItems([]); clear(); await onDone() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
         }}>Approve match</button>
         <button type="button" className="btn btn-secondary btn-block" onClick={() => { setItems([]); clear() }}>Clear</button>
         {error && <p role="alert" className="error">{error}</p>}
       </div>
     </div>
   </Card>
+}
+
+/** Which of the contact's open invoices or bills a new payment pays. */
+function Applies({ it, open, applied, onChange }: { it: NewItem; open: D[]; applied: Record<string, string>; onChange: (a: Record<string, string>) => void }) {
+  if (!it.contactId) return null
+  const what = it.type === 'receipt' ? 'invoices' : 'bills', any = Object.values(applied).some(v => v)
+  if (!open.length) return <p className="hint">No open {what} for them; the payment is recorded as unapplied.</p>
+  return <fieldset className="allocations"><legend>Pays these open {what}</legend>
+    {open.map(o => <div className="field" key={o.id}><label htmlFor={`ap-${o.id}`}>{o.number ?? o.reference} — {usd(o.open_cents)} open</label>
+      <input id={`ap-${o.id}`} inputMode="decimal" value={applied[o.id] ?? ''} onChange={e => onChange({ ...applied, [o.id]: e.target.value })} /></div>)}
+    {!any && <p className="hint">Not applied yet: enter what it pays, or it stays unapplied until you apply it under Sales &amp; bills › Payments.</p>}
+  </fieldset>
 }
 
 function Proposed({ p, onDone }: { p: D; onDone: () => Promise<void> }) {

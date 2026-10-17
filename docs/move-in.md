@@ -61,11 +61,7 @@ Xero's exports carry no files, so after a Xero import the page offers **Connect 
 
 Attachments on paid or voided documents stay in Xero, because those documents do not come in.
 
-Carrying attachments needs the installation's own Xero app:
-
-1. At developer.xero.com, create a Web app.
-2. Set its redirect URI to `https://<your Pantry address>/api/pantry/xero/callback`, or `http://localhost:<port>/api/pantry/xero/callback` on your own computer.
-3. Give Pantry its client id and secret as `XERO_CLIENT_ID` and `XERO_CLIENT_SECRET`.
+Carrying attachments needs a Xero app of your own, made with your Xero login. Until it is set up, the **Attachments from Xero** card says so and shows the steps; they are also in [Connections and keys](/docs/connections#attachments-xero).
 
 On RER Managed, carrying attachments over from Xero is not available yet: a managed installation cannot reach Xero until RER adds a provider relay, and the page says so. Upload the files in **Documents** instead.
 

@@ -1,4 +1,4 @@
-import { docsPath } from '../shell/links'
+import { docsPath, links } from '../shell/links'
 import { docsSections } from './pages'
 
 /** The sections and their pages, the current one marked. `idPrefix` keeps the sidebar's and the phone menu's ids apart. */
@@ -6,7 +6,7 @@ function DocsNavList({ current, idPrefix }: { current?: string; idPrefix: string
   return <>{docsSections.map((section, index) => <div className="docs-nav-group" key={section.title}>
     <p className="docs-nav-section" id={`${idPrefix}-${index}`}>{section.title}</p>
     <ul aria-labelledby={`${idPrefix}-${index}`}>{section.pages.map(page => <li key={page.slug}><a href={docsPath(page.slug)} aria-current={page.slug === current ? 'page' : undefined}>{page.title}</a></li>)}</ul>
-  </div>)}</>
+  </div>)}<div className="docs-nav-group"><p className="docs-nav-section" id={`${idPrefix}-project`}>Project</p><ul aria-labelledby={`${idPrefix}-project`}><li><a href={links.contract}>Contract</a></li></ul></div></>
 }
 
 /** The section navigation beside the page on wide screens; the header's Docs link opens the docs home. */

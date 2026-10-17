@@ -3,9 +3,10 @@
 // balance and whose text names that invoice or its customer's bank reference,
 // Pantry records the receipt and matches it, marked "matched automatically"
 // with an undo. Anything less certain is left for a person, with the reason.
+// A payment already recorded meets its own bank line the same way (matchRecorded).
 import { pantry } from './access'
 import { Fault, usd, type Data } from './core'
-import { all, run } from './db'
+import { all, one, run } from './db'
 import { matchPlan } from './matching'
 
 const plain = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]+/g, '')
@@ -58,6 +59,35 @@ export async function matchDeposits(db: D1Database, lineIds: string[]) {
     }
   }
   return { matched, needsPerson }
+}
+
+/** Payments recorded before their bank line arrived. A new line of exactly a recorded payment's amount, on its bank
+ * account within a week of its date, that names its customer or vendor (or the payment's reference), clears that
+ * payment's bank posting: nothing new is posted. Only a single such payment matches; anything else waits for a person. */
+export async function matchRecorded(db: D1Database, lineIds: string[]) {
+  const matched: Data[] = []
+  if (!lineIds.length) return matched
+  const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE removed_at IS NULL AND id IN (${lineIds.map(() => '?').join(',')}) ORDER BY posted_date, id`, ...lineIds)
+  for (const line of lines) {
+    if (await one(db, 'SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = ? AND active = 1', line.id)) continue
+    const candidates = await all(db, `SELECT p.id, p.direction, p.payment_date, p.reference, c.name, c.bank_reference, l.id AS journal_line_id
+      FROM pt_payments p JOIN pt_contacts c ON c.id = p.contact_id JOIN pt_bank_accounts b ON b.id = p.bank_account_id
+      JOIN pt_journal_lines l ON l.entry_id = p.journal_id AND l.account_id = b.account_id
+      WHERE p.bank_account_id = ? AND p.reversal_id IS NULL AND l.debit_cents - l.credit_cents = ?
+        AND p.payment_date BETWEEN date(?, '-7 days') AND date(?, '+7 days')
+        AND NOT EXISTS (SELECT 1 FROM pt_match_postings mp WHERE mp.journal_line_id = l.id AND mp.active = 1)`, line.bank_account_id, line.amount_cents, line.posted_date, line.posted_date)
+    const words = plain(`${line.description} ${line.reference}`)
+    const named = candidates.filter(p => [p.name, p.bank_reference, p.reference].some(t => plain(t ?? '').length >= 3 && words.includes(plain(t))))
+    if (named.length !== 1) continue
+    const p = named[0]
+    try {
+      const plan = await matchPlan(db, pantry('auto-match'), { bankLineIds: [line.id], journalLineIds: [p.journal_line_id], create: [],
+        note: `Matched automatically: the ${usd(Math.abs(line.amount_cents))} payment ${p.direction === 'paid' ? 'to' : 'from'} ${p.name} recorded on ${p.payment_date}` }, { automatic: true })
+      await run(db, plan.statements)
+      matched.push({ lineId: line.id, matchId: plan.id, payment: p.id, contact: p.name, amount: line.amount_cents })
+    } catch (error) { if (!(error instanceof Fault)) throw error }
+  }
+  return matched
 }
 
 /** For the reconciliation screen: why each unmatched deposit waits for a person. */

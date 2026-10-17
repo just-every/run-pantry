@@ -7,7 +7,7 @@ import { account } from './accounts'
 import { documentInsert } from './contacts'
 import { parseCsvStatement, parseOfxStatement, type ParsedStatement } from './statement-files'
 import { applyRulesAs } from './rules'
-import { matchDeposits } from './automatch'
+import { matchDeposits, matchRecorded } from './automatch'
 import { matchConnected } from './connected-match'
 import type { Command } from './context'
 
@@ -86,11 +86,11 @@ const importStatement: Command = { need: 'record', async run(c, b) {
     audit(who(c.actor), 'statement.import', 'statement', id, { file: name, sha256: hash, added: added.length, duplicates: keyed.length - fresh.length, fromFeed })]
   await run(c.db, statements)
   // Stripe payouts and Gusto payrolls already booked meet their bank lines; deposits that name exactly one
-  // open invoice of their amount match themselves; rules then file what is left.
+  // open invoice of their amount match themselves, as do payments already recorded; rules then file what is left.
   await matchConnected(c.db)
-  const automatic = await matchDeposits(c.db, added.map(l => l.id))
+  const automatic = await matchDeposits(c.db, added.map(l => l.id)), recorded = await matchRecorded(c.db, added.map(l => l.id))
   const filed = await applyRulesAs(c, added.map(l => l.id))
-  return { statement: await one(c.db, 'SELECT * FROM pt_statements WHERE id = ?', id), duplicate: false, added: added.length, automatic, duplicates: keyed.length - fresh.length, fromFeed, filedByRule: filed.filed, fileBalances: { opening, closing, lineTotal: total, agrees: closing - opening === total } }
+  return { statement: await one(c.db, 'SELECT * FROM pt_statements WHERE id = ?', id), duplicate: false, added: added.length, automatic, recorded, duplicates: keyed.length - fresh.length, fromFeed, filedByRule: filed.filed, fileBalances: { opening, closing, lineTotal: total, agrees: closing - opening === total } }
 } }
 
 /** Correct balances typed from a CSV statement before it is reconciled; the lines stay as imported. */

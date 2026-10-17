@@ -40,7 +40,8 @@ export async function overview(db: D1Database) {
     reopenRequests: await n("SELECT COUNT(*) AS n FROM pt_reopen_requests WHERE status = 'pending'"),
     questions: await n("SELECT COUNT(*) AS n FROM pt_questions WHERE status IN ('open', 'confirm')"),
   }
-  return { entity: e, steps, queue, closing: await closing(db, e?.books_start) }
+  const lastLocked = (await one<{ id: string | null }>(db, "SELECT MAX(id) AS id FROM pt_periods WHERE status = 'locked'"))?.id ?? null
+  return { entity: e, steps, queue, closing: await closing(db, e?.books_start), lastLocked }
 }
 
 /** The period due to close: the month after the last lock, else the books' first month; never past this month. */

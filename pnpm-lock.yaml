@@ -38,8 +38,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@runeditrun/rer':
-        specifier: 0.2.37
-        version: 0.2.37
+        specifier: 0.2.40
+        version: 0.2.40
       '@types/node':
         specifier: 22.18.6
         version: 22.18.6
@@ -651,8 +651,8 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
-  '@runeditrun/rer@0.2.37':
-    resolution: {integrity: sha512-W2oTykrB5FQdn7FWc8wqKVDO16xdSvNSBivpH8Uz2grxbxVspxNrRLgSzp+HRoIfo8jj8AnfOxes84VtkJ9OwA==}
+  '@runeditrun/rer@0.2.40':
+    resolution: {integrity: sha512-Vxgkc1tyhdkzIr2KQt9LZ4dsEvKljIBuZdiBicNvSyhk2EEb+2DrVUIJn6qRIlBblU5KQFu/yDuG/sVEKqFrAQ==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -1775,7 +1775,7 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
-  '@runeditrun/rer@0.2.37': {}
+  '@runeditrun/rer@0.2.40': {}
 
   '@sindresorhus/is@7.2.0': {}
 
