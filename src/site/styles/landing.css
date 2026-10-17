@@ -20,7 +20,7 @@
 .hero h1, .closing h2 { font: 800 clamp(46px, 5.5vw, 84px)/.98 var(--font-head); letter-spacing: -.052em; word-spacing: .04em; color: #0b1226; text-wrap: balance; }
 .brush { position: relative; z-index: 0; white-space: nowrap; }
 .brush::after { content: ''; position: absolute; z-index: -1; left: -.1em; right: -.03em; bottom: -.07em; height: .3em; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 460 34' preserveAspectRatio='none'%3E%3Cpath d='M4 22C60 13 130 9 210 10.5c80 1.5 160 5 246 9.5-30 4-72 3.4-118 4.6C252 27 150 30 64 29.6 36 29.5 16 27.6 4 22z' fill='%235f76ee' fill-opacity='.78'/%3E%3Cpath d='M30 19c90-7 220-7 380 1' stroke='%235166e6' stroke-opacity='.35' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
-.hero-sub { max-width: 680px; margin-top: 22px; font-size: 22.5px; line-height: 1.46; color: rgba(70, 77, 105, .92); letter-spacing: -.004em; }
+.hero-sub { max-width: 680px; margin-top: 22px; font-size: 22.5px; line-height: 1.46; color: rgba(70, 77, 105, .92); letter-spacing: -.004em; text-wrap: pretty; }
 .hero-alt { margin-top: 26px; font-size: 18.5px; line-height: 1.45; color: #0d1428; }
 .hero-alt strong { font-weight: 700; }
 .hero .site-actions { margin-top: 24px; gap: 16px 46px; }
