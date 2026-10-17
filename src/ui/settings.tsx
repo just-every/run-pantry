@@ -1,6 +1,6 @@
 // People & settings: the business, its declared policies, who has which role, and agent access.
 import { useState } from 'react'
-import { Action, Card, Chip, command, Details, Field, Form, PageHead, ROLE_LABEL, Table, day, useShared, type D } from './kit'
+import { Action, Card, Chip, command, Details, Field, Form, PageHead, ROLE_LABEL, Table, day, placeholderEmail, useShared, type D } from './kit'
 import { ReceiptSettings } from './receipt-settings'
 import { InvoicingSettings } from './invoicing-settings'
 import { ConnectedSettings } from './connected-settings'
@@ -31,7 +31,7 @@ function Owner() {
   return <Card title="You, the owner">
     <Form key={saved} label="Save name and email" submit={b => command('owner.save', b)} onDone={async () => { await reload(); setSaved(n => n + 1) }} className="grid-form">
       <Field label="Your name" name="name" defaultValue={me.name} required hint="Shown on entries you prepare or post, and to the people you invite" />
-      <Field label="Your sign-in email" name="email" type="email" defaultValue={me.email} required hint="Where your sign-in links go. Entries you already made keep the address they were made with." />
+      <Field label="Your sign-in email" name="email" type="email" defaultValue={me.email} required hint={placeholderEmail(me.email) ? `${me.email} is a placeholder no mail reaches, which is fine on this computer. Put Pantry online (below) asks for your own email for the hosted Pantry.` : 'Where your sign-in links go. Entries you already made keep the address they were made with.'} />
     </Form>
     {here && setupOwner && setupOwner !== me.email && <p className="hint">When you put Pantry online, put <code>OWNER_EMAIL={me.email}</code> in <code>.env.pantry</code> (see <a href="#put-online">Put Pantry online</a>). Without it, the hosted Pantry's owner is {setupOwner}, the address this Pantry was first set up with.</p>}
   </Card>
@@ -46,8 +46,8 @@ function People() {
         <td><div className="row-actions"><button type="button" className="btn btn-link" onClick={() => setEditing(m)}>Edit</button>{m.active ? <Action run={async () => { setInvited(null); setInvited(await command('member.invite', { email: m.email })) }}>Send sign-in invitation</Action> : null}</div></td></tr>)}
     </Table>
     {invited && (invited.emailed ? <p role="status" className="hint">Sign-in invitation emailed to {invited.invited}.</p>
-      : <div role="status" className="callout callout-warn"><strong>Invitation recorded; no email was sent</strong><span>Pantry on this computer sends no email. To work as {invited.name} here, choose <a href="/signout">Sign out or switch person</a> (under More), then Switch person and Sign in as {invited.name}; or stop Pantry and run <code>rer dev --as {invited.invited}</code>. Once Pantry is hosted with a mail provider, invitations reach their mailbox.</span></div>)}
-    <Form key={editing?.email ?? `new-${added}`} label={editing ? 'Save person' : 'Add person'} submit={b => command('member.save', { ...b, previousEmail: editing?.email, canPost: b.canPost === 'on', canLock: b.canLock === 'on', canReopen: b.canReopen === 'on', active: b.active !== 'no' })} onDone={async () => { setEditing(null); setAdded(n => n + 1); await reload() }} className="grid-form"
+      : <div role="status" className="callout callout-warn"><strong>{invited.name} can sign in; no email was sent</strong><span>Pantry on this computer sends no email. To work as {invited.name} here, choose <a href="/signout">Sign out or switch person</a> (under More), then Switch person and Sign in as {invited.name}; or stop Pantry and run <code>rer dev --as {invited.invited}</code>. Once Pantry is hosted with a mail provider, invitations reach their mailbox.</span></div>)}
+    <Form key={editing?.email ?? `new-${added}`} label={editing ? 'Save person' : 'Add person'} submit={b => command('member.save', { ...b, previousEmail: editing?.email, canPost: b.canPost === 'on', canLock: b.canLock === 'on', canReopen: b.canReopen === 'on', active: b.active !== 'no' })} onDone={async r => { setEditing(null); setAdded(n => n + 1); setInvited(r?.invited ? r : null); await reload() }} className="grid-form"
       secondary={editing && <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>Cancel</button>}>
       <Field label="Name" name="name" defaultValue={editing?.name} required />
       <Field label="Email" name="email" type="email" defaultValue={editing?.email} required />
@@ -59,7 +59,7 @@ function People() {
       </fieldset>
       {editing && <Field label="Status" name="active" defaultValue={editing.active ? 'yes' : 'no'} options={[{ value: 'yes', label: 'Active' }, { value: 'no', label: 'Inactive' }]} />}
     </Form>
-    <p className="hint">An invitation emails a one-time sign-in link. Roles take effect on the person's next request.</p>
+    <p className="hint">Adding someone sends them a one-time sign-in link by email; <strong>Send sign-in invitation</strong> sends a fresh one. Roles take effect on the person's next request.</p>
   </Card>
 }
 
@@ -77,18 +77,33 @@ function Agents() {
 
 const onThisComputer = () => typeof window !== 'undefined' && ['127.0.0.1', 'localhost', '[::1]'].includes(window.location.hostname)
 
-/** On this computer only: what to put in the deploy file, with this owner's own email, and where the steps are. */
+/** On this computer only: what to put in the deploy file, with this owner's own email, and where the steps are.
+ *  A placeholder owner address (no mail reaches it) is never offered: the card asks for the owner's own email
+ *  and fills the lines with that. This browser remembers it; the sign-in here is unchanged. */
 function Hosting() {
-  const { state } = useShared()
+  const { state } = useShared(), me = state.actor
+  const [typed, setTyped] = useState(() => { try { return window.localStorage.getItem(HOSTED_OWNER) ?? '' } catch { return '' } })
   if (!onThisComputer()) return null
-  const lines = [`OWNER_EMAIL=${state.actor.email}`, 'CLOUDFLARE_ACCOUNT_ID=your account ID', 'CLOUDFLARE_API_TOKEN=the token', 'MAIL_PROVIDER=resend', 'MAIL_API_KEY=your mail provider\'s API key', 'MAIL_FROM=billing@example.com']
+  const placeholder = placeholderEmail(me.email), owner = placeholder ? typed.trim().toLowerCase() : me.email
+  const ready = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(owner) && !placeholderEmail(owner)
+  const remember = (value: string) => { setTyped(value); try { window.localStorage.setItem(HOSTED_OWNER, value) } catch {} }
+  const lines = [`OWNER_EMAIL=${owner}`, 'CLOUDFLARE_ACCOUNT_ID=your account ID', 'CLOUDFLARE_API_TOKEN=the token', 'MAIL_PROVIDER=resend', 'MAIL_API_KEY=your mail provider\'s API key', 'MAIL_FROM=billing@example.com']
   return <section id="put-online"><Card title="Put Pantry online">
     <p>This Pantry runs on your own computer, so only you can reach it and it sends no email. Hosted on your own Cloudflare account, your accountant can sign in from anywhere and invoices go out by email.</p>
-    <p className="hint">You need a free Cloudflare account and a mail provider account (Resend or SendGrid); neither is set up for this Pantry yet. The deploy file, <code>.env.pantry</code> in your <code>run-pantry</code> folder, holds these lines; <code>OWNER_EMAIL</code> makes you, at {state.actor.email}, the hosted Pantry's owner:</p>
-    <pre className="env-lines"><code>{lines.join('\n')}</code></pre>
-    <p className="hint">Then one command, <code>rer deploy --env-file .env.pantry</code>, puts it online. The steps, from making the Cloudflare token to signing in: <a href="https://run-pantry.com/docs/hosting" target="_blank" rel="noreferrer">Put Pantry online</a>.</p>
+    <p className="hint">You need a free Cloudflare account and a mail provider account (Resend or SendGrid); neither is set up for this Pantry yet.</p>
+    {placeholder && <>
+      <p className="hint">You sign in here as {me.email}, a placeholder no mail reaches. The hosted Pantry emails your sign-in links to its owner, so give your own email:</p>
+      <div className="grid-form hosted-owner"><Field label="Your own email" name="hostedOwner" type="email" value={typed} onChange={(e: any) => remember(e.target.value)} hint="Where the hosted Pantry sends your sign-in links" error={typed && !ready ? 'Use a mailbox you can read: not a .test, .example or .localhost address' : undefined} /></div>
+    </>}
+    {ready ? <>
+      <p className="hint">The deploy file, <code>.env.pantry</code> in your <code>run-pantry</code> folder, holds these lines; <code>OWNER_EMAIL</code> makes you, at {owner}, the hosted Pantry's owner, and your sign-in links go there:</p>
+      <pre className="env-lines"><code>{lines.join('\n')}</code></pre>
+      <p className="hint">Stop Pantry here first (<code>rer dev --stop</code>): <code>rer deploy</code> refuses while it runs. Then one command, <code>rer deploy --env-file .env.pantry</code>, puts it online. The steps, from making the Cloudflare token to signing in: <a href="https://run-pantry.com/docs/hosting" target="_blank" rel="noreferrer">Put Pantry online</a>.</p>
+    </> : <p className="hint">The deploy lines appear here once you give your email.</p>}
   </Card></section>
 }
+
+const HOSTED_OWNER = 'pantry.hosted-owner-email'
 
 export function Settings() {
   const { state } = useShared()

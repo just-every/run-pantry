@@ -142,6 +142,8 @@ td > .row-actions { margin-top: 0; justify-content: flex-end; flex-wrap: nowrap;
 .inline-form .field { flex: 1; min-width: 200px; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field-wide { grid-column: 1 / -1; }
+.selectable tr.pickable { cursor: pointer; }
+.hosted-owner { margin-bottom: 16px; }
 .field.inline { flex-direction: row; align-items: center; gap: 10px; }
 .inline-fields { display: flex; gap: 12px; flex-wrap: wrap; }
 .field label, legend { font-size: 14px; font-weight: 600; color: var(--ink); }

@@ -2,7 +2,7 @@
 // business's own Stripe account so customers can pay by card or ACH from the
 // invoice link. Each card says plainly what works on this install.
 import { SetupSteps } from './provider-guides'
-import { Action, Card, Chip, command, day, Field, Form, Loading, useShared, useView, type D } from './kit'
+import { Action, Card, Chip, command, day, Field, Form, Loading, placeholderEmail, useShared, useView, type D } from './kit'
 
 const ZONE_LABEL: Record<string, string> = { 'America/New_York': 'Eastern', 'America/Chicago': 'Central', 'America/Denver': 'Mountain', 'America/Phoenix': 'Arizona', 'America/Los_Angeles': 'Pacific', 'America/Anchorage': 'Alaska', 'Pacific/Honolulu': 'Hawaii', 'America/Puerto_Rico': 'Atlantic (Puerto Rico)' }
 
@@ -18,7 +18,7 @@ function Sending({ s, onDone }: { s: D; onDone: () => Promise<void> }) {
       <label className="check"><input type="checkbox" name="remindersOn" defaultChecked={!!s.reminders_on} /> Send reminders for unpaid invoices</label>
       <Field label="Reminder days" name="reminderDays" defaultValue={(s.reminder_days as number[]).join(', ')} hint="Days from the due date: -3 is three days before, 0 the due date, 7 a week after" />
       <Field label="Time zone" name="timeZone" defaultValue={s.time_zone} required options={(s.zones as string[]).map(z => ({ value: z, label: ZONE_LABEL[z] ?? z }))} />
-      <Field label="Replies go to" name="replyTo" type="email" defaultValue={s.reply_to} hint={`Blank uses the owner's address, ${s.ownerEmail}`} />
+      <Field label="Replies go to" name="replyTo" type="email" defaultValue={s.reply_to} hint={placeholderEmail(s.ownerEmail) ? 'Blank uses the owner\'s sign-in email' : `Blank uses the owner's address, ${s.ownerEmail}`} />
     </Form>}
   </Card>
 }

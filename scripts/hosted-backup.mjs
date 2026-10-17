@@ -5,7 +5,7 @@
 //   rer queue hosted-backup -- node scripts/hosted-backup.mjs --env-file .env.pantry [--environment NAME] [--output FILE]
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync, statSync } from 'node:fs'
+import { chmodSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 const root = join(dirname(new URL(import.meta.url).pathname), '..')
@@ -27,6 +27,8 @@ const database = `${declaration.project.split('/').at(-1)}-${environment}-${decl
 const output = flag('--output') ?? join('exports', `${database}-${new Date().toISOString().slice(0, 10)}.sql`)
 mkdirSync(dirname(join(process.cwd(), output)), { recursive: true })
 
+// The file holds the whole book: it is created readable only by you, like a local .rer export.
+process.umask(0o077)
 console.log(`Exporting ${database} from your Cloudflare account; the hosted Pantry pauses for the few seconds this takes.`)
 const run = spawnSync(join(root, 'node_modules/.bin/wrangler'), ['d1', 'export', database, '--remote', '--output', output], {
   cwd: process.cwd(), stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8',
@@ -37,6 +39,7 @@ if (run.status !== 0) {
   fail(`The export failed${said ? `:\n${said}` : ''}\nCheck the environment name (--environment) and that the API token has D1: Edit.`)
 }
 
+chmodSync(join(process.cwd(), output), 0o600)
 const sql = readFileSync(join(process.cwd(), output))
 const rows = {}
 for (const [, table] of sql.toString('utf8').matchAll(/^INSERT INTO "?([A-Za-z0-9_]+)"?/gm)) rows[table] = (rows[table] ?? 0) + 1

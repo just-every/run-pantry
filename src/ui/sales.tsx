@@ -128,10 +128,22 @@ function ApplyPayment({ p, data, onDone }: { p: D; data: D; onDone: () => Promis
   </Card>
 }
 
+/** What a new payment of `amount` most likely pays: the one open item it equals, or the only open item it fits. */
+function likelyAllocation(open: D[], amount: string): Record<string, string> {
+  const cents = Math.round(Number(amount.replace(/[$,\s]/g, '')) * 100)
+  if (!Number.isFinite(cents) || cents <= 0) return {}
+  const exact = open.filter(o => o.open_cents === cents), only = open.length === 1 && cents <= open[0].open_cents ? open : []
+  const target = exact.length === 1 ? exact[0] : only[0]
+  return target ? { [target.id]: (cents / 100).toFixed(2) } : {}
+}
+
 function Payments({ data, reload }: { data: D; reload: () => Promise<void> }) {
   const { state } = useShared(), [direction, setDirection] = useState('received'), [contact, setContact] = useState(''), [selected, setSelected] = useState<string | null>(null)
   const open = openFor(data, direction, contact)
-  const [alloc, setAlloc] = useState<Record<string, string>>({}), [formKey, setFormKey] = useState(0)
+  const [alloc, setAllocState] = useState<Record<string, string>>({}), [formKey, setFormKey] = useState(0), [amount, setAmount] = useState(''), [typed, setTyped] = useState(false)
+  // The open item the amount pays is filled in for you; once you change an allocation yourself, it is yours.
+  const setAlloc = (f: (a: Record<string, string>) => Record<string, string>) => { setTyped(true); setAllocState(f) }
+  const choose = (nextContact: string, nextAmount: string, nextDirection = direction) => { setTyped(false); setAllocState(likelyAllocation(openFor(data, nextDirection, nextContact), nextAmount)) }
   const current = (data.payments as D[]).find(p => p.id === selected && !p.reversal_id && p.unallocated_cents > 0)
   return <div className="split split-wide-left">
     <Card title="Payments recorded">
@@ -143,17 +155,19 @@ function Payments({ data, reload }: { data: D; reload: () => Promise<void> }) {
     <div className="stack">
     {current && state.actor.can.record && <ApplyPayment key={current.id + current.unallocated_cents} p={current} data={data} onDone={async () => { setSelected(null); await reload() }} />}
     {state.actor.can.record && <Card title="Record a payment">
-      <Form key={formKey} label="Record payment" submit={b => command('payment.record', { ...b, allocations: Object.entries(alloc).filter(([, v]) => v).map(([targetId, amount]) => ({ targetId, amount })) })} onDone={async () => { setAlloc({}); setContact(''); setFormKey(k => k + 1); await reload() }}>
+      <Form key={formKey} label="Record payment" submit={b => command('payment.record', { ...b, allocations: Object.entries(alloc).filter(([, v]) => v).map(([targetId, amount]) => ({ targetId, amount })) })} onDone={async () => { setAllocState({}); setTyped(false); setAmount(''); setContact(''); setFormKey(k => k + 1); await reload() }}>
         <div className="grid-form">
-          <Field label="Direction" name="direction" value={direction} onChange={(e: any) => { setDirection(e.target.value); setContact(''); setAlloc({}) }} required options={[{ value: 'received', label: 'Received from a customer' }, { value: 'paid', label: 'Paid to a vendor' }]} />
-          <Field label={direction === 'received' ? 'Customer' : 'Vendor'} name="contactId" value={contact} onChange={(e: any) => { setContact(e.target.value); setAlloc({}) }} required options={contactOptions(state.contacts, direction === 'received' ? 'customer' : 'vendor')} />
+          <Field label="Direction" name="direction" value={direction} onChange={(e: any) => { setDirection(e.target.value); setContact(''); choose('', amount, e.target.value) }} required options={[{ value: 'received', label: 'Received from a customer' }, { value: 'paid', label: 'Paid to a vendor' }]} />
+          <Field label={direction === 'received' ? 'Customer' : 'Vendor'} name="contactId" value={contact} onChange={(e: any) => { setContact(e.target.value); choose(e.target.value, amount) }} required options={contactOptions(state.contacts, direction === 'received' ? 'customer' : 'vendor')} />
           <Field label="Date" name="date" type="date" defaultValue={today()} required />
-          <Field label="Amount" name="amount" required inputMode="decimal" />
-          <Field label="Bank account" name="bankAccountId" required options={state.bankAccounts.map((b: D) => ({ value: b.id, label: b.name }))} />
+          <Field label="Amount" name="amount" required inputMode="decimal" value={amount} onChange={(e: any) => { setAmount(e.target.value); if (!typed) setAllocState(likelyAllocation(open, e.target.value)) }} />
+          {state.bankAccounts.length ? <Field label="Bank account" name="bankAccountId" required options={state.bankAccounts.map((b: D) => ({ value: b.id, label: b.name }))} />
+            : <div role="status" className="callout callout-warn field-wide"><strong>Add a bank account first</strong><span>A payment is recorded against the bank account it went through, and this Pantry has none yet. Add one under <a href="/app/bank?tab=statements">Bank › Statements › Add a bank or card account</a>, linked to a ledger account such as 1000 Operating checking, then record the payment here.</span></div>}
           <Field label="Reference" name="reference" />
           <Field label="How it was paid" name="method" options={[{ value: 'check', label: 'Check' }, { value: 'ach', label: 'ACH' }, { value: 'wire', label: 'Wire' }, { value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }, { value: 'payment-network', label: 'Payment network (e.g. PayPal)' }]} hint="Card and payment-network payments stay out of 1099-NEC totals" />
         </div>
-        {open.length > 0 && <OpenItems open={open} alloc={alloc} setAlloc={setAlloc} />}
+        {open.length > 0 && <><OpenItems open={open} alloc={alloc} setAlloc={setAlloc} legend={`Pays these open ${direction === 'received' ? 'invoices' : 'bills'}`} />
+          <p className="hint">The {direction === 'received' ? 'invoice' : 'bill'} this amount pays is filled in, so recording the payment also marks it paid. Change the amounts, or clear them to record the payment unapplied.</p></>}
       </Form>
     </Card>}
     </div>
