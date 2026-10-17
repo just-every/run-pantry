@@ -496,7 +496,7 @@ Every connected clause has to work for the buyer this contract names: a business
 
 ## Security, privacy and operations
 
-- **OWN-001 — Owned, free and open source.** Pantry is free software under the MIT licence. The business runs it on its own computer with `rer install`, `rer setup` and `rer dev`, or deploys it to its own Cloudflare account. The books live in the business's own database, documents are kept byte for byte, and everything leaves at any time (PAN-14). No Pantry account or subscription stands between the business and its books. The only fees are those of the providers the business chooses to connect, each listed on DATA-001's page. **Acceptance evidence:** Read `LICENSE`. From a fresh clone, install, set up and run through the `rer` verbs, record books, export them and restore them into a second installation (`tests/browser/run.mjs`).
+- **OWN-001 — Owned, free and open source.** Pantry is free software under the MIT licence. The business runs it on its own computer with one line, `npx -y @runeditrun/rer dev just-every/run-pantry`, or deploys it to its own Cloudflare account. The books live in the business's own database, documents are kept byte for byte, and everything leaves at any time (PAN-14). No Pantry account or subscription stands between the business and its books. The only fees are those of the providers the business chooses to connect, each listed on DATA-001's page. **Acceptance evidence:** Read `LICENSE`. From a fresh clone, install, set up and run through the `rer` verbs, record books, export them and restore them into a second installation (`tests/browser/run.mjs`).
 
 - **OWN-002 — A hosted installation without a terminal.** From Pantry's homepage, a person who has never used a terminal gets an always-on installation from the browser alone, by either of two routes:
   - **The business's own Cloudflare account.** **Deploy to my Cloudflare** signs in to the business's Cloudflare account, or creates one, through Cloudflare's own consent screen. It then creates the Worker, the D1 database, document storage, the Cron triggers and the secrets, and deploys the published release. Cloudflare's own charges at the business's size, if any, are shown before the owner confirms (CONNECT-004).
@@ -616,7 +616,7 @@ Every capability claimed on the owner-accepted homepage (desk build, branch `br/
 | 35 | Move in | "with balances, open invoices" | PAN-16, MIGRATE-001, MIGRATE-002 | done (PAN-16 for QuickBooks Online and Xero) |
 | 36 | Move in | "and attachments" | PAN-16, MIGRATE-001, MIGRATE-005 | partial — Xero open items' attachments come over Xero's API with the installation's own Xero app (PAN-16), not yet proven against a live Xero organisation; QuickBooks Online attachments (MIGRATE-001) and document archives (MIGRATE-005) are not carried |
 | 37 | Move in | "checked before you switch" (trial balance check, matches) | PAN-16 | done |
-| 38 | Ownership | "Run Pantry on your own computer" (the five commands) | OWN-001 | done |
+| 38 | Ownership | "Run Pantry on your own computer" (terminal: `npx -y @runeditrun/rer dev just-every/run-pantry`) | OWN-001 | done |
 | 39 | Ownership | "keep every record" / "Your books, your database" | OWN-001, PAN-14 | done |
 | 40 | Ownership | "Export everything, any time" | PAN-14 | done |
 | 41 | Quiet details | Bank rules: "routine transactions file themselves" | RULE-002 | done, as row 13 |
