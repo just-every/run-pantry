@@ -57,7 +57,7 @@
   .lg-amount.good { color: var(--green-ink); }
   .lg-meta { order: 9; display: flex; flex-basis: 100%; align-items: center; font-size: 14px; color: #6b7290; }
   .lg-meta > span + span::before { content: '·'; }
-  .lg-coded, .lg-how { display: inline-flex; gap: 6px; padding-left: 0; white-space: normal; }
+  .lg-coded, .lg-how { display: block; padding-left: 0; white-space: normal; }
   .lg-how .icon, .lg-how .chevron { display: none; }
   .lg-row .chip { padding: 2px 9px; font-size: 13.5px; }
   .lg-split { margin: 0 0 8px; padding: 10px 16px; font-size: 14.5px; }

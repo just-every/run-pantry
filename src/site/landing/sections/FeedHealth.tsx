@@ -11,11 +11,10 @@ function Feeds() {
     {FEEDS.map(f => <div key={f.name} className={`fd-row${f.ok ? '' : ' broken'}`}>
       <b className="fd-name">{f.name}</b>
       <span className="fd-status"><span className={`chip ${f.ok ? 'chip-green' : 'chip-red'}`}>{f.ok ? 'Connected' : 'Sign-in needed'}</span></span>
-      <span className="fd-last"><i>Last </i>{f.last}</span>
-      <span className="fd-next">{f.ok && <i>Next </i>}{f.next}</span>
+      <span className="fd-sync dots"><span className="fd-last"><i>Last </i>{f.last}</span><span className="fd-next">{f.ok && <i>Next </i>}{f.next}</span></span>
       {!f.ok && <p className="fd-error"><span>American Express needs you to sign in again</span><span className="fd-relink">Re-link</span></p>}
     </div>)}
-    <p className="fd-exception"><Icon name="box" /><Dots text={`October close · 1 exception · ${AMEX} not synced through Oct 22`} /></p>
+    <p className="fd-exception"><Icon name="box" /><Dots text={`October close · 1 exception · ${AMEX} not synced through Oct\u00a022`} /></p>
   </div>
 }
 

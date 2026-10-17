@@ -49,8 +49,10 @@
   .sl-how .check { width: 30px; height: 30px; }
   .mail-subject { font-size: 18px; }
 }
-@media (max-width: 1099px) {
-  .snap { max-width: 760px; }
+/* Stacked (761-1099): the drawing takes the column's full width, the forwarded mail beside the phone. */
+@media (min-width: 761px) and (max-width: 1099px) {
+  .snap-top { padding-left: 0; }
+  .mail { max-width: 520px; }
 }
 @media (max-width: 760px) {
   .snap { justify-items: stretch; }
@@ -61,14 +63,14 @@
   .mail-subject { margin-top: 12px; font-size: 18px; }
   .mail-match { margin-top: 12px; padding: 10px 12px; font-size: 13.5px; }
   .phone::after, .snap-line::before, .snap-line::after { display: none; }
-  .snap-line { margin-top: 16px; padding: 14px 16px; border-radius: 16px; font-size: 14.5px; }
+  .snap-line { justify-content: flex-start; margin-top: 16px; padding: 14px 16px; border-radius: 16px; font-size: 14.5px; }
   .sl-amount { margin-left: auto; }
   .sl-break { display: block; flex-basis: 100%; height: 0; }
   .snap-line > span { padding: 0; }
   .snap-line > span + span { border-left: 0; }
   .sl-date::after, .sl-coded::after { content: '·'; margin: 0 .4em; color: #6b7290; font-weight: 400; }
   .sl-payee, .sl-amount { font-size: 16px; }
-  .sl-how { gap: 8px; margin-left: 0; }
+  .sl-how { gap: 8px; margin-left: 0; white-space: nowrap; }
   .sl-how .check { width: 22px; height: 22px; }
   .snap-skip { justify-self: start; margin: 12px 0 0; padding: 8px 14px 8px 28px; font-size: 13.5px; }
   .snap-skip::before { left: 12px; }

@@ -1,6 +1,7 @@
 /* A month in the books. (page-02): October on one ribbon, ticks grouped by week with the weekends in grey (from the
    calendar), a break, then Nov 2. Callouts hang above and below from their day; a pink band covers the days the Amex
-   feed was down and a green one the days after it caught up. Phones and tablets get the vertical rail (390 plan). */
+   feed was down and a green one the days after it caught up. From 1000px down to 1099 (tablets in landscape) the
+   callouts sit snugger so the ribbon keeps its width; narrower tablets and phones get the vertical rail (390 plan). */
 .month { --body-w: 590px; }
 .ribbon { --axis: 168px; --low: 256px; --hang: 86px; position: relative; padding: 0 60px 0 22px; }
 .rb-axis { position: relative; height: calc(var(--low) + 82px); font-size: clamp(13.5px, 1.18vw, 17px); }
@@ -30,7 +31,11 @@
 .rb-dot .icon { width: .7em; height: .7em; color: #fff; stroke-width: 2.6; }
 .rail { display: none; }
 
-@media (max-width: 1099px) {
+@media (min-width: 1000px) and (max-width: 1099px) {
+  .ribbon { padding-right: 44px; }
+  .rb-call { gap: .55em; padding: .7em .8em; }
+}
+@media (max-width: 999px) {
   .ribbon { display: none; }
   .rail { position: relative; display: grid; gap: 14px; max-width: 640px; }
   .rail::before { content: ''; position: absolute; top: -10px; bottom: -10px; left: 99px; width: 2px; background: #2a3350; }

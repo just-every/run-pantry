@@ -32,11 +32,14 @@
 .hero-cards > div { position: relative; width: 100%; height: 100%; }
 @media (min-width: 1500px) { .hero-cards { --hero-k: 1.06; } }
 @media (max-width: 1399px) { .hero-cards { --hero-k: .9; } }
-@media (max-width: 1299px) { .hero-cards { --hero-k: .82; } .hero-copy { max-width: 560px; } .hc-thumb { width: 84px; } }
-@media (max-width: 1199px) { .hero-cards { --hero-k: .8; left: calc(50% + 20px); } .hc-thumb { width: 76px; } .hero-copy { max-width: 500px; } .hero-sub { font-size: 20px; } }
-/* 1300-1499: the headline sets on two lines beside the cards; its size keeps "went." about 35px clear of the
-   Chase card (which starts at 50% + 32px), and the intro's box stops short of the cards too. */
-@media (min-width: 1300px) and (max-width: 1499px) { .hero h1, .closing h2 { font-size: min(5.35vw, 75px); } .hero-sub { max-width: 630px; } }
+@media (max-width: 1299px) { .hero-cards { --hero-k: .82; } .hc-thumb { width: 84px; } }
+@media (max-width: 1199px) { .hero-cards { --hero-k: .8; left: calc(50% + 20px); } .hc-thumb { width: 76px; } .hero-sub { font-size: 20px; } }
+/* From 1100 the headline sets on two lines beside the cards, as page-01: its size keeps "every dollar went." 30-45px
+   clear of the Chase card at every width (the wrap stops growing at 1440, so neither does the headline), and below
+   1300 the copy column follows the cards' edge and the three actions keep one row over the sky. */
+@media (min-width: 1100px) { .hero h1, .closing h2 { font-size: min(5.25vw, 75px); } }
+@media (min-width: 1100px) and (max-width: 1299px) { .hero-copy { max-width: calc(45vw + 10px); } .hero .site-actions { gap: 16px 34px; } }
+@media (min-width: 1300px) and (max-width: 1499px) { .hero-sub { max-width: 630px; } }
 
 /* ---------- Sections on paper ---------- */
 /* --sec-gap is the air between two sections, Uptime's: about 205px at 1440, less on smaller screens. Headings sit at

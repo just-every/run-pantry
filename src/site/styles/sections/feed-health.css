@@ -6,14 +6,19 @@
 .fh-row .sec-copy { padding-top: 26px; }
 /* page-07's heading is drawn smaller than its neighbours (45 px cap against about 51). */
 .feed-health h2 { font-size: calc(var(--h2) * .86); }
-.feeds { display: grid; grid-template-columns: repeat(4, auto); padding: 34px 16px 26px; border-radius: 22px; }
+/* --fd-x is the inset of the title and of every row, so the title keeps the rows' left edge at every width. */
+.feeds { --fd-x: 22px; display: grid; grid-template-columns: repeat(4, auto); padding: 34px 16px 26px; border-radius: 22px; }
 .feeds > * { grid-column: 1 / -1; }
 /* Every row shares the card's four columns, so each column is as wide as its widest entry. */
-.feeds-title { padding: 0 22px 18px; font-size: clamp(28px, 2.5vw, 36px); font-weight: 800; letter-spacing: -.04em; }
-.fd-row { display: grid; grid-template-columns: subgrid; align-items: center; column-gap: 14px; min-height: 68px; padding: 8px 22px; border-top: 1px solid var(--line); font-size: 16.5px; color: #2b3249; }
+.feeds-title { padding: 0 var(--fd-x) 18px; font-size: clamp(28px, 2.5vw, 36px); font-weight: 800; letter-spacing: -.04em; }
+.fd-row { display: grid; grid-template-columns: subgrid; align-items: center; column-gap: 14px; min-height: 68px; padding: 8px var(--fd-x); border-top: 1px solid var(--line); font-size: 16.5px; color: #2b3249; }
 .fd-cols { min-height: 44px; border-top: 0; font-size: 15.5px; color: #6b7290; }
 .fd-name { font-size: 18px; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .fd-row i { display: none; font-style: normal; }
+/* Desktop: last and next sync are the row's last two columns; on phones they are one " · " line (Dots). */
+.fd-sync { display: contents; }
+.fd-sync > span + span::before { content: none; }
+.fd-sync.dots > span { padding-right: 0; }
 .fd-status .chip { padding: 6px 15px; border-radius: 999px; font-size: 16px; font-weight: 600; }
 .fd-row.broken { margin-top: 4px; padding-top: 14px; padding-bottom: 16px; border-top: 0; border-radius: 12px; background: #fdecee; }
 .fd-error { display: flex; align-items: center; justify-content: space-between; gap: 16px; grid-column: 1 / -1; margin-top: 10px; font-size: 16.5px; color: #1f2740; }
@@ -32,15 +37,17 @@
 
 @media (max-width: 1280px) {
   .feed-health h2 br { display: none; }
-  .fd-row { column-gap: 10px; padding-left: 14px; padding-right: 14px; font-size: 14.5px; }
-  .fd-row > span, .fd-cols > span { white-space: nowrap; }
+  .feeds { --fd-x: 14px; }
+  .fd-row { column-gap: 10px; font-size: 14.5px; }
+  .fd-row > span, .fd-sync > span, .fd-cols > span { white-space: nowrap; }
   .fd-cols { font-size: 14px; }
   .fd-name { font-size: 15.5px; }
   .fd-error, .fd-relink { font-size: 15px; }
 }
 @media (max-width: 1180px) {
   .fd-status .chip { padding: 4px 9px; font-size: 13.5px; }
-  .fd-row { column-gap: 8px; padding-left: 12px; padding-right: 12px; font-size: 14px; }
+  .feeds { --fd-x: 12px; }
+  .fd-row { column-gap: 8px; font-size: 14px; }
   .fd-status .chip { padding: 5px 11px; font-size: 14.5px; }
   .bf-row { font-size: 15px; }
   .backfill { padding: 22px 22px 16px; }
@@ -52,17 +59,16 @@
   .fd-exception { padding-right: 20px; }
 }
 @media (max-width: 760px) {
-  .feeds { display: block; padding: 22px 10px 14px; border-radius: 18px; }
-  .feeds-title { padding: 0 10px 12px; font-size: 23px; }
+  .feeds { --fd-x: 10px; display: block; padding: 22px 10px 14px; border-radius: 18px; }
+  .feeds-title { padding-bottom: 12px; font-size: 23px; }
   .fd-cols { display: none; }
-  .fd-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'name status' 'last next'; row-gap: 6px; min-height: 0; padding: 12px 10px; font-size: 14px; color: #6b7290; }
+  .fd-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'name status' 'sync sync'; row-gap: 6px; min-height: 0; padding: 12px 10px; font-size: 14px; color: #6b7290; }
   .fd-name { grid-area: name; font-size: 16px; }
   .fd-status { grid-area: status; justify-self: end; }
   .fd-status .chip { font-size: 13.5px; padding: 3px 10px; }
-  .fd-last { grid-area: last; white-space: nowrap; }
-  .fd-next { grid-area: next; }
-  .fd-next::before { content: '·'; margin: 0 .45em; }
-  .fd-row > span { white-space: normal; }
+  .fd-sync { grid-area: sync; display: flex; }
+  .fd-sync > span + span::before { content: '·'; }
+  .fd-sync.dots > span:first-child { padding-right: .8em; }
   .fd-row i { display: inline; }
   .fd-row.broken { padding: 12px 10px 12px; }
   .fd-error { grid-column: 1 / -1; flex-direction: column; align-items: stretch; gap: 10px; margin-top: 6px; font-size: 15px; }

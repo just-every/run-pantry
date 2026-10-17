@@ -28,6 +28,11 @@
 .terminal-line { display: block; padding-left: 22px; text-indent: -22px; }
 .prompt { display: inline-block; width: 22px; text-indent: 0; color: #3ed598; font-weight: 600; }
 
+/* 1000-1099 keeps the desktop's two columns (the page stacks below 1100) so the card uses the tablet's width. */
+@media (min-width: 1000px) and (max-width: 1099px) {
+  .move-in .sec-row { grid-template-columns: minmax(0, var(--art)) minmax(0, var(--copy)); }
+  .move-in .sec-copy { order: 2; }
+}
 @media (max-width: 760px) {
   .tb { padding: 24px 18px 16px; border-radius: 18px; }
   .tb-title { padding-bottom: 14px; font-size: 22px; }

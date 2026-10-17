@@ -84,13 +84,15 @@ export const BACKFILL: [string, string, string, string, string][] = [
 ]
 
 // ---------- The books agent (Oct 9–27) ----------
+// The vendor's name never breaks at its hyphen (U+2011), and an amount stays on the line of the words it closes (U+00A0).
+const SHERWIN = 'Sherwin\u2011Williams'
 export type Case = { icon: 'bank' | 'doc' | 'clip'; tone: 'green' | 'apricot' | 'lavender'; title: string; when: string; outcome: string; steps: string[]; result?: string }
 export const CASES: Case[] = [
   { icon: 'bank', tone: 'green', title: '$2,000 transfer, no memo', when: 'Oct 9', outcome: 'Recoded · owner draw',
-    steps: [`${CHASE} → ••2290, Maya’s personal savings`, 'Asked Maya by text · Oct 9, 4:10 PM', 'Reply: owner draw · Oct 27'], result: 'Net income Oct: $9,040 → $11,040' },
+    steps: [`${CHASE} → ••2290, Maya’s personal savings`, 'Asked Maya by text · Oct 9, 4:10 PM', 'Reply: owner draw · Oct 27'], result: 'Net income Oct: $9,040\u00a0→\u00a0$11,040' },
   { icon: 'doc', tone: 'apricot', title: 'Payroll off by $50.00', when: 'Oct 15', outcome: 'Split',
-    steps: ['Gusto journal $2,840.00 · Chase debit $2,890.00', 'Found in Gusto: D. Park mileage $50.00'], result: 'Split: Wages $2,840.00 · Vehicle $50.00' },
-  { icon: 'clip', tone: 'lavender', title: 'Receipt missing · Sherwin-Williams $228.40', when: '', outcome: 'Attached',
+    steps: ['Gusto journal $2,840.00 · Chase debit $2,890.00', 'Found in Gusto: D. Park mileage\u00a0$50.00'], result: 'Split: Wages $2,840.00 · Vehicle $50.00' },
+  { icon: 'clip', tone: 'lavender', title: `Receipt missing · ${SHERWIN}\u00a0$228.40`, when: '', outcome: 'Attached',
     steps: ['Not in inbox or uploads', 'Asked Maya by text · Oct 26', 'Photo received Oct 27, 11:02 AM, total matches'] },
 ]
 export const FOR_JORDAN = 'For Jordan: $1,850 Ridgeline Lumber deposit for a November job. Prepaid or October cost?'
@@ -111,7 +113,7 @@ export const NET_INCOME = '$11,040.00'
 export const COGS: [string, string, string][] = [
   ['Oct 21', 'Lowe’s · receipt', '$486.20'],
   ['Oct 22', 'Ace Hardware · receipt', '$41.67'],
-  ['Oct 24', 'Sherwin-Williams · receipt', '$228.40'],
+  ['Oct 24', `${SHERWIN} · receipt`, '$228.40'],
   ['Oct 28', 'Acme Electric · bill · 1099', '$3,400.00'],
 ]
 export const COGS_MORE: [string, string] = ['+ 10 more', '$2,053.73']
