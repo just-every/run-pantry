@@ -166,6 +166,7 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
     const url = new URL(request.url)
     assert.equal(url.host, 'api.stripe.com', `unexpected outbound ${request.method} ${request.url}`)
     assert.equal(request.headers.get('authorization'), `Bearer ${KEY}`)
+    assert.match(request.headers.get('stripe-version') ?? '', /^\d{4}-\d{2}-\d{2}\.\w+$/, 'every call names the Stripe API version Pantry is written for, not the account default')
     if (request.method === 'GET' && url.pathname === '/v1/account') return Response.json({ id: 'acct_1Test', country: 'US', default_currency: 'usd', settings: { dashboard: { display_name: 'Juniper Lane Design' } } })
     if (request.method === 'POST' && url.pathname === '/v1/checkout/sessions') {
       const body = new URLSearchParams(await request.text()), id = `cs_test_${sessions.size + 1}`
@@ -199,7 +200,8 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
   const pay = await h.send(cardPage + '/pay', undefined, { headers: { 'content-type': 'application/x-www-form-urlencoded' }, raw: 'method=card' })
   assert.equal(pay.status, 303); assert.equal(pay.headers.get('location'), 'https://checkout.stripe.com/c/pay/cs_test_1')
   const s1 = sessions.get('cs_test_1')
-  assert.deepEqual([s1.body.get('payment_method_types[0]'), s1.body.get('line_items[0][price_data][unit_amount]'), s1.body.get('customer_email')], ['card', '240000', 'ap@cedar.example'])
+  assert.deepEqual([s1.body.get('allowed_payment_method_types[0]'), s1.body.get('line_items[0][price_data][unit_amount]'), s1.body.get('customer_email')], ['card', '240000', 'ap@cedar.example'])
+  assert.ok(![...s1.body.keys()].some(k => k.startsWith('payment_method_types')), 'Stripe removed payment_method_types from Checkout')
   assert.ok(s1.body.get('success_url').startsWith(h.origin + cardPage + '?checkout='))
   Object.assign(s1, { status: 'complete', pi: { id: 'pi_card', status: 'succeeded', amount_received: 240000, latest_charge: { id: 'ch_1', balance_transaction: { id: 'txn_1', amount: 240000, currency: 'usd', fee: 6990, exchange_rate: null } } } })
   const back = await h.send(cardPage + '?checkout=cs_test_1')
@@ -209,7 +211,7 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
   // ACH: processing first (not paid, no reminders), then cleared and recorded by due work.
   await h.send(achPage + '/pay', undefined, { headers: { 'content-type': 'application/x-www-form-urlencoded' }, raw: 'method=us_bank_account' })
   const s2 = sessions.get('cs_test_2')
-  assert.equal(s2.body.get('payment_method_types[0]'), 'us_bank_account')
+  assert.equal(s2.body.get('allowed_payment_method_types[0]'), 'us_bank_account')
   Object.assign(s2, { status: 'complete', pi: { id: 'pi_ach', status: 'processing', amount_received: 0, latest_charge: null } })
   assert.match((await h.send(achPage + '?checkout=cs_test_2')).value, /bank payment is processing/)
   assert.equal((await invoiceOf(h, ach.id)).open_cents, 90000)

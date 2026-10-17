@@ -5,6 +5,9 @@ import type { Bindings } from '../auth.server'
 import { Fault, type Data } from './core'
 
 const API = 'https://api.stripe.com/v1'
+/** The Stripe API version Pantry is written and tested against, sent on every call so an
+ *  account's own default version (new accounts start on the newest) never changes a request. */
+export const STRIPE_VERSION = '2026-09-30.endive'
 
 /** Stripe's bracketed form encoding for nested objects and lists. */
 export function form(value: Data, prefix = '', out = new URLSearchParams()) {
@@ -22,7 +25,7 @@ export async function stripeCall(key: string, method: 'GET' | 'POST' | 'DELETE',
   const body = form(params), get = method !== 'POST'
   let response: Response
   try {
-    response = await fetch(`${API}${path}${get && [...body].length ? `?${body}` : ''}`, { method, headers: { authorization: `Bearer ${key}`, ...(get ? {} : { 'content-type': 'application/x-www-form-urlencoded' }) }, ...(get ? {} : { body }) })
+    response = await fetch(`${API}${path}${get && [...body].length ? `?${body}` : ''}`, { method, headers: { authorization: `Bearer ${key}`, 'stripe-version': STRIPE_VERSION, ...(get ? {} : { 'content-type': 'application/x-www-form-urlencoded' }) }, ...(get ? {} : { body }) })
   } catch {
     throw new Fault(502, 'Pantry could not reach Stripe; try again in a minute')
   }

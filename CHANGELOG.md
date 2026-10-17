@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Online invoice payment works on a new Stripe account**: a Stripe account opened now starts on Stripe's newest API version, which refused Pantry's Checkout with "The `payment_method_types` parameter is no longer supported", so customers could not pay by card from the invoice link. Pantry now names the Stripe API version it is tested against (`2026-09-30.endive`) on every Stripe call and on the webhook it creates, and chooses card or ACH for a Checkout with `allowed_payment_method_types`. On a US account, ACH bank debit must also be turned on in Stripe's payment method settings for customers to use it.
+
 ## 0.2.0 (17 Oct 2026)
 
 Pantry 0.2.0 takes a v0.1.0 book from statement files and recorded payments to connected bookkeeping. Bank and card lines can arrive on their own and routine ones file themselves; receipts are read and attached; invoices go out by email and are followed up; every report figure opens to what is behind it. A v0.1.0 owner keeps every entry, document, reconciliation, sign-in and locked month.

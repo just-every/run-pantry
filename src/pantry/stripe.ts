@@ -13,7 +13,7 @@ import { entryStatements } from './journal'
 import { paymentStatements } from './payables'
 import { invoice } from './invoices'
 import { businessDay, customerLink, sendingSettings } from './delivery'
-import { managedInstall, seal, stripeCall, unseal } from './stripe-api'
+import { managedInstall, seal, STRIPE_VERSION, stripeCall, unseal } from './stripe-api'
 import type { Command } from './context'
 
 export const METHODS = { card: 'Card', us_bank_account: 'Bank account (ACH)' } as const
@@ -47,7 +47,7 @@ const connect: Command = { need: 'owner', async run(c, b) {
   if (existing?.webhook_id) await stripeCall(await unseal(c.env, existing.key_sealed), 'DELETE', `/webhook_endpoints/${existing.webhook_id}`).catch(() => null)
   // Stripe calls back only to a public https address; a computer-local install reads outcomes on return and in due work.
   const hook = origin.startsWith('https://') ? await stripeCall(key, 'POST', '/webhook_endpoints', {
-    url: `${origin}/api/pantry/stripe/webhook`, description: 'Pantry invoice payments',
+    url: `${origin}/api/pantry/stripe/webhook`, description: 'Pantry invoice payments', api_version: STRIPE_VERSION,
     enabled_events: ['checkout.session.completed', 'checkout.session.async_payment_succeeded', 'checkout.session.async_payment_failed', 'checkout.session.expired'],
   }) : null
   const statements: Sql[] = [authority(c.actor, 'owner')]
@@ -122,7 +122,7 @@ export async function startCheckout(env: Bindings, db: D1Database, token: string
   const s = (await stripeSettings(db))!, link = customerLink(env, token)
   const e = await one(db, 'SELECT legal_name FROM pt_entity WHERE id = 1')
   const session = await stripeCall(await unseal(env, s.key_sealed), 'POST', '/checkout/sessions', {
-    mode: 'payment', payment_method_types: [method], client_reference_id: inv.id, ...(inv.customer_email ? { customer_email: inv.customer_email } : {}),
+    mode: 'payment', allowed_payment_method_types: [method], client_reference_id: inv.id, ...(inv.customer_email ? { customer_email: inv.customer_email } : {}),
     line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: inv.open_cents, product_data: { name: `Invoice ${inv.number}`, description: `${e?.legal_name ?? 'Pantry'} · ${inv.customer_name}` } } }],
     metadata: { pantry_invoice: inv.id, pantry_number: inv.number }, payment_intent_data: { description: `Invoice ${inv.number}`, metadata: { pantry_invoice: inv.id, pantry_number: inv.number } },
     success_url: `${link}?checkout={CHECKOUT_SESSION_ID}`, cancel_url: link,
