@@ -10,6 +10,7 @@ import type { Bindings } from '../../auth.server'
 import { now, uid, type Data } from '../core'
 import { all, guard, one, q, run, type Sql } from '../db'
 import { applyRules, authorFiler } from '../rules'
+import { matchDeposits } from '../automatch'
 import { availability, plaid, PlaidError, relinkMessage, type PlaidTransaction, type SyncPage } from './plaid'
 import { open } from './vault'
 
@@ -108,6 +109,8 @@ export async function syncItem(env: Bindings, itemId: string, trigger: Trigger):
       ...mapped.map(a => q('UPDATE pt_feed_accounts SET last_synced_at = ? WHERE id = ?', now(), a.id)),
       q("UPDATE pt_feed_items SET cursor = ?, last_sync_at = ?, last_sync_error = '', error_code = '', error_message = '', sync_due_at = ?, claim_id = NULL, claim_until = NULL, revision = ? WHERE id = ? AND claim_id = ?", cursor, now(), later(EVERY_MS), uid(), itemId, claimId)])
     const arrived = await all<{ id: string }>(db, 'SELECT id FROM pt_bank_lines WHERE arrived_at = ? AND source = \'feed\'', stamp)
+    // Deposits that name exactly one open invoice of their amount match themselves; rules then file what is left.
+    await matchDeposits(db, arrived.map(l => l.id))
     const filed = await applyRules(db, arrived.map(l => l.id), authorFiler)
     const waiting = Number((await one(db, 'SELECT COUNT(*) AS n FROM pt_feed_pending p JOIN pt_feed_accounts f ON f.id = p.feed_account_id WHERE f.item_id = ?', itemId))?.n ?? 0)
     await run(db, [q('UPDATE pt_feed_syncs SET finished_at = ?, added = ?, updated = ?, removed = ?, pending = ?, filed = ? WHERE id = ?', now(), arrived.length, counts.updated, counts.removed, waiting, filed.filed, syncId)])

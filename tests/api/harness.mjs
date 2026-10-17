@@ -2,7 +2,8 @@
 // database, every migration applied, and genuine sign-ins: the owner by the
 // bootstrap token, everyone else by an emailed invitation link. Mail leaves
 // through the real Resend adapter; only its HTTP endpoint is faked here, as is
-// the AI model's (`model`), when a test reads receipts.
+// the AI model's (`model`) when a test reads receipts, and any other provider
+// edge (Stripe) a test answers with `outbound`.
 import { createServer } from 'node:net'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -46,8 +47,9 @@ export async function harness({ bindings = {}, outbound } = {}) {
     for (const file of (await readdir('migrations/core')).filter(f => f.endsWith('.sql')).sort())
       await db.batch(unstable_splitSqlQuery(await readFile('migrations/core/' + file, 'utf8')).map(sql => db.prepare(sql)))
 
-    async function send(path, body, { cookie = '', method, headers = {} } = {}) {
-      const r = await mf.dispatchFetch(origin + path, { method: method ?? (body === undefined ? 'GET' : 'POST'), headers: { host: new URL(origin).host, origin, 'content-type': 'application/json', cookie, ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'manual' })
+    /** A request through the public door; `raw` sends a body as given (a form post) instead of JSON. */
+    async function send(path, body, { cookie = '', method, headers = {}, raw } = {}) {
+      const r = await mf.dispatchFetch(origin + path, { method: method ?? (body === undefined && raw === undefined ? 'GET' : 'POST'), headers: { host: new URL(origin).host, origin, 'content-type': 'application/json', cookie, ...headers }, ...(raw !== undefined ? { body: raw } : body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'manual' })
       const text = await r.text()
       let value; try { value = JSON.parse(text) } catch { value = text }
       return { status: r.status, value, cookie: r.headers.get('set-cookie')?.split(';')[0], headers: r.headers }
@@ -94,7 +96,7 @@ export async function harness({ bindings = {}, outbound } = {}) {
     /** Fire the Worker's Cron trigger. */
     const cron = async () => (await mf.getWorker()).scheduled({ cron: '*/30 * * * *' })
     const close = async () => { await mf.dispose(); await rm(dir, { recursive: true, force: true }) }
-    return { db, origin, owner, send, command, view, member, agent, confirmMail, cron, close }
+    return { db, origin, owner, mail, send, command, view, member, agent, confirmMail, cron, close }
   } catch (error) {
     await mf.dispose(); await rm(dir, { recursive: true, force: true })
     throw error

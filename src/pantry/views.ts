@@ -55,6 +55,8 @@ async function names(db: D1Database) {
   const rows = await all<{ email: string; name: string }>(db, "SELECT lower(email) AS email, display_name AS name FROM oa_operators UNION ALL SELECT lower(email) AS email, name FROM pt_members UNION ALL SELECT 'agent:' || name AS email, name FROM pt_agents")
   const out: Record<string, string> = {}
   for (const r of rows) if (r.name?.trim()) out[r.email] = r.name.trim()
+  // Pantry acting by itself, named for the job it did.
+  Object.assign(out, { 'pantry:reminders': 'Pantry (reminders)', 'pantry:recurring': 'Pantry (recurring invoices)', 'pantry:auto-match': 'Pantry (matched automatically)', 'pantry:stripe': 'Pantry (Stripe)', 'pantry:customer': 'The customer' })
   return out
 }
 

@@ -384,3 +384,15 @@ details.setup-steps ol { padding-left: 20px; }
   .receipt-preview img { max-height: 240px; }
   .capture:not(.capture-compact) label.btn { flex: 1 1 140px; padding-inline: 14px; }
 }
+
+/* Invoices out: the sending panel, its delivery log and setup instructions. */
+.send-panel { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.send-panel h3, .card h3 { margin: 18px 0 8px; font-size: 15px; }
+.send-panel > h3:first-child { margin-top: 0; }
+.send-panel .action { display: inline-flex; margin: 4px 0 8px; }
+.send-log { list-style: none; margin: 0; padding: 0; }
+.send-log li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.send-log li small { grid-column: 1 / -1; color: var(--muted); }
+.send-log li > span { min-width: 0; overflow-wrap: anywhere; }
+ol.how-to { margin: 0 0 16px; padding-left: 22px; display: grid; gap: 8px; }
+.sub.block { display: block; margin-top: 2px; }

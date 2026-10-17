@@ -22,7 +22,17 @@ function Import({ accounts, onDone }: { accounts: D[]; onDone: () => Promise<voi
       </div>
     </Form>
     {result && <div className={`callout ${result.duplicate ? 'callout-warn' : 'callout-good'}`} role="status"><strong>{result.duplicate ? 'This file was already imported' : `Imported ${result.added} line${result.added === 1 ? '' : 's'}`}</strong><span>{result.duplicate ? 'No lines were added.' : `${result.duplicates} already in Pantry were skipped.${result.fromFeed ? ` ${result.fromFeed} came in from the feed already and joined this statement.` : ''}${result.filedByRule ? ` ${result.filedByRule} filed by your rules.` : ''}`}{result.fileBalances && !result.fileBalances.agrees ? ` The file's lines total ${usd(result.fileBalances.lineTotal)}, which does not match its balances; reconciliation will show the difference.` : ''}</span></div>}
+    {result && <AutomaticResult automatic={result.automatic} />}
   </Card>
+}
+
+/** What the import matched by itself, and the deposits it left for a person. */
+function AutomaticResult({ automatic }: { automatic?: D }) {
+  if (!automatic) return null
+  return <>
+    {automatic.matched.length > 0 && <div className="callout callout-good" role="status"><strong>{automatic.matched.length} deposit{automatic.matched.length === 1 ? '' : 's'} matched automatically</strong><span>{automatic.matched.map((m: D) => `${usd(m.amount)} from ${m.customer} paid ${m.invoice}`).join('; ')}. Each can be undone on the reconciliation screen.</span></div>}
+    {automatic.needsPerson.length > 0 && <div className="callout callout-warn" role="status"><strong>{automatic.needsPerson.length} deposit{automatic.needsPerson.length === 1 ? '' : 's'} need{automatic.needsPerson.length === 1 ? 's' : ''} you</strong><span>{automatic.needsPerson.map((m: D) => `${m.description}: ${m.reason}`).join(' · ')}</span></div>}
+  </>
 }
 
 function NewBankAccount({ onDone }: { onDone: () => Promise<void> }) {

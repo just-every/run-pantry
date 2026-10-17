@@ -3,7 +3,7 @@
 // guard, so a role removed or a session revoked mid-request still stops the write.
 import { operatorAuth, runtimeBindings, type Bindings } from '../auth.server'
 import { Fault, requireThat, sha256 } from './core'
-import { guard, one, type Sql } from './db'
+import { guard, one, type AuditActor, type Sql } from './db'
 
 export type Need = 'read' | 'record' | 'post' | 'lock' | 'reopen' | 'owner'
 export type Role = 'owner' | 'bookkeeper' | 'accountant' | 'viewer'
@@ -71,4 +71,7 @@ export function authority(actor: Actor, need: Need): Sql {
   return guard(c.sql, ...c.params)
 }
 
-export const who = (actor: Actor) => ({ email: actor.email, kind: actor.kind })
+export const who = (actor: Actor | AuditActor): AuditActor => ({ email: actor.email, kind: actor.kind })
+
+/** Pantry itself, acting in due work or on a provider's confirmation; `role` names the job. */
+export const pantry = (role: 'reminders' | 'recurring' | 'auto-match' | 'stripe' | 'customer'): AuditActor => ({ email: `pantry:${role}`, kind: 'system' })

@@ -20,7 +20,7 @@ export async function reconciliationState(db: D1Database, statementId: string): 
   const expectedOpening = previous ? previous.closing_cents : bank.opening_cents
   if (statement.opening_cents !== expectedOpening) blockers.push({ kind: 'opening', amount: statement.opening_cents - expectedOpening, message: `Statement opening ${usd(statement.opening_cents)} differs from the ${previous ? 'last reconciled closing' : 'opening statement balance'} ${usd(expectedOpening)}` })
 
-  const lines = await all(db, `SELECT l.*, m.match_id FROM pt_bank_lines l LEFT JOIN pt_match_bank_lines m ON m.bank_line_id = l.id AND m.active = 1
+  const lines = await all(db, `SELECT l.*, m.match_id, mt.automatic, mt.note AS match_note FROM pt_bank_lines l LEFT JOIN pt_match_bank_lines m ON m.bank_line_id = l.id AND m.active = 1 LEFT JOIN pt_matches mt ON mt.id = m.match_id
     WHERE l.bank_account_id = ? AND l.posted_date BETWEEN ? AND ? AND (l.removed_at IS NULL OR m.match_id IS NOT NULL) ORDER BY l.posted_date, l.description, l.id`, bank.id, statement.start_date, statement.end_date)
   const lineTotal = lines.reduce((s, l) => s + l.amount_cents, 0)
   if (lineTotal !== statement.closing_cents - statement.opening_cents) blockers.push({ kind: 'statement', amount: statement.closing_cents - statement.opening_cents - lineTotal, message: `Statement lines total ${usd(lineTotal)} but the balances move by ${usd(statement.closing_cents - statement.opening_cents)}: a line is missing or the balances were entered wrongly` })

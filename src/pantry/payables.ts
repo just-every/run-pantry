@@ -2,7 +2,7 @@
 // payments record money that moved outside Pantry and allocate it to open items.
 import { authority, who, type Actor } from './access'
 import { addDays, cents, date, list, now, optionalText, requireThat, text, uid, type Data } from './core'
-import { all, assertOpen, audit, changed, one, periodOpen, q, run, type Sql } from './db'
+import { all, assertOpen, audit, changed, one, periodOpen, q, run, type AuditActor, type Sql } from './db'
 import { controlAccount } from './accounts'
 import { contact } from './contacts'
 import { entryStatements, type Line } from './journal'
@@ -91,11 +91,11 @@ async function allocations(db: D1Database, direction: 'received' | 'paid', conta
   return { list: items, guards }
 }
 
-const allocationInsert = (actor: Actor, paymentId: string, kind: string, a: Allocation, day: string) =>
+const allocationInsert = (actor: AuditActor, paymentId: string, kind: string, a: Allocation, day: string) =>
   q("INSERT INTO pt_allocations (id, source_kind, source_id, target_kind, target_id, amount_cents, allocation_date, created_by, created_at) VALUES (?, 'payment', ?, ?, ?, ?, ?, ?, ?)", uid(), paymentId, kind, a.targetId, a.amount, day, actor.email, now())
 
-/** Statements recording one external payment and its allocations; used directly and from bank matching. */
-export async function paymentStatements(db: D1Database, actor: Actor, b: Data) {
+/** Statements recording one external payment and its allocations; used directly, from bank matching and by Pantry itself (Stripe, automatic matches). */
+export async function paymentStatements(db: D1Database, actor: AuditActor, b: Data) {
   const direction = text(b.direction, 'Direction')
   requireThat(direction === 'received' || direction === 'paid', 'A payment is received or paid')
   const who_ = await contact(db, text(b.contactId, direction === 'received' ? 'Customer' : 'Vendor'), direction === 'received' ? 'customer' : 'vendor')
@@ -112,7 +112,7 @@ export async function paymentStatements(db: D1Database, actor: Actor, b: Data) {
     ? [{ accountId: bank.account_id, debit: amount, credit: 0, memo: `Received from ${who_.name}` }, { accountId: control.id, debit: 0, credit: amount, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }]
     : [{ accountId: control.id, debit: amount, credit: 0, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }, { accountId: bank.account_id, debit: 0, credit: amount, memo: `Paid to ${who_.name}` }]
   const statements: Sql[] = [
-    ...entryStatements({ id: journalId, date: day, memo: `${received ? 'Payment from' : 'Payment to'} ${who_.name}`, sourceKind: 'payment', sourceId: id, preparedBy: actor.email, preparedKind: 'person', lines }, actor.email),
+    ...entryStatements({ id: journalId, date: day, memo: `${received ? 'Payment from' : 'Payment to'} ${who_.name}`, sourceKind: 'payment', sourceId: id, preparedBy: actor.email, preparedKind: actor.kind === 'system' ? 'import' : 'person', lines }, actor.email),
     q('INSERT INTO pt_payments (id, direction, contact_id, payment_date, amount_cents, bank_account_id, reference, memo, method, journal_id, recorded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       id, direction, who_.id, day, amount, bank.id, optionalText(b.reference, 'Reference', 80), optionalText(b.memo, 'Memo', 500), method, journalId, actor.email, now()),
     ...allocated.list.map(a => allocationInsert(actor, id, received ? 'invoice' : 'bill', a, day)), ...allocated.guards,

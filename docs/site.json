@@ -10,7 +10,7 @@
     {
       "title": "Run your books",
       "pages": [
-        { "slug": "sales-and-bills", "title": "Sales and bills", "file": "sales-and-bills.md", "summary": "Draft, approve and issue invoices and credits, record bills with their receipts, and record payments." },
+        { "slug": "sales-and-bills", "title": "Sales and bills", "file": "sales-and-bills.md", "summary": "Invoices that send and follow up, recurring invoices, card and ACH payment from the link, payments that match themselves, bills and payments." },
         { "slug": "bank-feeds-and-rules", "title": "Bank feeds and rules", "file": "bank-feeds-and-rules.md", "summary": "Connect your bank and cards once, choose where each account goes, and let your rules file the routine transactions." },
         { "slug": "receipts", "title": "Receipts", "file": "receipts.md", "summary": "Take a photo or forward the email; Pantry reads the vendor, date and total and attaches it to the right transaction when you accept." },
         { "slug": "reconcile", "title": "Reconcile a bank statement", "file": "reconcile.md", "summary": "Import a CSV or OFX statement, match each line to your books, and finish when the difference is $0.00." },

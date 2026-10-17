@@ -3,7 +3,7 @@
 // edits) and are corrected only by a linked reversal.
 import { authority, who, type Actor } from './access'
 import { cents, date, now, optionalText, requireThat, text, uid, list, type Data } from './core'
-import { all, approval, assertOpen, audit, changed, one, q, run, type Sql } from './db'
+import { all, approval, assertOpen, audit, changed, one, q, run, type AuditActor, type Sql } from './db'
 import type { Command } from './context'
 import { entryDocuments } from './receipts/attachments'
 
@@ -107,7 +107,7 @@ const post: Command = { need: 'post', async run(c, b) {
 } }
 
 /** `unmatching`: the same batch ends the entry's match first (undoing a filing by rule). */
-export async function reversalStatements(db: D1Database, actor: Actor, original: Data, day: string, memo: string, { unmatching = false } = {}) {
+export async function reversalStatements(db: D1Database, actor: AuditActor, original: Data, day: string, memo: string, { unmatching = false } = {}) {
   requireThat(original.status === 'posted', 'Only posted entries are reversed; edit or discard a draft', 409)
   requireThat(!original.reversed_by_id, 'Entry is already reversed', 409)
   requireThat(day >= original.entry_date, 'A reversal is dated on or after the original entry')
