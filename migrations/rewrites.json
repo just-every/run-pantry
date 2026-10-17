@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "rewrites": [
+    {
+      "migration": "0018_bank_rules_feeds.sql",
+      "from": "13c04f30f6aff72bfda6476e04155957db134c66f31d40f040b446b287fe94d9",
+      "to": "362bb5406b9decd217a6093d1e9749c5b196e3d8f7b7dd2a57e442fa059c2f20",
+      "reason": "The released bytes failed with FOREIGN KEY constraint failed on any book with a matched bank line (dropping pt_bank_lines under pt_match_bank_lines), so a v0.1.0 book could not upgrade. The rewrite only sets matched lines aside around the rebuild; a database that applied the released bytes had no matched lines at that point and holds the same schema, so no converging migration is needed.",
+      "reviewed": true
+    }
+  ]
+}

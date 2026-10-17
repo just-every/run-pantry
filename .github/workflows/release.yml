@@ -1,0 +1,55 @@
+name: Release checks
+
+# Apart from push Verify: on release tags, nightly and by hand.
+on:
+  push:
+    tags: ['v*']
+  schedule:
+    - cron: '41 15 * * *'
+  workflow_dispatch:
+    inputs:
+      from:
+        description: 'Previous release tag to upgrade from (default: the newest tag behind this commit that is not its own)'
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-checks-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # A book with matched bank lines made on the previous release tag upgrades to this commit and reads the same.
+  upgrade:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0; action runtime Node 24
+        with:
+          node-version: '22.20.0'
+          package-manager-cache: false
+      - run: npm install --global pnpm@10.12.4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run deps
+      - name: Upgrade from the previous release tag
+        env:
+          FROM: ${{ inputs.from }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/pantry-release"
+          pnpm run verify:release ${FROM:+--from "$FROM"} --evidence "$RUNNER_TEMP/pantry-release/upgrade"
+      - name: Keep the upgrade evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pantry-release-upgrade-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pantry-release/
+          if-no-files-found: ignore
+          retention-days: 7

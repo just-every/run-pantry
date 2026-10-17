@@ -4,6 +4,12 @@
 -- the feed recognised carries it too, so neither source duplicates the other.
 PRAGMA defer_foreign_keys = on;
 
+-- Matched lines are set aside while pt_bank_lines is rebuilt and put back after:
+-- D1 always enforces foreign keys, and dropping the old table with matches still
+-- pointing at it fails the commit even though the same ids return under the new one.
+CREATE TABLE pt_match_bank_lines_keep AS SELECT match_id, bank_line_id, active FROM pt_match_bank_lines;
+DELETE FROM pt_match_bank_lines;
+
 CREATE TABLE pt_bank_lines_next (
  id TEXT PRIMARY KEY,
  statement_id TEXT REFERENCES pt_statements(id),
@@ -28,6 +34,8 @@ DROP TABLE pt_bank_lines;
 ALTER TABLE pt_bank_lines_next RENAME TO pt_bank_lines;
 CREATE INDEX pt_bank_lines_date ON pt_bank_lines(bank_account_id, posted_date);
 CREATE UNIQUE INDEX pt_bank_lines_feed_once ON pt_bank_lines(feed_txn_id) WHERE feed_txn_id IS NOT NULL;
+INSERT INTO pt_match_bank_lines (match_id, bank_line_id, active) SELECT match_id, bank_line_id, active FROM pt_match_bank_lines_keep;
+DROP TABLE pt_match_bank_lines_keep;
 
 -- A rule files matching lines: conditions on payee, description and amount;
 -- splits across categories (basis points summing to 10000), an optional

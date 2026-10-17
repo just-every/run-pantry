@@ -71,4 +71,14 @@ The hosted Pantry starts with its own, empty books, and you set the business up 
 
   The second command deletes the Worker and database `rer deploy` created, and checks that both are gone. If you deployed with `--environment NAME`, add `--environment NAME` to both commands; without it they act on the `production` deployment, not yours.
 
+If an earlier update stopped at `0018_bank_rules_feeds.sql` with `FOREIGN KEY constraint failed`, Cloudflare rolled that step back and your books are as they were, but the unfinished step is still recorded, so the next deploy says the database "holds migration history this build does not match". Update Pantry (`git pull`), clear that record with your Cloudflare token from `.env.pantry`, and deploy again:
+
+```sh
+set -a; . ./.env.pantry; set +a
+npx wrangler d1 execute pantry-production-db --remote --command "DELETE FROM d1_migrations WHERE name='0018_bank_rules_feeds.sql' AND state='applying'"
+rer deploy --env-file .env.pantry
+```
+
+If you deployed with `--environment NAME`, the database is `pantry-NAME-db` and the deploy takes `--environment NAME` too.
+
 If a deploy stops with `token-scope-missing-workers` or `token-scope-missing-d1`, the API token lacks that permission: edit it in Cloudflare and run the same command again. `workers-subdomain-missing` means step 1 is not done yet.

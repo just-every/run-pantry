@@ -31,6 +31,7 @@
     "test:pantry": "node --test --test-concurrency=1 tests/api/*.test.mjs",
     "test:app": "node --test tests/app/*.test.mjs",
     "test:restore": "node --test tests/restore/*.test.mjs",
+    "verify:release": "node tests/release/verify.mjs",
     "agent": "node scripts/pantry-agent.mjs",
     "test:site": "node --test tests/site/*.test.mjs"
   },
@@ -45,7 +46,7 @@
     "@cloudflare/vite-plugin": "1.54.5",
     "@cloudflare/workers-types": "5.20260908.1",
     "@playwright/test": "1.63.0",
-    "@runeditrun/rer": "0.2.42",
+    "@runeditrun/rer": "0.2.43",
     "@types/node": "22.18.6",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
