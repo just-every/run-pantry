@@ -1,0 +1,10 @@
+*ContactName,AccountNumber,EmailAddress,FirstName,LastName,POAddressLine1,POCity,PORegion,POPostalCode,POCountry,PhoneNumber,TaxNumber,DueDateSalesDay,DueDateSalesTerm
+Bluebird Bakery,BLUE01,orders@bluebird-bakery.example,Rosa,Lind,,,,,,,,30,DAYSAFTERBILLDATE
+Harbor & Pine Architects,HARB01,accounts@harborpine.example,Theo,Grant,,,,,,,,30,DAYSAFTERBILLDATE
+Meridian Health Group,MERI01,ap@meridianhealth.example,Priya,Shah,,,,,,,,30,DAYSAFTERBILLDATE
+Oakridge Farms,OAKR01,,Sam,Oak,,,,,,,,30,DAYSAFTERBILLDATE
+Brightline Coworking,BRIG01,billing@brightline.example,,,,,,,,,,30,DAYSAFTERBILLDATE
+Copperleaf Software,COPP01,invoices@copperleaf.example,,,,,,,,,,30,DAYSAFTERBILLDATE
+Dana Ortiz,DANA01,dana.ortiz@example.com,Dana,Ortiz,,,,,,,,30,DAYSAFTERBILLDATE
+Summit Office Supply,SUMM01,orders@summitoffice.example,,,,,,,,,,30,DAYSAFTERBILLDATE
+Willow Creek Dental,WILL01,office@willowcreekdental.example,June,Park,,,,,,,,30,DAYSAFTERBILLDATE

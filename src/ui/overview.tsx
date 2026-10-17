@@ -31,8 +31,8 @@ export function Overview() {
         <Card title="Needs attention">
           <ul className="queue">{work.map(w => <li key={w.label}><Link to={w.to}><strong>{w.n}</strong><span>{w.label}</span></Link></li>)}</ul>
         </Card>
-        <Card title="Move in from QuickBooks Online">
-          <p>Bring your chart of accounts, customers, vendors, an accountant-approved trial balance, open invoices and bills, and a read-only history archive. Preview first; nothing posts until it is signed off.</p>
+        <Card title="Move in from QuickBooks Online or Xero">
+          <p>Bring your chart of accounts, customers, vendors, an accountant-approved trial balance, open invoices and bills (from Xero, with their attachments), and a read-only history archive. Preview first; nothing posts until it is signed off.</p>
           <Link className="btn btn-primary btn-block" to="/app/move-in">Preview a move-in</Link>
         </Card>
       </div>

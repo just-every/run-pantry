@@ -20,6 +20,7 @@ import { reconcileCommands, reconciliationState } from './reconcile'
 import { closeCommands, closeState } from './close'
 import { proposalCommands, proposalsView, agentContext, fileProposal, proposal } from './proposals'
 import { moveInCommands, moveInView } from './cutover/commands'
+import { xeroRoutes } from './cutover/xero-attachments'
 import { ageing, balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports'
 import { basisOf, BASIS_LABEL } from './basis'
 import { figureDetail } from './drilldown'
@@ -129,6 +130,7 @@ api.get('/api/pantry/documents/:id', async c => {
 })
 
 receiptRoutes(api)
+xeroRoutes(api)
 
 // Exports name their basis: in the file name (cash only, so accrual names stay as they were) and inside the file.
 const suffix = (basis: string) => basis === 'cash' ? '-cash' : ''

@@ -15,7 +15,7 @@ const SOURCE: Record<string, string> = { manual: 'Journal', opening: 'Opening ba
 function Chart({ balances, onPick }: { balances: Map<string, number>; onPick?: (a: D) => void }) {
   const { state, reload } = useShared()
   if (!state.accounts.length) return <Card title="Chart of accounts">
-    <p>No accounts yet. Start from a small service-business chart you can edit, add accounts one by one, or move in from QuickBooks Online.</p>
+    <p>No accounts yet. Start from a small service-business chart you can edit, add accounts one by one, or move in from QuickBooks Online or Xero.</p>
     {state.actor.can.record && <Action tone="primary" run={async () => { await command('chart.start', {}); await reload() }}>Start with a service-business chart</Action>}
   </Card>
   return <Card title="Chart of accounts">

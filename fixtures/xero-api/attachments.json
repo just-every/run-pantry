@@ -1,0 +1,78 @@
+{
+  "4074292c-09b3-456d-84e7-add864c6c39b": {
+    "Id": "7e357a45-69f5-4e8f-8d7b-15da8ef50aab",
+    "Status": "OK",
+    "ProviderName": "Pantry",
+    "DateTimeUTC": "/Date(1760688020000)/",
+    "Attachments": [
+      {
+        "AttachmentID": "9808ad7f-c8d4-41cf-995e-bc29cb76fd2c",
+        "FileName": "INV-0112 signed proposal.pdf",
+        "Url": "https://api.xero.com/api.xro/2.0/Invoices/4074292c-09b3-456d-84e7-add864c6c39b/Attachments/INV-0112%20signed%20proposal.pdf",
+        "MimeType": "application/pdf",
+        "ContentLength": 630,
+        "IncludeOnline": false,
+        "_file": "inv-0112-signed-proposal.pdf"
+      }
+    ]
+  },
+  "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6a": {
+    "Id": "7e357a45-69f5-4e8f-8d7b-15da8ef50aab",
+    "Status": "OK",
+    "ProviderName": "Pantry",
+    "DateTimeUTC": "/Date(1760688020000)/",
+    "Attachments": [
+      {
+        "AttachmentID": "5a500c1a-5a02-48de-939e-1d234fd170d4",
+        "FileName": "BR-0826.pdf",
+        "Url": "https://api.xero.com/api.xro/2.0/Invoices/c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6a/Attachments/BR-0826.pdf",
+        "MimeType": "application/pdf",
+        "ContentLength": 641,
+        "IncludeOnline": false,
+        "_file": "br-0826.pdf"
+      }
+    ]
+  },
+  "d3e4f5a6-b7c8-4d9e-8f0a-2b3c4d5e6f7a": {
+    "Id": "7e357a45-69f5-4e8f-8d7b-15da8ef50aab",
+    "Status": "OK",
+    "ProviderName": "Pantry",
+    "DateTimeUTC": "/Date(1760688020000)/",
+    "Attachments": [
+      {
+        "AttachmentID": "6b611d2b-6b13-49ef-a4af-2e345fe281e5",
+        "FileName": "receipt.png",
+        "Url": "https://api.xero.com/api.xro/2.0/Invoices/d3e4f5a6-b7c8-4d9e-8f0a-2b3c4d5e6f7a/Attachments/receipt.png",
+        "MimeType": "image/png",
+        "ContentLength": 83,
+        "IncludeOnline": false,
+        "_file": "cl-2291-receipt.png"
+      },
+      {
+        "AttachmentID": "7c722e3c-7c24-4af0-b5b0-3f456af392f6",
+        "FileName": "seat-licence-audit.pdf",
+        "Url": "https://api.xero.com/api.xro/2.0/Invoices/d3e4f5a6-b7c8-4d9e-8f0a-2b3c4d5e6f7a/Attachments/seat-licence-audit.pdf",
+        "MimeType": "application/pdf",
+        "ContentLength": 2450113,
+        "IncludeOnline": false
+      }
+    ]
+  },
+  "e4f5a6b7-c8d9-4e0f-9a1b-3c4d5e6f7a8b": {
+    "Id": "7e357a45-69f5-4e8f-8d7b-15da8ef50aab",
+    "Status": "OK",
+    "ProviderName": "Pantry",
+    "DateTimeUTC": "/Date(1760688020000)/",
+    "Attachments": [
+      {
+        "AttachmentID": "8d833f4d-8d35-4b01-86c1-40567b04a307",
+        "FileName": "summit-cl-2291.pdf",
+        "Url": "https://api.xero.com/api.xro/2.0/Invoices/e4f5a6b7-c8d9-4e0f-9a1b-3c4d5e6f7a8b/Attachments/summit-cl-2291.pdf",
+        "MimeType": "application/pdf",
+        "ContentLength": 624,
+        "IncludeOnline": false,
+        "_file": "summit-cl-2291.pdf"
+      }
+    ]
+  }
+}

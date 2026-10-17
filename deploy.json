@@ -52,6 +52,16 @@
       "optional": true
     },
     {
+      "binding": "XERO_CLIENT_ID",
+      "environment": "XERO_CLIENT_ID",
+      "optional": true
+    },
+    {
+      "binding": "XERO_CLIENT_SECRET",
+      "environment": "XERO_CLIENT_SECRET",
+      "optional": true
+    },
+    {
       "binding": "MAIL_PROVIDER",
       "environment": "MAIL_PROVIDER"
     },
