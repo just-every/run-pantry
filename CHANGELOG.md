@@ -1,8 +1,36 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 (17 Oct 2026)
 
-- **Online invoice payment works on a new Stripe account**: a Stripe account opened now starts on Stripe's newest API version, which refused Pantry's Checkout with "The `payment_method_types` parameter is no longer supported", so customers could not pay by card from the invoice link. Pantry now names the Stripe API version it is tested against (`2026-09-30.endive`) on every Stripe call and on the webhook it creates, and chooses card or ACH for a Checkout with `allowed_payment_method_types`. On a US account, ACH bank debit must also be turned on in Stripe's payment method settings for customers to use it.
+Pantry 0.2.1 lets customers pay an invoice by card from its link on a Stripe account opened now. Upgrading from 0.2.0 adds no migrations.
+
+- **Online invoice payment works on a new Stripe account.** A Stripe account opened now starts on Stripe's newest API version, which refused 0.2.0's Checkout with "The `payment_method_types` parameter is no longer supported", so a customer who chose **Pay by card** saw "Stripe refused the request" instead of the payment page. Pantry now names the Stripe API version it is tested against (`2026-09-30.endive`) on every Stripe call and on the webhook it creates, and chooses card or ACH for a Checkout with `allowed_payment_method_types`. The payment, its allocation to the invoice and Stripe's fee are recorded as before. Stripe stays connected through the upgrade: the webhook 0.2.0 created keeps working, so there is nothing to reconnect.
+- **US owners: turn on bank debit in Stripe for ACH.** On Stripe's current API, ACH needs the **US bank account** payment method turned on in the Stripe Dashboard (**Settings → Payment methods**). Until it is, Stripe refuses an ACH Checkout with "All types provided in `allowed_payment_method_types` are invalid" and the customer sees that refusal; card payment is not affected.
+- **Hosted changes pass the platform's source check.** Credential-shaped values in test fixtures and the demo (Plaid and Xero recordings, the demo's placeholder connection, a test setup token) are marked `synthetic-`, so a hosted change made from this source is no longer refused for a "credential pattern". No test assertion changed.
+- Pinned `@runeditrun/rer` 0.2.44.
+
+### Upgrading from 0.2.0
+
+No new migrations; your books, sign-ins and Stripe connection stay as they are. Back up first, as for any update ([Hosting → Keep it current](/docs/hosting#keep-it-current), [Back up and restore](/docs/backup)).
+
+**On your own computer**, in your `run-pantry` folder:
+
+```sh
+rer dev --stop
+rer export --output exports/pantry-books-0.2.0.rer
+git pull
+rer dev
+```
+
+**Hosted**, from the `run-pantry` folder you deploy from:
+
+```sh
+rer queue hosted-backup -- node scripts/hosted-backup.mjs --env-file .env.pantry
+git pull
+rer deploy --env-file .env.pantry
+```
+
+Add `--environment NAME` to both commands if you deployed with one. Still on 0.1.0? Follow [Upgrading from 0.1.0](#upgrading-from-010) below; `git pull` then brings you straight to 0.2.1.
 
 ## 0.2.0 (17 Oct 2026)
 
