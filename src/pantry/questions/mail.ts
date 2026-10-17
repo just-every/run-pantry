@@ -8,6 +8,7 @@ import { runtimeBindings, type Bindings } from '../../auth.server'
 import { operatorMail } from '../../mail.server.mjs'
 // @ts-expect-error Base's inbound MIME parser ships without type declarations.
 import { parseMime as parseBaseMime } from '../../modules/mail/src/inbound/mime.mjs'
+import { ownerEmail } from '../access'
 import { now, uid, type Data } from '../core'
 import { all, one, q, run } from '../db'
 import { pantryAddress } from '../receipts/mail'
@@ -16,12 +17,6 @@ import { AGENT, OPEN, parse, say, type Question } from './store'
 
 type MailResult = { status: 'accepted' | 'rejected' | 'rate_limited' | 'uncertain' | 'development'; provider: string; providerMessageId: string | null; code?: string }
 type Mailer = { send(message: Data): Promise<MailResult> }
-
-/** Who the owner is now: the active owner operator, else the install's configured owner email. */
-export async function ownerEmail(db: D1Database, env: Bindings) {
-  const row = await one<{ email: string }>(db, "SELECT lower(email) AS email FROM oa_operators WHERE role = 'owner' AND status = 'active' ORDER BY created_at LIMIT 1")
-  return (row?.email ?? String(runtimeBindings(env).OWNER_EMAIL ?? '')).trim().toLowerCase()
-}
 
 /** Whether this install can email questions: 'ready', 'local' (this computer sends none) or 'none'. */
 export function mailState(env: Bindings): 'ready' | 'local' | 'none' {

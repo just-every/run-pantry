@@ -1,7 +1,7 @@
 // D1 access: every write is one atomic batch. Conditions that must still hold
 // when the batch commits (current authority, unchanged revisions, open periods)
 // go in as guard rows; one false guard rolls the whole batch back.
-import { Fault, uid, now, type Data } from './core'
+import { Fault, longDay, monthName, uid, now, type Data } from './core'
 
 export type Sql = { sql: string; params: unknown[] }
 export const q = (sql: string, ...params: unknown[]): Sql => ({ sql, params })
@@ -56,5 +56,5 @@ export const periodOpen = (day: string) => guard("NOT EXISTS (SELECT 1 FROM pt_p
 
 export async function assertOpen(db: D1Database, day: string) {
   const locked = await one(db, "SELECT id FROM pt_periods WHERE status = 'locked' AND ? BETWEEN start_date AND end_date", day)
-  if (locked) throw new Fault(409, `${day} is in ${locked.id}, which is locked; ask for the period to be reopened first`)
+  if (locked) throw new Fault(409, `${longDay(day)} is in ${monthName(locked.id)}, which is locked; ask for the period to be reopened first`)
 }

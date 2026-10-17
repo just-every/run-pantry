@@ -25,7 +25,9 @@ export async function person(request: Request, original: Bindings): Promise<Pers
   const base = { kind: 'person' as const, id: session.operator.id, email: session.operator.email.toLowerCase(), name: session.operator.displayName, session: session.id }
   if (session.operator.role === 'owner') return { ...base, role: 'owner', grants: { post: true, lock: true, reopen: true } }
   const member = await one<{ name: string; role: Role; can_post: number; can_lock: number; can_reopen: number }>(env.DB, 'SELECT * FROM pt_members WHERE email = ? AND active = 1', base.email)
-  requireThat(member, 'You have no role in these books; ask the owner to add you', 403)
+  requireThat(member, env.AUTH_LOCAL === 'true' && base.email.endsWith('@dev.localhost')
+    ? `${base.email} has no role in these books yet. Sign out, sign in as the owner, and add ${base.email} under People & settings › People with the role to try.`
+    : 'You have no role in these books; ask the owner to add you', 403)
   return { ...base, name: member.name, role: member.role, grants: { post: !!member.can_post && member.role !== 'viewer', lock: !!member.can_lock && member.role !== 'viewer', reopen: !!member.can_reopen && member.role !== 'viewer' } }
 }
 
@@ -75,3 +77,9 @@ export const who = (actor: Actor | AuditActor): AuditActor => ({ email: actor.em
 
 /** Pantry itself, acting in due work or on a provider's confirmation; `role` names the job. */
 export const pantry = (role: 'reminders' | 'recurring' | 'auto-match' | 'stripe' | 'gusto' | 'customer'): AuditActor => ({ email: `pantry:${role}`, kind: 'system' })
+
+/** Who the owner is now: the active owner operator, else the install's configured owner email. */
+export async function ownerEmail(db: D1Database, env: Bindings) {
+  const row = await one<{ email: string }>(db, "SELECT lower(email) AS email FROM oa_operators WHERE role = 'owner' AND status = 'active' ORDER BY created_at LIMIT 1")
+  return (row?.email ?? String(runtimeBindings(env).OWNER_EMAIL ?? '')).trim().toLowerCase()
+}

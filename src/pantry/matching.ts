@@ -64,7 +64,7 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
         requireThat(other.active && !['bank', 'receivable', 'payable'].includes(other.subtype), `${label}: choose an income, expense or other account`)
       }
       const entryId = uid(), into = direction === 'in'
-      statements.push(...entryStatements({ id: entryId, date: item.date ?? day, memo: memo || `${type === 'fee' ? 'Bank fee' : type === 'transfer' ? 'Transfer' : 'Bank item'} — ${lines[0].description}`, sourceKind: 'bank', preparedBy: actor.email, preparedKind: 'person', lines: [
+      statements.push(...entryStatements({ id: entryId, date: item.date ?? day, memo: memo || `${type === 'transfer' ? 'Transfer' : other.name} — ${lines[0].description}`, sourceKind: 'bank', preparedBy: actor.email, preparedKind: 'person', lines: [
         { accountId: into ? bank.account_id : other.id, debit: amount, credit: 0, memo },
         { accountId: into ? other.id : bank.account_id, debit: 0, credit: amount, memo },
       ] }, actor.email))

@@ -511,9 +511,10 @@ ol.how-to code { overflow-wrap: anywhere; }
   .own-words .action, .own-words .btn { width: 100%; }
 }
 .choice input[type='radio'] { accent-color: var(--ink); flex: none; width: 18px; height: 18px; min-height: 0; padding: 0; margin: 3px 0 0; }
+.provider-choices { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); max-width: 420px; }
 
 /* Provider setup steps: the lines to paste keep their line breaks and scroll sideways on a phone. */
-.provider-setup pre.env-lines { margin: 8px 0 0; padding: 10px 12px; background: var(--row); border: 1px solid var(--line); border-radius: var(--radius-field); overflow-x: auto; font: 13px/1.6 var(--font-mono); }
+pre.env-lines { margin: 8px 0 0; padding: 10px 12px; background: var(--row); border: 1px solid var(--line); border-radius: var(--radius-field); overflow-x: auto; font: 13px/1.6 var(--font-mono); }
 .provider-setup .how-to code { overflow-wrap: anywhere; }
 details.setup-steps summary { width: fit-content; margin-bottom: 8px; color: var(--ink); font-weight: 600; cursor: pointer; }
 .provider-setup, details.setup-steps, ol.how-to > li { min-width: 0; }

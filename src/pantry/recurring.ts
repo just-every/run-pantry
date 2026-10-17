@@ -6,7 +6,7 @@
 // (template, date) key, so nothing is created twice.
 import type { Bindings } from '../auth.server'
 import { authority, pantry, who } from './access'
-import { addDays, date, Fault, now, optionalText, requireThat, text, uid, type Data } from './core'
+import { addDays, date, Fault, longDay, monthName, now, optionalText, requireThat, text, uid, type Data } from './core'
 import { all, approval, audit, changed, guard, one, periodOpen, q, run, type Sql } from './db'
 import { contact } from './contacts'
 import { issueStatements, lineStatements, nextNumber, parseInvoice } from './invoices'
@@ -120,7 +120,7 @@ async function runOccurrence(env: Bindings, db: D1Database, t: Data) {
     p = await parseInvoice(db, { customerId: customer.id, issueDate: occ, dueDate: addDays(occ, t.terms_days), lines: t.lines, memo: t.memo })
   } catch (error) { if (error instanceof Fault) return fail(error.message); throw error }
   const locked = await one(db, "SELECT id FROM pt_periods WHERE status = 'locked' AND ? BETWEEN start_date AND end_date", occ)
-  if (locked) return fail(`${occ} is in ${locked.id}, which is locked`)
+  if (locked) return fail(`${longDay(occ)} is in ${monthName(locked.id)}, which is locked`)
   const approverPosts = t.approved_by && await one(db, "SELECT 1 AS ok WHERE EXISTS (SELECT 1 FROM oa_operators WHERE lower(email) = ? AND role = 'owner' AND status = 'active') OR EXISTS (SELECT 1 FROM pt_members WHERE email = ? AND active = 1 AND can_post = 1 AND role <> 'viewer')", t.approved_by, t.approved_by)
   const sameAmounts = p.total === t.total_cents && p.tax === t.tax_cents
   const automatic = t.mode === 'send' && t.approved_revision === t.revision && sameAmounts && !!approverPosts

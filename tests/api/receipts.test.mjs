@@ -55,6 +55,11 @@ test('Receipts: a phone photo is kept byte for byte, read by the install\'s own 
   assert.equal(r.read_status, 'no-key'); assert.equal(r.read_note, 'Add a key to read receipts.')
   assert.equal(r.read_vendor, null); assert.equal(r.read_total_cents, null); assert.deepEqual(r.candidates, [])
   assert.equal(seen.length, 0)
+  // Typing the details from the receipt finds its charge without a key; with no transaction chosen, accepting says what is missing.
+  const typed = await h.view(`receipts/candidates?${new URLSearchParams({ vendor: 'The Home Depot', date: '2026-09-14', total: '84.37', currency: '' })}`)
+  assert.equal(typed.candidates[0].id, depot.id); assert.ok(!typed.candidates.some(c => c.id === cafe.id))
+  const refused = await h.command('receipt.attach', { id: r.id, revision: r.revision, total: '84.37' }, h.owner, 400)
+  assert.match(refused.error, /Choose the transaction/)
   await h.command('receipt.dismiss', { id: r.id, revision: r.revision })
 
   // The owner adds the install's key on the page; it is never shown again.

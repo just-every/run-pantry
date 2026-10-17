@@ -14,7 +14,7 @@ Importing the same file again adds nothing, and an overlapping download adds onl
 Choose **Reconcile** beside the statement. Pantry shows **Statement lines** beside **Ledger postings**, with the statement's balances and the **Difference** above them.
 
 1. Select one or more statement lines and the postings they correspond to.
-2. If the books are missing something, such as a bank fee, interest, a transfer between your accounts, a customer receipt or a vendor payment, add it in **Match review** with **+ Expense or fee**, **+ Bank income**, **+ Transfer**, **+ Customer payment** or **+ Vendor payment**.
+2. If the books are missing something, such as a bank fee, interest, a transfer between your accounts, a customer receipt or a vendor payment, add it in **Match review** with **+ Expense or fee**, **+ Bank income**, **+ Transfer**, **+ Customer payment** or **+ Vendor payment**. An expense is titled with the account you file it to, for example "Software and subscriptions — ADOBE *CREATIVE CLD".
 3. When the statement and ledger totals agree, choose **Approve match**.
 
 A payment you already recorded is cleared by its bank line without being posted twice. A line or posting is matched only once.

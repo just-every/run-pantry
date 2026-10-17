@@ -1,12 +1,12 @@
 // The Questions page: the agent's questions and their threads, answering in
 // the app, "Check now", and the owner's settings for how Pantry asks.
 import { requireThat, text, now, uid, optionalText, cents, usd } from '../core'
-import { authority, who } from '../access'
+import { authority, ownerEmail, who } from '../access'
 import { all, audit, changed, q, run } from '../db'
 import type { Command, Context } from '../context'
 import { answer, confirm, hear, personAnswerer } from './answer'
 import { hosting, pantryAddress } from '../receipts/mail'
-import { mailState, ownerEmail } from './mail'
+import { mailState } from './mail'
 import { modelState } from './model'
 import { runAgent } from './run'
 import { agentSettings, parse, withThreads } from './store'

@@ -2,9 +2,10 @@ Pantry runs on your own computer first. To reach it from anywhere, send invoices
 
 ## What you need
 
-- **Pantry running on this computer**, set up with your own email as the owner ([Getting started](/docs/getting-started)). The hosted Pantry starts with the same owner.
+- **Pantry running on this computer** ([Getting started](/docs/getting-started)).
 - **A Cloudflare account.** Sign up free at [dash.cloudflare.com/sign-up](https://dash.cloudflare.com/sign-up). Pantry runs on Cloudflare Workers with a D1 database; Cloudflare's free Workers plan is enough to start, and [Cloudflare's pricing](https://developers.cloudflare.com/workers/platform/pricing/) gives its limits.
-- **A mail provider account** (Resend or SendGrid) with your sending domain verified, so the hosted Pantry can email your sign-in links and invoices. [Connections and keys](/docs/connections#mail) walks through it.
+- **A domain of your own**, such as `yourbusiness.com`, to send mail from. No domain yet? Buy one in the Cloudflare dashboard under **Domain Registration → Register Domains**, or from any registrar. With the domain on your Cloudflare account, [forwarding receipts by email](/docs/receipts#forward-receipts-by-email) works too; without it, photos and uploads still do.
+- **A mail provider account** (Resend or SendGrid) with that domain verified, so the hosted Pantry can email your sign-in links and invoices. [Connections and keys](/docs/connections#mail) walks through it.
 
 ## 1. Give your Cloudflare account a workers.dev address
 
@@ -22,12 +23,17 @@ In the Cloudflare dashboard, open **Workers & Pages**. The first time, Cloudflar
 In your `run-pantry` folder, create a file named `.env.pantry` with these lines, each value replaced with yours:
 
 ```sh
+OWNER_EMAIL=you@example.com
 CLOUDFLARE_ACCOUNT_ID=your account ID
 CLOUDFLARE_API_TOKEN=the token
 MAIL_PROVIDER=resend
 MAIL_API_KEY=your mail provider's API key
-MAIL_FROM=Your Business <billing@example.com>
+MAIL_FROM=billing@example.com
 ```
+
+- `OWNER_EMAIL` is your own mailbox: the hosted Pantry's owner, where your sign-in links go. Without it, `rer deploy` uses the address Pantry on this computer was first set up with, which is a placeholder ending in `.test` if you started with `rer dev just-every/run-pantry`, and no mail reaches that. **People & settings → Put Pantry online** on this computer shows these lines with your current email filled in.
+- `MAIL_PROVIDER` is `resend` or `sendgrid`.
+- `MAIL_FROM` is the address alone, with no name: `rer deploy` refuses `Your Business <billing@…>`. Invoices and reminders show your business's legal name as the sender, and sign-in and invitation emails show Pantry.
 
 Keys for bank feeds, Gusto or Xero ([Connections and keys](/docs/connections)) can go in the same file now, or be added later. Make the file readable only by you; `rer deploy` refuses it otherwise. Git ignores files named `.env…`, so it never ends up in a commit.
 
@@ -41,7 +47,7 @@ chmod 600 .env.pantry
 rer deploy --env-file .env.pantry
 ```
 
-`rer deploy` builds Pantry, creates its Worker and database on your account, and checks that it answers. It ends by printing the address, for example `Your application is live on your Cloudflare account at https://pantry-production.yourbusiness.workers.dev`, and claims you as the hosted owner.
+`rer deploy` builds Pantry, creates its Worker and database on your account, and checks that it answers. It ends by printing the address, for example `Your application is live on your Cloudflare account at https://pantry-production.yourbusiness.workers.dev`, and claims your `OWNER_EMAIL` as the hosted owner.
 
 Open that address and sign in with your owner email: Pantry emails you a sign-in link. If the email does not arrive, check the mail provider's dashboard for the message; `rer signin --env-file .env.pantry` also prints a one-time owner sign-in link in the terminal, without email.
 
@@ -52,6 +58,7 @@ The hosted Pantry starts with its own, empty books, and you set the business up 
 - **Update Pantry**: in the `run-pantry` folder, `git pull`, then `rer deploy --env-file .env.pantry` again. Your books stay.
 - **Change one key**: put the new value in `.env.pantry`, then `rer deploy --set-secret NAME --env-file .env.pantry`.
 - **Keep the `.rer` folder.** It records what `rer deploy` created on your account, so later deploys update the same Pantry. Deploy from the same folder each time.
-- **Take it down**: `rer deploy --remove --yes --env-file .env.pantry` deletes the Worker and database it created, and checks that both are gone. Export your books first.
+- **Back up the hosted books**: `rer queue hosted-backup -- node scripts/hosted-backup.mjs --env-file .env.pantry` saves the hosted database, with every receipt and document in it, to the `exports` folder ([Back up and restore](/docs/backup#back-up-a-hosted-pantry)). Add `--environment NAME` if you deployed with one.
+- **Take it down**: back up the hosted books first (above), then `rer deploy --remove --yes --env-file .env.pantry` deletes the Worker and database it created, and checks that both are gone.
 
 If a deploy stops with `token-scope-missing-workers` or `token-scope-missing-d1`, the API token lacks that permission: edit it in Cloudflare and run the same command again. `workers-subdomain-missing` means step 1 is not done yet.

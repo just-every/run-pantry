@@ -43,7 +43,7 @@ export function MatchPanel({ lines, postings, bankId, clear, onDone }: { lines: 
   const add = (type: string) => setItems(xs => [...xs, { type, amount: Math.abs(statement - ledger) ? (Math.abs(statement - ledger) / 100).toFixed(2) : '', direction: statement - ledger >= 0 ? 'in' : 'out' }])
   return <Card title="Match review" className="match-panel">
     <div className="match-grid">
-      <div><h3>Statement line{lines.length === 1 ? '' : 's'}</h3>{lines.length ? lines.map(l => <p key={l.id} className="pair"><span>{day(l.posted_date)} {l.description}</span><strong>{usd(l.amount_cents)}</strong></p>) : <p className="hint">Choose statement lines on the left.</p>}</div>
+      <div><h3>Statement line{lines.length === 1 ? '' : 's'}</h3>{lines.length ? lines.map(l => <p key={l.id} className="pair"><span>{day(l.posted_date)} {l.description}</span><strong>{usd(l.amount_cents)}</strong></p>) : <p className="hint">Choose the statement lines to match.</p>}</div>
       <div><h3>Ledger postings</h3>{postings.map(p => <p key={p.id} className="pair"><span>{day(p.entry_date)} {p.memo}</span><strong>{usd(Number(p.amount))}</strong></p>)}
         {items.map((it, k) => <div className="new-item" key={k}>
           <strong>{KINDS.find(k => k[0] === it.type)![2]}</strong>

@@ -73,7 +73,11 @@ const inviteMember: Command = { need: 'owner', async run(c, b) {
   const email = text(b.email, 'Email').toLowerCase()
   const member = await one(c.db, 'SELECT * FROM pt_members WHERE email = ? AND active = 1', email)
   requireThat(member, 'Add the person with a role before inviting them')
-  await operatorAuth(runtimeBindings(c.env)).invite(c.request, { email, displayName: member.name, role: 'member', returnTo: '/app' })
+  try { await operatorAuth(runtimeBindings(c.env)).invite(c.request, { email, displayName: member.name, role: 'member', returnTo: '/app' }) }
+  catch (error) {
+    if ((error as { code?: string }).code === 'invitation_conflict') throw new Fault(409, `${member.name} already signs in to this Pantry with ${email}; no new invitation is needed`)
+    throw error
+  }
   await run(c.db, [authority(c.actor, 'owner'), audit(who(c.actor), 'member.invite', 'member', email)])
   // A run on this computer (or the demo) records the invitation but sends no email.
   const e = runtimeBindings(c.env)
@@ -139,5 +143,7 @@ export async function settingsView(c: Context): Promise<Data> {
     members: owner ? await all(c.db, 'SELECT email, name, role, can_post, can_lock, can_reopen, active FROM pt_members ORDER BY email') : [],
     agents: owner ? await all(c.db, 'SELECT id, name, created_by, created_at, active FROM pt_agents ORDER BY created_at') : [],
     choices: { entityTypes: ENTITY_TYPES, states: STATES },
+    // The owner address this install was set up with, which rer deploy gives a hosted Pantry unless .env.pantry names one.
+    setupOwner: owner ? String(runtimeBindings(c.env).OWNER_EMAIL ?? '').toLowerCase() : null,
   }
 }

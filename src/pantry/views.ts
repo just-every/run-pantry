@@ -27,7 +27,7 @@ export async function overview(db: D1Database) {
   const steps = [
     { key: 'business', title: 'Set up the business', done: !!e, detail: e ? `${e.legal_name}, ${e.state}; books start ${longDay(e.books_start)}` : 'Legal name, entity type, state, fiscal year and declared tax method', go: 'settings' },
     { key: 'chart', title: 'Chart of accounts and opening balances', done: accounts > 0 && opening > 0 && !stagedCutover, detail: !accounts ? 'Start a chart or move in from QuickBooks Online or Xero' : stagedCutover ? 'Imported opening balances wait for accountant sign-off' : opening ? `${accounts} accounts; balances posted` : `${accounts} accounts; no opening balances posted yet`, go: stagedCutover ? 'move-in' : 'books' },
-    { key: 'contacts', title: 'Customers and vendors', done: contacts > 0, detail: contacts ? `${contacts} customers and vendors` : 'Add the businesses you invoice and pay', go: 'sales' },
+    { key: 'contacts', title: 'Customers and vendors', done: contacts > 0, detail: contacts ? `${contacts} customers and vendors` : 'Add the businesses you invoice and pay', go: 'contacts' },
     { key: 'bank', title: 'Bank statements', done: banks > 0 && statements > 0 && reconciled > 0, detail: !banks ? 'Add a bank account' : !statements ? 'Import a CSV or OFX statement' : reconciled ? `${reconciled} statement${reconciled === 1 ? '' : 's'} reconciled` : 'Reconcile your first statement', go: 'bank' },
     { key: 'close', title: 'First close', done: locked > 0, detail: locked ? `${locked} period${locked === 1 ? '' : 's'} locked` : 'Complete the checklist and lock a month', go: 'close' },
   ]

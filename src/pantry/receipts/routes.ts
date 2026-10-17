@@ -3,7 +3,7 @@
 import type { Hono } from 'hono'
 import type { Bindings } from '../../auth.server'
 import { authority, must, person, who } from '../access'
-import { Fault, requireThat, type Data } from '../core'
+import { cents, date, Fault, optionalText, requireThat, type Data } from '../core'
 import { all } from '../db'
 import { MAX_DOCUMENT_BYTES } from '../documents'
 import type { Command, Context } from '../context'
@@ -67,6 +67,15 @@ export function receiptRoutes(api: Hono<{ Bindings: Bindings }>) {
     const actor = await person(c.req.raw, c.env)
     must(actor, 'read')
     return c.json(await receiptsView({ db: c.env.DB, env: c.env, request: c.req.raw, actor }))
+  })
+
+  // The transactions a receipt may belong to, from details a person typed (no AI key needed).
+  api.get('/api/pantry/receipts/candidates', async c => {
+    const actor = await person(c.req.raw, c.env)
+    must(actor, 'record')
+    const q = c.req.query(), total = q.total ? cents(q.total, 'Total') : null
+    const currency = optionalText(q.currency, 'Currency', 3).toUpperCase() || 'USD'
+    return c.json({ candidates: (await candidates(c.env.DB, total, q.date ? date(q.date, 'Receipt date') : null, optionalText(q.vendor, 'Vendor', 200) || null, currency)).slice(0, 6) })
   })
 
   api.get('/api/pantry/receipts/settings', async c => {
