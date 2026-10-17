@@ -7,7 +7,9 @@
 .site-header.over-art .site-header-row { border-bottom-color: rgba(16, 26, 51, .14); }
 
 /* ---------- Hero ---------- */
-.hero { position: relative; isolation: isolate; aspect-ratio: 3 / 2; min-height: 780px; max-height: 1180px; overflow: hidden; background: #a6c9f8; }
+/* The painted bands (hero, closing) keep the art's 3:2 until max-height, then grow only in width:
+   an explicit width stops max-height from shrinking them through the aspect ratio on wide screens. */
+.hero { position: relative; isolation: isolate; width: 100%; aspect-ratio: 3 / 2; min-height: 780px; max-height: 1180px; overflow: hidden; background: #a6c9f8; }
 .hero-art, .hero-art img { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-art { z-index: -1; }
 .hero-art img { object-fit: cover; object-position: 50% 100%; }
@@ -15,7 +17,7 @@
 .hero::before { content: ''; position: absolute; z-index: -1; inset: 0 45% 30% 0; background: radial-gradient(70% 60% at 30% 40%, rgba(247, 240, 236, .42), transparent 72%); pointer-events: none; }
 .hero-grid { position: relative; height: 100%; padding-top: 117px; }
 .hero-copy { max-width: 690px; }
-.hero h1 { font: 800 clamp(46px, 5.5vw, 84px)/.98 var(--font-head); letter-spacing: -.052em; color: #0b1226; text-wrap: balance; }
+.hero h1 { font: 800 clamp(46px, 5.5vw, 84px)/.98 var(--font-head); letter-spacing: -.052em; word-spacing: .04em; color: #0b1226; text-wrap: balance; }
 .brush { position: relative; z-index: 0; white-space: nowrap; }
 .brush::after { content: ''; position: absolute; z-index: -1; left: -.1em; right: -.03em; bottom: -.07em; height: .3em; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 460 34' preserveAspectRatio='none'%3E%3Cpath d='M4 22C60 13 130 9 210 10.5c80 1.5 160 5 246 9.5-30 4-72 3.4-118 4.6C252 27 150 30 64 29.6 36 29.5 16 27.6 4 22z' fill='%235f76ee' fill-opacity='.78'/%3E%3Cpath d='M30 19c90-7 220-7 380 1' stroke='%235166e6' stroke-opacity='.35' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
 .hero-sub { max-width: 680px; margin-top: 22px; font-size: 22.5px; line-height: 1.46; color: rgba(70, 77, 105, .92); letter-spacing: -.004em; }
@@ -48,7 +50,7 @@
 .feature-drawing { width: 100%; display: flex; justify-content: inherit; }
 .eyebrow { font: 600 14px/1 var(--font-body); letter-spacing: .3em; text-transform: uppercase; color: var(--lavender-ink); }
 .eyebrow.ink { color: var(--ink); }
-.feature h2, .details h2 { margin-top: 22px; font: 800 clamp(42px, 5.25vw, 77px)/.97 var(--font-head); letter-spacing: -.052em; color: var(--ink); text-wrap: balance; }
+.feature h2, .details h2 { margin-top: 22px; font: 800 clamp(42px, 5.25vw, 77px)/.97 var(--font-head); letter-spacing: -.052em; word-spacing: .04em; color: var(--ink); text-wrap: balance; }
 .feature-body { max-width: 520px; margin-top: 26px; font-size: 24px; line-height: 1.5; color: var(--body); letter-spacing: -.004em; text-wrap: pretty; }
 .feature + .feature { padding-top: 12px; }
 
@@ -82,13 +84,13 @@
 /* ---------- Closing ---------- */
 /* The sky behind the copy is drawn here, not by the painting: it is one even lavender-white (#f5f3fb, sampled
    from the plate), so no codec block can show behind the headline; the painting fades in below the copy. */
-.closing { position: relative; isolation: isolate; aspect-ratio: 3 / 2; min-height: 760px; max-height: 1180px; display: flex; flex-direction: column; overflow: hidden; background: linear-gradient(var(--paper), #f5f3fb 14%); }
+.closing { position: relative; isolation: isolate; width: 100%; aspect-ratio: 3 / 2; min-height: 760px; max-height: 1180px; display: flex; flex-direction: column; overflow: hidden; background: linear-gradient(var(--paper), #f5f3fb 14%); }
 .closing-art, .closing-art img { position: absolute; inset: 0; width: 100%; height: 100%; }
 .closing-art { z-index: -1; }
 .closing-art img { object-fit: cover; object-position: 50% 100%; -webkit-mask-image: linear-gradient(transparent 30%, #000 41%); mask-image: linear-gradient(transparent 30%, #000 41%); }
 .closing::after { content: ''; position: absolute; z-index: -1; inset: auto 0 0; height: 18%; background: linear-gradient(transparent, rgba(12, 14, 30, .45)); pointer-events: none; }
 .closing-copy { padding-top: clamp(96px, 9vw, 132px); text-align: center; display: flex; flex-direction: column; align-items: center; }
-.closing h2 { font: 800 clamp(38px, 4.15vw, 62px)/1.05 var(--font-head); letter-spacing: -.05em; color: #0b1226; text-wrap: balance; }
+.closing h2 { font: 800 clamp(38px, 4.15vw, 62px)/1.05 var(--font-head); letter-spacing: -.05em; word-spacing: .04em; color: #0b1226; text-wrap: balance; }
 .closing-sub { margin-top: 20px; font-size: clamp(19px, 1.95vw, 28px); color: #1d2440; letter-spacing: -.005em; }
 .closing .site-actions { margin-top: 36px; justify-content: center; gap: 16px 36px; }
 .closing .site-pill { min-height: 52px; padding: 0 30px 0 32px; font-size: 19px; }
