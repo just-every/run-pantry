@@ -1,7 +1,7 @@
 // Reports, all calculated from posted journal lines (and, for ageing, the open
 // items those lines carry). Nothing here stores or accepts a total. Each ledger
 // report reads on the accrual or the cash basis (basis.ts) and names its basis.
-import { daysBetween, requireThat, type Data } from './core'
+import { daysBetween, longDay, requireThat, type Data } from './core'
 import { all, one } from './db'
 import { cashLines, sameOnCash, type Basis } from './basis'
 
@@ -92,7 +92,7 @@ export async function balanceSheet(db: D1Database, asOf: string, startMonth: num
   const equity = all_.filter(r => r.type === 'equity' && r.net !== 0).map(r => ({ ...r, amount: -r.net }))
   // Earnings not yet closed to an equity account appear as calculated lines, labelled as such.
   if (prior) equity.push({ id: 'prior-earnings', code: '', name: "Prior years' earnings (calculated)", type: 'equity', subtype: 'retained', debit: 0, credit: 0, net: -prior, amount: prior })
-  if (current.netIncome) equity.push({ id: 'current-earnings', code: '', name: `Net income since ${fyStart} (calculated)`, type: 'equity', subtype: 'retained', debit: 0, credit: 0, net: -current.netIncome, amount: current.netIncome })
+  if (current.netIncome) equity.push({ id: 'current-earnings', code: '', name: `Net income since ${longDay(fyStart)} (calculated)`, type: 'equity', subtype: 'retained', debit: 0, credit: 0, net: -current.netIncome, amount: current.netIncome })
   const totalAssets = assets.reduce((s, r) => s + r.amount, 0), totalLiabilities = liabilities.reduce((s, r) => s + r.amount, 0), totalEquity = equity.reduce((s, r) => s + r.amount, 0)
   return { basis, asOf, fyStart, assets, liabilities, equity, totalAssets, totalLiabilities, totalEquity, balanced: totalAssets === totalLiabilities + totalEquity }
 }

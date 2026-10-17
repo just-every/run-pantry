@@ -166,3 +166,11 @@ export const ROLE_LABEL: Record<string, string> = { owner: 'Owner', bookkeeper: 
 
 /** A reserved address no mail reaches, such as the owner@run-pantry.test a first `rer dev` sets up with. */
 export const placeholderEmail = (email: string | null | undefined) => !email || /@(?:[^@]*\.)?(?:test|localhost|invalid|example|example\.(?:com|net|org))$/i.test(email)
+
+/** The image types a browser shows inline from Pantry's document route (`?view=1`). */
+export const IMAGE_TYPE = /^image\/(png|jpeg|webp|gif)$/
+
+/** A stored file by name, led by a small picture of it when it is a photo. */
+export function FileLink({ id, name, mediaType }: { id: string; name: string; mediaType?: string | null }) {
+  return <a className="file-link" href={`/api/pantry/documents/${id}`}>{mediaType && IMAGE_TYPE.test(mediaType) && <img className="file-thumb" src={`/api/pantry/documents/${id}?view=1`} alt="" loading="lazy" />}<span>{name}</span></a>
+}

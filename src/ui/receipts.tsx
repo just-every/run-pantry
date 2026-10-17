@@ -2,11 +2,10 @@
 // and total, proposes the transaction, and attaches it when a person accepts.
 import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Action, amountText, api, Card, Chip, command, day, Field, Form, Loading, PageHead, Table, usd, useShared, useView, useWho, type D } from './kit'
+import { Action, amountText, api, Card, Chip, command, day, Field, FileLink, Form, IMAGE_TYPE as IMAGE, Loading, PageHead, Table, usd, useShared, useView, useWho, type D } from './kit'
 import { CaptureButtons } from './receipt-capture'
 import { Icon } from './icons'
 
-const IMAGE = /^image\/(png|jpeg|webp|gif)$/
 /** A receipt's own amount: dollars, or the figure with its currency code. */
 const money = (c: number, currency?: string | null) => currency && currency !== 'USD' ? `${amountText(c)} ${currency}` : usd(c)
 const KIND: Record<string, string> = { bankline: 'Bank or card line', bill: 'Bill', payment: 'Payment', journal: 'Entry' }
@@ -125,7 +124,7 @@ export function Receipts() {
         <Table heads={['Date', 'Vendor', 'Total', 'Attached to', 'By', 'Receipt']} figures={[2]} empty="No receipts attached yet.">
           {data.attached.map((r: D) => <tr key={r.id}><td>{day(r.receipt_date ?? r.decided_at)}</td><td>{r.vendor ?? '—'}</td><td className="fig">{r.total_cents ? money(r.total_cents, r.currency) : '—'}</td>
             <td>{r.linked_kind && r.linked_id ? <Link to="/app/reports" search={{ record: `${r.linked_kind === 'journal' ? 'entry' : r.linked_kind}:${r.linked_id}` } as any}>{r.linked_label ?? 'Record'}</Link> : '—'}</td>
-            <td>{r.rule_id ? <Chip tone="agent">Rule</Chip> : who(r.decided_by)}</td><td><a href={`/api/pantry/documents/${r.document_id}`}>{r.file_name}</a></td></tr>)}
+            <td>{r.rule_id ? <Chip tone="agent">Rule</Chip> : who(r.decided_by)}</td><td><FileLink id={r.document_id} name={r.file_name} mediaType={r.media_type} /></td></tr>)}
         </Table>
       </Card>
       {state.actor.can.owner && <Rules data={data} onChange={reload} />}

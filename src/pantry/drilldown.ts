@@ -3,7 +3,7 @@
 // invoice, credit or bill), the record it came from, what settled it, its
 // documents and the bank statement lines it was matched to. The rows are read
 // separately from the report and must add up to the report's own figure.
-import { requireThat, type Data } from './core'
+import { longDay, requireThat, type Data } from './core'
 import { all } from './db'
 import { cashLines, sameOnCash, type Basis } from './basis'
 import { balanceSheet, prevDay, profitAndLoss, settlementMemo } from './reports'
@@ -41,7 +41,7 @@ async function scope(db: D1Database, report: string, line: string, from: string,
     // Equity includes the calculated earnings lines, so it opens to every income and expense line too.
     if (line === 'equity') return { label: 'Total equity', types: ['equity', 'income', 'expense'], from: START, to, sign: -1, figure: bs.totalEquity }
     if (line === 'liabilities-and-equity') return { label: 'Liabilities and equity', types: ['liability', 'equity', 'income', 'expense'], from: START, to, sign: -1, figure: bs.totalLiabilities + bs.totalEquity }
-    if (line === 'current-earnings') return { label: `Net income since ${bs.fyStart} (calculated)`, types: ['income', 'expense'], from: bs.fyStart, to, sign: -1, figure: earnings('current-earnings') }
+    if (line === 'current-earnings') return { label: `Net income since ${longDay(bs.fyStart)} (calculated)`, types: ['income', 'expense'], from: bs.fyStart, to, sign: -1, figure: earnings('current-earnings') }
     if (line === 'prior-earnings') return { label: "Prior years' earnings (calculated)", types: ['income', 'expense'], from: START, to: prevDay(bs.fyStart), sign: -1, figure: earnings('prior-earnings') }
   }
   requireThat(false, 'Choose a figure on the profit and loss or the balance sheet', 404)

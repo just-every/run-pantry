@@ -1,6 +1,6 @@
 // Agent work, documents and the activity record.
 import { useRef } from 'react'
-import { Action, Card, Chip, command, Details, Empty, Field, Form, Loading, PageHead, Table, day, monthName, readFileBase64, usd, useShared, useView, useWho, type D } from './kit'
+import { Action, Card, Chip, command, Details, Empty, Field, FileLink, Form, Loading, PageHead, Table, day, monthName, readFileBase64, usd, useShared, useView, useWho, type D } from './kit'
 import { actionLabel, approvalLabel, detailFacts, recordLabel } from './activity-labels'
 import { Icon } from './icons'
 
@@ -47,7 +47,7 @@ export function Documents() {
       <div className="field"><label htmlFor="doc-file">File</label><input id="doc-file" ref={file} type="file" required /></div><Field label="Note" name="note" />
     </Form></Card>}
     {!data ? <Loading error={error} what="documents" /> : <Card title="All documents"><Table heads={['Name', 'Attached to', 'Size', 'Uploaded', '']} figures={[2]} empty="No documents yet.">
-      {data.documents.map((d: D) => <tr key={d.id}><td>{d.name}</td><td>{d.linked_label ?? 'Nothing yet'}</td><td className="fig">{Math.ceil(d.size / 1024)} KB</td><td>{who(d.uploaded_by)}, {day(d.uploaded_at)}</td><td><a href={`/api/pantry/documents/${d.id}`}>Download</a><Details facts={{ 'Fingerprint (SHA-256)': d.sha256 }} code={['Fingerprint (SHA-256)']} /></td></tr>)}
+      {data.documents.map((d: D) => <tr key={d.id}><td><FileLink id={d.id} name={d.name} mediaType={d.media_type} /></td><td>{d.linked_label ?? 'Nothing yet'}</td><td className="fig">{Math.ceil(d.size / 1024)} KB</td><td>{who(d.uploaded_by)}, {day(d.uploaded_at)}</td><td><a href={`/api/pantry/documents/${d.id}`}>Download</a><Details facts={{ 'Fingerprint (SHA-256)': d.sha256 }} code={['Fingerprint (SHA-256)']} /></td></tr>)}
     </Table></Card>}
   </>
 }

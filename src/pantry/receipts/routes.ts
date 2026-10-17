@@ -30,7 +30,7 @@ export async function receiptsView(c: Context): Promise<Data> {
   const review = await all(c.db, `SELECT r.*, d.name AS file_name, d.media_type, d.size, d.sha256, f.name AS read_file_name, f.media_type AS read_media_type
     FROM pt_receipts r JOIN pt_documents d ON d.id = r.document_id LEFT JOIN pt_documents f ON f.id = r.file_document_id WHERE r.status = 'review' ORDER BY r.received_at DESC LIMIT 100`)
   for (const r of review) r.candidates = (await candidates(c.db, r.read_total_cents, r.read_date, r.read_vendor, r.read_currency)).slice(0, 6)
-  const attached = await all(c.db, `SELECT r.id, r.vendor, r.receipt_date, r.total_cents, r.tax_cents, r.currency, r.source, r.target_kind, r.target_id, r.linked_kind, r.linked_id, r.rule_id, r.decided_by, r.decided_at, r.document_id, r.file_document_id, d.name AS file_name, d.sha256,
+  const attached = await all(c.db, `SELECT r.id, r.vendor, r.receipt_date, r.total_cents, r.tax_cents, r.currency, r.source, r.target_kind, r.target_id, r.linked_kind, r.linked_id, r.rule_id, r.decided_by, r.decided_at, r.document_id, r.file_document_id, d.name AS file_name, d.media_type, d.sha256,
       CASE r.linked_kind WHEN 'bill' THEN (SELECT c.name || ' — bill ' || b.reference FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id WHERE b.id = r.linked_id)
         WHEN 'payment' THEN (SELECT 'Payment to ' || c.name FROM pt_payments p JOIN pt_contacts c ON c.id = p.contact_id WHERE p.id = r.linked_id)
         WHEN 'journal' THEN (SELECT 'Entry ' || COALESCE(e.number, '') || ' · ' || e.memo FROM pt_journal_entries e WHERE e.id = r.linked_id) END AS linked_label

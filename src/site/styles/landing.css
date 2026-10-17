@@ -34,6 +34,9 @@
 @media (max-width: 1399px) { .hero-cards { --hero-k: .9; } }
 @media (max-width: 1299px) { .hero-cards { --hero-k: .82; } .hero-copy { max-width: 560px; } }
 @media (max-width: 1199px) { .hero-cards { --hero-k: .75; } .hero-copy { max-width: 500px; } .hero-sub { font-size: 20px; } }
+/* 1300-1499: the headline sets on two lines beside the cards; its size keeps "went." about 35px clear of the
+   Chase card (which starts at 50% + 32px), and the intro's box stops short of the cards too. */
+@media (min-width: 1300px) and (max-width: 1499px) { .hero h1 { font-size: min(5.35vw, 75px); } .hero-sub { max-width: 630px; } }
 
 /* ---------- Feature sections: one idea each, alternating sides ---------- */
 .feature { position: relative; padding: 80px 0; }
