@@ -26,6 +26,14 @@
   --rer-wordmark-weight: 700;
   --rer-wordmark-tracking: -.03em;
   --rer-logo: url('/brand/mark.svg');
+  /* Base's /contract page: done in the mark's green, partial in its apricot, missing in quiet lavender (not built yet, not an alarm). */
+  --rer-done: #19a974;
+  --rer-done-ink: #0e8659;
+  --rer-on-done: #101a33;
+  --rer-partial: #f2a272;
+  --rer-partial-ink: #a3461a;
+  --rer-missing: #6b6fa3;
+  --rer-missing-ink: #5b5f94;
 
   --paper: var(--rer-page);
   --surface: var(--rer-surface);
