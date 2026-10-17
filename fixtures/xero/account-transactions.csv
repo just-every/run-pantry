@@ -1,0 +1,23 @@
+Account Transactions
+Juniper Lane Design LLC
+For the period 1 August 2026 to 31 August 2026
+
+Date,Source,Description,Reference,Debit,Credit,Running Balance,Gross,Tax
+Checking Account (090)
+Opening Balance,,,,,,"28,950.12",,
+3 Aug 2026,Receivable Payment,Harbor & Pine Architects,INV-0112,"1,000.00",,"29,950.12","1,000.00",0.00
+4 Aug 2026,Payable Payment,Dana Ortiz,DO-07,,"3,450.00","26,500.12","-3,450.00",0.00
+5 Aug 2026,Payable Payment,Harbor & Pine Architects,HP-0007,,400.00,"26,100.12",-400.00,0.00
+7 Aug 2026,Spend Money,Brightline Coworking,July desk rent,,"1,600.00","24,500.12","-1,600.00",0.00
+14 Aug 2026,Receive Money,Bluebird Bakery,Catering menu design,"2,738.75",,"27,238.87","2,738.75",0.00
+21 Aug 2026,Receive Money,Bluebird Bakery,Pastry workshop,"4,200.00",,"31,438.87","4,200.00",0.00
+31 Aug 2026,Spend Money,First Harbor Bank,Monthly service fee,,32.00,"31,406.87",-32.00,0.00
+Total Checking Account (090),,,,"7,938.75","5,482.00",,,
+Closing Balance,,,,,,"31,406.87",,
+
+Savings Account (091)
+Opening Balance,,,,,,"11,980.00",,
+31 Aug 2026,Receive Money,First Harbor Bank,Interest,20.00,,"12,000.00",20.00,0.00
+Total Savings Account (091),,,,20.00,0.00,,,
+Closing Balance,,,,,,"12,000.00",,
+

@@ -7,6 +7,8 @@ import { account } from './accounts'
 import { documentInsert } from './contacts'
 import { parseCsvStatement, parseOfxStatement, type ParsedStatement } from './statement-files'
 import { applyRulesAs } from './rules'
+import { matchDeposits } from './automatch'
+import { matchConnected } from './connected-match'
 import type { Command } from './context'
 
 const saveBankAccount: Command = { need: 'record', async run(c, b) {
@@ -83,8 +85,12 @@ const importStatement: Command = { need: 'record', async run(c, b) {
     ...fresh.filter(l => l.feedLineId).map(l => q('UPDATE pt_bank_lines SET statement_id = ?, fingerprint = ? WHERE id = ? AND statement_id IS NULL', id, l.fingerprint, l.feedLineId)),
     audit(who(c.actor), 'statement.import', 'statement', id, { file: name, sha256: hash, added: added.length, duplicates: keyed.length - fresh.length, fromFeed })]
   await run(c.db, statements)
+  // Stripe payouts and Gusto payrolls already booked meet their bank lines; deposits that name exactly one
+  // open invoice of their amount match themselves; rules then file what is left.
+  await matchConnected(c.db)
+  const automatic = await matchDeposits(c.db, added.map(l => l.id))
   const filed = await applyRulesAs(c, added.map(l => l.id))
-  return { statement: await one(c.db, 'SELECT * FROM pt_statements WHERE id = ?', id), duplicate: false, added: added.length, duplicates: keyed.length - fresh.length, fromFeed, filedByRule: filed.filed, fileBalances: { opening, closing, lineTotal: total, agrees: closing - opening === total } }
+  return { statement: await one(c.db, 'SELECT * FROM pt_statements WHERE id = ?', id), duplicate: false, added: added.length, automatic, duplicates: keyed.length - fresh.length, fromFeed, filedByRule: filed.filed, fileBalances: { opening, closing, lineTotal: total, agrees: closing - opening === total } }
 } }
 
 /** Correct balances typed from a CSV statement before it is reconciled; the lines stay as imported. */

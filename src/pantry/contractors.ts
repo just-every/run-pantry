@@ -9,7 +9,7 @@
 // The reporting threshold is kept per tax year (One Big Beautiful Bill Act, 2025).
 import { authority, who } from './access'
 import { requireThat, text, uid, now, type Data } from './core'
-import { all, audit, changed, one, q, run, type Sql } from './db'
+import { all, audit, changed, one, q, run, type Sql, type AuditActor } from './db'
 import { contact } from './contacts'
 import { requireEntity } from './settings'
 import { STATES } from './states'
@@ -54,7 +54,7 @@ export async function contractors(db: D1Database, year: number) {
 const cell = (v: unknown) => { const s = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s }
 
 /** The filing CSV: one row per 1099-NEC, with the full TIN. Only after the year ends, only with every form complete. */
-export async function necCsv(db: D1Database, actor: { email: string; kind: 'person' | 'agent' }, year: number) {
+export async function necCsv(db: D1Database, actor: AuditActor, year: number) {
   const report = await contractors(db, year), entity = await requireEntity(db)
   requireThat(report.yearEnded, `The ${year} forms are ready after December 31, ${year}`, 409)
   const incomplete = report.forms.filter(f => !f.ready).map(f => f.name)

@@ -26,7 +26,7 @@ export async function overview(db: D1Database) {
   const locked = await n("SELECT COUNT(*) AS n FROM pt_periods WHERE status = 'locked'")
   const steps = [
     { key: 'business', title: 'Set up the business', done: !!e, detail: e ? `${e.legal_name}, ${e.state}; books start ${longDay(e.books_start)}` : 'Legal name, entity type, state, fiscal year and declared tax method', go: 'settings' },
-    { key: 'chart', title: 'Chart of accounts and opening balances', done: accounts > 0 && opening > 0 && !stagedCutover, detail: !accounts ? 'Start a chart or move in from QuickBooks Online' : stagedCutover ? 'Imported opening balances wait for accountant sign-off' : opening ? `${accounts} accounts; balances posted` : `${accounts} accounts; no opening balances posted yet`, go: stagedCutover ? 'move-in' : 'books' },
+    { key: 'chart', title: 'Chart of accounts and opening balances', done: accounts > 0 && opening > 0 && !stagedCutover, detail: !accounts ? 'Start a chart or move in from QuickBooks Online or Xero' : stagedCutover ? 'Imported opening balances wait for accountant sign-off' : opening ? `${accounts} accounts; balances posted` : `${accounts} accounts; no opening balances posted yet`, go: stagedCutover ? 'move-in' : 'books' },
     { key: 'contacts', title: 'Customers and vendors', done: contacts > 0, detail: contacts ? `${contacts} customers and vendors` : 'Add the businesses you invoice and pay', go: 'sales' },
     { key: 'bank', title: 'Bank statements', done: banks > 0 && statements > 0 && reconciled > 0, detail: !banks ? 'Add a bank account' : !statements ? 'Import a CSV or OFX statement' : reconciled ? `${reconciled} statement${reconciled === 1 ? '' : 's'} reconciled` : 'Reconcile your first statement', go: 'bank' },
     { key: 'close', title: 'First close', done: locked > 0, detail: locked ? `${locked} period${locked === 1 ? '' : 's'} locked` : 'Complete the checklist and lock a month', go: 'close' },
@@ -38,6 +38,7 @@ export async function overview(db: D1Database) {
     proposals: await n("SELECT COUNT(*) AS n FROM pt_proposals WHERE status = 'proposed'"),
     receipts: await n("SELECT COUNT(*) AS n FROM pt_receipts WHERE status = 'review'"),
     reopenRequests: await n("SELECT COUNT(*) AS n FROM pt_reopen_requests WHERE status = 'pending'"),
+    questions: await n("SELECT COUNT(*) AS n FROM pt_questions WHERE status IN ('open', 'confirm')"),
   }
   return { entity: e, steps, queue, closing: await closing(db, e?.books_start) }
 }
@@ -55,6 +56,8 @@ async function names(db: D1Database) {
   const rows = await all<{ email: string; name: string }>(db, "SELECT lower(email) AS email, display_name AS name FROM oa_operators UNION ALL SELECT lower(email) AS email, name FROM pt_members UNION ALL SELECT 'agent:' || name AS email, name FROM pt_agents")
   const out: Record<string, string> = {}
   for (const r of rows) if (r.name?.trim()) out[r.email] = r.name.trim()
+  // Pantry acting by itself, named for the job it did.
+  Object.assign(out, { 'pantry:reminders': 'Pantry (reminders)', 'pantry:recurring': 'Pantry (recurring invoices)', 'pantry:auto-match': 'Pantry (matched automatically)', 'pantry:stripe': 'Pantry (Stripe)', 'pantry:customer': 'The customer', 'agent:pantry': 'Pantry' })
   return out
 }
 

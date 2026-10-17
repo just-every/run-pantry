@@ -1,0 +1,8 @@
+{
+ "access_token": "demo-access-token-1",
+ "token_type": "bearer",
+ "expires_in": 7200,
+ "refresh_token": "demo-refresh-token-1",
+ "created_at": 1792224000,
+ "scope": "companies:read payrolls:read"
+}

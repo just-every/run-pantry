@@ -17,6 +17,7 @@ import { MAX_IMAGE_TO_READ, receive } from './intake'
 import type { ReceiptInput } from './reader'
 import { applyRules } from './review'
 import { managed } from './settings'
+import { receiveReply } from '../questions/mail'
 
 const PURPOSE = 'receipt-address-tag'
 export const MAX_EMAIL_BYTES = 12_000_000
@@ -131,13 +132,22 @@ function forwardingConfirmation(m: Parsed) {
 
 const fileName = (subject: string) => `${(subject || 'email').replace(/[^\w .-]+/g, '').trim().slice(0, 80) || 'email'}.eml`
 
-export type MailOutcome = { result: 'refused'; reason: string } | { result: 'confirmation' } | { result: 'received'; receiptId: string; read: string; rule: string | null }
+export type MailOutcome = { result: 'refused'; reason: string } | { result: 'confirmation' } | { result: 'reply'; question: string; outcome: string } | { result: 'received'; receiptId: string; read: string; rule: string | null }
+
+/** The Pantry address, where replies to Pantry's questions also come back; null until the owner creates it. */
+export async function pantryAddress(db: D1Database, env: Bindings) {
+  return (await liveAddress(db, env))?.address ?? null
+}
 
 /** One message delivered to the Pantry address (or a saved .eml sent to it on this computer). */
 export async function receiveMail(env: Bindings, recipients: string[], raw: Uint8Array, envelopeFrom?: string): Promise<MailOutcome> {
   const db = env.DB, live = await liveAddress(db, env)
   const ours = (r: string) => { const a = (/<([^<>]+)>/.exec(r)?.[1] ?? r).trim().toLowerCase(); return !!live && (sameText(a, live.address) || sameText(a, live.exactAddress)) }
   if (!live || !recipients.some(ours)) return { result: 'refused', reason: 'Unknown address' }
+  // A reply to one of Pantry's questions answers it; everything else is a receipt.
+  const reply = await receiveReply(env, raw)
+  if (reply.result === 'refused') return reply
+  if (reply.result !== 'not-mine') return { result: 'reply', question: reply.question, outcome: reply.result }
   let parsed: Parsed | null = null
   // The sender shown is the message's From; the envelope sender is often the provider's bounce address.
   try { parsed = parseMime(raw, LIMITS, undefined) } catch { parsed = null }

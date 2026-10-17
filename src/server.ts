@@ -10,6 +10,8 @@ import { identity } from './identity'
 import { api } from './pantry/api'
 import { runDue } from './pantry/feeds/sync'
 import { emailHandler } from './pantry/receipts/mail'
+import { runDueWork } from './pantry/due'
+import { runAgent } from './pantry/questions/run'
 
 // Start documents keep their own cache policy and add no-transform, so no proxy
 // rewrites the HTML React hydrates (Cloudflare's email address obfuscation
@@ -32,13 +34,19 @@ export default withDemo({
     if (state) return state
     const lobby = await lobbyResponse(request, runtimeBindings(env), identity)
     if (lobby) return lobby
+    // A sent invoice's customer page (/i/<token>) is served by the API's public routes.
+    if (new URL(request.url).pathname.startsWith('/i/')) return api.fetch(request, env, execution)
     return dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request)))
   },
-  // Scheduled bank and card feed pulls: each connection is due every few hours, sooner after a webhook.
-  async scheduled(_controller, env) {
+  // Cron: bank and card feed pulls (each connection is due every few hours, sooner after a webhook),
+  // then invoices' due work: reminders, recurring invoices and Stripe follow-up, and about hourly
+  // the books agent's look for what doesn't add up.
+  async scheduled(_controller, env, execution) {
     await runDue(runtimeBindings(env), 10)
+    execution.waitUntil(runDueWork(env, { scheduled: true }))
+    execution.waitUntil(runAgent(runtimeBindings(env), { scheduled: true }))
   },
-  // Cloudflare Email Routing delivers mail for the Pantry address here.
+  // Cloudflare Email Routing delivers mail for the Pantry address here: forwarded receipts, and replies to Pantry's questions.
   async email(message, env) {
     await emailHandler(message, runtimeBindings(env))
   },

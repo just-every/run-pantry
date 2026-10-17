@@ -7,6 +7,7 @@ import { all, approval, audit, changed, guard, one, q, run, type Sql } from './d
 import { ageing, trialBalance } from './reports'
 import { requireEntity } from './settings'
 import { missingReceipts } from './receipts/attachments'
+import { openSummary, periodThread } from './questions/close'
 import type { Command } from './context'
 
 const DEFAULT_TASKS = ['Review the trial balance', 'Review receivables and payables aging', 'Review adjusting entries']
@@ -49,6 +50,11 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
   const proposals = await all(db, "SELECT id, summary FROM pt_proposals WHERE status = 'proposed'")
   checks.push({ key: 'proposals', title: 'No agent proposals waiting', ok: proposals.length === 0, items: proposals.map(x => ({ kind: 'proposal', id: x.id, label: x.summary })), detail: proposals.length ? `${proposals.length} waiting for a person` : 'None waiting' })
 
+  // The books agent's questions about this month: every one answered (or settled) before the lock.
+  const questions = await periodThread(db, id), waiting = questions.filter(x => x.status === 'open' || x.status === 'confirm')
+  checks.push({ key: 'questions', title: 'Pantry’s questions answered', ok: waiting.length === 0, items: waiting.map(x => ({ kind: 'question', id: x.id, label: x.title })),
+    detail: waiting.length ? openSummary(waiting) : questions.length ? `All ${questions.length} answered or settled` : 'Pantry has asked nothing about this month' })
+
   const tasks = await all(db, 'SELECT * FROM pt_close_tasks WHERE period = ? ORDER BY title, id', id)
   const requests = await all(db, 'SELECT * FROM pt_reopen_requests WHERE period = ? ORDER BY requested_at DESC, id', id)
   const approvals = await all(db, "SELECT * FROM pt_approvals WHERE subject_kind = 'period' AND subject_id = ? ORDER BY at DESC, id", id)
@@ -56,7 +62,7 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
   const ready = checks.every(x => x.ok) && tasks.length > 0 && tasks.every(t => t.status === 'done')
   // Every entry keeps its receipt: spending without one is listed here, to add one or say why none is needed.
   const receipts = { missing: await missingReceipts(db, start, end), waived: await all(db, 'SELECT w.*, e.memo, e.entry_date FROM pt_receipt_waivers w JOIN pt_journal_entries e ON e.id = w.entry_id WHERE e.entry_date BETWEEN ? AND ? ORDER BY e.entry_date', start, end) }
-  return { id, start, end, status: p?.status ?? 'open', period: p, checks, tasks, requests, approvals, notes, ready, receipts }
+  return { id, start, end, status: p?.status ?? 'open', period: p, checks, tasks, requests, approvals, notes, ready, receipts, questions }
 }
 
 const ensureTasks: Command = { need: 'record', async run(c, b) {
@@ -92,6 +98,7 @@ export async function lockPlan(db: D1Database, actor: Actor, id: string, note: s
     // The checked state must still hold: no task reopened, no draft or posting added in the period meanwhile.
     guard("(SELECT COUNT(*) FROM pt_close_tasks WHERE period = ? AND status <> 'done') = 0", id),
     guard("NOT EXISTS (SELECT 1 FROM pt_journal_entries WHERE status = 'draft' AND entry_date BETWEEN ? AND ?)", state.start, state.end),
+    guard("NOT EXISTS (SELECT 1 FROM pt_questions WHERE period = ? AND status IN ('open', 'confirm'))", id),
     state.period
       ? q("UPDATE pt_periods SET status = 'locked', locked_by = ?, locked_at = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'open'", actor.email, now(), revision, id, state.period.revision)
       : q("INSERT INTO pt_periods (id, start_date, end_date, status, locked_by, locked_at, revision) VALUES (?, ?, ?, 'locked', ?, ?, ?)", id, state.start, state.end, actor.email, now(), revision),

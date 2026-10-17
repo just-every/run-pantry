@@ -6,7 +6,7 @@ import type { Bindings } from '../auth.server'
 import { deploymentHealth } from '../base/deployment-health'
 import { agent, must, person, who, type Actor } from './access'
 import { date, Fault, requireThat, type Data } from './core'
-import { one } from './db'
+import { all, one } from './db'
 import type { Command, Context } from './context'
 import { settingsCommands, settingsView } from './settings'
 import { accountCommands } from './accounts'
@@ -20,6 +20,7 @@ import { reconcileCommands, reconciliationState } from './reconcile'
 import { closeCommands, closeState } from './close'
 import { proposalCommands, proposalsView, agentContext, fileProposal, proposal } from './proposals'
 import { moveInCommands, moveInView } from './cutover/commands'
+import { xeroRoutes } from './cutover/xero-attachments'
 import { ageing, balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports'
 import { basisOf, BASIS_LABEL } from './basis'
 import { figureDetail } from './drilldown'
@@ -36,18 +37,33 @@ import { receive, verify } from './feeds/webhook'
 import { availability } from './feeds/plaid'
 import { documentFile } from './documents'
 import { receiptCommands, receiptRoutes } from './receipts/routes'
+import { deliveryCommands, deliveriesView, reminderPlans, sendingView } from './delivery'
+import { recurringCommands, recurringView } from './recurring'
+import { stripeCommands, stripeView } from './stripe'
+import { payoutCommands, payoutsView } from './payouts'
+import { gustoCommands, gustoRoutes, gustoView } from './gusto/commands'
+import { depositNotes } from './automatch'
+import { customer } from './customer-page'
+import { runDueWork } from './due'
+import { questionCommands, questionsView } from './questions/commands'
 
 const commands: Record<string, Command> = {
   ...settingsCommands, ...accountCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands,
   ...bankCommands, ...matchCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
-  ...receiptCommands,
+  ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands,
 }
 
 type C = HonoContext<{ Bindings: Bindings }>
 export const api = new Hono<{ Bindings: Bindings }>()
 
+// Ordinary requests also run due work (reminders, recurring invoices, Stripe follow-up) after they answer.
+api.use('*', async (c, next) => {
+  await next()
+  c.executionCtx.waitUntil(runDueWork(c.env).catch(error => console.error('Pantry due work failed:', error)))
+})
 api.get('/health', c => c.json({ status: 'ok', ...deploymentHealth(c.env) }))
+api.route('/', customer)
 api.use('/api/pantry/*', async (c, next) => { await next(); c.header('cache-control', 'no-store'); c.header('x-content-type-options', 'nosniff') })
 // Feed syncs that have come due run after an ordinary read answers, as well as on the Cron trigger.
 api.use('/api/pantry/*', async (c, next) => { await next(); if (c.req.method === 'GET' && await anyDue(c.env)) c.executionCtx.waitUntil(runDue(c.env, 2).catch(e => console.error(e))) })
@@ -64,14 +80,17 @@ const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10
 
 view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await lookups(ctx.db)), overview: await overview(ctx.db), settings: await settingsView(ctx) }))
 view('journal', async ctx => ({ entries: await journalView(ctx.db) }))
-view('sales', async ctx => ({ invoices: await invoicesView(ctx.db), bills: await billsView(ctx.db), payments: await paymentsView(ctx.db) }))
+view('sales', async ctx => ({ invoices: await invoicesView(ctx.db), bills: await billsView(ctx.db), payments: await paymentsView(ctx.db), deliveries: await deliveriesView(ctx.db), reminders: await reminderPlans(ctx.db), recurring: await recurringView(ctx.db), onlinePayments: await all(ctx.db, 'SELECT id, invoice_id, method, amount_cents, status, fee_cents, created_at, updated_at FROM pt_stripe_payments ORDER BY created_at DESC LIMIT 500') }))
+view('invoicing', async ctx => ({ sending: await sendingView(ctx.env, ctx.db), stripe: await stripeView(ctx.env, ctx.db) }))
+view('connected', async ctx => ({ payouts: await payoutsView(ctx.env, ctx.db), gusto: await gustoView(ctx) }))
 view('bank', async ctx => bankView(ctx.db))
 view('bank/lines', async ctx => bankLinesView(ctx.db))
 view('bank/rules', async ctx => rulesView(ctx.db))
 view('bank/feeds', async ctx => feedsView(ctx))
-view('reconciliation/:statement', async (ctx, c) => reconciliationState(ctx.db, c.req.param('statement')!))
+view('reconciliation/:statement', async (ctx, c) => { const r = await reconciliationState(ctx.db, c.req.param('statement')!); return { ...r, depositNotes: await depositNotes(ctx.db, r.lines) } })
 view('close/:period', async (ctx, c) => closeState(ctx.db, c.req.param('period')!))
 view('proposals', async ctx => ({ proposals: await proposalsView(ctx.db) }))
+view('questions', async (ctx, c) => questionsView(ctx, c.req.query('q') || undefined))
 view('move-in', async ctx => moveInView(ctx))
 view('activity', async ctx => activity(ctx.db))
 view('documents', async ctx => ({ documents: await documents(ctx.db) }))
@@ -114,6 +133,8 @@ api.get('/api/pantry/documents/:id', async c => {
 })
 
 receiptRoutes(api)
+xeroRoutes(api)
+gustoRoutes(api)
 
 // Exports name their basis: in the file name (cash only, so accrual names stay as they were) and inside the file.
 const suffix = (basis: string) => basis === 'cash' ? '-cash' : ''

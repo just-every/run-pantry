@@ -1,0 +1,98 @@
+{
+  "Id": "7e357a45-69f5-4e8f-8d7b-15da8ef50aab",
+  "Status": "OK",
+  "ProviderName": "Pantry",
+  "DateTimeUTC": "/Date(1760688010000)/",
+  "Invoices": [
+    {
+      "Type": "ACCREC",
+      "InvoiceID": "4074292c-09b3-456d-84e7-add864c6c39b",
+      "InvoiceNumber": "INV-0112",
+      "Reference": "",
+      "Contact": {
+        "ContactID": "00000000-0000-0000-0000-add864c6c39b",
+        "Name": "Harbor & Pine Architects"
+      },
+      "DateString": "2026-08-01T00:00:00",
+      "Status": "AUTHORISED",
+      "LineAmountTypes": "Exclusive",
+      "Total": 4250.0,
+      "AmountDue": 3250.0,
+      "CurrencyCode": "USD",
+      "HasAttachments": true,
+      "UpdatedDateUTC": "/Date(1760688000000+0000)/"
+    },
+    {
+      "Type": "ACCREC",
+      "InvoiceID": "9b3c1f0e-2d4a-4e6b-8c7d-1a2b3c4d5e6f",
+      "InvoiceNumber": "INV-0118",
+      "Reference": "",
+      "Contact": {
+        "ContactID": "00000000-0000-0000-0000-1a2b3c4d5e6f",
+        "Name": "Meridian Health Group"
+      },
+      "DateString": "2026-08-01T00:00:00",
+      "Status": "AUTHORISED",
+      "LineAmountTypes": "Exclusive",
+      "Total": 5933.45,
+      "AmountDue": 5933.45,
+      "CurrencyCode": "USD",
+      "HasAttachments": false,
+      "UpdatedDateUTC": "/Date(1760688000000+0000)/"
+    },
+    {
+      "Type": "ACCPAY",
+      "InvoiceID": "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6a",
+      "InvoiceNumber": "BR-0826",
+      "Reference": "",
+      "Contact": {
+        "ContactID": "00000000-0000-0000-0000-1a2b3c4d5e6a",
+        "Name": "Brightline Coworking"
+      },
+      "DateString": "2026-08-01T00:00:00",
+      "Status": "AUTHORISED",
+      "LineAmountTypes": "Exclusive",
+      "Total": 1600.0,
+      "AmountDue": 1600.0,
+      "CurrencyCode": "USD",
+      "HasAttachments": true,
+      "UpdatedDateUTC": "/Date(1760688000000+0000)/"
+    },
+    {
+      "Type": "ACCPAY",
+      "InvoiceID": "d3e4f5a6-b7c8-4d9e-8f0a-2b3c4d5e6f7a",
+      "InvoiceNumber": "CL-2291",
+      "Reference": "",
+      "Contact": {
+        "ContactID": "00000000-0000-0000-0000-2b3c4d5e6f7a",
+        "Name": "Copperleaf Software"
+      },
+      "DateString": "2026-08-01T00:00:00",
+      "Status": "AUTHORISED",
+      "LineAmountTypes": "Exclusive",
+      "Total": 717.08,
+      "AmountDue": 717.08,
+      "CurrencyCode": "USD",
+      "HasAttachments": true,
+      "UpdatedDateUTC": "/Date(1760688000000+0000)/"
+    },
+    {
+      "Type": "ACCPAY",
+      "InvoiceID": "e4f5a6b7-c8d9-4e0f-9a1b-3c4d5e6f7a8b",
+      "InvoiceNumber": "CL-2291",
+      "Reference": "",
+      "Contact": {
+        "ContactID": "00000000-0000-0000-0000-3c4d5e6f7a8b",
+        "Name": "Summit Office Supply"
+      },
+      "DateString": "2026-08-01T00:00:00",
+      "Status": "PAID",
+      "LineAmountTypes": "Exclusive",
+      "Total": 212.5,
+      "AmountDue": 0.0,
+      "CurrencyCode": "USD",
+      "HasAttachments": true,
+      "UpdatedDateUTC": "/Date(1760688000000+0000)/"
+    }
+  ]
+}

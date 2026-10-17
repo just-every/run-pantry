@@ -1,0 +1,21 @@
+*Code,*Name,*Type,*Tax Code,Description,Dashboard,Expense Claims,Enable Payments,Balance
+090,Checking Account,Bank,Tax Exempt,Main business checking,Yes,No,No,31406.87
+091,Savings Account,Bank,Tax Exempt,Reserve savings,Yes,No,No,12000.00
+120,Accounts Receivable,Accounts Receivable,Tax Exempt,Outstanding invoices the company has issued out to the client but has not yet received in cash at balance date.,No,No,No,9183.45
+150,Office Equipment,Fixed Asset,Tax on Purchases,Office equipment that is owned and controlled by the business,No,No,No,6850.00
+151,Less Accumulated Depreciation on Office Equipment,Fixed Asset,Tax Exempt,The total amount of office equipment cost that has been consumed by the entity (based on the useful life),No,No,No,-1141.67
+200,Accounts Payable,Accounts Payable,Tax Exempt,Outstanding invoices the company has received from suppliers but has not yet paid at balance date,No,No,No,-2317.08
+220,Sales Tax,Sales Tax,Tax Exempt,The balance of sales tax collected and not yet remitted,No,No,No,-412.36
+230,Historical Adjustment,Historical Adjustment,Tax Exempt,For accountant adjustments,No,No,No,
+260,Rounding,Rounding,Tax Exempt,An adjustment entry to allow for rounding,No,No,No,
+300,Owner's Capital,Equity,Tax Exempt,Value of shares purchased by the owner,No,No,No,-25000.00
+320,Retained Earnings,Retained Earnings,Tax Exempt,Do not Use,No,No,No,-9148.86
+400,Sales,Revenue,Tax on Sales,Income from any normal business activity,No,No,No,-58317.50
+460,Interest Income,Other Income,Tax Exempt,Interest income,No,No,No,-23.11
+500,Contract Labor,Direct Costs,Tax on Purchases,Designers engaged per project,No,No,No,17450.15
+600,Advertising,Expense,Tax on Purchases,Expenses incurred for advertising while trying to increase sales,No,No,No,2145.00
+604,Bank Service Charges,Expense,Tax Exempt,Fees charged by your bank for transactions regarding your bank account(s).,No,No,No,96.00
+620,Rent,Overhead,Tax on Purchases,The payment to lease a building or area.,No,No,No,12800.00
+630,Subscriptions,Expense,Tax on Purchases,E.g. Software subscriptions,No,No,No,3287.44
+700,Depreciation,Depreciation,Tax Exempt,The amount of the asset's cost (based on the useful life) that was consumed during the period,No,No,No,1141.67
+710,Office Supplies,Expense,Tax on Purchases,General office supplies,No,No,No,

@@ -12,9 +12,7 @@
   ],
   "originVar": "AUTH_ORIGIN",
   "vars": {
-    "AUTH_LOCAL": "false",
-    "MAIL_PROVIDER": "resend",
-    "MAIL_FROM": "auth@example.invalid"
+    "AUTH_LOCAL": "false"
   },
   "secrets": [
     {
@@ -52,6 +50,39 @@
       "binding": "PLAID_REDIRECT_URI",
       "environment": "PLAID_REDIRECT_URI",
       "optional": true
+    },
+    {
+      "binding": "XERO_CLIENT_ID",
+      "environment": "XERO_CLIENT_ID",
+      "optional": true
+    },
+    {
+      "binding": "XERO_CLIENT_SECRET",
+      "environment": "XERO_CLIENT_SECRET",
+      "optional": true
+    },
+    {
+      "binding": "GUSTO_CLIENT_ID",
+      "environment": "GUSTO_CLIENT_ID",
+      "optional": true
+    },
+    {
+      "binding": "GUSTO_CLIENT_SECRET",
+      "environment": "GUSTO_CLIENT_SECRET",
+      "optional": true
+    },
+    {
+      "binding": "GUSTO_ENV",
+      "environment": "GUSTO_ENV",
+      "optional": true
+    },
+    {
+      "binding": "MAIL_PROVIDER",
+      "environment": "MAIL_PROVIDER"
+    },
+    {
+      "binding": "MAIL_FROM",
+      "environment": "MAIL_FROM"
     }
   ],
   "crons": [

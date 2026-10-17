@@ -35,8 +35,9 @@ Writes: `POST /api/pantry/command/:action` with a JSON object.
 | `period.lock` | lock | `period` |
 | `period.request-reopen` / `period.decide-reopen` | record / reopen | `period, reason` / `id, decision ('approve'|'reject'), note` |
 | `proposal.decide` | record (journal proposals: post) | `id, revision, decision ('approve'|'reject'), note` |
-| `move-in.preview`, `move-in.commit` | record | `files{accounts, customers, vendors, trialBalance, openInvoices, unpaidBills, generalLedger: {name, content}}, banks[{account, institution, last4, statementBalance}]`, commit adds `fingerprint` |
-| `move-in.accept` / `move-in.undo` | post | `id, revision` / `jobId` |
+| `move-in.preview`, `move-in.commit` | record | `source ('quickbooks-online' (default) or 'xero')`, `files{…: {name, content}}` (QuickBooks Online: `accounts, customers, vendors, trialBalance, openInvoices, unpaidBills, generalLedger`; Xero: `accounts, contacts, trialBalance, invoices, bills, bankTransactions`), `banks[{account, institution, last4, statementBalance}]`, commit adds `fingerprint` |
+| `move-in.accept` / `move-in.undo` | post | `id, revision` / `jobId` (undo also removes attachments carried from Xero) |
+| `move-in.xero.connect` / `move-in.xero.carry` / `move-in.xero.disconnect` | record | none: connect answers `{url}` to send the person to Xero (back at `/api/pantry/xero/callback`); carry runs one batch and answers the progress (`done`, `wait` seconds when Xero asks) |
 
 ## Agents: `/api/pantry/agent/*`
 
