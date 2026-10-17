@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "projectId": "just-every/run-pantry",
+  "name": "Pantry",
+  "sourceRepository": "https://github.com/just-every/run-pantry",
+  "license": "MIT"
+}
