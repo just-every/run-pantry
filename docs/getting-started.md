@@ -2,19 +2,13 @@ Pantry runs on your own computer: macOS, Linux or Windows with WSL2, with git. P
 
 ## Get Pantry and start it
 
-First install `rer`, the Run Edit Run command that installs, starts, backs up and restores Pantry. You do this once per computer, and it brings its own Node when you have none:
+One line gets Pantry and starts it. It uses `rer`, the Run Edit Run command that installs, starts, backs up and restores Pantry:
 
 ```sh
-curl -fsSL https://runeditrun.com/install.sh | sh
+npx -y @runeditrun/rer dev just-every/run-pantry
 ```
 
-It changes no shell settings. If it prints an `export PATH=…` line, run that line. Then get Pantry and start it:
-
-```sh
-rer dev just-every/run-pantry
-```
-
-`rer` clones Pantry into a `run-pantry` folder and starts it. To start it again later, run `cd run-pantry && rer dev`. If you already have Node 22 or later, `npx -y @runeditrun/rer dev just-every/run-pantry` does both steps in one line.
+`rer` clones Pantry into a `run-pantry` folder and starts it. Without Node, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-pantry` does the same and brings its own Node. To start it again later, run `cd run-pantry && rer dev`.
 
 The first start installs everything Pantry needs, which can take a few minutes. When it is ready, `rer dev` prints two lines:
 
