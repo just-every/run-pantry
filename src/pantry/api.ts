@@ -40,6 +40,8 @@ import { receiptCommands, receiptRoutes } from './receipts/routes'
 import { deliveryCommands, deliveriesView, reminderPlans, sendingView } from './delivery'
 import { recurringCommands, recurringView } from './recurring'
 import { stripeCommands, stripeView } from './stripe'
+import { payoutCommands, payoutsView } from './payouts'
+import { gustoCommands, gustoRoutes, gustoView } from './gusto/commands'
 import { depositNotes } from './automatch'
 import { customer } from './customer-page'
 import { runDueWork } from './due'
@@ -49,7 +51,7 @@ const commands: Record<string, Command> = {
   ...settingsCommands, ...accountCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands,
   ...bankCommands, ...matchCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
-  ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands,
+  ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands,
 }
 
 type C = HonoContext<{ Bindings: Bindings }>
@@ -80,6 +82,7 @@ view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await look
 view('journal', async ctx => ({ entries: await journalView(ctx.db) }))
 view('sales', async ctx => ({ invoices: await invoicesView(ctx.db), bills: await billsView(ctx.db), payments: await paymentsView(ctx.db), deliveries: await deliveriesView(ctx.db), reminders: await reminderPlans(ctx.db), recurring: await recurringView(ctx.db), onlinePayments: await all(ctx.db, 'SELECT id, invoice_id, method, amount_cents, status, fee_cents, created_at, updated_at FROM pt_stripe_payments ORDER BY created_at DESC LIMIT 500') }))
 view('invoicing', async ctx => ({ sending: await sendingView(ctx.env, ctx.db), stripe: await stripeView(ctx.env, ctx.db) }))
+view('connected', async ctx => ({ payouts: await payoutsView(ctx.env, ctx.db), gusto: await gustoView(ctx) }))
 view('bank', async ctx => bankView(ctx.db))
 view('bank/lines', async ctx => bankLinesView(ctx.db))
 view('bank/rules', async ctx => rulesView(ctx.db))
@@ -131,6 +134,7 @@ api.get('/api/pantry/documents/:id', async c => {
 
 receiptRoutes(api)
 xeroRoutes(api)
+gustoRoutes(api)
 
 // Exports name their basis: in the file name (cash only, so accrual names stay as they were) and inside the file.
 const suffix = (basis: string) => basis === 'cash' ? '-cash' : ''

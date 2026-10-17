@@ -1,0 +1,14 @@
+{
+ "ein": "00-0000000",
+ "entity_type": "LLC",
+ "tier": "plus",
+ "is_suspended": false,
+ "company_status": "Approved",
+ "uuid": "c3a1b7e2-5d4f-4e8a-9b2c-6f1d0e7a8b90",
+ "name": "Juniper Lane Design LLC",
+ "slug": "juniper-lane-design-llc",
+ "trade_name": "Juniper Lane Design",
+ "is_partner_managed": false,
+ "pay_schedule_type": "single",
+ "join_date": "2026-01-02"
+}

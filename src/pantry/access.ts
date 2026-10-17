@@ -74,4 +74,4 @@ export function authority(actor: Actor, need: Need): Sql {
 export const who = (actor: Actor | AuditActor): AuditActor => ({ email: actor.email, kind: actor.kind })
 
 /** Pantry itself, acting in due work or on a provider's confirmation; `role` names the job. */
-export const pantry = (role: 'reminders' | 'recurring' | 'auto-match' | 'stripe' | 'customer'): AuditActor => ({ email: `pantry:${role}`, kind: 'system' })
+export const pantry = (role: 'reminders' | 'recurring' | 'auto-match' | 'stripe' | 'gusto' | 'customer'): AuditActor => ({ email: `pantry:${role}`, kind: 'system' })
