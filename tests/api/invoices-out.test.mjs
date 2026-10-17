@@ -159,7 +159,7 @@ test('PAY-004 a deposit naming one open invoice of its amount matches itself, wi
   assert.equal(again.duplicate, true)
 })
 
-test('PAY-001 customers pay by card or ACH from the invoice link through the business\'s own Stripe; the payment is recorded and allocated and the fee booked; RER Managed says plainly it is not available', async t => {
+test('PAY-001 customers pay by card or ACH from the invoice link through the business\'s own Stripe; the payment is recorded and allocated and the fee booked; without online payment the customer is told how to pay, and RER Managed refuses to connect', async t => {
   const KEY = 'sk_test_' + 'A1b2C3d4E5f6G7h8I9j0K1l2'
   const sessions = new Map()
   const outbound = async request => {
@@ -185,7 +185,9 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
   const card = await issue('Cedar Studio', '2026-10-01', '2026-10-31', '2400.00'), ach = await issue('Willow Services', '2026-10-01', '2026-10-31', '900.00')
   await h.command('invoice.send', { id: card.id }); const cardPage = linkIn(h.mail.at(-1))
   await h.command('invoice.send', { id: ach.id }); const achPage = linkIn(h.mail.at(-1))
-  assert.doesNotMatch((await h.send(cardPage)).value, /Pay by card/, 'no online payment before Stripe is connected')
+  const before = (await h.send(cardPage)).value
+  assert.doesNotMatch(before, /Pay by card/, 'no online payment before Stripe is connected')
+  assert.match(before, /How to pay/); assert.doesNotMatch(before, /Stripe/, 'the customer is not told how the business is set up')
 
   await h.command('stripe.connect', { secretKey: 'pk_test_not-a-secret' }, h.owner, 400)
   const settings = (await h.command('stripe.connect', { secretKey: KEY })).connected
@@ -228,12 +230,12 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
   await h.send(cardPage + '?checkout=cs_test_1'); await h.cron()
   assert.equal((await h.view('sales')).payments.filter(p => p.bank_name === 'Stripe balance').length, 2)
 
-  // RER Managed has no route out to Stripe yet: the page says so and connecting is refused.
+  // RER Managed has no route out to Stripe yet: the customer is told how to pay, and connecting is refused.
   const m = await harness({ bindings: { RER_INSTALLATION_ID: 'inst_test', RER_MANAGEMENT_ORIGIN: 'https://manage.runeditrun.example' } }); t.after(() => m.close())
   const ms = await setup(m), minv = await ms.issue('Cedar Studio', '2026-10-01', '2026-10-31', '400.00')
   await m.command('invoice.send', { id: minv.id })
   const managedPage = await m.send(linkIn(m.mail.at(-1)))
-  assert.match(managedPage.value, /not available yet on RER Managed/); assert.doesNotMatch(managedPage.value, /Pay by card/)
+  assert.match(managedPage.value, /How to pay/); assert.doesNotMatch(managedPage.value, /Pay by card|RER Managed|Stripe/)
   assert.equal((await m.view('invoicing')).stripe.managed, true)
   await m.command('stripe.connect', { secretKey: KEY }, m.owner, 409)
 })

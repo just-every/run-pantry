@@ -62,26 +62,36 @@ const saveMember: Command = { need: 'owner', async run(c, b) {
       audit(who(c.actor), 'member.save', 'member', email, { previousEmail: previous, role, canPost: !!row.post, canLock: !!row.lock, canReopen: !!row.reopen, active: !!row.active })])
     return (await one(c.db, 'SELECT * FROM pt_members WHERE email = ?', email))!
   }
+  const added = !(await one(c.db, 'SELECT 1 FROM pt_members WHERE email = ?', email))
   await run(c.db, [authority(c.actor, 'owner'),
     q('INSERT INTO pt_members (email, name, role, can_post, can_lock, can_reopen, active, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(email) DO UPDATE SET name = excluded.name, role = excluded.role, can_post = excluded.can_post, can_lock = excluded.can_lock, can_reopen = excluded.can_reopen, active = excluded.active, revision = excluded.revision',
       email, row.name, role, row.post, row.lock, row.reopen, row.active, uid()),
     audit(who(c.actor), 'member.save', 'member', email, { role, canPost: !!row.post, canLock: !!row.lock, canReopen: !!row.reopen, active: !!row.active })])
-  return (await one(c.db, 'SELECT * FROM pt_members WHERE email = ?', email))!
+  const member = (await one(c.db, 'SELECT * FROM pt_members WHERE email = ?', email))!
+  // Someone new gets their sign-in invitation in the same step, so they can sign in (and, on this computer,
+  // Sign in as or rer dev --as works for them) without a second action. Someone who already signs in needs none.
+  if (!added || !row.active) return member
+  return { ...member, ...await invite(c, email, row.name, false) }
 } }
+
+/** Records a sign-in invitation; hosted with a mail provider it is emailed. On this computer (or the demo) none is sent. */
+async function invite(c: Context, email: string, name: string, conflictIsError: boolean) {
+  try { await operatorAuth(runtimeBindings(c.env)).invite(c.request, { email, displayName: name, role: 'member', returnTo: '/app' }) }
+  catch (error) {
+    if ((error as { code?: string }).code !== 'invitation_conflict') throw error
+    if (conflictIsError) throw new Fault(409, `${name} already signs in to this Pantry with ${email}; no new invitation is needed`)
+    return {}
+  }
+  await run(c.db, [authority(c.actor, 'owner'), audit(who(c.actor), 'member.invite', 'member', email)])
+  const e = runtimeBindings(c.env)
+  return { invited: email, name, emailed: !(e.MAIL_PROVIDER === 'development' || e.RER_DEMO === '1') }
+}
 
 const inviteMember: Command = { need: 'owner', async run(c, b) {
   const email = text(b.email, 'Email').toLowerCase()
   const member = await one(c.db, 'SELECT * FROM pt_members WHERE email = ? AND active = 1', email)
   requireThat(member, 'Add the person with a role before inviting them')
-  try { await operatorAuth(runtimeBindings(c.env)).invite(c.request, { email, displayName: member.name, role: 'member', returnTo: '/app' }) }
-  catch (error) {
-    if ((error as { code?: string }).code === 'invitation_conflict') throw new Fault(409, `${member.name} already signs in to this Pantry with ${email}; no new invitation is needed`)
-    throw error
-  }
-  await run(c.db, [authority(c.actor, 'owner'), audit(who(c.actor), 'member.invite', 'member', email)])
-  // A run on this computer (or the demo) records the invitation but sends no email.
-  const e = runtimeBindings(c.env)
-  return { invited: email, name: member.name, emailed: !(e.MAIL_PROVIDER === 'development' || e.RER_DEMO === '1') }
+  return await invite(c, email, member.name, true)
 } }
 
 // The owner's own name and sign-in email. The email changes through sign-in, which asks for a fresh

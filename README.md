@@ -25,7 +25,7 @@ Stop Pantry with `rer dev --stop`. To start it again, run `cd run-pantry && rer 
 
 ## Working with others
 
-Add your bookkeeper and accountant in **People & settings**, with their role and grants ([People and roles](https://run-pantry.com/docs/people)). Pantry on your own computer sends no email: to work as another person here, add them, choose **Send sign-in invitation** (it records the invitation), then **More → Sign out or switch person → Switch person** and **Sign in as** them, or run `rer dev --as their.email@example.com` ([Work as someone else on your own computer](https://run-pantry.com/docs/people#work-as-someone-else-on-your-own-computer)). To let them sign in from anywhere and to email invoices, [put Pantry online](https://run-pantry.com/docs/hosting) on your own Cloudflare account with `rer deploy`.
+Add your bookkeeper and accountant in **People & settings**, with their role and grants ([People and roles](https://run-pantry.com/docs/people)). Pantry on your own computer sends no email: to work as another person here, add them (adding records their invitation), then **More → Sign out or switch person → Switch person** and **Sign in as** them, or run `rer dev --as their.email@example.com` ([Work as someone else on your own computer](https://run-pantry.com/docs/people#work-as-someone-else-on-your-own-computer)). To let them sign in from anywhere and to email invoices, [put Pantry online](https://run-pantry.com/docs/hosting) on your own Cloudflare account with `rer deploy`.
 
 ## Bank feeds, payroll, Xero and email
 

@@ -63,7 +63,7 @@ export async function figureDetail(db: D1Database, q: { report: string; line: st
     const record = recordOf(l, labels)
     return { key: l.line_id, date: l.entry_date, account: account(l.account_id), amount: s.sign * (l.debit_cents - l.credit_cents), debit: l.debit_cents, credit: l.credit_cents,
       description: l.entry_memo, lineMemo: l.memo, entry: { id: l.entry_id, number: l.number }, record, settlement: null,
-      documents: docs.forRecords([record, { kind: 'entry', id: l.entry_id }], l.document_id), bank: bank.forLine(l.line_id, record) }
+      documents: docs.forRecords([record, { kind: 'entry', id: l.entry_id }], l.document_id), bank: bank.forLine(l.line_id, l.entry_id, record) }
   })
   if (q.basis === 'cash') for (const [i, c] of (await cashLines(db, s.from, s.to)).entries()) {
     if (!inScope(c.accountId)) continue

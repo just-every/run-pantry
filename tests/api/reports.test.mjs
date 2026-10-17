@@ -73,10 +73,12 @@ test('REPORT-005 every P&L and balance sheet figure opens to its records, docume
   const h = await harness(); t.after(() => h.close())
   const s = await october(h)
   await h.command('document.upload', { name: 'brightline-bl-1042.pdf', mediaType: 'application/pdf', base64: Buffer.from('%PDF-1.4 Brightline BL-1042 $640.00\n').toString('base64'), linkedKind: 'bill', linkedId: s.bills.x.id })
-  const statement = 'Details,Posting Date,Description,Amount,Type,Balance,Check or Slip #\nDEBIT,10/16/2026,"CHECK 1001 BRIGHTLINE",-640.00,CHECK_PAID,9360.00,1001\nCREDIT,10/21/2026,"DEPOSIT CEDAR STUDIO ACH",500.00,ACH_CREDIT,9860.00,\n'
-  const imported = await h.command('statement.import', { bankAccountId: s.bank.id, fileName: 'checking-2026-10.csv', content: statement, opening: '10000.00', closing: '9860.00', start: '2026-10-01', end: '2026-10-30', confirmLast4: '4821' })
+  const statement = 'Details,Posting Date,Description,Amount,Type,Balance,Check or Slip #\nDEBIT,10/16/2026,"CHECK 1001 BRIGHTLINE",-640.00,CHECK_PAID,9360.00,1001\nCREDIT,10/21/2026,"DEPOSIT CEDAR STUDIO ACH",500.00,ACH_CREDIT,9860.00,\nDEBIT,10/29/2026,"WIRE FEE",-15.00,FEE_TRANSACTION,9845.00,\n'
+  const imported = await h.command('statement.import', { bankAccountId: s.bank.id, fileName: 'checking-2026-10.csv', content: statement, opening: '10000.00', closing: '9845.00', start: '2026-10-01', end: '2026-10-30', confirmLast4: '4821' })
   const r = await h.view(`reconciliation/${imported.statement.id}`)
   await h.command('match.approve', { bankLineIds: [at(r.lines, l => l.description.includes('BRIGHTLINE')).id], journalLineIds: [at(r.postings, p => p.memo.includes('Payment to Brightline')).id] })
+  // A fee filed by hand from its statement line (+ Expense or fee).
+  await h.command('match.approve', { bankLineIds: [at(r.lines, l => l.description === 'WIRE FEE').id], journalLineIds: [], create: [{ type: 'fee', accountId: s.acct['6400'], amount: '15.00' }] })
 
   for (const basis of ['accrual', 'cash']) {
     const pl = await h.view(`reports/profit-and-loss?${OCT}&basis=${basis}`), bs = await h.view(`reports/balance-sheet?to=2026-10-31&basis=${basis}`)
@@ -95,6 +97,9 @@ test('REPORT-005 every P&L and balance sheet figure opens to its records, docume
   assert.deepEqual([row.amount, row.record.id, row.record.label], [64000, s.bills.x.id, 'Bill BL-1042 · Brightline Software'])
   assert.deepEqual(row.documents.map(d => d.name), ['brightline-bl-1042.pdf'])
   assert.deepEqual(row.bank.map(b => [b.date, b.description, b.amount]), [['2026-10-16', 'CHECK 1001 BRIGHTLINE', -64000]])
+  // The hand-filed fee opens to the statement line it was filed from.
+  const fees = await h.view(`reports/detail?report=profit-and-loss&line=${s.acct['6400']}&${OCT}`)
+  assert.deepEqual(at(fees.rows, x => x.amount === 1500).bank.map(b => [b.date, b.description, b.amount, b.reconciled]), [['2026-10-29', 'WIRE FEE', -1500, false]])
   // Design revenue on the cash basis: the share of INV-0001 the October payment settled, and that payment.
   const design = await h.view(`reports/detail?report=profit-and-loss&line=${s.acct['4000']}&${OCT}&basis=cash`)
   assert.deepEqual(design.rows.map(x => [x.date, x.amount, x.record.id, x.settlement.by.id, x.settlement.share]), [['2026-10-20', 28483, s.inv.a.id, s.paid.a1.id, '500.00 of 1053.25 settled']])
