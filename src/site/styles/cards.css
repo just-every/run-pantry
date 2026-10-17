@@ -111,9 +111,9 @@
 
 /* ---------- Invoice timeline ---------- */
 .invoice { width: 100%; max-width: 764px; padding: 30px 34px 40px; border-radius: 20px; }
-.invoice-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.invoice-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; }
 .invoice-head p { font: 700 25px/1.2 var(--font-body); letter-spacing: -.02em; white-space: nowrap; }
-.timeline { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 34px; }
+.timeline { position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 34px; }
 .timeline li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; font-size: 18px; color: #4f5670; }
 .timeline li::before { content: ''; position: absolute; top: 12px; left: -50%; right: 50%; height: 3px; background: #d5d7e2; }
 .timeline li:first-child::before { display: none; }
@@ -231,6 +231,8 @@
   .hc { position: relative; inset: auto; width: auto; height: auto; min-height: 72px; }
   .hc-net { grid-column: 1 / -1; width: auto; height: auto; }
   .hc-receipt { grid-row: span 2; }
+  /* The stack is the column's width here: what is behind the figure keeps to its right edge. */
+  .behind { left: auto; right: 0; }
 }
 
 /* ---------- Phones ---------- */

@@ -13,7 +13,7 @@ function RecordLink({ r }: { r: D }) {
 }
 
 const Documents = ({ docs }: { docs: D[] }) => docs.length ? <>{docs.map(d => <a key={d.id} className="doc-link" href={`/api/pantry/documents/${d.id}`}>{d.name}</a>)}</> : <span className="sub">—</span>
-const Bank = ({ lines }: { lines: D[] }) => lines.length ? <>{lines.map(b => <span key={b.id} className="bank-line">{day(b.date)} · {b.description} · {usd(b.amount)}{b.statementDocumentId && <> · <a href={`/api/pantry/documents/${b.statementDocumentId}`}>statement</a></>}</span>)}</> : <span className="sub">Not matched</span>
+const Bank = ({ lines }: { lines: D[] }) => lines.length ? <>{lines.map(b => <span key={b.id} className="bank-line">{day(b.date)} · {b.description} · {usd(b.amount)} · {b.reconciled ? 'reconciled' : 'matched'}{b.statementDocumentId && <> · <a href={`/api/pantry/documents/${b.statementDocumentId}`}>statement</a></>}</span>)}</> : <span className="sub">Not matched</span>
 
 export function FigureDetail({ report, line, from, to, basis, reportLabel }: { report: string; line: string; from: string; to: string; basis: 'cash' | 'accrual'; reportLabel: string }) {
   const search = useSearch({ from: '/app/reports' })
@@ -76,7 +76,7 @@ export function RecordView({ record, reportLabel }: { record: string; reportLabe
       <div className="stack">
         <Card title="Linked records">{r.links.length ? <ul className="plain">{r.links.map((l: D) => <li key={`${l.kind}:${l.id}`}><RecordLink r={l} />{l.note && <small className="sub"> · {l.note}</small>}</li>)}</ul> : <p>Nothing else is linked to this record.</p>}</Card>
         <Card title="Documents">{r.documents.length ? <ul className="plain">{r.documents.map((d: D) => <li key={d.id}><a href={`/api/pantry/documents/${d.id}`}>{d.name}</a></li>)}</ul> : <p>No document is attached.</p>}</Card>
-        <Card title="Bank statement lines">{r.bank.length ? <ul className="plain">{r.bank.map((b: D) => <li key={b.id}>{day(b.date)} · {b.description} · {usd(b.amount)} · {b.bank}{b.statementDocumentId && <> · <a href={`/api/pantry/documents/${b.statementDocumentId}`}>statement file</a></>}</li>)}</ul> : <p>Not matched to a statement line yet.</p>}</Card>
+        <Card title="Bank statement lines">{r.bank.length ? <ul className="plain">{r.bank.map((b: D) => <li key={b.id}>{day(b.date)} · {b.description} · {usd(b.amount)} · {b.bank} · {b.reconciled ? 'reconciled' : 'matched, not yet reconciled'}{b.statementDocumentId && <> · <a href={`/api/pantry/documents/${b.statementDocumentId}`}>statement file</a></>}</li>)}</ul> : <p>Not matched to a statement line yet.</p>}</Card>
       </div>
     </div>
   </>

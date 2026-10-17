@@ -78,10 +78,10 @@ export async function harness({ bindings = {}, outbound, entry = 'tests/api/work
       assert.equal(r.status, status, `${path}: ${JSON.stringify(r.value)}`)
       return r.value
     }
-    /** Add a person with a Pantry role and sign them in through their invitation. */
+    /** Add a person with a Pantry role (which emails their invitation) and sign them in through it. */
     async function member(email, role, grants = {}) {
-      await command('member.save', { email, name: email.split('@')[0], role, ...grants })
-      await command('member.invite', { email })
+      const added = await command('member.save', { email, name: email.split('@')[0], role, ...grants })
+      assert.deepEqual([added.invited, added.emailed], [email, true])
       return confirmMail(email)
     }
     async function agent(name = 'books-agent') {

@@ -70,7 +70,7 @@ test('every report opens by clicking it, at 1440 and 390, and a payment made fro
   // The stranger's way: the bank line, a vendor payment to Acme, approve. It pays A-778 without a second step.
   const page = await owner.newPage()
   await page.goto(`${app.origin}/app/bank`)
-  await page.getByLabel(/Select ACH DEBIT ACME CONTRACTORS/).check()
+  await page.getByRole('row', { name: /ACH DEBIT ACME CONTRACTORS/ }).getByRole('button', { name: 'File it' }).click()
   await page.getByRole('button', { name: '+ Vendor payment' }).click()
   await page.getByLabel('Vendor', { exact: true }).selectOption({ label: 'Acme Contractors' })
   await assert.doesNotReject(page.getByLabel(/A-778/).and(page.locator('[value="1500.00"]')).waitFor(), 'the bill it names is filled in')
@@ -80,4 +80,13 @@ test('every report opens by clicking it, at 1440 and 390, and a payment made fro
   assert.equal(sales.bills.find(b => b.reference === 'A-778').open_cents, 0)
   const pl = await (await owner.request.get(`${app.origin}/api/pantry/reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=cash`)).json()
   assert.equal(pl.expenses.find(e => e.code === '6000').amount, 150000, 'the cash basis counts the contractor cost in September')
+
+  // Put Pantry online never offers the placeholder owner address: it asks for the owner's own email, then fills the deploy lines with it.
+  await page.goto(`${app.origin}/app/settings`)
+  const online = page.locator('#put-online')
+  await online.getByText('Set up hosting').click()
+  await online.getByLabel('Your own email').waitFor()
+  assert.equal(await online.locator('pre').count(), 0, 'no deploy lines with the placeholder owner')
+  await online.getByLabel('Your own email').fill('books@run-pantry.com')
+  await online.getByText('OWNER_EMAIL=books@run-pantry.com').waitFor()
 })

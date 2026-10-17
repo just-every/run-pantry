@@ -45,23 +45,26 @@ export async function attachments(db: D1Database) {
 
 /** Statement lines matched to ledger postings, by posting and by payment. */
 export async function bankMatches(db: D1Database) {
-  const rows = await all(db, `SELECT mp.journal_line_id, jl.entry_id, b.id, b.posted_date, b.description, b.amount_cents, s.id AS statement_id, s.document_id, ba.name AS bank
+  const rows = await all(db, `SELECT mp.journal_line_id, jl.entry_id, b.id, b.posted_date, b.description, b.amount_cents, s.id AS statement_id, s.document_id, ba.name AS bank, r.completed_at AS reconciled_at
     FROM pt_match_postings mp JOIN pt_matches m ON m.id = mp.match_id AND m.status = 'approved' JOIN pt_match_bank_lines mb ON mb.match_id = m.id AND mb.active = 1
     JOIN pt_bank_lines b ON b.id = mb.bank_line_id JOIN pt_statements s ON s.id = b.statement_id JOIN pt_bank_accounts ba ON ba.id = b.bank_account_id JOIN pt_journal_lines jl ON jl.id = mp.journal_line_id
+    LEFT JOIN pt_reconciliations r ON r.statement_id = s.id
     WHERE mp.active = 1 ORDER BY b.posted_date, b.id`)
   const paymentJournal = new Map((await all(db, 'SELECT id, journal_id FROM pt_payments')).map(p => [p.id, p.journal_id]))
   const allocated = await all(db, "SELECT target_kind, target_id, source_id FROM pt_allocations WHERE source_kind = 'payment'")
-  const view = (r: Data) => ({ id: r.id, date: r.posted_date, description: r.description, amount: r.amount_cents, bank: r.bank, statementDocumentId: r.document_id })
+  const view = (r: Data) => ({ id: r.id, date: r.posted_date, description: r.description, amount: r.amount_cents, bank: r.bank, statementDocumentId: r.document_id, reconciled: !!r.reconciled_at })
   const unique = (list: Data[]) => [...new Map(list.map(r => [r.id, view(r)])).values()]
   const forEntry = (entryId: string | undefined) => unique(rows.filter(r => r.entry_id === entryId))
   const forPayment = (paymentId: string) => forEntry(paymentJournal.get(paymentId))
   return {
     forPayment,
     forEntry,
-    /** A posting's own bank match; for an invoice or bill, the bank lines of the payments applied to it. */
-    forLine(lineId: string, record: RecordRef) {
+    /** A posting's own bank match; for an invoice or bill, the bank lines of the payments applied to it; otherwise the
+     *  statement lines matched to its entry's bank posting (an expense filed from a bank line by a rule or by hand). */
+    forLine(lineId: string, entryId: string, record: RecordRef) {
       const own = rows.filter(r => r.journal_line_id === lineId)
-      if (own.length || (record.kind !== 'invoice' && record.kind !== 'bill')) return unique(own)
+      if (own.length) return unique(own)
+      if (record.kind !== 'invoice' && record.kind !== 'bill') return forEntry(entryId)
       return unique(allocated.filter(a => a.target_id === record.id).flatMap(a => rows.filter(r => r.entry_id === paymentJournal.get(a.source_id))))
     },
   }
