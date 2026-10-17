@@ -15,7 +15,8 @@ function matchState(m: D | null) {
 
 function PayoutStatus({ p }: { p: D }) {
   if (p.status === 'booked') return <>{p.match ? <Chip tone="good">Booked · matched</Chip> : <Chip tone="info">Booked · waiting for the deposit</Chip>}{p.match && <small className="sub block">{matchState(p.match)}</small>}</>
-  return <><Chip tone="warn">{p.status === 'other-currency' ? 'Not booked' : 'Needs you'}</Chip><small className="sub block">{p.reason}</small></>
+  if (p.status === 'other-currency') return <Chip tone="warn">Not booked: {String(p.currency).toUpperCase()}</Chip>
+  return <><Chip tone="warn">Needs you</Chip><small className="sub block">{p.reason}</small></>
 }
 
 function PayoutSettings({ v, onDone }: { v: D; onDone: () => Promise<void> }) {
