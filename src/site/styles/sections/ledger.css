@@ -1,0 +1,73 @@
+/* Every transaction, already in. (page-04): one ledger across Chase and Amex, eight rows, two waiting for review,
+   the Stripe payout opened into sales and fees. Under 860px each row stacks in two lines (date · payee · amount,
+   then account · coded as · how) with the split as an indented panel (390 plan). */
+.ledger-sec { --body-w: 380px; }
+.ledger { padding: 26px 32px 30px; border-radius: 22px; }
+.lg-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; padding-bottom: 16px; }
+.lg-title { font: 800 28px/1.15 var(--font-head); letter-spacing: -.035em; }
+.lg-tools { display: flex; flex-wrap: wrap; gap: 14px; }
+.lg-filter, .lg-review { display: inline-flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 18px 0 20px; border-radius: 14px; font-size: 16px; font-weight: 500; white-space: nowrap; }
+.lg-filter { background: #eff0f9; color: var(--ink); box-shadow: inset 0 0 0 1px #e3e4f1; }
+.lg-filter .icon { width: 18px; height: 18px; stroke-width: 2; }
+.lg-review { background: var(--apricot-tint); color: var(--apricot-text); }
+.lg-review b { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #fbd6bd; font-size: 14.5px; font-weight: 600; }
+.lg-row { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.6fr) minmax(0, 2.2fr) minmax(0, 1.3fr) minmax(0, 2.15fr) minmax(0, 2fr); align-items: center; column-gap: 24px; min-height: 48px; padding: 4px 0; border-top: 1px solid var(--line); font-size: 16.5px; color: #1f2740; }
+.lg-row > span, .lg-meta > span { min-width: 0; }
+/* Desktop: the meta group (account, coded as, how) dissolves into the row's columns, in the drawing's order. */
+.lg-meta { display: contents; }
+.lg-group .lg-date { order: 1; } .lg-group .lg-account { order: 2; } .lg-group .lg-payee { order: 3; } .lg-group .lg-amount { order: 4; } .lg-group .lg-coded { order: 5; } .lg-group .lg-how { order: 6; }
+.lg-meta > span + span::before { content: none; }
+.lg-cols { min-height: 40px; border-top: 0; border-bottom: 1px solid var(--line); font-size: 14.5px; color: #6b7290; }
+.lg-cols + .lg-group .lg-row { border-top: 0; }
+.lg-amount { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lg-amount-col { padding-left: 28%; }
+.lg-coded, .lg-how { display: flex; align-items: center; gap: 10px; padding-left: 14px; }
+.lg-how .icon { width: 22px; height: 22px; stroke-width: 1.5; color: #39405a; }
+.lg-how .chevron { width: 15px; height: 15px; stroke: #39405a; stroke-width: 2; }
+.lg-cols > span:nth-child(5), .lg-cols > span:nth-child(6) { padding-left: 14px; }
+.lg-split { margin: 0 0 4px; padding: 16px 0 16px 0; border-radius: 10px; background: #f4f4f9; font-size: 15.5px; color: #4f5670; font-variant-numeric: tabular-nums; }
+.lg-tree { width: fit-content; margin-left: calc((100% - 120px) * .85 / 10.1 + 24px); padding-left: 22px; border-left: 1.5px solid #c9ccda; }
+.lg-split p { display: grid; grid-template-columns: 150px 140px; padding: 3px 0; }
+.lg-split p span:last-child { text-align: right; }
+.lg-split p.net { margin-top: 8px; padding-top: 10px; border-top: 1px solid #dcdde8; }
+.lg-split p.net span:last-child { color: var(--green-ink); font-weight: 600; font-size: 16.5px; }
+
+@media (max-width: 1180px) {
+  .lg-row { grid-template-columns: minmax(0, .8fr) minmax(0, 1.5fr) minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 2fr) minmax(0, 2.3fr); column-gap: 16px; font-size: 15.5px; }
+  .lg-how, .lg-coded { white-space: nowrap; }
+  .lg-coded, .lg-how { padding-left: 6px; }
+  .lg-cols > span:nth-child(5), .lg-cols > span:nth-child(6) { padding-left: 6px; }
+}
+@media (max-width: 860px) {
+  .ledger { max-width: 640px; margin: 0 auto; padding: 22px 22px 14px; }
+  .lg-head { display: grid; justify-content: start; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+  .lg-title { font-size: 24px; }
+  .lg-tools { gap: 10px; }
+  .lg-filter, .lg-review { min-height: 38px; padding: 0 14px; border-radius: 999px; font-size: 15px; }
+  .lg-filter { background: var(--green-tint); color: var(--green-ink); box-shadow: none; }
+  .lg-filter .icon { display: none; }
+  .lg-review b { width: 22px; height: 22px; font-size: 13px; }
+  .lg-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 0; padding: 12px 0; border-top: 1px solid var(--line); }
+  .lg-row.lg-cols { display: none; }
+  .lg-group:first-of-type .lg-row, .lg-cols + .lg-group .lg-row { border-top: 0; }
+  .lg-date, .lg-payee { font-size: 16.5px; font-weight: 600; color: var(--ink); }
+  .lg-date::after { content: '·'; margin: 0 .45em; }
+  .lg-payee { flex: 1; }
+  .lg-amount { margin-left: 12px; font-size: 16.5px; color: var(--ink); }
+  .lg-amount.good { color: var(--green-ink); }
+  .lg-meta { order: 9; display: flex; flex-basis: 100%; align-items: center; font-size: 14px; color: #6b7290; }
+  .lg-meta > span + span::before { content: '·'; }
+  .lg-coded, .lg-how { display: inline-flex; gap: 6px; padding-left: 0; white-space: normal; }
+  .lg-how .icon, .lg-how .chevron { display: none; }
+  .lg-row .chip { padding: 2px 9px; font-size: 13.5px; }
+  .lg-split { margin: 0 0 8px; padding: 10px 16px; font-size: 14.5px; }
+  .lg-tree { width: auto; margin-left: 0; padding-left: 0; border-left: 0; }
+  .lg-split p, .lg-split p.net { grid-template-columns: minmax(0, 1fr) auto; padding: 2px 0; border: 0; }
+  .lg-split p.net { margin-top: 2px; padding-top: 2px; }
+  .lg-split p.net span:last-child { font-size: 14.5px; }
+}
+@media (max-width: 400px) {
+  .ledger { padding: 18px 16px 10px; }
+  .lg-date, .lg-payee, .lg-amount { font-size: 15.5px; }
+  .lg-meta { font-size: 13.5px; }
+}

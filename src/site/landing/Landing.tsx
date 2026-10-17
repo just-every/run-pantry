@@ -1,35 +1,48 @@
 import { SiteHeader } from '../shell/SiteHeader'
 import { Hero } from './Hero'
-import { BankFeeds, Receipts } from './sections/Banking'
-import { BooksAgent, MonthEnd } from './sections/Books'
+import { Agent } from './sections/Agent'
+import { Close } from './sections/Close'
 import { Closing } from './sections/Closing'
-import { Details } from './sections/Details'
-import { Invoices, Numbers } from './sections/GettingPaid'
+import { FeedHealth } from './sections/FeedHealth'
 import { Interlude } from './sections/Interlude'
-import { Connected, MoveIn } from './sections/Moving'
-import { Ownership } from './sections/Ownership'
+import { Invoices } from './sections/Invoices'
+import { Ledger } from './sections/Ledger'
+import { Month } from './sections/Month'
+import { MoveIn } from './sections/MoveIn'
+import { Receipts } from './sections/Receipts'
+import { Reports } from './sections/Reports'
 import '../styles/site.css'
 import '../styles/landing.css'
 import '../styles/cards.css'
+import '../styles/sections/month.css'
+import '../styles/sections/move-in.css'
+import '../styles/sections/ledger.css'
+import '../styles/sections/receipts.css'
+import '../styles/sections/invoices.css'
+import '../styles/sections/feed-health.css'
+import '../styles/sections/agent.css'
+import '../styles/sections/close.css'
+import '../styles/sections/reports.css'
 
 /**
- * run-pantry.com's homepage, built from the design desk's approved page (16 Oct 2026, page v3) in its order:
- * hero; bank feeds and receipts; invoices and every number; the books agent and the close; the interlude;
- * connected services and moving in; ownership; the quiet details; the closing with the footer.
- * Painted art appears only in the hero, the interlude and the closing; every other drawing is HTML and CSS.
+ * run-pantry.com's homepage, built from the owner-approved page structure (17 Oct 2026, page-s1): one month of one
+ * business's books, in the order a small-business owner lives it. The hero; October on one ribbon; moving in (Sep 30);
+ * the feeds (Oct 1–19); receipts (Oct 13); invoices (Oct 4–19); a feed that breaks (Oct 20–23); the books agent
+ * (Oct 27); the interlude (Oct 31); the close with the accountant (Nov 2); the reports (Nov 3); the closing with the
+ * footer. Painted art appears only in the hero, the interlude and the closing; every other drawing is HTML and CSS.
  */
 export function Landing() {
   return <>
     <SiteHeader overArt />
     <main id="main">
       <Hero />
-      <BankFeeds /><Receipts />
-      <Invoices /><Numbers />
-      <BooksAgent /><MonthEnd />
+      <div className="sections">
+        <Month /><MoveIn /><Ledger /><Receipts /><Invoices /><FeedHealth /><Agent />
+      </div>
       <Interlude />
-      <Connected /><MoveIn />
-      <Ownership />
-      <Details />
+      <div className="sections">
+        <Close /><Reports />
+      </div>
       <Closing />
     </main>
   </>

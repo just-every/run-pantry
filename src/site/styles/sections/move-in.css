@@ -1,0 +1,51 @@
+/* Bring your books with you. (page-03): the trial balance tied QuickBooks Online to Pantry on Sep 30, its tie-out
+   rows with plain counts (no check circles: the pill and the equal columns show the match) and a plain sign-off
+   line; the real commands that start Pantry in a terminal under the copy. */
+.move-in { --art: 52fr; --copy: 48fr; }
+.move-in .sec-row { column-gap: clamp(40px, 4.4vw, 64px); }
+.tb { width: 100%; max-width: 690px; padding: 46px 44px 26px; border-radius: 26px; }
+.tb-title { padding-bottom: 22px; border-bottom: 1px solid var(--line); font: 800 31px/1.15 var(--font-head); letter-spacing: -.035em; }
+.tb-date { font-weight: 400; color: #6b7290; letter-spacing: -.02em; }
+.tb-pair { display: grid; grid-template-columns: 1fr 1fr; margin-top: 26px; }
+.tb-pair > div + div { padding-left: 42px; border-left: 1px solid var(--line); }
+.tb-pair p { font-size: 19px; color: #6b7290; }
+.tb-pair b { display: block; margin-top: 4px; font: 800 clamp(26px, 2.6vw, 38px)/1.05 var(--font-head); letter-spacing: -.035em; white-space: nowrap; }
+.tb-match { display: flex; width: fit-content; align-items: center; gap: 12px; margin: 26px auto 0; padding: 10px 22px 10px 14px; border-radius: 999px; background: var(--green-tint); color: var(--green-ink); font-size: 17.5px; font-weight: 600; }
+.tb-match .check { width: 24px; height: 24px; }
+.tb-table { width: 100%; margin-top: 18px; border-collapse: collapse; font-size: 17.5px; color: #2b3249; font-variant-numeric: tabular-nums; }
+.tb-table th { padding: 0 0 12px; font-size: 16px; font-weight: 400; color: #6b7290; text-align: center; }
+.tb-table td { padding: 14px 0; border-top: 1px solid var(--row); text-align: center; }
+.tb-table td:first-child { padding-left: 4px; text-align: left; }
+.tb-table th:not(:first-child), .tb-table td:not(:first-child) { width: 25%; }
+.tb-sign { margin-top: 8px; padding-top: 22px; border-top: 1px solid var(--line); font-size: 16px; color: #39405a; }
+.tb-sign span { color: #6b7290; }
+
+.terminal { width: 100%; max-width: 620px; margin-top: 40px; border-radius: 16px; background: linear-gradient(180deg, #19244a, #121a37); box-shadow: 0 30px 60px -28px rgba(16, 26, 51, .55), inset 0 1px 0 rgba(255, 255, 255, .06); color: #e8eaf5; }
+.terminal-bar { display: flex; gap: 9px; padding: 20px 24px 6px; }
+.terminal-bar span { width: 13px; height: 13px; border-radius: 50%; background: #ff5f57; }
+.terminal-bar span:nth-child(2) { background: #febc2e; } .terminal-bar span:nth-child(3) { background: #28c840; }
+.terminal pre { margin: 0; padding: 12px 20px 26px; font: 400 13.5px/2.1 var(--font-mono); white-space: pre-wrap; }
+.terminal-line { display: block; padding-left: 22px; text-indent: -22px; }
+.prompt { display: inline-block; width: 22px; text-indent: 0; color: #3ed598; font-weight: 600; }
+
+@media (max-width: 760px) {
+  .tb { padding: 24px 18px 16px; border-radius: 18px; }
+  .tb-title { padding-bottom: 14px; font-size: 22px; }
+  .tb-date { font-size: 17px; }
+  .tb-pair { margin-top: 16px; }
+  .tb-pair > div + div { padding-left: 16px; }
+  .tb-pair p { font-size: 14.5px; }
+  .tb-pair b { font-size: clamp(19px, 6vw, 24px); }
+  .tb-match { margin-top: 16px; padding: 7px 16px 7px 10px; font-size: 15px; }
+  .tb-match .check { width: 20px; height: 20px; }
+  .tb-table { margin-top: 12px; font-size: 15px; }
+  .tb-table th { font-size: 13.5px; }
+  .tb-table td { padding: 11px 0; }
+  .tb-table th:not(:first-child), .tb-table td:not(:first-child) { width: 27%; }
+  .tb-sign { padding-top: 14px; font-size: 14px; }
+  .terminal { margin-top: 28px; border-radius: 14px; }
+  .terminal-bar { padding: 14px 16px 2px; }
+  .terminal pre { padding: 10px 16px 18px; font-size: 12.5px; line-height: 1.9; }
+  .terminal-line { padding-left: 17px; text-indent: -17px; }
+  .prompt { width: 17px; }
+}

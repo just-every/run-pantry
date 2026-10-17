@@ -1,11 +1,11 @@
 import { Actions } from '../shell/Actions'
 import { HeroCards } from './HeroCards'
-import { Painting } from './parts'
+import { BAND_WIDTHS, Painting } from './parts'
 
 /** The painted sunrise lookout, the promise and the action, with October's books tied together on the right. */
 export function Hero() {
   return <section className="hero" aria-labelledby="hero-title">
-    <Painting className="hero-art" name="hero" widths={[768, 1152, 1536]} sizes="100vw" eager phone={{ name: 'hero-phone', widths: [640, 1016], media: '(max-width: 760px)' }} />
+    <Painting className="hero-art" name="hero" widths={BAND_WIDTHS} sizes="100vw" eager phone={{ name: 'hero-phone', widths: [640, 1016], media: '(max-width: 760px)' }} />
     <div className="site-wrap hero-grid">
       <div className="hero-copy">
         <h1 id="hero-title">Know where <span className="brush">every dollar</span> went.</h1>

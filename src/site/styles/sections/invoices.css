@@ -1,0 +1,71 @@
+/* Sent. Reminded. Paid. Matched. (page-06): INV-0231 with its lines and the ACH payment, its activity log from the
+   email to the Chase match, and beside them the recurring INV-0240 and receivables aging. Tablets put the log beside
+   the invoice and the side cards below; phones stack every card whole. */
+.invoices { --body-w: 370px; }
+/* page-06's heading is drawn a touch smaller than page-04's (50 px cap against 51). */
+.invoices h2 { font-size: calc(var(--h2) * .96); }
+.inv-grid { display: grid; grid-template-columns: minmax(0, 1.14fr) minmax(0, 1fr) minmax(0, 1.02fr); gap: 22px; align-items: stretch; }
+.inv { padding: 30px 28px 28px; }
+.inv-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.inv-head b { font: 800 26px/1.1 var(--font-head); letter-spacing: -.035em; }
+.inv-head .chip { padding: 7px 14px; border-radius: 10px; font-size: 17px; font-weight: 600; }
+.inv-customer { margin-top: 8px; font-size: 20px; color: #2b3249; }
+.inv-due { margin-top: 12px; padding-bottom: 22px; border-bottom: 1px solid var(--line); font-size: 17px; color: #6b7290; }
+.inv-lines { display: grid; gap: 18px; padding: 24px 0; border-bottom: 1px solid var(--line); font-size: 17.5px; color: #2b3249; }
+.inv-lines p, .inv-total { display: flex; justify-content: space-between; gap: 16px; font-variant-numeric: tabular-nums; }
+.inv-total { align-items: baseline; padding: 24px 0 22px; font-size: 18px; }
+.inv-total b:last-child { font: 800 25px/1 var(--font-head); letter-spacing: -.03em; }
+.inv-paid { display: flex; align-items: center; gap: 16px; padding: 18px 20px; border-radius: 12px; background: var(--green-tint); color: var(--green-ink); font-size: 19px; font-weight: 600; }
+.inv-paid .check { width: 34px; height: 34px; }
+.activity { padding: 30px 26px 26px; }
+.activity ol { margin-top: 22px; }
+.activity li { position: relative; display: grid; grid-template-columns: 30px minmax(0, 1fr); column-gap: 18px; padding-bottom: 22px; }
+.activity li:last-child { padding-bottom: 0; }
+.activity li::before { content: ''; position: absolute; left: 14px; top: 22px; bottom: -2px; width: 2px; background: #dedfe8; }
+.activity li:last-child::before { display: none; }
+.act-node { grid-row: span 2; width: 20px; height: 20px; margin: 2px 0 0 5px; border: 2.5px solid #161d36; border-radius: 50%; background: #fff; }
+.activity li.done .act-node { border-color: var(--green); background: var(--green); }
+.activity b { font-size: 17px; font-weight: 600; line-height: 1.35; color: var(--ink); }
+.activity li > span:last-child { margin-top: 3px; font-size: 16px; color: #6b7290; }
+.inv-side { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 22px; }
+.recurring { padding: 26px 26px 24px; }
+.recurring p:last-child { margin-top: 10px; font-size: 16.5px; line-height: 1.45; color: #4f5670; }
+.aging { display: flex; flex-direction: column; padding: 26px 26px 24px; }
+.aging-bars { display: grid; flex: 1; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; min-height: 210px; margin-top: 22px; }
+.aging-bar { display: grid; grid-template-rows: minmax(0, 1fr) auto auto; justify-items: center; text-align: center; }
+.aging-bar .bar { align-self: end; width: min(62px, 100%); height: 7px; border-radius: 4px; background: #dcdde6; }
+.aging-bar.b0 .bar { border-radius: 5px 5px 3px 3px; background: linear-gradient(#36c08a, #22a873); }
+.aging-bar.b1 .bar { border-radius: 5px 5px 3px 3px; background: linear-gradient(#f6a273, #f08d55); }
+.aging-bucket { margin-top: 14px; font-size: 16px; color: #6b7290; white-space: nowrap; }
+.aging-bar b { margin-top: 2px; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1180px) {
+  .inv, .activity, .recurring, .aging { padding-left: 22px; padding-right: 22px; }
+  .inv-head .chip { font-size: 15px; padding: 6px 11px; }
+  .inv-paid { gap: 12px; padding: 16px; font-size: 17px; }
+  .inv-paid .check { width: 28px; height: 28px; }
+}
+@media (max-width: 1320px) {
+  .inv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .inv-side { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto; align-items: start; }
+}
+@media (max-width: 760px) {
+  .inv-grid, .inv-side { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .inv, .activity, .recurring, .aging { padding: 20px 18px; }
+  .inv-head b { font-size: 23px; }
+  .inv-customer { font-size: 17.5px; }
+  .inv-due { padding-bottom: 16px; font-size: 15px; }
+  .inv-lines { gap: 12px; padding: 16px 0; font-size: 15.5px; }
+  .inv-total { padding: 16px 0; font-size: 16px; }
+  .inv-total b:last-child { font-size: 21px; }
+  .inv-paid { padding: 13px 14px; font-size: 16px; }
+  .inv-paid .check { width: 24px; height: 24px; }
+  .activity ol { margin-top: 16px; }
+  .activity li { column-gap: 12px; padding-bottom: 16px; }
+  .activity b { font-size: 15.5px; }
+  .activity li > span:last-child { font-size: 14.5px; }
+  .recurring p:last-child { font-size: 15px; }
+  .aging-bars { min-height: 150px; gap: 10px; }
+  .aging-bucket { font-size: 14px; }
+  .aging-bar b { font-size: 16px; }
+}

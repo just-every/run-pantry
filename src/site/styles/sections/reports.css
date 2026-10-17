@@ -1,0 +1,83 @@
+/* Click any number. (page-11): October's accrual P&L with cost of goods sold picked, a lead to its 14 entries, and
+   the 1099-NEC contractors for 2026. Tablets and phones stack the P&L above its drill-down, without the lead. */
+.reports { --body-w: 720px; }
+.reports h2 { font-size: calc(var(--h2) * .96); }
+.rp-grid { --gap: clamp(40px, 4.6vw, 66px); display: grid; grid-template-columns: minmax(0, 1.36fr) minmax(0, 1fr); align-items: start; gap: var(--gap); }
+.pl { padding: 30px 32px 28px; border-radius: 20px; }
+.pl-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; }
+.pl-head .card-title { font-size: clamp(22px, 2vw, 28px); }
+.toggle { display: inline-flex; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: #fbfbfd; font-size: 16.5px; }
+.toggle span { padding: 8px 20px; border-radius: 999px; color: #4f5670; }
+.toggle .on { background: var(--green-tint); color: var(--green-ink); font-weight: 600; }
+.pl-tabs { display: flex; gap: clamp(20px, 3vw, 46px); margin-top: 18px; padding: 0 0 0 4px; border-bottom: 2px solid var(--line); font-size: 17px; color: #39405a; white-space: nowrap; }
+.pl-tabs span { padding: 10px 10px 12px; margin-bottom: -2px; }
+.pl-tabs .on { color: var(--green-ink); font-weight: 600; border-bottom: 3px solid var(--green); }
+.pl-row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; padding: 0 4px; border-bottom: 1px solid var(--line); font-size: 19px; color: #1f2740; font-variant-numeric: tabular-nums; }
+.pl-row:nth-of-type(2) { margin-top: 8px; }
+.pl-row.hot { margin: 2px -18px 0; padding: 0 22px; border: 1.5px solid #f3a676; border-radius: 6px; background: linear-gradient(90deg, #fff1e7, #fff6f0); font-weight: 500; }
+.pl-pointer { position: absolute; left: 36%; top: 50%; width: 20px; height: 26px; fill: #111827; stroke: #fff; stroke-width: 1.4; stroke-linejoin: round; }
+.pl-net { margin-top: 12px; border-top: 2px solid var(--line); border-bottom: 0; }
+.pl-net b { font-weight: 700; }
+.pl-net b:last-child { font-size: 20px; color: var(--green-ink); }
+/* The lead from the picked figure to its entries: out of the row, up, and into the drill-down's first line. It sits
+   between the cards and finds both ends by anchor; where anchors are not supported it is left out. */
+.rp-grid { position: relative; }
+.pl-row.hot { anchor-name: --pl-hot; }
+.cogs-row:nth-of-type(2) { anchor-name: --pl-entry; }
+.cogs { anchor-name: --pl-drill; }
+.pl-lead { display: none; }
+@supports (anchor-name: --a) {
+  .pl-lead { position: absolute; display: block; left: anchor(--pl-hot right); right: anchor(--pl-drill left); top: anchor(--pl-entry center); bottom: anchor(--pl-hot center); margin: -1px -4px 0 -4px; pointer-events: none; }
+  .pl-lead::before, .pl-lead::after { content: ''; position: absolute; border: 0 solid #f08d55; }
+  .pl-lead::before { left: 4px; bottom: -1px; width: calc(50% - 4px); height: 50%; border-width: 0 2px 2px 0; border-bottom-right-radius: 14px; }
+  .pl-lead::after { right: 4px; top: 0; width: calc(50% - 2px); height: 50%; border-width: 2px 0 0 2px; border-top-left-radius: 14px; }
+  .pl-lead i { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #f08d55; }
+  .pl-lead i:first-child { left: 0; bottom: -4px; }
+  .pl-lead i:last-child { right: 0; top: -3px; }
+}
+.rp-side { display: grid; gap: 26px; }
+.cogs, .nec { padding: 26px 30px 22px; border-radius: 20px; }
+.rp-side .card-title { padding-bottom: 14px; border-bottom: 1px solid var(--line); font-size: clamp(19px, 1.7vw, 24px); }
+.cogs-row, .nec-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 50px; border-bottom: 1px solid var(--line); font-size: 17px; color: #2b3249; font-variant-numeric: tabular-nums; }
+.cogs-total { min-height: 58px; border-bottom: 0; border-top: 1px solid var(--line); font-size: 19px; }
+.cogs-total b { font-weight: 700; color: var(--ink); }
+.nec-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto minmax(0, auto); column-gap: 18px; min-height: 62px; }
+.nec-row:last-child { border-bottom: 0; }
+.nec-initial { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; font-size: 17px; font-weight: 600; }
+.nec-initial.green { background: var(--green-tint); color: var(--green-ink); }
+.nec-initial.apricot { background: #fde6d6; color: #a3461a; }
+.nec-initial.lavender { background: #e7e8fb; color: #3a3f9a; }
+.nec-amount { text-align: right; }
+.nec-status { min-width: 7.2em; text-align: right; color: #4f5670; }
+
+@media (max-width: 1280px) {
+  .pl { padding: 26px 24px 24px; }
+  .pl-row { font-size: 17.5px; }
+  .cogs, .nec { padding: 22px 22px 18px; }
+  .cogs-row, .nec-row { font-size: 15.5px; }
+  .nec-row { column-gap: 12px; }
+}
+@media (max-width: 1099px) {
+  .rp-grid { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .rp-side { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .pl-lead { display: none !important; }
+}
+@media (max-width: 760px) {
+  .rp-side { grid-template-columns: minmax(0, 1fr); }
+  .pl { padding: 18px 16px 16px; border-radius: 18px; }
+  .pl-head .card-title { font-size: 19px; }
+  .toggle { font-size: 14px; } .toggle span { padding: 5px 14px; }
+  .pl-tabs { gap: 2px; margin-top: 14px; padding: 0; font-size: 14px; }
+  .pl-tabs span { padding: 8px 7px 10px; }
+  .pl-row { min-height: 50px; font-size: 15.5px; }
+  .pl-row.hot { margin: 2px -8px 0; padding: 0 12px; }
+  .pl-pointer { left: 58%; width: 16px; height: 21px; }
+  .pl-net b:last-child { font-size: 17px; }
+  .cogs, .nec { padding: 18px 16px 14px; border-radius: 18px; }
+  .rp-side .card-title { font-size: 17.5px; }
+  .cogs-row, .nec-row { min-height: 44px; font-size: 14.5px; }
+  .cogs-total { font-size: 16px; }
+  .nec-row { grid-template-columns: 34px minmax(0, 1fr) auto; grid-template-areas: 'initial name amount' 'initial status status'; row-gap: 0; padding: 10px 0; }
+  .nec-initial { grid-area: initial; width: 34px; height: 34px; font-size: 14.5px; }
+  .nec-name { grid-area: name; } .nec-amount { grid-area: amount; } .nec-status { grid-area: status; min-width: 0; text-align: left; font-size: 13.5px; }
+}

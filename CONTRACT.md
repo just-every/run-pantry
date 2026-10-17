@@ -577,57 +577,61 @@ These are decided and are not open questions:
 
 ## Homepage claims
 
-Every capability claimed on the owner-accepted homepage (desk build, branch `br/style`, 17 October 2026, with claim 42's copy as corrected on `main` in `22748ee`, rows 1, 7, 12, 13, 14 and 41 re-judged when bank feeds and rules landed in `2776755`, rows 2, 3, 8, 10, 15 to 20, 23, 24, 26 and 45 re-judged when receipts, invoices out and Pantry's questions landed in `c84211e`, rows 34 and 36 when the Xero move-in landed in `ee45530`, and rows 9, 30 and 31 when Stripe payouts and Gusto payroll landed in `3306493`), in page order, mapped to the clauses that deliver it. The status is the claim's own: `done` where the claimed form runs today, otherwise what exists and what is missing.
+Every capability claimed on the homepage rebuilt on the owner-approved page structure (page-s1, 17 October 2026; branch `br/page`, 18 October 2026), in page order, mapped to the clauses that deliver it. The status is the claim's own: `done` where the claimed form runs today, `partial` naming what exists and what is missing, `missing` where the page shows the product this contract builds towards. `docs/CLAIMS.md` gives the code path for each row.
 
 | # | Section | Claim | Clause(s) | Status |
 |---|---|---|---|---|
-| 1 | Hero | "pulls in your bank and cards" | BANK-001, BANK-003, CONNECT-001, PAN-07 | done on installations holding their own Plaid keys: Plaid Link, account mapping and sync by webhook, schedule and request beside statement files (`tests/api/feeds.test.mjs`); the production path without a developer account (CONNECT-001) and the rest of BANK-001 and BANK-003 are partial or missing |
-| 2 | Hero | "catches every receipt" | PAN-17, CAPTURE-001, CAPTURE-002, CAPTURE-003, CAPTURE-004, CAPTURE-008 | done: photo, upload or the private Pantry address, kept byte for byte, read and attached on acceptance (PAN-17, `tests/api/receipts.test.mjs`); the Pantry Connect address and full reading are CAPTURE-002, CAPTURE-003 and CONNECT-006 |
-| 3 | Hero | "gets invoices paid" | INVOICE-002, INVOICE-004, PAY-001, PAY-003, CONNECT-005 | done on installations with their own mail provider and Stripe key: invoices sent with PDF and link, reminders that stop when paid, card from the link and deposits that match themselves (`tests/api/invoices-out.test.mjs`); INVOICE-002, PAY-001 and CONNECT-005 stay partial |
+| 1 | Hero | "pulls in your bank and cards" | BANK-001, BANK-003, CONNECT-001, PAN-07 | done on installations holding their own Plaid keys (`tests/api/feeds.test.mjs`); the production path without a developer account (CONNECT-001) is missing |
+| 2 | Hero | "catches every receipt" | PAN-17, CAPTURE-001, CAPTURE-002, CAPTURE-003 | done (PAN-17, `tests/api/receipts.test.mjs`); the Pantry Connect address is CONNECT-006 |
+| 3 | Hero | "gets invoices paid" | INVOICE-002, INVOICE-004, PAY-001, PAY-003 | done on installations with their own mail provider and Stripe key (`tests/api/invoices-out.test.mjs`) |
 | 4 | Hero | "closes the month with your accountant" | PAN-13, CLOSE-003 | done (PAN-13) |
 | 5 | Hero | "100% free, open source" | OWN-001 | done |
-| 6 | Hero cards | Net income · October with its lines (P&L) | PAN-12, REPORT-001 | done (PAN-12) |
-| 7 | Hero cards | Chase Business ••4417 feed, 2,847 transactions | BANK-001, BANK-002, BANK-004 | done on installations holding their own Plaid keys: each connected account shows its feed and last sync in Bank and card feeds (`src/ui/bank-feeds.tsx`, `tests/api/feeds.test.mjs`); 24-month backfill choices are BANK-002 |
-| 8 | Hero cards | Home Depot receipt read into vendor, date, category | PAN-17, CAPTURE-003, CAPTURE-004, CAPTURE-006 | done with the installation's own AI key: vendor, date, total, tax and expense account read for a person to accept (PAN-17); CAPTURE-003's further fields and confidence are partial |
-| 9 | Hero cards | Stripe payout matched to 23 charges, fees split | PAN-19, PROC-001, PAY-003 | done on installations with the business's own Stripe key: a 23-charge payout split into gross sales, fees and refunds and matched to its deposit (PAN-19, `tests/api/connected.test.mjs`); PROC-001's further lines are partial |
-| 10 | Hero cards | INV-0231 paid via ACH | PAY-001, PAY-002 | partial — ACH bank debit from the link is built for US Stripe accounts (`src/pantry/stripe.ts`) but not proven live |
-| 11 | Hero cards | "Looks right, closing October · Reviewed by your accountant" | PAN-13, AGENT-005 | done (PAN-13) |
-| 12 | Live bank feeds | "Connect your bank and cards once. Transactions arrive on their own" | BANK-001, BANK-003, CONNECT-001 | done on installations holding their own Plaid keys: Plaid Link, account mapping and sync by webhook, schedule and request beside statement files (`tests/api/feeds.test.mjs`); the production path without a developer account (CONNECT-001) and the rest of BANK-001 and BANK-003 are partial or missing |
-| 13 | Live bank feeds | "your rules file the routine ones" (Adobe → Software "by rule") | RULE-002 | done: rules preview, file matching lines from feeds and files marked "Filed by rule" with undo, and never touch a locked month or reconciled statement (`tests/api/rules.test.mjs`); RULE-002 stays partial for suggest-only rules, dimensions and rule revisions |
-| 14 | Live bank feeds | "re-link to stay current" (Amex) | BANK-004 | done on installations holding their own Plaid keys: a connection needing sign-in says so and **Re-link** opens Plaid Link in update mode (`tests/api/feeds.test.mjs`); BANK-004 stays partial for consent-expiry notice, owner notification and the close exception |
-| 15 | Receipts | "Take a photo or forward the email" | PAN-17, CAPTURE-001, CAPTURE-002, CONNECT-006, MOBILE-002 | done: camera from the phone browser, upload and forwarding to the private Pantry address on the business's own domain (PAN-17); the Pantry Connect address (CONNECT-006) and native apps (MOBILE-002) are missing |
-| 16 | Receipts | "Pantry reads the vendor, date and total, and attaches it to the right transaction" | PAN-17, CAPTURE-003, CAPTURE-004 | done with the installation's own AI key: read, proposed against the matching transaction and attached on acceptance or the owner's rule (PAN-17); CAPTURE-004's tolerances and late-arriving lines are partial |
-| 17 | Invoices | "Send it and Pantry follows up" (sent, viewed, reminder) | INVOICE-002, INVOICE-003, INVOICE-004, CONNECT-005 | done on installations with their own mail provider: sent, first view recorded, reminders on schedule that stop when paid (`tests/api/invoices-out.test.mjs`); Pantry Connect mail, bounces and per-customer schedules are partial |
-| 18 | Invoices | "Customers pay by card or ACH from the link" | PAY-001, INVOICE-003 | partial — card from the link through the business's own Stripe is built and tested; ACH is not proven live |
-| 19 | Invoices | "the payment matches itself" | PAY-003, PROC-001 | done: deposits naming their invoice match themselves with an undo, link payments record themselves (`src/pantry/automatch.ts`, `tests/api/invoices-out.test.mjs`), and a Stripe payout matches its bank deposit by itself, as row 9 (PAN-19, PAY-003, `src/pantry/provider-match.ts`, `tests/api/connected.test.mjs` PAYOUT-001); PROC-001's further processor lines stay partial |
-| 20 | Invoices | "Repeats monthly" | INVOICE-005, PAY-005 | done: recurring invoices as drafts or sent on their own after template approval (`src/pantry/recurring.ts`, `tests/api/invoices-out.test.mjs`); autopay (PAY-005) is missing |
-| 21 | Every number | "Every figure on your P&L opens to the bills, receipts and transactions behind it" | REPORT-005 | done for the P&L and balance sheet: every figure opens to its postings, records, documents and bank lines (`tests/api/reports.test.mjs`); REPORT-005 stays partial for the other reports and export at each level |
-| 22 | Every number | "Cash or accrual, one switch" | REPORT-002 | done for the trial balance, general ledger, P&L, balance sheet and sales tax (`tests/api/reports.test.mjs`); REPORT-002 stays partial for the other reports, the dashboard and PDF labels |
-| 23 | Books agent | "Pantry follows up on what doesn't add up" ("Asked Maya by text") | PAN-18, AGENT-002, NOTIFY-001 | done by email to the owner: Pantry's books agent asks one question per finding and the answer files it (PAN-18, `tests/api/questions.test.mjs`); asking by text and other people (AGENT-002, NOTIFY-001) is missing |
-| 24 | Books agent | "shows you the change before anything moves" (Approve / Not now) | PAN-18, PAN-15, AGENT-003 | done: every proposal waits for approval (PAN-15) and each answer to Pantry's question shows the month's net income before and after (PAN-18); AGENT-003's full preview is partial |
-| 25 | Month-end close | "Reconcile" | PAN-09, BANK-005 | done (PAN-09) |
-| 26 | Month-end close | "answer the open questions" | PAN-18, CLOSE-003, AGENT-002 | done: the month's questions are one thread at close and the lock waits until none is open (PAN-18); CLOSE-003 stays partial |
-| 27 | Month-end close | "lock the month" | PAN-13 | done |
-| 28 | Month-end close | "Your accountant signs off in the same place" | PAN-01, PAN-13, ACCT-001 | done (PAN-01, PAN-13) |
-| 29 | Interlude | "Books up to date · Oct 31" | PAN-13, REPORT-008 | done (PAN-13 close status per period); the dashboard line is REPORT-008 |
-| 30 | Connected | "Payouts split into sales and fees" (Stripe) | PAN-19, PROC-001 | done, as row 9 (PAN-19); PROC-001 stays partial |
-| 31 | Connected | "payroll posts as one balanced entry" (Gusto) | PAN-19, PAYROLL-001, CONNECT-001 | done on installations with their own Gusto app: each processed payroll posts as one balanced entry matched to Gusto's debits (PAN-19, `tests/api/connected.test.mjs`); Rippling, report files and the Pantry Connect path (PAYROLL-001, CONNECT-001) are partial or missing |
-| 32 | Connected | "sales tax tracks by state" | SALESTAX-001, SALESTAX-002 | done: sales tax by state and code, tied to each liability account (`tests/api/reports.test.mjs`); address-based rates and filing remain partial |
-| 33 | Move in | "Move from QuickBooks Online" | PAN-16, MIGRATE-001 | done (PAN-16) |
-| 34 | Move in | "or Xero" | PAN-16, MIGRATE-002 | done from Xero's six standard exports, signed off to Xero's trial balance to the cent (PAN-16, `tests/api/move-in.test.mjs`); MIGRATE-002's full API connection is partial |
-| 35 | Move in | "with balances, open invoices" | PAN-16, MIGRATE-001, MIGRATE-002 | done (PAN-16 for QuickBooks Online and Xero) |
-| 36 | Move in | "and attachments" | PAN-16, MIGRATE-001, MIGRATE-005 | partial — Xero open items' attachments come over Xero's API with the installation's own Xero app (PAN-16), not yet proven against a live Xero organisation; QuickBooks Online attachments (MIGRATE-001) and document archives (MIGRATE-005) are not carried |
-| 37 | Move in | "checked before you switch" (trial balance check, matches) | PAN-16 | done |
-| 38 | Ownership | "Run Pantry on your own computer" (terminal: `npx -y @runeditrun/rer dev just-every/run-pantry`) | OWN-001 | done |
-| 39 | Ownership | "keep every record" / "Your books, your database" | OWN-001, PAN-14 | done |
-| 40 | Ownership | "Export everything, any time" | PAN-14 | done |
-| 41 | Quiet details | Bank rules: "routine transactions file themselves" | RULE-002 | done, as row 13 |
-| 42 | Quiet details | 1099 tracking: "Contractors flagged at the IRS threshold ($2,000 from 2026), forms ready in January" | TAXFORM-001, TAXFORM-002, CONNECT-003 | done for tracking, flags at the tax year's threshold and the January forms and filing CSV (`tests/api/reports.test.mjs`); W-9 requests and IRIS filing are partial |
-| 43 | Quiet details | Audit trail: "who, what and when" | AUDIT-001 | done for who, what and when; AUDIT-001's filters and before/after values are partial |
-| 44 | Quiet details | Locked periods: "Closed months stay closed" | PAN-13 | done |
-| 45 | Quiet details | Attachments everywhere: "Every entry keeps its receipt or bill" | PAN-17, PAN-03, PAN-05, CAPTURE-004, CAPTURE-008 | done for listing: every entry's receipts open from the entry, report and exports, and spending without one is listed at close (PAN-17); requiring one on every entry is CAPTURE-008 |
-| 46 | Quiet details | Export everything: "CSV and a full database export, any time" | PAN-14, REPORT-007 | done (PAN-14) |
-| 47 | Closing | "Open source accounting for US small businesses" / "Free and open source, MIT licensed" | OWN-001 | done |
+| 6 | Hero cards | Net income · October, the P&L | PAN-12, REPORT-001 | done (PAN-12) |
+| 7 | Hero cards | Chase Business ••4417 feed, 2,847 transactions | BANK-001, BANK-004 | done on installations holding their own Plaid keys |
+| 8 | Hero cards | Home Depot receipt read into vendor, date, category | PAN-17, CAPTURE-003 | done with the installation's own AI key (PAN-17) |
+| 9 | Hero cards | Stripe payout matched to 23 charges, fees split | PAN-19, PROC-001 | done (PAN-19, `tests/api/connected.test.mjs`) |
+| 10 | Hero cards | INV-0231 "Paid via ACH" | PAY-003 | done: the customer's ACH transfer arrives on the bank feed and matches its invoice by itself (`src/pantry/automatch.ts`) |
+| 11 | Hero cards | "Looks right, closing October · Reviewed by your accountant" | PAN-13 | done |
+| 12 | A month in the books | "one bank, one card, Stripe, Gusto and an accountant" | BANK-001, PAN-19, PAN-01 | done |
+| 13 | A month in the books | "Oct 1 · 2,847 transactions backfilled" | BANK-002 | done for a new connection's 730 days of history without duplicating imported lines (`src/pantry/feeds/plaid.ts`, `sync.ts`); BANK-002's start-date choices are partial |
+| 14 | A month in the books | "Oct 20 · Amex ••1009 sign-in expired" | BANK-004 | done: the connection says so with Re-link |
+| 15 | A month in the books | "Oct 27 · Agent closes 3 loose ends" | PAN-18, AGENT-002, NOTIFY-001 | partial: questions by email to the owner (PAN-18); by text and to the accountant are missing |
+| 16 | A month in the books | "Oct 31 · Books up to date", "Nov 2 · Locked by Jordan Kim, CPA" | PAN-13 | done |
+| 17 | Bring your books with you | "Import from QuickBooks Online or Xero" | PAN-16, MIGRATE-001, MIGRATE-002 | done (PAN-16, `tests/api/move-in.test.mjs`) |
+| 18 | Bring your books with you | "Balances, open items … tie out before you switch" (trial balance matched to the cent, signed off by the accountant) | PAN-16 | done |
+| 19 | Bring your books with you | "… and attachments tie out" | PAN-16, MIGRATE-001, MIGRATE-005 | partial: Xero open items' attachments over Xero's API, not proven against a live organisation; QuickBooks Online attachments are missing |
+| 20 | Bring your books with you | Terminal: `git clone …run-pantry.git pantry`, `cd pantry`, `rer install`, `rer setup`, `rer dev` | OWN-001 | done |
+| 21 | Every transaction, already in. | "Chase, Amex, Stripe and Gusto land in one ledger" | BANK-001, PAN-19, RULE-001 | done |
+| 22 | Every transaction, already in. | "Rules code the routine" | RULE-002 | done (`tests/api/rules.test.mjs`) |
+| 23 | Every transaction, already in. | "Payouts and payroll split into real entries" | PAN-19, PROC-001, PAYROLL-001 | done (`tests/api/connected.test.mjs`) |
+| 24 | Every transaction, already in. | Ledger with "Needs review 2", "Matched to invoice", "Receipt attached" | RULE-001, PAY-003, PAN-17 | done; RULE-001 stays partial for per-line splits |
+| 25 | Every transaction, already in. | "Deposit? · For Jordan" | AGENT-002 | partial: questions go to the owner (PAN-18); to the accountant is missing |
+| 26 | Snap it or forward it. | Snap a photo or forward the email | PAN-17, CAPTURE-001, CAPTURE-002 | done (PAN-17) |
+| 27 | Snap it or forward it. | "reads the vendor, date and total, finds the card charge" | PAN-17, CAPTURE-003, CAPTURE-004 | done with the installation's own AI key |
+| 28 | Snap it or forward it. | "files each receipt once" ("Emailed copy skipped · already attached") | CAPTURE-005 | missing |
+| 29 | Sent. Reminded. Paid. Matched. | "Email the invoice with a card … link" | INVOICE-002, PAY-001 | done for card through the business's own Stripe |
+| 30 | Sent. Reminded. Paid. Matched. | "Reminders go out on schedule" | INVOICE-004 | done |
+| 31 | Sent. Reminded. Paid. Matched. | "the payment matches itself" (emailed, viewed, reminded, paid by ACH bank transfer, matched) | INVOICE-002, INVOICE-003, PAY-003 | done |
+| 32 | Sent. Reminded. Paid. Matched. | Recurring INV-0240; Receivables aging | INVOICE-005, REPORT-004 | done |
+| 33 | Sent. Reminded. Paid. Matched. | "… or ACH link" | PAY-001 | partial: built for US Stripe accounts, not proven live |
+| 34 | When a feed breaks, you see it. | Connection status, last successful sync, the plain-words sign-in error and Re-link | BANK-004 | done |
+| 35 | When a feed breaks, you see it. | "Next sync" | BANK-004 | missing |
+| 36 | When a feed breaks, you see it. | "Pantry flagged the gap that morning"; "October close · 1 exception" | BANK-004, NOTIFY-001 | missing |
+| 37 | When a feed breaks, you see it. | "backfilled every missed day once Maya re-linked"; "no duplicates" | BANK-002, BANK-003, BANK-004 | done: sync resumes from its cursor, idempotent on Plaid transaction ids |
+| 38 | Loose ends, chased down. | "follows each mismatch across your bank … and inbox until the ledger and the evidence agree" | PAN-18, AGENT-002, CAPTURE-008 | done for the bank and inbox checks and answers that file themselves (PAN-18) |
+| 39 | Loose ends, chased down. | "… across your … payroll" ("Payroll off by $50.00") | PAYROLL-001, AGENT-004 | partial: a payroll that does not add up waits for a person; tracing it inside Gusto is missing |
+| 40 | Loose ends, chased down. | "Asked Maya by text" | AGENT-002, NOTIFY-001 | missing |
+| 41 | Loose ends, chased down. | "Each fix shows what it changed in the report" | PAN-18, AGENT-003 | done: net income before and after on each answer |
+| 42 | Closed with your accountant. | "Everything reconciles before Jordan opens it" | PAN-09, PAN-13, PAN-17, PROC-003, PAYROLL-002 | done for reconciliation and the close checks; clearing and payroll-liability checks (PROC-003, PAYROLL-002) are missing |
+| 43 | Closed with your accountant. | "One judgment call, one answer, and October is locked." | PAN-18, PAN-13, CLOSE-003 | done (PAN-18, PAN-13) |
+| 44 | Closed with your accountant. | The accountant answers the deposit question in the close | AGENT-002, AGENT-005 | partial: the accountant works the close with the lock grant; a question to the accountant is missing |
+| 45 | Click any number. | "P&L, balance sheet … on cash or accrual" | REPORT-002 | done |
+| 46 | Click any number. | "… and cash flow" | REPORT-003 | missing |
+| 47 | Click any number. | "Every figure opens to the bills, receipts and vendors behind it" | REPORT-005 | done for the P&L and balance sheet |
+| 48 | Click any number. | Aging tab | REPORT-004 | done |
+| 49 | Click any number. | 1099-NEC · 2026, "W-9 on file", "under $2,000" | TAXFORM-001, TAXFORM-002 | done for tracking at the tax year's threshold; the online W-9 request is partial |
+| 50 | Interlude | "Books up to date · Oct 31" | PAN-13 | done |
+| 51 | Closing | "Open source accounting for US small businesses" / "Free and open source, MIT licensed" | OWN-001 | done |
 
 ## Status
 

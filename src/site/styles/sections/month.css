@@ -1,0 +1,59 @@
+/* A month in the books. (page-02): October on one ribbon, ticks grouped by week with the weekends in grey (from the
+   calendar), a break, then Nov 2. Callouts hang above and below from their day; a pink band covers the days the Amex
+   feed was down and a green one the days after it caught up. Phones and tablets get the vertical rail (390 plan). */
+.month { --body-w: 590px; }
+.ribbon { --axis: 168px; --low: 256px; --hang: 86px; position: relative; padding: 0 60px 0 22px; }
+.rb-axis { position: relative; height: calc(var(--low) + 82px); font-size: clamp(13.5px, 1.18vw, 17px); }
+.rb-line { position: absolute; top: calc(var(--axis) - 1px); left: -10px; width: calc(30.6 / 32 * 100% + 10px); height: 2px; background: #2a3350; }
+.rb-line.nov { left: calc(31.35 / 32 * 100%); width: calc(.65 / 32 * 100%); }
+.rb-tick { position: absolute; top: calc(var(--axis) - 11px); width: 2px; height: 22px; margin-left: -1px; background: #2a3350; }
+.rb-tick > span { position: absolute; top: 34px; left: 50%; transform: translateX(-50%); font-size: 16px; line-height: 1; color: var(--ink); white-space: nowrap; }
+.rb-tick.weekend { background: #b4b8ca; }
+.rb-tick.weekend > span { color: #9298b0; }
+.rb-band { position: absolute; top: calc(var(--axis) - 9px); height: 18px; border-radius: 9px; filter: blur(1.5px); }
+.rb-band.down { background: rgba(229, 72, 86, .17); }
+.rb-band.back { background: rgba(25, 169, 116, .15); }
+.rb-node { position: absolute; z-index: 1; top: calc(var(--axis) - 7px); width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; box-shadow: 0 0 0 2.5px var(--paper); }
+.rb-stem { position: absolute; width: 2px; margin-left: -1px; }
+.rb-stem.above { top: var(--hang); height: calc(var(--axis) - var(--hang)); }
+.rb-stem.below { top: calc(var(--axis) + 56px); height: calc(var(--low) - var(--axis) - 56px); }
+.rb-call { position: absolute; z-index: 2; display: flex; align-items: flex-start; gap: .7em; width: max-content; padding: .8em 1.05em; transform: translateX(calc(var(--anchor) * -100%));
+  background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-card); line-height: 1.38; color: var(--ink); }
+.rb-call.above { bottom: calc(100% - var(--hang)); }
+.rb-call.below { top: var(--low); }
+.rb-text { display: grid; white-space: nowrap; }
+.rb-dot { display: grid; place-items: center; flex: none; width: .92em; height: .92em; margin-top: .25em; border-radius: 50%; }
+.rb-call.tone-green .rb-dot, .rb-node.tone-green, .rb-stem.tone-green { background: var(--green); }
+.rb-call.tone-apricot .rb-dot, .rb-node.tone-apricot, .rb-stem.tone-apricot { background: #e9915a; }
+.rb-call.tone-red .rb-dot, .rb-node.tone-red, .rb-stem.tone-red { background: #e04452; }
+.rb-call.tone-navy .rb-dot, .rb-stem.tone-navy { background: #26315c; }
+.rb-dot .icon { width: .7em; height: .7em; color: #fff; stroke-width: 2.6; }
+.rail { display: none; }
+
+@media (max-width: 1099px) {
+  .ribbon { display: none; }
+  .rail { position: relative; display: grid; gap: 14px; max-width: 640px; }
+  .rail::before { content: ''; position: absolute; top: -10px; bottom: -10px; left: 99px; width: 2px; background: #2a3350; }
+  .rail li { position: relative; display: grid; grid-template-columns: 72px 28px minmax(0, 1fr); align-items: center; gap: 0 14px; }
+  .rail li.gap { margin-bottom: 64px; }
+  .rail li.gap::after { content: ''; position: absolute; top: calc(50% + 14px); left: 98px; width: 4px; height: calc(50% + 50px); background: linear-gradient(#e04452, rgba(224, 68, 82, .25) 40%, rgba(25, 169, 116, .35) 70%, var(--green)); filter: blur(1px); }
+  .rail-date { font: 600 17px/1.2 var(--font-body); color: var(--ink); white-space: nowrap; }
+  .rail-date.weekend { color: #9298b0; }
+  .rail-node { position: relative; z-index: 1; justify-self: center; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 3px var(--paper); }
+  .rail .tone-green .rail-node { background: var(--green); }
+  .rail .tone-apricot .rail-node { background: #f2a272; }
+  .rail .tone-red .rail-node { background: #e04452; }
+  .rail .tone-navy .rail-node { background: #26315c; }
+  .rail-node .icon { width: 13px; height: 13px; color: #fff; stroke-width: 2.4; }
+  .rail li:last-child .rail-node { width: 26px; height: 26px; }
+  .rail-card { padding: 16px 20px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 26, 51, .04), 0 10px 22px -16px rgba(16, 26, 51, .22); font: 600 17px/1.3 var(--font-body); color: var(--ink); }
+}
+@media (max-width: 760px) {
+  .rail { gap: 10px; }
+  .rail::before { left: 79px; }
+  .rail li { grid-template-columns: 56px 24px minmax(0, 1fr); gap: 0 12px; }
+  .rail li.gap { margin-bottom: 48px; }
+  .rail li.gap::after { left: 78px; height: calc(50% + 34px); }
+  .rail-date { font-size: 15.5px; }
+  .rail-card { padding: 13px 15px; font-size: 15.5px; }
+}

@@ -1,0 +1,76 @@
+/* Snap it or forward it. (page-05): the phone shows the Home Depot receipt as monospace text with the vendor, date
+   and total boxed; a forwarded Lowe's order sits beside it; a lead runs from the phone to the Home Depot line it was
+   filed on, and the skipped emailed copy hangs from that line. */
+.receipts { --copy: 36fr; --art: 64fr; }
+.receipts .sec-row { column-gap: clamp(32px, 3.4vw, 48px); }
+.snap { position: relative; display: grid; justify-items: start; }
+.snap-top { display: flex; align-items: center; gap: 20px; width: 100%; padding-left: 3%; }
+.phone { position: relative; flex: none; width: 300px; padding: 12px 8px 30px; border: 9px solid #161a2c; border-radius: 46px; background: #fff; box-shadow: 0 0 0 1.5px #4a4f66, 0 34px 60px -30px rgba(16, 26, 51, .55); }
+.phone::after { content: ''; position: absolute; left: 50%; bottom: -17px; width: 12px; height: 12px; margin-left: -6px; border: 2px solid #161a2c; border-radius: 50%; background: #fff; }
+.phone-status { display: flex; align-items: center; justify-content: space-between; padding: 2px 14px 12px; font: 600 13px/1 var(--font-body); color: #111; }
+.phone-island { width: 88px; height: 25px; border-radius: 14px; background: #0c0e18; }
+.phone-icons { display: flex; align-items: flex-end; gap: 2px; }
+.phone-icons i { display: block; width: 4px; border-radius: 1px; background: #111; }
+.phone-icons i:nth-child(1) { height: 5px; } .phone-icons i:nth-child(2) { height: 8px; } .phone-icons i:nth-child(3) { height: 11px; }
+.phone-screen { padding: 8px 0 0; background: linear-gradient(#fbfbfd, #f2f2f7); border-radius: 6px; }
+.phone .receipt-paper { width: 100%; }
+.mail { flex: 1; min-width: 0; max-width: 430px; margin-top: -60px; padding: 22px 20px 20px; border-radius: 20px; }
+.mail-from { display: flex; align-items: center; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid var(--line); font-size: 18px; font-weight: 500; overflow-wrap: anywhere; }
+.mail-icon { display: grid; place-items: center; flex: none; width: 50px; height: 50px; border-radius: 50%; background: #eef0f8; color: #26315c; }
+.mail-icon .icon { width: 22px; height: 22px; }
+.mail-subject { margin-top: 18px; font: 700 21px/1.25 var(--font-head); letter-spacing: -.025em; }
+.mail-match { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 16px; padding: 11px 10px 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: #f8f8fb; font-size: 13.5px; color: #2b3249; }
+.mail-match .dots > span + span::before { width: .7em; margin-left: -.7em; }
+.mail-match .dots > span { padding-right: .7em; }
+.mail-match .dots > span:last-child { padding-right: 0; }
+.sl-break { display: none; }
+.mail-match .check { width: 24px; height: 24px; }
+.snap-line { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; row-gap: 8px; width: 100%; margin-top: 58px; padding: 18px 20px 18px 6px; border-radius: 18px; font-size: 15.5px; color: #6b7290; }
+.snap-line::before { content: ''; position: absolute; left: calc(3% + 150px); bottom: 100%; width: 2px; height: 42px; margin-left: -1px; background: #161a2c; }
+.snap-line::after { content: ''; position: absolute; left: calc(3% + 150px); top: -5px; width: 9px; height: 9px; margin-left: -4.5px; border-radius: 50%; background: #161a2c; }
+.snap-line > span { padding: 2px 14px; }
+.snap-line > span + span { border-left: 1px solid var(--line); }
+.sl-payee, .sl-amount { font-size: 17.5px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.sl-amount { font-variant-numeric: tabular-nums; }
+.sl-how { display: flex; align-items: center; gap: 14px; padding-right: 0 !important; }
+.sl-how .check { width: 36px; height: 36px; }
+.snap-skip { position: relative; margin: 18px 0 0 calc(3% + 18px); padding: 10px 20px 10px 34px; border: 1px solid #f6d3bb; border-radius: 999px; background: #fff3ea; color: var(--apricot-text); font-size: 15.5px; }
+.snap-skip::before { content: ''; position: absolute; left: 15px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: #ee7e3e; }
+.snap-skip::after { content: ''; position: absolute; left: 30px; bottom: 100%; width: 2px; height: 18px; background: #ee7e3e; }
+
+@media (max-width: 1280px) {
+  .snap-top { padding-left: 0; }
+  .snap-line::before, .snap-line::after { left: 150px; }
+  .snap-skip { margin-left: 18px; }
+  .snap-line { padding: 14px 14px 14px 4px; font-size: 14.5px; }
+  .sl-payee, .sl-amount { font-size: 16px; }
+  .snap-line > span { padding: 2px 11px; }
+  .sl-how { gap: 10px; }
+  .sl-how .check { width: 30px; height: 30px; }
+  .mail-subject { font-size: 18px; }
+}
+@media (max-width: 1099px) {
+  .snap { max-width: 760px; }
+}
+@media (max-width: 760px) {
+  .snap { justify-items: stretch; }
+  .snap-top { flex-direction: column; align-items: center; gap: 20px; }
+  .mail { order: 2; width: 100%; max-width: none; margin-top: 0; padding: 16px; border-radius: 16px; }
+  .mail-from { gap: 12px; padding-bottom: 12px; font-size: 15.5px; }
+  .mail-icon { width: 40px; height: 40px; }
+  .mail-subject { margin-top: 12px; font-size: 18px; }
+  .mail-match { margin-top: 12px; padding: 10px 12px; font-size: 13.5px; }
+  .phone::after, .snap-line::before, .snap-line::after { display: none; }
+  .snap-line { margin-top: 16px; padding: 14px 16px; border-radius: 16px; font-size: 14.5px; }
+  .sl-amount { margin-left: auto; }
+  .sl-break { display: block; flex-basis: 100%; height: 0; }
+  .snap-line > span { padding: 0; }
+  .snap-line > span + span { border-left: 0; }
+  .sl-date::after, .sl-coded::after { content: '·'; margin: 0 .4em; color: #6b7290; font-weight: 400; }
+  .sl-payee, .sl-amount { font-size: 16px; }
+  .sl-how { gap: 8px; margin-left: 0; }
+  .sl-how .check { width: 22px; height: 22px; }
+  .snap-skip { justify-self: start; margin: 12px 0 0; padding: 8px 14px 8px 28px; font-size: 13.5px; }
+  .snap-skip::before { left: 12px; }
+  .snap-skip::after { left: 24px; height: 12px; }
+}
