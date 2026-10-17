@@ -29,6 +29,7 @@
         { "slug": "move-in", "title": "Move in from QuickBooks Online or Xero", "file": "move-in.md", "summary": "Preview your QuickBooks Online or Xero exports and their tie-outs, import them as staged records, carry Xero's attachments over, and sign them off." },
         { "slug": "backup", "title": "Back up and restore", "file": "backup.md", "summary": "Export the whole book to one archive and restore it into an empty installation." },
         { "slug": "connections", "title": "Connections and keys", "file": "connections.md", "summary": "Set up live bank feeds (Plaid), Gusto payroll, Xero attachments and email with accounts of your own: where each key comes from and where it goes." },
+        { "slug": "integrations", "title": "Sibling integrations", "file": "integrations.md", "summary": "Give a sibling book a scoped credential, send records once, mark bills ready and read their payments." },
         { "slug": "hosting", "title": "Put Pantry online", "file": "hosting.md", "summary": "Deploy Pantry to your own Cloudflare account with rer deploy: the token it needs, the mail it sends with, and how to update or remove it." }
       ]
     }

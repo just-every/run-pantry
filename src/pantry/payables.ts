@@ -7,7 +7,7 @@ import { controlAccount } from './accounts'
 import { contact } from './contacts'
 import { entryStatements, type Line } from './journal'
 import { invoice, openBalance } from './invoices'
-import type { Command } from './context'
+import type { Command, Context } from './context'
 import { METHODS } from './contractors'
 
 export async function bill(db: D1Database, id: string) {
@@ -33,7 +33,8 @@ async function parseBill(db: D1Database, b: Data) {
   return { vendor, billDate, dueDate, lines, total: lines.reduce((s, l) => s + l.amount, 0), reference: text(b.reference, "Vendor's invoice number", 80), memo: optionalText(b.memo, 'Memo', 1000) }
 }
 
-const saveBill: Command = { need: 'record', async run(c, b) {
+/** Build one bill's complete write batch, also used by the idempotent integration API. */
+export async function billStatements(c: Context, b: Data) {
   const p = await parseBill(c.db, b)
   const id = uid(), post = b.post === true || b.post === 'true'
   // A locked month refuses bills dated in it, drafts included (PAN-13).
@@ -46,8 +47,13 @@ const saveBill: Command = { need: 'record', async run(c, b) {
     ...p.lines.map((l, i) => q('INSERT INTO pt_bill_lines (id, bill_id, line_no, description, account_id, amount_cents) VALUES (?, ?, ?, ?, ?, ?)', uid(), id, i + 1, l.description, l.accountId, l.amount))]
   if (payable) statements.push(...postBill(c.actor, { id, journalId, payable: payable.id, vendor: p.vendor, reference: p.reference, date: p.billDate, lines: p.lines.map(l => ({ account_id: l.accountId, amount_cents: l.amount, description: l.description })), total: p.total }))
   statements.push(audit(who(c.actor), post ? 'bill.record' : 'bill.draft', 'bill', id, { vendor: p.vendor.name, reference: p.reference, total: p.total }))
-  await run(c.db, statements)
-  return bill(c.db, id)
+  return { id, statements }
+}
+
+const saveBill: Command = { need: 'record', async run(c, b) {
+  const prepared = await billStatements(c, b)
+  await run(c.db, prepared.statements)
+  return bill(c.db, prepared.id)
 } }
 
 function postBill(actor: Actor, b: { id: string; journalId: string; payable: string; vendor: Data; reference: string; date: string; lines: Data[]; total: number }): Sql[] {

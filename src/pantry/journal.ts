@@ -10,7 +10,7 @@ import { entryDocuments } from './receipts/attachments'
 export type Line = { accountId: string; debit: number; credit: number; memo?: string; contactId?: string | null }
 export type Entry = {
   id: string; date: string; memo: string; sourceKind: string; sourceId?: string | null
-  preparedBy: string; preparedKind: 'person' | 'agent' | 'import'; proposalId?: string | null; documentId?: string | null
+  preparedBy: string; preparedKind: 'person' | 'agent' | 'import'; proposalId?: string | null; documentId?: string | null; revision?: string
   lines: Line[]
 }
 
@@ -18,7 +18,7 @@ export type Entry = {
 export function entryStatements(e: Entry, postedBy?: string): Sql[] {
   const statements: Sql[] = [
     q('INSERT INTO pt_journal_entries (id, entry_date, memo, source_kind, source_id, status, prepared_by, prepared_kind, proposal_id, document_id, revision, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      e.id, e.date, e.memo, e.sourceKind, e.sourceId ?? null, 'draft', e.preparedBy, e.preparedKind, e.proposalId ?? null, e.documentId ?? null, uid(), now()),
+      e.id, e.date, e.memo, e.sourceKind, e.sourceId ?? null, 'draft', e.preparedBy, e.preparedKind, e.proposalId ?? null, e.documentId ?? null, e.revision ?? uid(), now()),
     ...e.lines.map((l, i) => q('INSERT INTO pt_journal_lines (id, entry_id, line_no, account_id, debit_cents, credit_cents, memo, contact_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       uid(), e.id, i + 1, l.accountId, l.debit, l.credit, l.memo ?? '', l.contactId ?? null)),
   ]

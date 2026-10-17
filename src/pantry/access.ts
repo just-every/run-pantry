@@ -13,7 +13,8 @@ export type Person = {
   grants: { post: boolean; lock: boolean; reopen: boolean }
 }
 export type Agent = { kind: 'agent'; id: string; email: string; name: string; tokenHash: string }
-export type Actor = Person | Agent
+export type Integration = { kind: 'integration'; id: string; email: string; name: string; tokenHash: string; scope: string }
+export type Actor = Person | Agent | Integration
 
 export async function person(request: Request, original: Bindings): Promise<Person> {
   const env = runtimeBindings(original)
@@ -52,6 +53,7 @@ export function allowed(actor: Person, need: Need) {
 }
 
 export function must(actor: Actor, need: Need) {
+  if (actor.kind === 'integration') throw new Fault(403, 'Integration credentials use only the integration API')
   if (actor.kind === 'agent') throw new Fault(403, 'Agents prepare proposals; a person approves them')
   if (!allowed(actor, need)) throw new Fault(403, ({ read: 'Viewing', record: 'Recording', post: 'Posting', lock: 'Locking periods', reopen: 'Approving reopening', owner: 'Owner access' } as const)[need] + ' is not part of your role')
 }
@@ -60,6 +62,10 @@ const sessionLive = "EXISTS (SELECT 1 FROM oa_sessions se JOIN oa_operators o ON
 
 /** The capability check as a scalar SQL condition, for guards and the import kit's fences. */
 export function authorityCondition(actor: Actor, need: Need): { sql: string; params: unknown[] } {
+  if (actor.kind === 'integration') return {
+    sql: `EXISTS (SELECT 1 FROM pt_integrations i WHERE i.id = ? AND i.token_hash = ? AND i.revoked_at IS NULL AND EXISTS (SELECT 1 FROM json_each(i.scopes) WHERE value = ?)${need === 'post' ? " AND EXISTS (SELECT 1 FROM json_each(i.scopes) WHERE value = 'post')" : ''})`,
+    params: [actor.id, actor.tokenHash, actor.scope],
+  }
   if (actor.kind === 'agent') return { sql: 'EXISTS (SELECT 1 FROM pt_agents WHERE id = ? AND token_hash = ? AND active = 1)', params: [actor.id, actor.tokenHash] }
   if (actor.role === 'owner') return { sql: `${sessionLive} AND o.role = 'owner')`, params: [actor.session, actor.id] }
   const grant = need === 'post' ? 'AND m.can_post = 1' : need === 'lock' ? 'AND m.can_lock = 1' : need === 'reopen' ? 'AND m.can_reopen = 1' : ''

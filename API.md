@@ -53,3 +53,7 @@ Writes: `POST /api/pantry/command/:action` with a JSON object.
 - `GET proposals/:id`: the decision.
 
 `node scripts/pantry-agent.mjs` wraps these as typed commands (`context`, `propose-match`, `propose-journal`, `propose-close-packet`, `propose-variance`, `status`) with `PANTRY_URL` and `PANTRY_AGENT_TOKEN`; it exits 3 on a 409 and 4 when the token is refused.
+
+## Sibling integrations: `/api/pantry/integration/v1/`
+
+See [Sibling integrations](docs/integrations.md) for owner-created scoped credentials, idempotent writes, record reads, bill readiness and a complete `curl` example. Integration credentials use this separate API and cannot sign in as people or use the proposal-only agent API.

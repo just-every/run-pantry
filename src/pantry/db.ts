@@ -41,7 +41,7 @@ export async function one<T = Data>(db: D1Database, sql: string, ...params: unkn
   return await db.prepare(sql).bind(...params).first<T>()
 }
 
-export type AuditActor = { email: string; kind: 'person' | 'agent' | 'system' }
+export type AuditActor = { email: string; kind: 'person' | 'agent' | 'system' | 'integration' }
 
 export const audit = (actor: AuditActor, action: string, subjectKind: string, subjectId: string, detail: Data = {}) =>
   q('INSERT INTO pt_audit (id, at, actor_email, actor_kind, action, subject_kind, subject_id, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',

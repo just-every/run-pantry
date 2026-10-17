@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (next minor)
+
+- Owners can give each sibling book a named, scoped integration credential in People & settings, copy it once, revoke it and inspect its calls. Credentials do not sign in and do not expire with the owner's session.
+- The versioned integration API upserts contacts, creates bills, invoices, credits and journals once per idempotency key, attaches documents, records bill receipt/readiness and reads payments and the trial balance. Posting needs a separate grant; period locks still apply. See [Sibling integrations](/docs/integrations).
+- Migration `0024_integrations.sql` adds credential hashes, request identities, call history and bill readiness flags. Existing books and sign-ins stay in place.
+
 ## 0.2.1 (17 Oct 2026)
 
 Pantry 0.2.1 lets customers pay an invoice by card from its link on a Stripe account opened now. Upgrading from 0.2.0 adds no migrations.

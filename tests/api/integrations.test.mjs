@@ -1,0 +1,80 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { books, harness } from './harness.mjs'
+
+test('a scoped sibling posts once, readies its bill, reads payment after owner expiry, and loses access on revocation', async t => {
+  const h = await harness(); t.after(h.close)
+  const { acct } = await books(h)
+  const bank = await h.command('bank-account.save', { name: 'Operating checking', institution: 'Community Bank', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-10-01', openingBalance: '0.00' })
+  const scopes = ['contacts:write', 'bills:write', 'invoices:write', 'journals:write', 'documents:write', 'payments:read', 'reports:read', 'post']
+  const credential = await h.command('integration.create', { name: 'Pier warehouse', scopes })
+  const call = async (path, body, key, status = 200, token = credential.token) => {
+    const r = await h.send('/api/pantry/integration/v1/' + path, body, { headers: { authorization: `Bearer ${token}`, ...(key ? { 'idempotency-key': key } : {}) } })
+    assert.equal(r.status, status, `${path}: ${JSON.stringify(r.value)}`)
+    return r.value
+  }
+  const vendor = await call('contacts', { externalId: 'harbor-ceramics', kind: 'vendor', name: 'Harbor Ceramics', termsDays: 30 }, 'vendor')
+  const updated = await call('contacts', { externalId: 'harbor-ceramics', kind: 'vendor', name: 'Harbor Ceramics LLC', termsDays: 15 }, 'vendor-update')
+  assert.equal(updated.id, vendor.id)
+  assert.equal(updated.terms_days, 15)
+  const body = { vendorId: vendor.id, reference: 'HC-7731', billDate: '2026-10-17', post: true, lines: [{ description: '48 ceramic mugs and inbound freight', accountId: acct['6100'], amount: '482.00' }] }
+  const [a, b] = await Promise.all([call('bills', body, 'receipt-7731'), call('bills', { ...body }, 'receipt-7731')])
+  assert.equal(a.id, b.id)
+  assert.equal(a.status, 'posted')
+  assert.equal((await h.view('sales')).bills.length, 1)
+  await call('bills', { ...body, reference: 'HC-CHANGED' }, 'receipt-7731', 409)
+  await call('bills', body, undefined, 400)
+  const ready = await call(`bills/${a.id}/readiness`, { received: true, readyToPay: true }, 'receipt-ready')
+  assert.equal(ready.received, 1)
+  assert.equal(ready.ready_to_pay, 1)
+  assert.equal((await call(`bills/${a.id}/readiness`, { readyToPay: true, received: true }, 'receipt-ready')).id, a.id)
+  await call(`bills/${a.id}/readiness`, { received: false, readyToPay: true }, 'bad-readiness', 400)
+  const source = Buffer.from('Harbor Ceramics HC-7731\n48 mugs x $9.50 = $456.00; freight $26.00; total $482.00\n')
+  const document = await call('documents', { name: 'HC-7731.txt', mediaType: 'text/plain', base64: source.toString('base64'), linkedKind: 'bill', linkedId: a.id }, 'source-invoice')
+  const raw = await h.send('/api/pantry/integration/v1/documents/' + document.id, undefined, { headers: { authorization: `Bearer ${credential.token}` } })
+  assert.equal(raw.value, source.toString())
+  assert.equal((await call('documents', { name: 'HC-7731.txt', mediaType: 'text/plain', base64: source.toString('base64'), linkedKind: 'bill', linkedId: a.id }, 'source-invoice')).id, document.id)
+  const payment = await h.command('payment.record', { direction: 'paid', contactId: vendor.id, date: '2026-10-17', amount: '482.00', method: 'ach', bankAccountId: bank.id, allocations: [{ targetId: a.id, amount: '482.00' }] })
+  const payments = await call('payments?billId=' + a.id)
+  assert.equal(payments.payments[0].id, payment.id)
+  assert.equal(payments.payments[0].allocations[0].target_id, a.id)
+  assert.equal((await call('bills?id=' + a.id)).bills[0].open_cents, 0)
+  const customer = await call('contacts', { externalId: 'cedar', kind: 'customer', name: 'Cedar Studio' }, 'customer')
+  const invoiceBody = { customerId: customer.id, number: 'PIER-01', issueDate: '2026-10-17', post: true, lines: [{ description: 'Mugs', rate: '40.00', quantity: '1', accountId: acct['4000'], taxCode: 'exempt' }] }
+  const invoice = await call('invoices', invoiceBody, 'invoice')
+  assert.equal(invoice.status, 'issued')
+  assert.equal((await call('invoices', invoiceBody, 'invoice')).id, invoice.id)
+  const journalBody = { date: '2026-10-17', memo: 'Pier COGS', post: true, lines: [{ accountId: acct['6100'], debit: '10.00' }, { accountId: acct['1000'], credit: '10.00' }] }
+  const journal = await call('journals', journalBody, 'cogs')
+  assert.equal(journal.status, 'posted')
+  assert.equal((await call('journals', journalBody, 'cogs')).id, journal.id)
+  const limited = await h.command('integration.create', { name: 'Pier replacement without posting', scopes: ['bills:write', 'contacts:write'] })
+  const linked = await call('contacts', { externalId: 'harbor-ceramics', kind: 'vendor', name: 'Harbor Ceramics LLC' }, 'vendor-link', 200, limited.token)
+  assert.equal(linked.id, vendor.id)
+  assert.equal(linked.terms_days, 15)
+  await call('journals', journalBody, 'forbidden', 403, limited.token)
+  await call('bills', body, 'forbidden-post', 403, limited.token)
+  const draft = await call('bills', { ...body, reference: 'DRAFT', post: false }, 'draft', 200, limited.token)
+  assert.equal(draft.status, 'draft')
+  assert.equal((await h.send('/api/pantry/state', undefined, { headers: { authorization: `Bearer ${credential.token}` } })).status, 401)
+  assert.equal((await h.send('/api/pantry/command/member.save', { email: 'intruder@example.test' }, { headers: { authorization: `Bearer ${credential.token}` } })).status, 401)
+  // Exercise the locked-period refusal without needing an unrelated month's close workflow.
+  await h.db.prepare("INSERT INTO pt_periods (id,start_date,end_date,status,revision) VALUES ('2026-11','2026-11-01','2026-11-30','locked','locked')").run()
+  const locked = await call('bills', { ...body, billDate: '2026-11-01' }, 'locked', 409)
+  assert.match(locked.error, /locked/i)
+  // The bearer remains useful when the same owner's ordinary session has expired.
+  await h.db.prepare('UPDATE oa_sessions SET expires_at = 0').run()
+  await h.view('state', h.owner, 401)
+  assert.equal((await call('payments?billId=' + a.id)).payments[0].id, payment.id)
+  assert.equal((await call('bills', body, 'receipt-7731')).open_cents, 0)
+  // Restore only the test owner's session to exercise the real owner revocation door.
+  await h.db.prepare('UPDATE oa_sessions SET expires_at = ?').bind(Date.now() + 60_000).run()
+  const audit = await h.view('integrations')
+  assert.ok(audit.calls.some(c => c.path.endsWith('/journals') && c.status === 403))
+  assert.ok(audit.calls.some(c => c.path.endsWith('/bills') && c.status === 409))
+  assert.equal(audit.credentials[0].token, undefined)
+  assert.ok(!JSON.stringify(audit).includes(credential.token))
+  await h.command('integration.revoke', { id: credential.id })
+  await call('payments', undefined, undefined, 401)
+  assert.equal((await h.view('integrations')).calls[0].status, 401)
+})

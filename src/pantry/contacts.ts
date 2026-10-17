@@ -3,7 +3,7 @@
 import { authority, who } from './access'
 import { now, optionalText, requireThat, sha256, text, uid } from './core'
 import { audit, changed, one, q, run, type Sql } from './db'
-import type { Command } from './context'
+import type { Command, Context } from './context'
 
 export async function contact(db: D1Database, id: string, kind?: 'customer' | 'vendor') {
   const row = await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', id)
@@ -44,7 +44,7 @@ export async function documentInsert(c: { actor: any }, input: { name: string; m
     id, input.name, input.mediaType, input.bytes.length, hash, input.bytes, input.linkedKind ?? null, input.linkedId ?? null, input.note ?? '', c.actor.email, now()) }
 }
 
-const uploadDocument: Command = { need: 'record', async run(c, b) {
+export async function documentStatements(c: Context, b: Record<string, any>) {
   const name = text(b.name, 'File name', 200), mediaType = text(b.mediaType, 'File type', 100)
   requireThat(MEDIA.test(mediaType), 'Upload a PDF, image, text, CSV or OFX file')
   requireThat(typeof b.base64 === 'string' && /^[A-Za-z0-9+/]+=*$/.test(b.base64), 'File content is missing')
@@ -57,7 +57,12 @@ const uploadDocument: Command = { need: 'record', async run(c, b) {
     requireThat(await one(c.db, `SELECT 1 FROM ${table} WHERE id = ?`, linkedId), 'Linked record not found', 404)
   }
   const doc = await documentInsert(c, { name, mediaType, bytes, linkedKind: linkedKind === 'none' ? null : linkedKind, linkedId, note: optionalText(b.note, 'Note', 500) })
-  await run(c.db, [authority(c.actor, 'record'), doc.statement, audit(who(c.actor), 'document.upload', 'document', doc.id, { name, sha256: doc.sha256, linkedKind, linkedId })])
+  return { id: doc.id, statements: [authority(c.actor, 'record'), doc.statement, audit(who(c.actor), 'document.upload', 'document', doc.id, { name, sha256: doc.sha256, linkedKind, linkedId })] }
+}
+
+const uploadDocument: Command = { need: 'record', async run(c, b) {
+  const doc = await documentStatements(c, b)
+  await run(c.db, doc.statements)
   return (await one(c.db, 'SELECT id, name, media_type, size, sha256, linked_kind, linked_id, note, uploaded_by, uploaded_at FROM pt_documents WHERE id = ?', doc.id))!
 } }
 
