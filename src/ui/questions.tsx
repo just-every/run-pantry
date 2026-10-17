@@ -79,12 +79,12 @@ function ReceiptUpload({ q, onDone }: { q: D; onDone: () => Promise<void> }) {
   </div>
 }
 
-function AgentStatus({ agent, onRun }: { agent: D; onRun: () => Promise<void> }) {
+function AgentStatus({ agent, open, onRun }: { agent: D; open: number; onRun: () => Promise<void> }) {
   const can = useShared().state.actor.can.record, r = agent.lastRun
   const mail = agent.mail === 'ready' ? (agent.settings.emailOn ? `Emails new questions to ${agent.owner}, up to ${agent.settings.perDay} a day.` : 'Email is off; questions wait here.') : agent.mail === 'local' ? 'This computer sends no email, so questions wait here.' : 'No mail provider is set up, so questions wait here.'
   return <Card title="How Pantry checks" className="card-stone">
     <ul className="plain">
-      <li><strong>{r ? <>Last checked {day(r.at)}</> : 'Not checked yet'}</strong>{r && <span className="hint"> · {r.found} things to ask about, {r.open} open</span>}</li>
+      <li><strong>{r ? <>Last checked {day(r.at)}</> : 'Not checked yet'}</strong>{r && <span className="hint"> · {r.found} {r.found === 1 ? 'thing' : 'things'} to ask about; {open} open now</span>}</li>
       <li>{mail}</li>
       <li>{agent.model.line}</li>
       <li className="hint">Pantry never files anything without your answer.</li>
@@ -135,7 +135,7 @@ export function Questions({ focus }: { focus?: string }) {
             <span className="answered-end"><StatusChip status={x.status} /><button type="button" className="btn btn-secondary btn-small" onClick={() => { setPicked(x.id); window.scrollTo({ top: 0 }) }}>Answer</button></span>
           </li>)}</ol>
         </Card>}
-        {!data.open.length && !focused && <Card title="Nothing to ask" className="empty-card"><span className="empty-tile" aria-hidden="true" /><p>Every deposit is explained, every payment is filed with its receipt, and the bank and the books agree.</p></Card>}
+        {!data.open.length && !focused && <Card title="Nothing to ask" className="empty-card"><span className="empty-tile" aria-hidden="true" /><p>Every deposit is explained, every payment is filed, every payment of ${data.agent.settings.receiptAmount} or more has its receipt, and the bank and the books agree.</p></Card>}
         {data.settled.length > 0 && <Card title="Answered">
           <ol className="answered">{data.settled.filter((x: D) => x.id !== focused?.id).map((x: D) => <li key={x.id}>
             <div><strong>{x.title}</strong><span className="hint">{x.answer ? <>“{x.answer}” — {who(x.answered_by)}{x.answered_via === 'email' ? ' by email' : ''}, {day(x.answered_at)}</> : x.messages.at(-1)?.body}</span></div>
@@ -144,7 +144,7 @@ export function Questions({ focus }: { focus?: string }) {
         </Card>}
       </div>
       <div className="stack">
-        <AgentStatus agent={data.agent} onRun={async () => { await command('books-agent.run', {}); await refresh() }} />
+        <AgentStatus agent={data.agent} open={data.open.length} onRun={async () => { await command('books-agent.run', {}); await refresh() }} />
         {shared.state.actor.can.owner && <AgentSettings agent={data.agent} onSaved={refresh} />}
       </div>
     </div>

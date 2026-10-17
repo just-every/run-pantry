@@ -72,6 +72,7 @@ const attach: Command = { need: 'record', async run(c, b) {
   const r = await receipt(c.db, text(b.id, 'Receipt'))
   requireThat(r, 'Receipt not found', 404)
   requireThat(r.status === 'review' && r.revision === b.revision, 'This receipt changed; reload', 409)
+  requireThat(b.targetKind && b.targetId, 'Choose the transaction this receipt belongs to')
   const kind = text(b.targetKind, 'Transaction') as Target['kind']
   requireThat(['bankline', 'bill', 'payment', 'journal'].includes(kind), 'Choose a bank or card line, bill, payment or entry')
   const f = fieldsFrom(b)

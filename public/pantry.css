@@ -437,9 +437,10 @@ ol.how-to code { overflow-wrap: anywhere; }
   .own-words .action, .own-words .btn { width: 100%; }
 }
 .choice input[type='radio'] { accent-color: var(--glaze); flex: none; width: 18px; height: 18px; min-height: 0; padding: 0; margin: 3px 0 0; }
+.provider-choices { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); max-width: 420px; }
 
 /* Provider setup steps: the lines to paste keep their line breaks and scroll sideways on a phone. */
-.provider-setup pre.env-lines { margin: 8px 0 0; padding: 10px 12px; background: var(--paper-2, rgba(0,0,0,.04)); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; font-size: 13px; }
+pre.env-lines { margin: 8px 0 0; padding: 10px 12px; background: var(--paper-2, rgba(0,0,0,.04)); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; font-size: 13px; }
 .provider-setup .how-to code { overflow-wrap: anywhere; }
 details.setup-steps summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
 .provider-setup, details.setup-steps, ol.how-to > li { min-width: 0; }

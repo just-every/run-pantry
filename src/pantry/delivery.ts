@@ -5,7 +5,7 @@
 // (days before or after the due date) and stop once the invoice is paid.
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { operatorMail } from '../mail.server.mjs'
-import { authority, pantry, who } from './access'
+import { authority, ownerEmail, pantry, who } from './access'
 import { addDays, daysBetween, longDay, now, optionalText, requireThat, sha256, text, uid, usd, type Data } from './core'
 import { all, audit, changed, one, q, run, type AuditActor } from './db'
 import { invoice } from './invoices'
@@ -93,7 +93,7 @@ export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, 
     requireThat(from, 'MAIL_FROM is not set for this installation', 409)
     result = await mailer.send({
       deliveryId: id, from: fromName ? `${fromName} <${from.replace(/^.*<([^>]+)>.*$/, '$1')}>` : from, to: [recipient], subject, text: textBody, html,
-      replyTo: settings.reply_to || runtimeBindings(env).OWNER_EMAIL, attachments: [{ filename: `${inv.number}.pdf`, contentType: 'application/pdf', content: pdf }],
+      replyTo: settings.reply_to || await ownerEmail(db, env), attachments: [{ filename: `${inv.number}.pdf`, contentType: 'application/pdf', content: pdf }],
     })
     detail = result.code ?? ''
   } catch (error) {
@@ -167,7 +167,7 @@ export const deliveryCommands: Record<string, Command> = {
 export async function sendingView(env: Bindings, db: D1Database) {
   const e = runtimeBindings(env), mailer = operatorMail(e)
   const mail = !mailer ? 'none' : e.MAIL_PROVIDER === 'development' || e.RER_DEMO === '1' ? 'local' : 'ready'
-  return { ...(await sendingSettings(db)), zones: ZONES, mail, from: mail === 'ready' ? e.MAIL_FROM ?? '' : '', ownerEmail: e.OWNER_EMAIL }
+  return { ...(await sendingSettings(db)), zones: ZONES, mail, from: mail === 'ready' ? e.MAIL_FROM ?? '' : '', ownerEmail: await ownerEmail(db, env) }
 }
 
 export async function deliveriesView(db: D1Database) {

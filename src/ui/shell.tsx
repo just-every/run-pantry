@@ -37,7 +37,7 @@ function More({ path }: { path: string }) {
   const active = MORE.some(m => m.to === path)
   return <div className="more" ref={ref}>
     <button ref={button} type="button" className={`nav-link${active ? ' active' : ''}`} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen(o => !o)}><Icon name="more" /><span>More</span></button>
-    {open && <div className="more-menu" role="menu">{MORE.map(m => <Link key={m.to} to={m.to} role="menuitem" onClick={() => setOpen(false)} aria-current={path === m.to ? 'page' : undefined}>{m.label}</Link>)}</div>}
+    {open && <div className="more-menu" role="menu">{MORE.map(m => <Link key={m.to} to={m.to} role="menuitem" onClick={() => setOpen(false)} aria-current={path === m.to ? 'page' : undefined}>{m.label}</Link>)}<a href="/signout" role="menuitem">Sign out or switch person</a></div>}
   </div>
 }
 
@@ -56,7 +56,7 @@ export function Shell() {
       {state && <div className="profile"><span className="profile-name">{state.actor.name}</span>{state.actor.name !== ROLE_LABEL[state.actor.role] && <small>{ROLE_LABEL[state.actor.role]}</small>}</div>}
     </header></HydrationUnit>
     <main className="workspace">
-      {state ? <SharedState.Provider value={{ state, reload }}><Outlet /></SharedState.Provider> : <Loading error={error} what="your books" />}
+      {state ? <SharedState.Provider value={{ state, reload }}><Outlet /></SharedState.Provider> : <><Loading error={error} what="your books" />{error && <p><a href="/signout">Sign out or switch person</a></p>}</>}
     </main>
   </div>
 }

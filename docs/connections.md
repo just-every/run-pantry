@@ -56,22 +56,33 @@ Then connect on the move-in page ([Move in from QuickBooks Online or Xero](/docs
 
 Pantry on your own computer sends no email: it records each invoice and reminder as "Not sent: local run". A hosted Pantry emails invoices, reminders and sign-in links through a mail provider account of your own, [Resend](https://resend.com) or [SendGrid](https://sendgrid.com). You set it up before you [put Pantry online](/docs/hosting), because a hosted Pantry needs it to sign you in.
 
-1. Sign up at Resend (or SendGrid).
-2. Add the domain you send from (Resend: **Domains → Add domain**; SendGrid: **Settings → Sender Authentication**) and add the DNS records it shows wherever your domain's DNS is managed. Wait until it says **Verified**.
-3. Create an API key with sending access (Resend: **API Keys → Create API key**; SendGrid: **Settings → API Keys**, with Mail Send) and copy it.
-4. Choose the From address your customers see, at that domain.
+You send from a domain of your own, such as `yourbusiness.com`. No domain yet? Buy one from any registrar, or in the Cloudflare dashboard under **Domain Registration → Register Domains**, which also puts it on your Cloudflare account (forwarding receipts by email needs that).
+
+**With Resend:**
+
+1. Sign up at [resend.com](https://resend.com/signup).
+2. Open **Domains**, choose **Add Domain** and enter your domain. Add the DNS records it shows wherever your domain's DNS is managed (on Cloudflare: your domain → **DNS → Records**), then choose **Verify DNS Records** and wait until it says **Verified**.
+3. Open **API Keys**, choose **Create API Key** with **Sending access**, and copy it.
+
+**With SendGrid:**
+
+1. Sign up at [sendgrid.com](https://signup.sendgrid.com).
+2. Open **Settings → Sender Authentication** and choose **Authenticate Your Domain**. Enter your domain, add the DNS records it shows wherever your domain's DNS is managed, then choose **Verify** and wait until it says **Verified**.
+3. Open **Settings → API Keys**, choose **Create API Key**, pick **Restricted Access** with **Mail Send** set to **Full Access**, and copy the key. SendGrid shows it once.
+
+Then choose the address mail comes from, at that domain, and write these lines (`MAIL_PROVIDER=sendgrid` for SendGrid):
 
 ```sh
 MAIL_PROVIDER=resend
 MAIL_API_KEY=the API key
-MAIL_FROM=Your Business <billing@example.com>
+MAIL_FROM=billing@example.com
 ```
 
-Use `MAIL_PROVIDER=sendgrid` for SendGrid. Customer replies go to the address in **People & settings → Sending invoices and reminders**, or to the owner's.
+Write `MAIL_FROM` as the address alone, with no name: `rer deploy` refuses `Your Business <billing@…>`. Invoices and reminders show your business's legal name (**People & settings → The business**) as the sender, and sign-in and invitation emails show Pantry. Customer replies go to the address in **People & settings → Sending invoices and reminders**, or to the owner's current sign-in email.
 
 ## Give the keys to Pantry
 
-**On your own computer.** In your `run-pantry` folder, open the file `.dev.vars` in a text editor. It already holds this Pantry's private settings. Add your lines at the end, save, and restart Pantry:
+**On your own computer.** In your `run-pantry` folder, open the file `.dev.vars` in a text editor. It already holds this Pantry's private settings. Its name starts with a dot, so Finder and file dialogs hide it: open it from a terminal in that folder with `open -e .dev.vars` on a Mac, `notepad .dev.vars` on Windows, or `nano .dev.vars` on Linux. Add your lines at the end, save, and restart Pantry:
 
 ```sh
 rer dev --stop

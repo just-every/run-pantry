@@ -27,11 +27,13 @@ function Business() {
 /** The owner's own name and sign-in email, as people and invoices see them. */
 function Owner() {
   const { state, reload } = useShared(), me = state.actor, [saved, setSaved] = useState(0)
+  const here = onThisComputer(), setupOwner = state.settings.setupOwner
   return <Card title="You, the owner">
     <Form key={saved} label="Save name and email" submit={b => command('owner.save', b)} onDone={async () => { await reload(); setSaved(n => n + 1) }} className="grid-form">
       <Field label="Your name" name="name" defaultValue={me.name} required hint="Shown on entries you prepare or post, and to the people you invite" />
       <Field label="Your sign-in email" name="email" type="email" defaultValue={me.email} required hint="Where your sign-in links go. Entries you already made keep the address they were made with." />
     </Form>
+    {here && setupOwner && setupOwner !== me.email && <p className="hint">When you put Pantry online, put <code>OWNER_EMAIL={me.email}</code> in <code>.env.pantry</code> (see <a href="#put-online">Put Pantry online</a>). Without it, the hosted Pantry's owner is {setupOwner}, the address this Pantry was first set up with.</p>}
   </Card>
 }
 
@@ -44,7 +46,7 @@ function People() {
         <td><div className="row-actions"><button type="button" className="btn btn-link" onClick={() => setEditing(m)}>Edit</button>{m.active ? <Action run={async () => { setInvited(null); setInvited(await command('member.invite', { email: m.email })) }}>Send sign-in invitation</Action> : null}</div></td></tr>)}
     </Table>
     {invited && (invited.emailed ? <p role="status" className="hint">Sign-in invitation emailed to {invited.invited}.</p>
-      : <div role="status" className="callout callout-warn"><strong>Invitation recorded; no email was sent</strong><span>Pantry on this computer sends no email. To work as {invited.name} here, open <a href="/signin">the sign-in page</a> and choose Sign in as {invited.name}, or stop Pantry and run <code>rer dev --as {invited.invited}</code>. Once Pantry is hosted with a mail provider, invitations reach their mailbox.</span></div>)}
+      : <div role="status" className="callout callout-warn"><strong>Invitation recorded; no email was sent</strong><span>Pantry on this computer sends no email. To work as {invited.name} here, choose <a href="/signout">Sign out or switch person</a> (under More), then Switch person and Sign in as {invited.name}; or stop Pantry and run <code>rer dev --as {invited.invited}</code>. Once Pantry is hosted with a mail provider, invitations reach their mailbox.</span></div>)}
     <Form key={editing?.email ?? `new-${added}`} label={editing ? 'Save person' : 'Add person'} submit={b => command('member.save', { ...b, previousEmail: editing?.email, canPost: b.canPost === 'on', canLock: b.canLock === 'on', canReopen: b.canReopen === 'on', active: b.active !== 'no' })} onDone={async () => { setEditing(null); setAdded(n => n + 1); await reload() }} className="grid-form"
       secondary={editing && <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>Cancel</button>}>
       <Field label="Name" name="name" defaultValue={editing?.name} required />
@@ -73,14 +75,19 @@ function Agents() {
   </Card>
 }
 
-/** On this computer only: where to go to put this Pantry online. */
+const onThisComputer = () => typeof window !== 'undefined' && ['127.0.0.1', 'localhost', '[::1]'].includes(window.location.hostname)
+
+/** On this computer only: what to put in the deploy file, with this owner's own email, and where the steps are. */
 function Hosting() {
-  const here = typeof window !== 'undefined' && ['127.0.0.1', 'localhost', '[::1]'].includes(window.location.hostname)
-  if (!here) return null
-  return <Card title="Put Pantry online">
+  const { state } = useShared()
+  if (!onThisComputer()) return null
+  const lines = [`OWNER_EMAIL=${state.actor.email}`, 'CLOUDFLARE_ACCOUNT_ID=your account ID', 'CLOUDFLARE_API_TOKEN=the token', 'MAIL_PROVIDER=resend', 'MAIL_API_KEY=your mail provider\'s API key', 'MAIL_FROM=billing@example.com']
+  return <section id="put-online"><Card title="Put Pantry online">
     <p>This Pantry runs on your own computer, so only you can reach it and it sends no email. Hosted on your own Cloudflare account, your accountant can sign in from anywhere and invoices go out by email.</p>
-    <p className="hint">You need a free Cloudflare account and a mail provider account (Resend or SendGrid); neither is set up for this Pantry yet. Then one command, <code>rer deploy --env-file .env.pantry</code>, puts it online. The steps, from making the Cloudflare token to signing in: <a href="https://run-pantry.com/docs/hosting" target="_blank" rel="noreferrer">Put Pantry online</a>.</p>
-  </Card>
+    <p className="hint">You need a free Cloudflare account and a mail provider account (Resend or SendGrid); neither is set up for this Pantry yet. The deploy file, <code>.env.pantry</code> in your <code>run-pantry</code> folder, holds these lines; <code>OWNER_EMAIL</code> makes you, at {state.actor.email}, the hosted Pantry's owner:</p>
+    <pre className="env-lines"><code>{lines.join('\n')}</code></pre>
+    <p className="hint">Then one command, <code>rer deploy --env-file .env.pantry</code>, puts it online. The steps, from making the Cloudflare token to signing in: <a href="https://run-pantry.com/docs/hosting" target="_blank" rel="noreferrer">Put Pantry online</a>.</p>
+  </Card></section>
 }
 
 export function Settings() {

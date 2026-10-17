@@ -182,7 +182,8 @@ function Contacts() {
 }
 
 export function Sales() {
-  const [tab, setTab] = useState('Invoices'), { data, error, reload } = useView<D>('sales'), shared = useShared()
+  // Overview's Customers and vendors step opens this page at ?tab=contacts.
+  const [tab, setTab] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'contacts' ? 'Customers & vendors' : 'Invoices'), { data, error, reload } = useView<D>('sales'), shared = useShared()
   const refresh = async () => { await reload(); await shared.reload() }
   return <>
     <PageHead title="Sales & bills" lead="Invoices you send and follow up, recurring invoices, bills and their evidence, and payments." />

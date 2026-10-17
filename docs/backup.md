@@ -1,4 +1,4 @@
-Your books live in the folder where you run Pantry. An export is one archive holding the whole book: the ledger, documents byte for byte, reconciliations, close state, approvals and the move-in journal.
+Your books live in the folder where you run Pantry. An export is one archive holding the whole book: the ledger, documents byte for byte, reconciliations, close state, approvals and the move-in journal. A hosted Pantry keeps its own books on your Cloudflare account; back those up as in [Back up a hosted Pantry](#back-up-a-hosted-pantry).
 
 ## Export
 
@@ -9,7 +9,17 @@ rer dev --stop
 rer export --output exports/pantry-books.rer
 ```
 
-The archive is saved in the `exports` folder with an integrity receipt. Copy it somewhere safe, away from this computer. Sign-ins are not part of it: after a restore you set up the owner again. Keys Pantry keeps sealed with this installation's own secret (Stripe, the AI key, Gusto and bank feed connections) only open in this installation, so after a restore into a fresh install, connect them again in People & settings and Bank.
+The archive is saved in the `exports` folder, with its checksums inside it: `rer import` checks them before restoring. Copy it somewhere safe, away from this computer. Sign-ins are not part of it: after a restore you set up the owner again. Keys Pantry keeps sealed with this installation's own secret (Stripe, the AI key, Gusto and bank feed connections) only open in this installation, so after a restore into a fresh install, connect them again in People & settings and Bank.
+
+## Back up a hosted Pantry
+
+`rer export` copies the books on this computer, even with `--origin` set to the hosted address (a fix is coming in rer); it never reads a hosted Pantry. To keep the hosted books, run this in the `run-pantry` folder you deploy from:
+
+```sh
+rer queue hosted-backup -- node scripts/hosted-backup.mjs --env-file .env.pantry
+```
+
+Add `--environment NAME` if you deployed with one. It saves the hosted database, every table plus every receipt, bill PDF and statement file stored in it, as one SQL file such as `exports/pantry-production-db-2026-10-17.sql`, and prints its size, fingerprint and how many journal entries, invoices, bills, bank lines and stored files it holds. It uses the Cloudflare account ID and token in `.env.pantry`; the hosted Pantry pauses for the few seconds the export takes. Keep the file somewhere safe; it is a complete copy you can open with any SQLite tool (`sqlite3 books.db < exports/pantry-production-db-2026-10-17.sql`). `rer import` does not read it yet.
 
 ## Restore into a fresh install
 
