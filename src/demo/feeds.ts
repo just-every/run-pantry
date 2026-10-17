@@ -12,7 +12,7 @@ import { matchDeposits } from '../pantry/automatch'
 import { demoId as id, records, thisMonth } from './records'
 import { payoutNet } from './stripe'
 
-const NO_TOKEN = 'demo-connection-with-no-provider-token'
+const NO_TOKEN = 'synthetic-demo-connection-with-no-provider-token'
 
 export async function seedFeeds(db: D1Database, { ownerEmail, now, checkingBalance, savingsBalance }: { ownerEmail: string; now: Date; checkingBalance: number; savingsBalance: number }) {
   const r = records(db), at = now.toISOString(), today = at.slice(0, 10), monthStart = `${today.slice(0, 7)}-01`

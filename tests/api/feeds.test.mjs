@@ -27,7 +27,7 @@ test('Bank and card feeds: connect once, choose accounts, and transactions arriv
   const link = await h.command('feed.link-token', {})
   assert.equal(link.linkToken, plaid.recorded['link-token-create'].link_token)
   assert.deepEqual(at(plaid.state.calls, c => c.path === '/link/token/create').body.products, ['transactions'])
-  const connection = await h.command('feed.connect', { publicToken: 'public-sandbox-b0e2c4ee-a763-4df5-bfe9-46a46bce993d', institution: { institution_id: 'ins_109508', name: 'First Platypus Bank' } })
+  const connection = await h.command('feed.connect', { publicToken: 'synthetic-public-sandbox-b0e2c4ee-a763-4df5-bfe9-46a46bce993d', institution: { institution_id: 'ins_109508', name: 'First Platypus Bank' } })
   assert.deepEqual(connection.accounts.map(a => a.mask).sort(), ['0000', '1111', '3333'])
   const stored = await h.db.prepare('SELECT access_token FROM pt_feed_items WHERE id = ?').bind(connection.id).first()
   assert.ok(!stored.access_token.includes('access-sandbox'), 'the access token rests encrypted')

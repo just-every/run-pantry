@@ -11,7 +11,7 @@ import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 
-const TOKEN = 'app-test-setup-token-0123456789abcdef'
+const TOKEN = 'synthetic-app-test-setup-token-0123456789abcdef'
 const wrangler = ['node_modules/wrangler/bin/wrangler.js']
 const quiet = { ...process.env, CI: '1', WRANGLER_SEND_METRICS: 'false' }
 
