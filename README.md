@@ -12,14 +12,13 @@ Tests: `pnpm run test:pantry` (one flow per clause on the real Worker and D1), `
 
 # Run it locally
 
-Install the `rer` command once (it brings its own Node when there is none), then clone Pantry and start it:
+One line clones Pantry, installs it, sets up a local owner and starts it:
 
 ```sh
-curl -fsSL https://runeditrun.com/install.sh | sh
-rer dev just-every/run-pantry
+npx -y @runeditrun/rer dev just-every/run-pantry
 ```
 
-If the installer prints an `export PATH=…` line, run it before the second line. With Node 22 or later already installed, `npx -y @runeditrun/rer dev just-every/run-pantry` does both in one line. To start it again later, run `cd run-pantry && rer dev`.
+Without Node, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-pantry` does the same. To start it again later, run `cd run-pantry && rer dev`.
 This edition is runnable after composition. From the composed edition's
 checkout root, `rer dev` alone launches it for review: it installs pinned
 dependencies, sets up a local owner on a free port, starts the real app and
