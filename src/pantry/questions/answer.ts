@@ -12,7 +12,7 @@ import { documentInsert } from '../contacts'
 import { matchInput, matchPlan } from '../matching'
 import { applyRules, newRuleStatements, payeeKey } from '../rules'
 import { categoryEffect, NetIncome, type Choice } from './checks'
-import { modelState, ModelError, readAnswer } from './model'
+import { modelState, ModelError, readAnswer, type Reading } from './model'
 import { AGENT, OPEN, question, say, type Question } from './store'
 
 /** Who answered and the authority their write carries: a signed-in person, or the owner by email. */
@@ -141,12 +141,17 @@ export async function hear(env: Bindings, db: D1Database, id: string, words: str
   try { read = await readAnswer(model.config, qn, qn.choices, accounts, said) }
   catch (e) { return unclear(`Pantry could not read your answer: ${e instanceof ModelError ? e.message : 'the AI model failed.'} Choose one of the answers instead.`) }
   if (!read.understood) return unclear(`Pantry could not tell what it was${read.note ? ` (${read.note})` : ''}. Choose one of the answers, or say what the money was for.`)
+  return awaitYes(db, qn, said, read, by)
+}
+
+/** The owner's words, read into one answer that waits for their yes. */
+export async function awaitYes(db: D1Database, qn: Question, said: string, read: Omit<Reading, 'understood'>, by: Answerer): Promise<Heard> {
   const c = await chosen(db, qn, { choice: read.choice, accountId: read.accountId })
   const pending = { choice: read.choice, accountId: read.accountId, remember: read.remember && !!c.learn, note: read.note, read: said, label: c.label, effect: c.effect }
   const message = `I read that as: ${c.label}. ${c.effect}${pending.remember ? ' And from now on, the same for this payee.' : ''} Nothing changes until you say yes.`
   await run(db, [by.authority('record'), q("UPDATE pt_questions SET status = 'confirm', pending = ?, revision = ? WHERE id = ? AND revision = ?", JSON.stringify(pending), uid(), qn.id, qn.revision), changed(),
     say(qn.id, by.audit.email, by.via, said), say(qn.id, AGENT.email, 'agent', message), audit(AGENT, 'question.read', 'question', qn.id, { via: by.via, read: c.label })])
-  return { result: 'confirm', question: await question(db, id), message }
+  return { result: 'confirm', question: await question(db, qn.id), message }
 }
 
 /** The owner's yes (or no) to an answer read from their words. */

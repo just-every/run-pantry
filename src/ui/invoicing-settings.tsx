@@ -2,7 +2,7 @@
 // business's own Stripe account so customers can pay by card or ACH from the
 // invoice link. Each card says plainly what works on this install.
 import { SetupSteps } from './provider-guides'
-import { Action, Card, Chip, command, day, Field, Form, Loading, useShared, useView, type D } from './kit'
+import { Action, Card, Chip, command, day, Details, Field, Form, Loading, useShared, useView, type D } from './kit'
 
 const ZONE_LABEL: Record<string, string> = { 'America/New_York': 'Eastern', 'America/Chicago': 'Central', 'America/Denver': 'Mountain', 'America/Phoenix': 'Arizona', 'America/Los_Angeles': 'Pacific', 'America/Anchorage': 'Alaska', 'Pacific/Honolulu': 'Hawaii', 'America/Puerto_Rico': 'Atlantic (Puerto Rico)' }
 
@@ -29,9 +29,10 @@ function Stripe({ st, onDone }: { st: D; onDone: () => Promise<void> }) {
   if (c) return <Card title="Online payments (Stripe)" actions={<Chip tone={c.livemode ? 'good' : 'info'}>{c.livemode ? 'Live' : 'Test mode'}</Chip>}>
     <p>Customers can pay {[c.card && 'by card', c.ach && 'by ACH bank debit'].filter(Boolean).join(' or ') || 'nothing online (both methods are off)'} from the invoice link. Payments land in the <strong>Stripe balance</strong> account and Stripe's fee is booked to <strong>Stripe fees</strong>.</p>
     {c.settlementCurrency !== 'usd' && <div className="callout callout-warn" role="status"><strong>This Stripe account settles in {String(c.settlementCurrency).toUpperCase()}</strong><span>Pantry keeps US-dollar books: payments are recorded at the invoice's dollar amount and each Stripe fee is booked in dollars at Stripe's own conversion rate for that charge. A US Stripe account settles in dollars and needs no conversion.</span></div>}
-    <dl className="facts"><div><dt>Account</dt><dd>{c.account} ({c.accountId})</dd></div><div><dt>Key</dt><dd className="code">{c.keyHint}</dd></div>
+    <dl className="facts"><div><dt>Account</dt><dd>{c.account}</dd></div>
       <div><dt>Confirmations</dt><dd>{c.webhook ? 'Stripe notifies Pantry the moment a payment completes.' : 'This install is not reachable from the internet, so Pantry confirms a payment when the customer returns from Stripe and checks again every few minutes.'}</dd></div>
       <div><dt>Connected</dt><dd>{day(c.connectedAt)}</dd></div></dl>
+    <Details facts={{ 'Stripe account': c.accountId, key: c.keyHint }} code={['Stripe account', 'key']} />
     {owner && <Form label="Save payment methods" submit={b => command('stripe.methods', { card: b.card === 'on', ach: b.ach === 'on' })} onDone={onDone}>
       <label className="check"><input type="checkbox" name="card" defaultChecked={c.card} /> Card</label>
       {c.country === 'US' ? <label className="check"><input type="checkbox" name="ach" defaultChecked={c.ach} /> ACH bank debit (US bank accounts; takes a few business days to clear)</label>
@@ -40,16 +41,16 @@ function Stripe({ st, onDone }: { st: D; onDone: () => Promise<void> }) {
     {owner && <Action tone="danger" run={async () => { await command('stripe.disconnect', {}); await onDone() }}>Disconnect Stripe</Action>}
   </Card>
   return <Card title="Online payments (Stripe)">
-    <p>Let customers pay by card or ACH bank debit from the invoice link. The money goes to your own Stripe account; Pantry records the payment against the invoice and books Stripe's fee.</p>
+    <p>Let customers pay by card or ACH bank debit from the invoice link, into your own Stripe account; Pantry records each payment and its fee.</p>
     {owner ? <>
-      <ol className="how-to">
-        <li>Sign in at <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noreferrer">dashboard.stripe.com/apikeys</a> (Developers → API keys). To try it first, switch the dashboard to Test mode.</li>
-        <li>Under Standard keys, reveal and copy the <strong>Secret key</strong>. It starts with <code>sk_live_</code>, or <code>sk_test_</code> in test mode.</li>
-        <li>Paste it below. Pantry checks it with Stripe, {st.publicOrigin ? 'adds a webhook so payments confirm the moment they complete,' : 'confirms payments when customers return from Stripe (this install is not reachable from the internet, so Stripe cannot call it),'} and adds two accounts to your chart: Stripe balance and Stripe fees.</li>
-      </ol>
       <Form label="Connect Stripe" submit={b => command('stripe.connect', b)} onDone={onDone}>
-        <Field label="Stripe secret key" name="secretKey" type="password" autoComplete="off" required hint="Kept encrypted in your books' database. A restricted key (rk_…) also works if it may read the account, payment intents, charges and balance transactions, and write Checkout Sessions and webhook endpoints." />
+        <Field label="Stripe secret key" name="secretKey" type="password" autoComplete="off" required hint="Kept encrypted in your books' database." />
       </Form>
+      <details className="setup-steps"><summary>Set up Stripe: where to find your key</summary><ol className="how-to">
+        <li>Sign in at <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noreferrer">dashboard.stripe.com/apikeys</a> (Developers → API keys). To try it first, switch the dashboard to Test mode.</li>
+        <li>Under Standard keys, reveal and copy the <strong>Secret key</strong>. It starts with <code>sk_live_</code>, or <code>sk_test_</code> in test mode. A restricted key (<code>rk_…</code>) also works if it may read the account, payment intents, charges and balance transactions, and write Checkout Sessions and webhook endpoints.</li>
+        <li>Paste it above. Pantry checks it with Stripe, {st.publicOrigin ? 'adds a webhook so payments confirm the moment they complete,' : 'confirms payments when customers return from Stripe (this install is not reachable from the internet, so Stripe cannot call it),'} and adds two accounts to your chart: Stripe balance and Stripe fees.</li>
+      </ol></details>
     </> : <p className="hint">The owner connects Stripe.</p>}
   </Card>
 }

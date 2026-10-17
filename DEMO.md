@@ -10,11 +10,24 @@ records with fixed IDs and dates relative to the start: customers and vendors,
 a service-business chart, two bank accounts and a business card, opening balances, invoices, bills,
 recorded payments, a statement to reconcile, a journal draft, review tasks,
 source documents, approvals and an agent proposal a person can decide.
-Bank shows this month's feeds (`src/demo/feeds.ts`): Chase connected and current,
-an American Express card that needs re-linking, a pending card charge, and an
-Adobe rule that files its line through Pantry's own rule code. The connections
-hold no provider token and the demo calls no provider, so Sync now and Re-link
-say that live feeds need setting up.
+Bank shows this month's feeds (`src/demo/feeds.ts`): Chase checking and savings
+connected and current with their balances, an American Express card that needs
+re-linking, a pending card charge, an Adobe rule that files its line and a Cedar
+Studio ACH that meets its invoice through Pantry's own rule and deposit code. The
+connections hold no provider token and the demo calls no provider, so Sync now
+and Re-link say that live feeds need setting up.
+This month also carries the homepage's moments, each made by Pantry's own code
+(`src/demo/sales.ts`, `src/demo/inbox.ts`): Dana Ruiz, a 1099 contractor over the
+threshold, paid by ACH and matched; a 23-charge Stripe payout split into sales
+and fees and matched to its deposit; a monthly recurring invoice drafted by its
+due work, approved and issued; an invoice sent with its PDF and opened by the
+customer; a Home Depot receipt read and attached by the owner's receipt rule and
+a Paper & Pine receipt waiting to be accepted; and one pass of the books agent,
+with a receipt question answered and the owner's own words about an unexplained
+savings transfer read into an answer that shows its net-income change and waits
+for "Yes, do it". Only a provider's answers are seeded as records (Stripe's payout
+listing, the mail provider's acceptance, the customer's first view, the AI
+model's readings), and the Stripe and AI connections hold no working key.
 The month before last is closed the way a person closes it: `src/demo/close.ts`
 matches its statement lines, completes both reconciliations and locks the
 period through Pantry's own match, reconciliation and lock plans. Last month is

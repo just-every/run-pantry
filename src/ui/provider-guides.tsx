@@ -60,9 +60,9 @@ const GUIDES: Record<Provider, Guide> = {
 const onThisComputer = (origin: string) => { try { return ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(origin).hostname) } catch { return false } }
 
 /** The setup steps behind a disclosure, for the owner (who holds this installation's keys); others see who sets it up. */
-export function SetupSteps({ provider, reason, summary, owner, open = false }: { provider: Provider; reason: string; summary: string; owner: boolean; open?: boolean }) {
-  if (!owner) return <><p className="hint">{reason}</p><p className="hint">The owner of this Pantry sets it up.</p></>
-  return <><p className="hint">{reason}</p><details className="setup-steps" open={open}><summary>{summary}</summary><ProviderSetup provider={provider} /></details></>
+export function SetupSteps({ provider, reason, summary, owner }: { provider: Provider; reason: string; summary: string; owner: boolean }) {
+  if (!owner) return <>{reason && <p className="hint">{reason}</p>}<p className="hint">The owner of this Pantry sets it up.</p></>
+  return <>{reason && <p className="hint">{reason}</p>}<details className="setup-steps"><summary>{summary}</summary><ProviderSetup provider={provider} /></details></>
 }
 
 /** The steps to set up one provider for this installation. `reason` is the server's one line about what is missing. */

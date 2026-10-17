@@ -51,7 +51,7 @@ export type Connection = { id: string; authEventId?: string; tenantId: string; t
 
 export async function connections(access: string): Promise<Connection[]> {
   const r = await reach(`${API}/connections`, { headers: { authorization: `Bearer ${access}`, accept: 'application/json' } })
-  if (!r.ok) throw new Fault(502, `Xero did not list the organisations: HTTP ${r.status}`)
+  if (!r.ok) throw new Fault(502, `Xero did not list the organizations: HTTP ${r.status}`)
   return await r.json() as Connection[]
 }
 

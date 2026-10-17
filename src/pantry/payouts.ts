@@ -84,7 +84,7 @@ async function recordedPayments(env: Bindings, db: D1Database, intents: string[]
   return { known, waiting }
 }
 
-function bookStatements(s: Data, payout: Data, split: Split, entryId: string, bankLedger: string, balanceLedger: string, sales: Data): Sql[] {
+export function bookStatements(s: Data, payout: Data, split: Split, entryId: string, bankLedger: string, balanceLedger: string, sales: Data): Sql[] {
   const id = String(payout.id), lines = [
     { accountId: bankLedger, signed: split.lines.bank, memo: `Stripe payout · ${id}` },
     { accountId: s.fee_account_id, signed: split.lines.fees, memo: `Stripe fees on ${split.charges} charge${split.charges === 1 ? '' : 's'}` },
@@ -99,7 +99,7 @@ function bookStatements(s: Data, payout: Data, split: Split, entryId: string, ba
   ]
 }
 
-const row = (payout: Data, split: Split, status: string, reason: string, entryId: string | null) =>
+export const payoutRow = (payout: Data, split: Split, status: string, reason: string, entryId: string | null) =>
   q(`INSERT INTO pt_stripe_payouts (id, arrival_date, currency, amount_cents, gross_cents, invoiced_cents, fee_cents, refund_cents, charges, refunds, status, reason, entry_id, read_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (id) DO UPDATE SET gross_cents = excluded.gross_cents, invoiced_cents = excluded.invoiced_cents, fee_cents = excluded.fee_cents, refund_cents = excluded.refund_cents, charges = excluded.charges, refunds = excluded.refunds, status = excluded.status, reason = excluded.reason, entry_id = excluded.entry_id, read_at = excluded.read_at
     WHERE pt_stripe_payouts.status <> 'booked'`,
@@ -126,21 +126,21 @@ export async function syncPayouts(env: Bindings, db: D1Database) {
       const { known, waiting } = await recordedPayments(env, db, intents)
       const split = splitPayout(payout, items, known)
       if (split.currency !== 'usd') {
-        await run(db, [row(payout, split, 'other-currency', `This payout is in ${split.currency.toUpperCase()}. Pantry keeps US-dollar books, so it books payouts only from a Stripe account that pays out in US dollars.`, null)])
+        await run(db, [payoutRow(payout, split, 'other-currency', `This payout is in ${split.currency.toUpperCase()}. Pantry keeps US-dollar books, so it books payouts only from a Stripe account that pays out in US dollars.`, null)])
         counts.held++; continue
       }
       const reason = !split.ok ? split.reason : waiting.length ? `Waiting for Pantry to confirm ${waiting.length} invoice payment${waiting.length === 1 ? '' : 's'} inside it with Stripe.` : ''
-      if (reason) { await run(db, [row(payout, split, 'held', reason, null)]); counts.held++; continue }
+      if (reason) { await run(db, [payoutRow(payout, split, 'held', reason, null)]); counts.held++; continue }
       const entryId = uid()
       try {
-        await run(db, [...bookStatements(s, payout, split, entryId, bank.account_id, balance.account_id, sales), row(payout, split, 'booked', '', entryId), changed(),
+        await run(db, [...bookStatements(s, payout, split, entryId, bank.account_id, balance.account_id, sales), payoutRow(payout, split, 'booked', '', entryId), changed(),
           audit(pantry('stripe'), 'stripe.payout', 'stripe-payout', payout.id, { net: split.net, gross: split.gross, fees: split.fees, refunds: split.refunds, charges: split.charges, invoiced: split.invoiced })])
         counts.booked++
       } catch (e) {
         if (!(e instanceof Fault)) throw e
         // Booked by another reader meanwhile, or the period is locked: say why it waits.
         if ((await one(db, 'SELECT status FROM pt_stripe_payouts WHERE id = ?', payout.id))?.status === 'booked') continue
-        await run(db, [row(payout, split, 'held', e.message, null)]); counts.held++
+        await run(db, [payoutRow(payout, split, 'held', e.message, null)]); counts.held++
       }
     }
     counts.matched = await matchPayouts(db)

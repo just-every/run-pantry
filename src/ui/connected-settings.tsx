@@ -84,12 +84,12 @@ function Payroll({ g, onDone }: { g: D; onDone: () => Promise<void> }) {
       </Table>
       {owner && <Action tone="danger" run={async () => { if (window.confirm(`Disconnect Gusto? Payrolls already posted stay.`)) { await command('gusto.disconnect', {}); await onDone() } }}>Disconnect Gusto</Action>}
     </> : owner ? <>
-      <ol className="how-to">
+      <Action tone="primary" run={async () => { const { url } = await command('gusto.connect', {}); window.location.assign(url) }}>Connect Gusto</Action>
+      <details className="setup-steps"><summary>Set up Gusto before you connect</summary><ol className="how-to">
         <li>In Gusto's developer portal, add <code>{a.redirectUri}</code> as a redirect URI of this installation's Gusto app.</li>
         <li>Choose <strong>Connect Gusto</strong>, sign in to Gusto as a company admin and choose the company.</li>
         <li>Pantry adds Wages and salaries, Payroll taxes, Employee benefits, Employee reimbursements and Payroll liabilities to your chart and posts each processed payroll.</li>
-      </ol>
-      <Action tone="primary" run={async () => { const { url } = await command('gusto.connect', {}); window.location.assign(url) }}>Connect Gusto</Action>
+      </ol></details>
     </> : <p className="hint">The owner connects Gusto.</p>}
   </Card></div>
 }

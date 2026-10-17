@@ -47,7 +47,7 @@ function People() {
         <td><div className="row-actions"><button type="button" className="btn btn-link" onClick={() => setEditing(m)}>Edit</button>{m.active ? <Action run={async () => { setInvited(null); setInvited(await command('member.invite', { email: m.email })) }}>Send sign-in invitation</Action> : null}</div></td></tr>)}
     </Table>
     {invited && (invited.emailed ? <p role="status" className="hint">Sign-in invitation emailed to {invited.invited}.</p>
-      : <div role="status" className="callout callout-warn"><strong>Invitation recorded; no email was sent</strong><span>Pantry on this computer sends no email. To work as {invited.name} here, open <a href="/signin">the sign-in page</a> and choose Sign in as {invited.name}, or stop Pantry and run <code>rer dev --as {invited.invited}</code>. Once Pantry is hosted with a mail provider, invitations reach their mailbox.</span></div>)}
+      : <div role="status" className="callout callout-warn"><strong>Invitation recorded; no email was sent</strong><span>Pantry on this computer sends no email. To work as {invited.name} here, open <a href="/signin">the sign-in page</a> and choose Sign in as {invited.name}. Once Pantry is hosted with a mail provider, invitations reach their mailbox.</span></div>)}
     <Form key={editing?.email ?? `new-${added}`} label={editing ? 'Save person' : 'Add person'} submit={b => command('member.save', { ...b, previousEmail: editing?.email, canPost: b.canPost === 'on', canLock: b.canLock === 'on', canReopen: b.canReopen === 'on', active: b.active !== 'no' })} onDone={async () => { setEditing(null); setAdded(n => n + 1); await reload() }} className="grid-form"
       secondary={editing && <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>Cancel</button>}>
       <Field label="Name" name="name" defaultValue={editing?.name} required />
@@ -68,7 +68,8 @@ function Agents() {
   const { state, reload } = useShared(), [token, setToken] = useState<D | null>(null)
   return <Card title={<><Icon name="agent" /> Agent access</>}>
     <p>An agent reads your books through its token and files proposals. A person approves each one; agents never post, approve or lock.</p>
-    {token && <div className="callout callout-warn" role="status"><strong>Copy this token now — it is shown once.</strong><code className="token">{token.token}</code><span>Give it to {token.name} as PANTRY_AGENT_TOKEN.</span></div>}
+    {token && <div className="callout callout-warn" role="status"><strong>Copy this token now — it is shown once.</strong><code className="token">{token.token}</code><span>Give it to {token.name}; it is that agent's key to these books.</span>
+      <details className="setup-steps"><summary>Set up the agent with its token</summary><p className="hint">The agent reads the token from <code>PANTRY_AGENT_TOKEN</code>.</p></details></div>}
     <Table heads={['Agent', 'Created', 'Status', '']} empty="No agents yet.">
       {state.settings.agents.map((a: D) => <tr key={a.id}><td>{a.name}</td><td>{day(a.created_at)} by {a.created_by}</td><td>{a.active ? <Chip tone="good">Active</Chip> : <Chip>Turned off</Chip>}</td><td>{a.active ? <Action tone="danger" run={async () => { await command('agent.deactivate', { id: a.id }); await reload() }}>Turn off</Action> : null}<Details facts={{ id: a.id }} /></td></tr>)}
     </Table>
@@ -81,8 +82,9 @@ function Hosting() {
   const here = typeof window !== 'undefined' && ['127.0.0.1', 'localhost', '[::1]'].includes(window.location.hostname)
   if (!here) return null
   return <Card title="Put Pantry online">
-    <p>This Pantry runs on your own computer, so only you can reach it and it sends no email. Hosted on your own Cloudflare account, your accountant can sign in from anywhere and invoices go out by email.</p>
-    <p className="hint">You need a free Cloudflare account and a mail provider account (Resend or SendGrid); neither is set up for this Pantry yet. Then one command, <code>rer deploy --env-file .env.pantry</code>, puts it online. The steps, from making the Cloudflare token to signing in: <a href="https://run-pantry.com/docs/hosting" target="_blank" rel="noreferrer">Put Pantry online</a>.</p>
+    <p>Put Pantry on your own Cloudflare account and your accountant can sign in from anywhere, with invoices going out by email.</p>
+    <a className="btn btn-secondary" href="https://run-pantry.com/docs/hosting" target="_blank" rel="noreferrer">How to put Pantry online</a>
+    <details className="setup-steps"><summary>Set up hosting</summary><p className="hint">You need a free Cloudflare account and a mail provider account (Resend or SendGrid); neither is set up for this Pantry yet. Then one command, <code>rer deploy --env-file .env.pantry</code>, puts it online.</p></details>
   </Card>
 }
 

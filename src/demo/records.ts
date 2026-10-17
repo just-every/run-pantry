@@ -1,5 +1,11 @@
+import { addDays } from '../pantry/core'
+
 // Fixed identities make a repeated seed harmless, including after a partial start.
 export const demoId = (name: string) => `demo-${name}`
+
+/** A day this month, n days before today but never before the month's first: last month's statement stays as it is. */
+export const thisMonth = (today: string, n: number) => { const d = addDays(today, -n), first = `${today.slice(0, 7)}-01`; return d < first ? first : d }
+
 export function records(db: D1Database) {
   const statements: D1PreparedStatement[] = []
   return {

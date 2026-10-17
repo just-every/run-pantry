@@ -9,7 +9,7 @@ import type { Command, Context } from '../context'
 import { seal, unseal } from '../seal'
 import { DEFAULTS, readReceipt, ReaderError, type Provider, type ReaderConfig } from './reader'
 
-const PURPOSE = 'ai-reader-key'
+export const PURPOSE = 'ai-reader-key'
 
 export const MANAGED_LINE = 'Not available yet on RER Managed hosting: it has no outbound connection for AI providers. Reading works on a self-hosted install.'
 export const managed = (env: Bindings) => String(env.MAIL_PROVIDER) === 'rer'

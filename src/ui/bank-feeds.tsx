@@ -59,11 +59,12 @@ export function Feeds({ data, onDone, onImport }: { data: D | undefined; onDone:
   const a = data.availability, none = !data.connections.length
   // With nothing connected yet, connecting is the card's one action, so it leads the body instead of the head.
   // Without live feeds set up, importing a statement is the one action that works; the owner's setup steps wait behind their disclosure.
+  // Once a connection exists the card is about connections: the setup guide belongs to the empty card only.
   const connect = (primary: boolean) => a.available && can.record && <Link className={`btn ${primary ? 'btn-primary' : 'btn-secondary btn-small'}`} to="/app/bank/connect">Connect a bank or card</Link>
   return <Card title="Bank and card feeds" actions={!none && connect(false)}>
     {none && <p>Connect a bank or card once and its transactions arrive on their own. Statement files keep working beside it.</p>}
     {data.connections.map((c: D) => <Connection key={c.id} c={c} onDone={onDone} />)}
-    {!a.available && (a.needsKeys ? <SetupSteps provider="plaid" reason={a.reason} summary="Set up live bank feeds" owner={can.owner} /> : <p className="hint">{a.reason}</p>)}
+    {none && !a.available && (a.needsKeys ? <SetupSteps provider="plaid" reason={a.reason} summary="Set up live bank feeds" owner={can.owner} /> : <p className="hint">{a.reason}</p>)}
     {none && (a.available ? connect(true) : can.record && <button type="button" className="btn btn-primary" onClick={onImport}>Import a statement</button>)}
   </Card>
 }

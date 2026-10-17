@@ -24,7 +24,7 @@ export async function categories(db: D1Database): Promise<(Category & { id: stri
   return all(db, "SELECT id, code, name FROM pt_accounts WHERE active = 1 AND type = 'expense' ORDER BY code")
 }
 
-type ReadOutcome = { status: 'read' | 'failed' | 'no-key' | 'unavailable'; note: string; model: string | null; reading: Reading | null }
+export type ReadOutcome = { status: 'read' | 'failed' | 'no-key' | 'unavailable'; note: string; model: string | null; reading: Reading | null }
 
 export async function readWith(db: D1Database, env: Bindings, input: ReceiptInput | string): Promise<ReadOutcome> {
   const state = await readerState(db, env)
@@ -51,9 +51,9 @@ export type Arrival = {
   original: NewDocument; file?: NewDocument | null; read: ReceiptInput | string; guards?: Sql[]
 }
 
-/** Store, read and file one receipt for review; returns its id. */
-export async function receive(db: D1Database, env: Bindings, a: Arrival) {
-  const outcome = await readWith(db, env, a.read)
+/** Store, read and file one receipt for review; returns its id. A reading made elsewhere (the demo's) is passed as `read`. */
+export async function receive(db: D1Database, env: Bindings, a: Arrival, read?: ReadOutcome) {
+  const outcome = read ?? await readWith(db, env, a.read)
   const original = await documentStatements(a.by.email, a.original)
   const file = a.file ? await documentStatements(a.by.email, a.file) : null
   const id = uid(), cols = await readingColumns(db, outcome)

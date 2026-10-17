@@ -1,23 +1,28 @@
 import type { Bindings } from './auth.server'
+import type { Person } from './pantry/access'
 import { SERVICE_CHART } from './pantry/accounts'
 import { addDays, sha256 } from './pantry/core'
 import { closeMonth } from './demo/close'
 import { seedFeeds } from './demo/feeds'
-import { demoId as id, records } from './demo/records'
+import { askQuestions, connectReader, receiveReceipts } from './demo/inbox'
+import { demoId as id, records, thisMonth } from './demo/records'
+import { bookPayout, payContractor, runRecurring, sendInvoice } from './demo/sales'
 
 const OWNER_NAME = 'Priya Shah', TAYLOR = 'taylor@juniperlane.example', MORGAN = 'morgan@leecpa.example'
-const OPENING = 2395552
+const OPENING = 2395552, SAVINGS = 1020000
 
 /** Juniper Lane Design, adapted from tests/api/scenario.mjs and the QBO fixtures.
  * Real, editable books: no network or external service is involved in seeding.
  * The month before last is closed (matched, reconciled and locked through Pantry's
- * own close code); last month is open with a statement to reconcile. */
+ * own close code); last month is open with a statement to reconcile. This month
+ * carries the homepage's moments (src/demo/sales.ts, src/demo/inbox.ts). */
 export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail: string; now: Date }) {
   const r = records(env.DB), at = now.toISOString(), today = at.slice(0, 10)
   const monthBack = (n: number) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - n, 1)).toISOString().slice(0, 7)
   const month = monthBack(1), prior = monthBack(2)
   const inMonth = (id: string) => (n: number) => `${id}-${String(n).padStart(2, '0')}`
   const day = inMonth(month), priorDay = inMonth(prior)
+  const thisDay = (n: number) => thisMonth(today, n)
   const start = day(1), priorEnd = addDays(start, -1), openingDay = addDays(priorDay(1), -1), end = addDays(`${monthBack(0)}-01`, -1)
   const owner = await env.DB.prepare('SELECT id FROM oa_operators WHERE lower(email) = ?').bind(ownerEmail.toLowerCase()).first<{ id: string }>()
   if (!owner) throw new Error('Demo owner is not ready')
@@ -30,11 +35,15 @@ export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail:
     r.add('pt_members', { email, name, role, can_post: post, can_reopen: post, revision: id(String(name)) })
   const contacts = [
     ['cedar', 'customer', 'Cedar Studio'], ['northstar', 'customer', 'Northstar Consulting'], ['willow', 'customer', 'Willow Services'], ['harbor-lights', 'customer', 'Harbor Lights Cafe'],
-    ['brightline', 'vendor', 'Brightline Software'], ['harbor', 'vendor', 'Harbor Office Rentals'], ['paper', 'vendor', 'Paper & Pine Supply'],
+    ['brightline', 'vendor', 'Brightline Software'], ['harbor', 'vendor', 'Harbor Office Rentals'], ['paper', 'vendor', 'Paper & Pine Supply'], ['dana', 'vendor', 'Dana Ruiz Photography'],
   ]
   for (const [key, kind, name] of contacts) r.add('pt_contacts', { id: id(key), kind, name, email: `accounts@${name.toLowerCase().replace(/[^a-z]+/g, '')}.example`, revision: id(key) })
+  // Dana Ruiz is a 1099 contractor with her W-9 on file; this year's ACH payments pass the threshold.
+  r.sql('UPDATE pt_contacts SET is_1099 = 1 WHERE id = ?', id('dana'))
+  r.sql('INSERT INTO pt_contractor_tax (contact_id, legal_name, tin_kind, tin, address, city, state, zip, revision, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
+    id('dana'), 'Dana Ruiz', 'ssn', '900701234', '88 Dean Street, Apt 3', 'Brooklyn', 'NY', '11201', id('dana-tax'), ownerEmail, at)
   r.add('pt_tax_codes', { id: id('nyc'), name: 'New York City', rate_milli_percent: 8875, account_id: id('2200'), revision: id('nyc') })
-  for (const [key, name, code, last4, amount] of [['checking', 'Operating checking', '1000', '4821', OPENING], ['savings', 'Savings', '1010', '7730', 0]] as const)
+  for (const [key, name, code, last4, amount] of [['checking', 'Operating checking', '1000', '4821', OPENING], ['savings', 'Savings', '1010', '7730', SAVINGS]] as const)
     r.add('pt_bank_accounts', { id: id(key), name, account_id: id(code), institution: 'Chase', number_last4: last4, opening_date: openingDay, opening_cents: amount, revision: id(key) })
 
   let number = 1
@@ -77,11 +86,11 @@ export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail:
       r.add('pt_close_tasks', { id: id(`close-${period}-${i}`), period, title, status: done(i) ? 'done' : 'open', note: done(i) ? note(i) : '', done_by: done(i) ? by(i) : null, done_at: done(i) ? when(i) : null, revision: id(`close-${period}-${i}`) })
   }
 
-  entry('opening', openingDay, 'Opening balances', 'opening', id('opening'), [['1000', OPENING, 0], ['3000', 0, OPENING]])
+  entry('opening', openingDay, 'Opening balances', 'opening', id('opening'), [['1000', OPENING, 0], ['1010', SAVINGS, 0], ['3000', 0, OPENING + SAVINGS]])
 
   // The month before last: invoiced, billed and paid; closed below.
-  invoice('cedar-guidelines', 'cedar', '1037', 'Brand guidelines', 185000, priorDay(1), 'issued')
-  invoice('cafe-photos', 'harbor-lights', '1038', 'Menu photography', 96000, priorDay(5), 'issued')
+  invoice('cedar-guidelines', 'cedar', 'INV-0217', 'Brand guidelines', 185000, priorDay(1), 'issued')
+  invoice('cafe-photos', 'harbor-lights', 'INV-0218', 'Menu photography', 96000, priorDay(5), 'issued')
   bill('software-prior', 'brightline', 'INV-71', 'Design software subscriptions', '6200', 64000, priorDay(1), priorEnd)
   await document('software-prior-receipt', 'brightline-INV-71.txt', 'text/plain', `Brightline Software\nInvoice INV-71 · ${priorDay(1)}\nTeam plan, 4 seats: $640.00\nPaid by bank transfer\n`, 'bill', id('software-prior'), 'Vendor invoice')
   bill('rent-prior', 'harbor', 'R-08', 'Studio rent', '6100', 130000, priorDay(1), priorEnd, `Monthly rent under the studio lease on file — ${ownerEmail}`)
@@ -93,19 +102,26 @@ export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail:
   // Each statement line with the ledger line it clears: [date, amount, description, entry key, line index].
   const priorLines = [[priorDay(9), -64000, 'BRIGHTLINE SOFTWARE', 'software-prior-paid', 1], [priorDay(12), 96000, 'HARBOR LIGHTS CAFE', 'cafe-photos-paid', 0], [priorDay(24), -130000, 'CHECK 2047 HARBOR RENT', 'rent-prior-paid', 1], [priorDay(26), 185000, 'CEDAR STUDIO', 'cedar-guidelines-paid', 0], [priorDay(28), -1200, 'MONTHLY SERVICE FEE', 'fee-prior', 1]] as const
   await statement('prior-statement', 'checking', 'operating-checking', prior, priorDay(1), priorEnd, OPENING, priorLines)
-  await statement('prior-savings', 'savings', 'savings', prior, priorDay(1), priorEnd, 0, [])
+  await statement('prior-savings', 'savings', 'savings', prior, priorDay(1), priorEnd, SAVINGS, [])
   tasks(prior, () => true, i => ['Statement matched line by line.', 'Both paid in full; nothing overdue.', 'Brightline invoice attached; rent per lease.', 'No accruals this month.'][i], i => i === 3 ? MORGAN : TAYLOR, i => `${day(2 + (i >> 1))}T1${4 + i}:00:00.000Z`)
 
   // Last month: open, with a statement to reconcile and drafts to review.
   for (const [key, customer, ref, description, amount, date, status] of [
-    ['cedar-site', 'cedar', '1041', 'Website refresh', 240000, 1, 'issued'], ['northstar-retainer', 'northstar', '1042', 'Quarterly retainer', 385000, 2, 'issued'],
-    ['willow-brand', 'willow', '1043', 'Brand workshop', 140000, 5, 'issued'], ['cedar-social', 'cedar', '1044', 'Social templates', 120000, 12, 'issued'],
-    ['cafe-menu', 'harbor-lights', '1045', 'Seasonal menu redesign', 95000, 20, 'approved'], ['willow-followup', 'willow', '1046', 'Brand rollout planning', 175000, 24, 'draft'],
+    ['cedar-site', 'cedar', 'INV-0221', 'Website refresh', 240000, 1, 'issued'], ['northstar-retainer', 'northstar', 'INV-0222', 'Quarterly retainer', 385000, 2, 'issued'],
+    ['willow-brand', 'willow', 'INV-0223', 'Brand workshop', 140000, 5, 'issued'], ['cedar-social', 'cedar', 'INV-0224', 'Social templates', 120000, 12, 'issued'],
+    ['cafe-menu', 'harbor-lights', 'INV-0225', 'Seasonal menu redesign', 95000, 20, 'approved'], ['willow-followup', 'willow', 'INV-0226', 'Brand rollout planning', 175000, 24, 'draft'],
   ] as const) invoice(key, customer, ref, description, amount, day(date), status)
   for (const [key, vendor, ref, description, code, amount] of [['software', 'brightline', 'INV-88', 'Design software subscriptions', '6200', 64000], ['rent', 'harbor', 'R-09', 'Studio rent', '6100', 130000], ['supplies', 'paper', 'PP-204', 'Workshop paper and supplies', '6300', 18650]] as const)
-    bill(key, vendor, ref, description, code, amount, day(1), end)
+    bill(key, vendor, ref, description, code, amount, day(1), end, key === 'rent' ? `Monthly rent under the studio lease on file — ${ownerEmail}` : null)
   for (const [key, contact, target, date, amount, direction] of [['cedar-paid', 'cedar', 'cedar-site', 3, 240000, 'received'], ['willow-paid', 'willow', 'willow-brand', 18, 140000, 'received'], ['rent-paid', 'harbor', 'rent', 24, 130000, 'paid']] as const)
     payment(key, contact, target, day(date), amount, direction)
+  // This month: an invoice sent and viewed (src/demo/sales.ts), the contractor's bills, and a monthly retainer.
+  invoice('northstar-phase2', 'northstar', 'INV-0227', 'Brand system, phase 2', 320000, thisDay(9), 'issued')
+  bill('dana-cedar', 'dana', 'DR-114', 'Product photography, Cedar Studio launch', '6000', 125000, thisDay(16), addDays(thisDay(16), 15))
+  bill('dana-menu', 'dana', 'DR-121', 'Menu photography, Harbor Lights', '6000', 140000, thisDay(9), addDays(thisDay(9), 15))
+  const retainer = thisDay(2), lines = [{ description: 'Monthly menu and social content', quantity: '1', rate: '1200.00', accountId: id('4000'), taxCode: 'exempt' }]
+  r.add('pt_recurring', { id: id('recurring-harbor'), number: 'REC-0001', customer_id: id('harbor-lights'), lines: JSON.stringify(lines), memo: 'Monthly retainer: menu updates and two social posts a week.', every: 1, unit: 'month',
+    start_date: retainer, end_date: null, runs: 0, next_date: retainer, terms_days: 15, mode: 'draft', status: 'active', subtotal_cents: 120000, tax_cents: 0, total_cents: 120000, prepared_by: TAYLOR, revision: id('recurring-harbor'), created_at: at })
   entry('accrual', today, 'Monthly bookkeeping fee on business card', 'manual', id('accrual'), [['6500', 35000, 0], ['2100', 0, 35000]], false)
   const priorClosing = OPENING + priorLines.reduce((s, l) => s + l[1], 0)
   const statementLines = [[day(3), 240000, 'CEDAR STUDIO'], [day(8), -64000, 'BRIGHTLINE SOFTWARE'], [day(18), 140000, 'WILLOW SERVICES'], [day(24), -130000, 'CHECK 2052 HARBOR RENT'], [day(28), -1200, 'MONTHLY SERVICE FEE']] as const
@@ -127,7 +143,18 @@ export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail:
   })
 
   // This month's feed lines arrive after the open statement, as a sync brings them.
-  await seedFeeds(env.DB, { ownerEmail, now, checkingBalance: priorClosing + statementLines.reduce((s, l) => s + l[1], 0) })
+  await seedFeeds(env.DB, { ownerEmail, now, checkingBalance: priorClosing + statementLines.reduce((s, l) => s + l[1], 0), savingsBalance: SAVINGS })
+
+  // This month's moments, through Pantry's own code.
+  const person: Person = { kind: 'person', id: owner.id, email: ownerEmail.toLowerCase(), name: OWNER_NAME, session: '', role: 'owner', grants: { post: true, lock: true, reopen: true } }
+  const moment = { env, owner: person, reviewer: MORGAN, now }
+  await payContractor(moment)
+  await bookPayout(moment)
+  await runRecurring(moment)
+  await sendInvoice(moment)
+  await receiveReceipts({ env, ownerEmail, now, suppliesBillDay: day(1) })
+  await askQuestions({ env, ownerEmail, now, suppliesBillDay: day(1) })
+  await connectReader({ env, ownerEmail, now, suppliesBillDay: day(1) })
 
   // An agent's proposal waits for a person; added after the close, which requires none waiting.
   const later = records(env.DB)

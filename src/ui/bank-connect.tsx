@@ -93,7 +93,9 @@ export function Connect() {
   const a = feeds.data.availability
   return <>
     <PageHead title="Connect a bank or card" lead="Sign in to your bank once, through Plaid. Pantry never sees your bank password, and transactions arrive on their own from then on." actions={<Link to="/app/bank" className="btn btn-secondary">Back to Bank</Link>} />
-    {!a.available ? <Card title={a.needsKeys ? 'Set up live bank feeds' : 'Not available on this installation'}>{a.needsKeys ? <SetupSteps provider="plaid" reason={a.reason} summary="How to set up live bank feeds" owner={shared.state.actor.can.owner} open /> : <p>{a.reason}</p>}<p><Link to="/app/bank" search={{ tab: 'statements' }}>Import a statement file</Link> meanwhile.</p></Card> : <div className="connect stack">
+    {!a.available ? <Card title={a.needsKeys ? 'Live bank feeds' : 'Not available on this installation'}><p>{a.reason}</p>
+      <Link className="btn btn-primary" to="/app/bank" search={{ tab: 'statements' }}>Import a statement</Link>
+      {a.needsKeys && <SetupSteps provider="plaid" reason="" summary="Set up live bank feeds" owner={shared.state.actor.can.owner} />}</Card> : <div className="connect stack">
       <Card title="1 · Sign in to your bank" actions={connection && <Chip tone="good">{connection.institution_name}</Chip>}>
         {connection ? <p className="hint">Connected to {connection.institution_name} with {connection.accounts.length} account{connection.accounts.length === 1 ? '' : 's'}.</p>
           : <><p className="hint">Plaid opens in a window over this page. Choose your bank or card issuer and sign in there.{a.environment === 'sandbox' ? ' This installation uses Plaid’s sandbox: sign in with user_good / pass_good.' : ''}</p>

@@ -119,9 +119,9 @@ export function Questions({ focus }: { focus?: string }) {
   const [picked, setPicked] = useState<string | null>(null)
   const refresh = async () => { await reload(); await shared.reload() }
   if (!data) return <Loading error={error} what="Pantry’s questions" />
-  // One question at a time: the one the email opened, else the one chosen, else the oldest still open.
+  // One question at a time: the one the email opened, else the one chosen, else an answer waiting for your yes, else the oldest still open.
   const focused = focus && !picked ? [...data.open, ...data.settled].find((x: D) => x.id === focus) : null
-  const current = focused ?? data.open.find((x: D) => x.id === picked) ?? data.open[0]
+  const current = focused ?? data.open.find((x: D) => x.id === picked) ?? data.open.find((x: D) => x.status === 'confirm') ?? data.open[0]
   const rest = data.open.filter((x: D) => x.id !== current?.id)
   return <>
     <PageHead title="Questions from Pantry" chip={data.open.length ? <Chip tone="warn">{data.open.length} open</Chip> : <Chip tone="good">All answered</Chip>}
@@ -153,7 +153,7 @@ export function Questions({ focus }: { focus?: string }) {
 
 /** At close: the month's questions as one thread to work through, the next open one first. */
 export function MonthQuestions({ questions, month, onDone }: { questions: D[]; month: string; onDone: () => Promise<void> }) {
-  const who = useWho(), open = questions.filter(x => x.status === 'open' || x.status === 'confirm'), next = open[0]
+  const who = useWho(), open = questions.filter(x => x.status === 'open' || x.status === 'confirm'), next = open.find(x => x.status === 'confirm') ?? open[0]
   return <Card title={<><Icon name="agent" /> Pantry’s questions</>} actions={questions.length ? <span className="progress-count">{questions.length - open.length} of {questions.length} answered</span> : null}>
     {!questions.length ? <p>Pantry has asked nothing about {month}.</p> : <>
       {next && <QuestionCard q={next} onDone={onDone} compact />}

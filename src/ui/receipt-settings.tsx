@@ -9,17 +9,17 @@ function ReadingCard({ reader, onChange }: { reader: D; onChange: () => Promise<
   const chip = reader.unavailable ? <Chip>Not available here</Chip> : reader.missing ? <Chip tone="warn">No key</Chip> : <Chip tone="good">Reading receipts</Chip>
   return <section id="ai-reading"><Card title={<><Icon name="agent" /> AI reading</>} actions={chip}>
     {reader.unavailable ? <p>{reader.unavailable}</p> : <>
-      <p>{reader.missing ? `${reader.missing} ` : ''}Pantry reads the vendor, date, total, tax and currency of each receipt with your own AI provider account. It sends the receipt and your expense account names to that provider, and only ever proposes: a person accepts before anything is attached.</p>
-      <details className="details setup-steps"><summary>Get a key</summary><ol>
+      <p>{reader.missing ? `${reader.missing} ` : ''}Pantry reads each receipt's vendor, date, total and tax with your own AI provider account, and a person accepts before anything is attached.</p>
+      <details className="details setup-steps"><summary>Set up AI reading: get a key</summary><ol>
         <li><strong>Anthropic:</strong> open <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">console.anthropic.com → API keys</a>, choose <strong>Create Key</strong>, and copy it. An organization key that is not tied to one workspace also needs that workspace’s ID (Console → Workspaces).</li>
         <li><strong>OpenAI or another OpenAI-compatible provider:</strong> open <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">platform.openai.com → API keys</a>, create a key, and enter a model that reads images and PDFs.</li>
         <li>Paste it below and choose <strong>Save</strong>, then <strong>Test the key</strong>.</li>
-      </ol></details>
+      </ol><p className="hint">Pantry sends the receipt and your expense account names to that provider, and only ever proposes.</p></details>
       <Form key={saved?.revision ?? 'new'} label={saved ? 'Save' : 'Save key'} submit={b => command('reader.save', { ...b, provider })} onDone={async () => { setCheck(null); await onChange() }} className="grid-form">
         <Field label="Provider" name="providerChoice" value={provider} onChange={(e: any) => setProvider(e.target.value)} options={[{ value: 'anthropic', label: 'Anthropic (Claude)' }, { value: 'openai', label: 'OpenAI or OpenAI-compatible' }]} />
         <Field label="Model" name="model" defaultValue={saved?.provider === provider ? saved.model : reader.defaults[provider].model} placeholder={provider === 'openai' ? 'The model name from your provider' : ''} required={provider === 'openai'} />
         <Field label="API key" name="key" type="password" autoComplete="off" placeholder={saved ? `Saved key ${saved.key_hint}; paste a new one to replace it` : 'Paste the key'} required={!saved} />
-        {provider === 'anthropic' ? <Field label="Workspace ID (only for keys not tied to a workspace)" name="workspace" defaultValue={saved?.workspace ?? ''} placeholder="wrkspc_…" />
+        {provider === 'anthropic' ? <details className="setup-steps field-wide" open={!!saved?.workspace}><summary>Set up an organization key</summary><Field label="Workspace ID (only for keys not tied to a workspace)" name="workspace" defaultValue={saved?.workspace ?? ''} placeholder="wrkspc_…" /></details>
           : <Field label="Endpoint" name="endpoint" defaultValue={saved?.provider === 'openai' ? saved.endpoint : reader.defaults.openai.endpoint} />}
       </Form>
       {saved && <div className="row-actions">
@@ -58,7 +58,7 @@ function AddressCard({ inbox, onChange }: { inbox: D; onChange: () => Promise<vo
     {inbox.address ? <>
       <p>Forward receipt emails, or have your mail forward them automatically, to:</p>
       <p><code className="token">{inbox.address}</code> <button type="button" className="btn btn-link" onClick={() => navigator.clipboard?.writeText(inbox.address)}>Copy</button></p>
-      <details className="details"><summary>Your domain has Subaddressing off?</summary><p className="hint">Pantry also accepts the same private address as <code className="token">{inbox.exactAddress}</code>. In Cloudflare Email Routing, create a rule for that exact address with <strong>Send to a Worker</strong> and forward to it instead; no Subaddressing needed.</p></details>
+      <details className="details"><summary>Set up: mail to this address does not arrive</summary><p className="hint">Pantry also accepts the same private address as <code className="token">{inbox.exactAddress}</code>. In Cloudflare Email Routing, create a rule for that exact address with <strong>Send to a Worker</strong> and forward to it instead; no Subaddressing needed.</p></details>
       <p className="hint">{inbox.lastReceivedAt ? <>Last received {day(inbox.lastReceivedAt)}: {inbox.lastNote}</> : 'Nothing received yet.'} Each message is kept whole; Pantry reads its PDF or photo, or its text when it has none.</p>
       {inbox.confirmation && <div className="callout callout-warn" role="status"><strong>Gmail asked to confirm forwarding{inbox.confirmation.account ? ` from ${inbox.confirmation.account}` : ''}</strong>
         <span>{inbox.confirmation.code ? <>Code <strong>{inbox.confirmation.code}</strong>. </> : null}Enter it in Gmail’s forwarding settings{inbox.confirmation.link ? <>, or <a href={inbox.confirmation.link} target="_blank" rel="noreferrer">open Google’s confirmation link</a></> : null}.</span></div>}
@@ -69,15 +69,17 @@ function AddressCard({ inbox, onChange }: { inbox: D; onChange: () => Promise<vo
         <Action tone="danger" run={async () => { await command('receipt-address.remove', {}); await onChange() }}>Stop receiving by email</Action>
       </details>
     </> : <>
-      {inbox.hosting === 'local' && <p className="hint">Pantry on this computer cannot receive mail from the internet, so these steps are for once it is <a href="https://run-pantry.com/docs/hosting" target="_blank" rel="noreferrer">online on your Cloudflare account</a>. Until then, take a photo or upload the receipt in Receipts.</p>}
+      <p>Forward receipt emails to a private Pantry address and they wait in Receipts, read and ready to attach.</p>
+      {inbox.hosting === 'local' && <p className="hint">Pantry on this computer cannot receive mail from the internet; until it is <a href="https://run-pantry.com/docs/hosting" target="_blank" rel="noreferrer">online</a>, take a photo or upload the receipt in Receipts.</p>}
+      {create}
+      <details className="setup-steps"><summary>Set up receiving on your domain</summary>
       <p>Do this once, with a domain you have on {inbox.hosting === 'local' ? 'your' : 'the'} Cloudflare account {inbox.hosting === 'local' ? 'Pantry is deployed to' : 'this Pantry runs on'} (about five minutes){inbox.host.endsWith('.workers.dev') ? <>; {inbox.host} itself cannot receive mail</> : null}:</p>
-      <ol className="setup-steps">
+      <ol>
         <li>In Cloudflare, open your domain, then <strong>Email</strong> › <strong>Email Routing</strong>, and turn it on (a spare subdomain such as <code>books.example.com</code> keeps your normal mail as it is).</li>
         <li>Under <strong>Routing rules</strong>, create the address <code>receipts@</code> your domain with the action <strong>Send to a Worker</strong>, and choose {inbox.hosting === 'local' ? <>your hosted Pantry's Worker (<code>pantry-production</code>, unless you deployed another environment)</> : <>the Worker that serves {inbox.host}</>}.</li>
         <li>Under <strong>Settings</strong>, turn on <strong>Subaddressing</strong>, so the private <code>receipts+tag@</code> address reaches the same rule. (To leave it off, skip this: once the address exists, this card shows a <code>receipts-tag@</code> spelling to route with its own rule.)</li>
-        <li>Enter the address here and create your Pantry address.</li>
-      </ol>
-      {create}
+        <li>Enter the address above and create your Pantry address.</li>
+      </ol></details>
     </>}
   </Card></section>
 }

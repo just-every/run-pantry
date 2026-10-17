@@ -417,7 +417,11 @@ ul.plain li:last-child { border-bottom: 0; }
   .card-actions .inline-fields .field label { min-width: 64px; }
   .card-actions .inline-fields select { flex: 1; min-width: 0; }
   .card-actions .inline-fields .field input { min-width: 0; width: 100%; }
-  .ledger td .filed { display: inline-flex; max-width: 70%; }
+  /* On a phone the filed pill, its account line and Undo stack inside the cell, right-aligned beside the "Filed" label. */
+  .ledger td .filed { grid-template-columns: minmax(0, auto); justify-items: end; max-width: calc(100% - 56px); vertical-align: top; }
+  .ledger td .filed > .sub, .ledger td .filed > .action { grid-column: 1; grid-row: auto; }
+  .ledger td .filed > .sub { text-align: right; }
+  .ledger td .filed .chip { max-width: 100%; white-space: normal; }
   .preview-lines li { flex-direction: column; gap: 2px; }
 }
 
@@ -446,6 +450,8 @@ ul.plain li:last-child { border-bottom: 0; }
 .setup-steps { margin: 0 0 14px; padding-left: 20px; }
 .setup-steps li { margin-bottom: 6px; }
 details.setup-steps { padding-left: 0; }
+/* A collapsed "Set up …" after the card's one action keeps clear of it. */
+.btn + details.setup-steps, .action + details.setup-steps, form + details.setup-steps { margin-top: 14px; }
 details.setup-steps ol { padding-left: 20px; }
 @media (max-width: 720px) {
   .receipt-body { grid-template-columns: minmax(0, 1fr); gap: 16px; }
