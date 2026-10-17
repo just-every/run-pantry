@@ -17,7 +17,7 @@ export type Availability = { available: true } | { available: false; reason: str
 
 export function xeroAvailability(env: Bindings): Availability {
   if (managedInstall(env)) return { available: false, reason: 'Carrying attachments over from Xero is not available yet on RER Managed: it cannot reach Xero until RER adds a provider relay. Upload the files in Documents instead.' }
-  if (!env.XERO_CLIENT_ID || !env.XERO_CLIENT_SECRET) return { available: false, reason: 'Carrying attachments over needs this installation’s own Xero app (XERO_CLIENT_ID and XERO_CLIENT_SECRET; see the move-in guide). Until then, upload the files in Documents.' }
+  if (!env.XERO_CLIENT_ID || !env.XERO_CLIENT_SECRET) return { available: false, reason: 'Carrying attachments over from Xero needs setting up on this installation first (the move-in guide says how). Until then, upload the files in Documents.' }
   return { available: true }
 }
 
@@ -51,7 +51,7 @@ export type Connection = { id: string; authEventId?: string; tenantId: string; t
 
 export async function connections(access: string): Promise<Connection[]> {
   const r = await reach(`${API}/connections`, { headers: { authorization: `Bearer ${access}`, accept: 'application/json' } })
-  if (!r.ok) throw new Fault(502, `Xero did not list the organisations: HTTP ${r.status}`)
+  if (!r.ok) throw new Fault(502, `Xero did not list the organizations: HTTP ${r.status}`)
   return await r.json() as Connection[]
 }
 

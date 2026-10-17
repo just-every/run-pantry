@@ -35,9 +35,9 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
   checks.push({ key: 'drafts', title: 'No unposted drafts', ok: unposted === 0, items: [...drafts.map(d => ({ kind: 'journal', id: d.id, label: d.memo })), ...invoices.map(i => ({ kind: 'invoice', id: i.id, label: i.number })), ...bills.map(b => ({ kind: 'bill', id: b.id, label: b.reference }))],
     detail: unposted ? `${drafts.length} journal, ${invoices.length} invoice and ${bills.length} bill drafts dated in ${monthName(id)}` : 'Nothing waiting to post' })
 
-  const missing = await all(db, "SELECT b.id, b.reference, c.name AS vendor FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id WHERE b.status = 'posted' AND b.bill_date BETWEEN ? AND ? AND b.evidence_waived IS NULL AND NOT EXISTS (SELECT 1 FROM pt_documents d WHERE d.linked_kind = 'bill' AND d.linked_id = b.id)", start, end)
+  const missing = await all(db, "SELECT b.id, b.reference, b.bill_date, b.total_cents, c.name AS vendor FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id WHERE b.status = 'posted' AND b.bill_date BETWEEN ? AND ? AND b.evidence_waived IS NULL AND NOT EXISTS (SELECT 1 FROM pt_documents d WHERE d.linked_kind = 'bill' AND d.linked_id = b.id)", start, end)
   const waived = Number((await one(db, "SELECT COUNT(*) AS n FROM pt_bills WHERE status = 'posted' AND bill_date BETWEEN ? AND ? AND evidence_waived IS NOT NULL", start, end))?.n ?? 0)
-  checks.push({ key: 'evidence', title: 'Bills have source documents', ok: missing.length === 0, items: missing.map(m => ({ kind: 'bill', id: m.id, label: `${m.vendor} ${m.reference}` })),
+  checks.push({ key: 'evidence', title: 'Bills have source documents', ok: missing.length === 0, items: missing.map(m => ({ kind: 'bill', id: m.id, label: `${m.vendor} ${m.reference}`, date: m.bill_date, amount_cents: m.total_cents })),
     detail: missing.length ? `${missing.length} bill${missing.length === 1 ? '' : 's'} without a document or recorded reason` : waived ? `Every bill has a receipt or a recorded reason (${waived} waived)` : 'Every bill has a receipt' })
 
   const ar = await ageing(db, 'receivable', end), ap = await ageing(db, 'payable', end)

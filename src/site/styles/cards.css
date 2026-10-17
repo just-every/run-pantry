@@ -62,17 +62,19 @@
 .receipt-paper { width: 410px; padding: 22px 26px 26px; background: #fff; font: 500 14.5px/1.38 var(--font-mono); letter-spacing: -.01em; color: #2a2a32; box-shadow: 0 1px 2px rgba(0, 0, 0, .06), 0 18px 30px -16px rgba(16, 26, 51, .35); clip-path: polygon(0 1%, 6% 0, 13% .8%, 22% 0, 31% .9%, 40% 0, 50% 1%, 60% 0, 70% .8%, 80% 0, 89% 1%, 100% 0, 100% 99%, 93% 100%, 85% 99.2%, 75% 100%, 64% 99%, 52% 100%, 41% 99.2%, 30% 100%, 19% 99%, 9% 100%, 0 99.2%); }
 .receipt-paper p { margin: 0; }
 .receipt-head { display: flex; align-items: center; gap: 14px; }
-.receipt-logo { display: grid; place-items: center; width: 66px; height: 66px; background: #f26f21; color: #fff; font: 800 12px/1 var(--font-head); letter-spacing: .02em; transform: rotate(-2deg); outline: 3px solid #fff; outline-offset: -6px; }
-.receipt-logo span { display: block; }
-.receipt-slogan { font: 700 17px/1.1 var(--font-body); color: #333; letter-spacing: -.01em; }
+.receipt-logo { display: grid; place-items: center; width: 52px; height: 52px; flex: none; border-radius: 8px; background: #f26f21; color: #fff; font: 800 19px/1 var(--font-head); letter-spacing: -.02em; }
+.receipt-name { font: 700 15.5px/1.3 var(--font-mono); color: #2a2a32; letter-spacing: .02em; }
 .receipt-store { margin-top: 12px !important; padding-left: 52px; }
 .receipt-meta { display: flex; justify-content: space-between; margin-top: 10px !important; }
 .receipt-line { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px !important; white-space: pre; }
-.receipt-line.sums { margin-top: 14px !important; padding-left: 150px; }
+.receipt-sums { margin-top: 14px; padding-left: 150px; }
+.receipt-sums .receipt-line { margin-top: 2px !important; }
+/* TOTAL stands on its own row, a little apart, so its box clears the tax figure above. */
+.receipt-sums .receipt-line.total { margin-top: 11px !important; }
 .receipt-line b { font-weight: 700; }
 .receipt-paper.marked .receipt-logo, .receipt-paper.marked .receipt-date, .receipt-paper.marked .receipt-total { position: relative; }
-.receipt-paper.marked .receipt-logo::after, .receipt-paper.marked .receipt-date::after, .receipt-paper.marked .receipt-total::after { content: ''; position: absolute; inset: -6px -7px; border: 2.4px solid var(--green); border-radius: 2px; }
-.receipt-paper.marked .receipt-logo::after { inset: -9px; }
+.receipt-paper.marked .receipt-logo::after, .receipt-paper.marked .receipt-date::after, .receipt-paper.marked .receipt-total::after { content: ''; position: absolute; inset: -4px -7px; border: 2.4px solid var(--green); border-radius: 2px; }
+.receipt-paper.marked .receipt-logo::after { inset: -7px; border-radius: 10px; }
 .receipt-paper.mini { width: 300px; padding: 16px 18px; font-size: 10.5px; transform-origin: 0 0; scale: .32; box-shadow: none; }
 .hc-thumb .receipt-paper.mini { scale: .4; }
 .hc-thumb .receipt-paper { left: -4px; top: 6px; }
@@ -103,8 +105,8 @@
 .receipt-leads circle { fill: var(--green); }
 .receipt-match { position: relative; display: flex; align-items: center; gap: 18px; margin-top: 14px; padding: 14px 22px 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; font-size: 19px; }
 .receipt-match .who { flex: 1; font-weight: 500; }
-.receipt-match .amt { font-weight: 500; font-size: 20px; font-variant-numeric: tabular-nums; }
-.receipt-match .date { color: #6b7290; margin-left: 24px; }
+.receipt-match .amt { font-weight: 500; font-size: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.receipt-match .date { color: #6b7290; margin-left: 24px; white-space: nowrap; }
 .receipt-match .tick { width: 22px; height: 22px; margin-left: 10px; }
 
 /* ---------- Invoice timeline ---------- */
@@ -135,8 +137,9 @@
 .pl-row.hot { margin-top: 6px; border-radius: 10px; background: #fde9dc; }
 .pl-pin { position: absolute; right: -4px; top: 50%; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; background: var(--apricot); box-shadow: 0 0 0 4px rgba(242, 162, 114, .25); }
 /* The lead from the pinned figure down to what is behind it. */
-.pl-pin::after { content: ''; position: absolute; left: 9px; top: 8px; width: 46px; height: 86px; border: solid var(--apricot); border-width: 2px 2px 0 0; border-top-right-radius: 12px; }
-.behind { position: absolute; left: 290px; bottom: 0; display: flex; align-items: center; gap: 18px; width: min(442px, 92%); padding: 16px 22px 16px 16px; border-radius: 16px; font-size: 17.5px; font-weight: 500; }
+.pl-pin::after { content: ''; position: absolute; left: 9px; top: 8px; width: 30px; height: 86px; border: solid var(--apricot); border-width: 2px 2px 0 0; border-top-right-radius: 12px; }
+/* The drill-down hangs from the drawing's own right edge, so it never reaches the copy beside it (page-03). */
+.behind { position: absolute; right: -20px; bottom: 0; display: flex; align-items: center; gap: 18px; width: min(442px, 92%); padding: 16px 22px 16px 16px; border-radius: 16px; font-size: 17.5px; font-weight: 500; }
 .behind p span { color: #4f5670; font-weight: 400; }
 .behind-icon { display: grid; place-items: center; width: 56px; height: 56px; flex: none; border-radius: 50%; background: var(--apricot-tint); color: #8a3f15; }
 .behind-icon .icon { width: 26px; height: 26px; stroke-width: 1.6; }
@@ -202,12 +205,13 @@
 .tb-list b { margin-left: auto; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
 
 /* ---------- Terminal ---------- */
-.terminal { position: relative; width: 100%; max-width: 680px; min-height: 370px; border: 1.5px solid #2c3757; border-radius: 16px; background: linear-gradient(180deg, #19244a, #121a37); box-shadow: 0 30px 60px -28px rgba(16, 26, 51, .55), inset 0 1px 0 rgba(255, 255, 255, .06); color: #e8eaf5; }
+.terminal { position: relative; width: 100%; max-width: 680px; min-height: 250px; border: 1.5px solid #2c3757; border-radius: 16px; background: linear-gradient(180deg, #19244a, #121a37); box-shadow: 0 30px 60px -28px rgba(16, 26, 51, .55), inset 0 1px 0 rgba(255, 255, 255, .06); color: #e8eaf5; }
 .terminal-bar { display: flex; gap: 10px; padding: 18px 22px; border-bottom: 1px solid var(--terminal-line); }
 .terminal-bar span { width: 15px; height: 15px; border-radius: 50%; background: #ff5f57; }
 .terminal-bar span:nth-child(2) { background: #febc2e; } .terminal-bar span:nth-child(3) { background: #28c840; }
 .terminal pre { margin: 0; padding: 30px 26px 40px; font: 400 16px/2.9 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .terminal-line { display: block; padding-left: 26px; text-indent: -26px; }
+.terminal-line.comment { color: #8f97b8; }
 .prompt { display: inline-block; width: 26px; text-indent: 0; color: #3ed598; font-weight: 600; }
 
 /* ---------- The quiet details ---------- */
@@ -251,6 +255,7 @@
   .receipt-desk .receipt-paper { scale: .74; transform-origin: 50% 0; top: 10px; }
   .receipt-leads { display: none; }
   .receipt-match { gap: 8px; padding: 12px 12px; font-size: 15.5px; } .receipt-match .who { white-space: nowrap; } .receipt-match .party { width: 34px; height: 34px; font-size: 12px; }
+  .receipt-match .amt { font-size: 15.5px; } .receipt-match .date { margin-left: 2px; } .receipt-match .tick { margin-left: 0; }
   .receipt-match .amt { font-size: 16px; } .receipt-match .date { margin-left: 4px; }
   .invoice { padding: 20px 18px 24px; }
   .invoice-head { flex-direction: column; align-items: flex-start; gap: 12px; } .invoice-head p { font-size: 19px; white-space: normal; }
@@ -265,7 +270,7 @@
   .toggle { font-size: 15px; } .toggle span { padding: 6px 14px; }
   .pl-row { padding: 15px 30px 15px 10px; font-size: 17px; }
   .pl-pin::after { left: 8px; width: 0; height: 64px; border-radius: 0; border-width: 0 2px 0 0; top: 18px; }
-  .behind { left: 0; width: 100%; gap: 12px; padding: 12px 14px; font-size: 15px; }
+  .behind { left: 0; right: auto; width: 100%; gap: 12px; padding: 12px 14px; font-size: 15px; }
   .behind-icon { width: 42px; height: 42px; }
   .agent, .close, .tb { padding: 20px 18px; }
   .agent-head { gap: 14px; font-size: 16.5px; } .agent-icon { width: 46px; height: 46px; }

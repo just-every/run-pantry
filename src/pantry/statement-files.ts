@@ -56,7 +56,7 @@ export function parseCsvStatement(source: string): ParsedStatement {
   const find = (names: string[]) => head.findIndex(h => names.includes(h))
   const col = { date: find(HEADERS.date), description: find(HEADERS.description), amount: find(HEADERS.amount), debit: find(HEADERS.debit), credit: find(HEADERS.credit), reference: find(HEADERS.reference) }
   if (col.date < 0 || col.description < 0 || (col.amount < 0 && (col.debit < 0 || col.credit < 0)))
-    throw new Fault(400, `Unrecognised statement columns (${rows[0].join(', ')}). Pantry reads a header with a date (Date, Posting Date), a description (Description, Payee) and either Amount or Debit and Credit columns.`)
+    throw new Fault(400, `Unrecognized statement columns (${rows[0].join(', ')}). Pantry reads a header with a date (Date, Posting Date), a description (Description, Payee) and either Amount or Debit and Credit columns.`)
   const lines = rows.slice(1).map((r, i) => {
     const label = `Row ${i + 2}`
     const amount = col.amount >= 0

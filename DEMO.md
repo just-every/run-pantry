@@ -7,16 +7,21 @@ The app's nav and document title say **Pantry Demo**, without a demo bar or outb
 
 The sample adapts `tests/api/scenario.mjs` and the QuickBooks fixtures into real
 records with fixed IDs and dates relative to the start: customers and vendors,
-a service-business chart, two bank accounts, opening balances, invoices, bills,
+a service-business chart, two bank accounts and a business card, opening balances, invoices, bills,
 recorded payments, a statement to reconcile, a journal draft, review tasks,
 source documents, approvals and an agent proposal a person can decide.
+Bank shows this month's feeds (`src/demo/feeds.ts`): Chase connected and current,
+an American Express card that needs re-linking, a pending card charge, and an
+Adobe rule that files its line through Pantry's own rule code. The connections
+hold no provider token and the demo calls no provider, so Sync now and Re-link
+say that live feeds need setting up.
 The month before last is closed the way a person closes it: `src/demo/close.ts`
 matches its statement lines, completes both reconciliations and locks the
 period through Pantry's own match, reconciliation and lock plans. Last month is
 open, with its statement to reconcile. The owner is Priya Shah
 (`ownerEmail` in `deploy-demo.json`). `src/demo.ts` is idempotent and never fetches.
 
-Public reads run for real. Pantry has no public URL check, bank feed or payment
+Public reads run for real. Pantry has no public URL check, live bank feed or payment
 initiation. Its invoice/payment commands record books locally; issuing an invoice
 does not email it or move money. Sign-in and invitation mail use Base's
 `demoEffect` delivery success and send nothing in demo mode. Optional identity

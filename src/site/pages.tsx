@@ -16,6 +16,10 @@ const COPY = "document.querySelectorAll('.docs-copy').forEach(b=>{b.hidden=false
 
 const SHARE_IMAGE = `${identity.runSite}/site/share.jpg`
 
+// Base's shared Run page (src/base/run-site.ts, copied unchanged) prints British "licence";
+// Pantry is a US product, so its /run says "license".
+const usSpelling = (html: string) => html.replaceAll(`${run.licence} licence<`, `${run.licence} license<`)
+
 export function sitePages({ styles }: SiteContext): SiteBuild {
   const data: RunData = run
   const document = (title: string, description: string, body: ReactElement, script = '') => '<!doctype html>' + renderToStaticMarkup(
@@ -50,7 +54,7 @@ export function sitePages({ styles }: SiteContext): SiteBuild {
   return {
     pages: [
       { path: '/', html: document('Pantry — Know where every dollar went', identity.tagline, <Landing />) },
-      { path: '/run', html: runPageHtml(identity, data) },
+      { path: '/run', html: usSpelling(runPageHtml(identity, data)) },
       { path: '/docs', html: document(...head(), <DocsIndex />) },
       ...docsPages.map(page => ({ path: `/docs/${page.slug}`, html: document(...head(page.slug), <DocsArticle slug={page.slug} />, COPY) })),
       { path: '/404', html: siteNotFoundHtml(identity, data) },

@@ -82,7 +82,7 @@ function ReceiptUpload({ q, onDone }: { q: D; onDone: () => Promise<void> }) {
 function AgentStatus({ agent, onRun }: { agent: D; onRun: () => Promise<void> }) {
   const can = useShared().state.actor.can.record, r = agent.lastRun
   const mail = agent.mail === 'ready' ? (agent.settings.emailOn ? `Emails new questions to ${agent.owner}, up to ${agent.settings.perDay} a day.` : 'Email is off; questions wait here.') : agent.mail === 'local' ? 'This computer sends no email, so questions wait here.' : 'No mail provider is set up, so questions wait here.'
-  return <Card title="How Pantry checks" className="card-stone">
+  return <Card title="How Pantry checks">
     <ul className="plain">
       <li><strong>{r ? <>Last checked {day(r.at)}</> : 'Not checked yet'}</strong>{r && <span className="hint"> · {r.found} things to ask about, {r.open} open</span>}</li>
       <li>{mail}</li>
@@ -135,7 +135,7 @@ export function Questions({ focus }: { focus?: string }) {
             <span className="answered-end"><StatusChip status={x.status} /><button type="button" className="btn btn-secondary btn-small" onClick={() => { setPicked(x.id); window.scrollTo({ top: 0 }) }}>Answer</button></span>
           </li>)}</ol>
         </Card>}
-        {!data.open.length && !focused && <Card title="Nothing to ask" className="empty-card"><span className="empty-tile" aria-hidden="true" /><p>Every deposit is explained, every payment is filed with its receipt, and the bank and the books agree.</p></Card>}
+        {!data.open.length && !focused && <Card title="Nothing to ask" className="empty-card"><span className="empty-lines" aria-hidden="true" /><p>Every deposit is explained, every payment is filed with its receipt, and the bank and the books agree.</p></Card>}
         {data.settled.length > 0 && <Card title="Answered">
           <ol className="answered">{data.settled.filter((x: D) => x.id !== focused?.id).map((x: D) => <li key={x.id}>
             <div><strong>{x.title}</strong><span className="hint">{x.answer ? <>“{x.answer}” — {who(x.answered_by)}{x.answered_via === 'email' ? ' by email' : ''}, {day(x.answered_at)}</> : x.messages.at(-1)?.body}</span></div>

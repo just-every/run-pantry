@@ -35,7 +35,8 @@ function Connection({ c, onDone }: { c: D; onDone: () => Promise<void> }) {
     </li>)}</ul>
     {c.status === 'active' && c.last_sync_error && <p className="hint">Last try: {c.last_sync_error}. Pantry tries again within the hour.</p>}
     {can && <div className="row-actions small">
-      {c.status === 'relink' && <Action tone="primary" run={async () => { await relink(c); await onDone() }}>Re-link</Action>}
+      {/* The notice at the top of Bank carries the navy Re-link; here it is the quiet second door. */}
+      {c.status === 'relink' && <Action run={async () => { await relink(c); await onDone() }}>Re-link</Action>}
       {!brought.length && <Link className="btn btn-primary btn-small" to="/app/bank/connect" search={{ connection: c.id }}>Choose accounts</Link>}
       {c.status === 'active' && brought.length > 0 && <Action run={async () => { await command('feed.sync', { itemId: c.id }); await onDone() }}>Sync now</Action>}
       <Action tone="danger" run={async () => { if (window.confirm(`Disconnect ${c.institution_name}? Lines already in Pantry stay.`)) { await command('feed.disconnect', { itemId: c.id }); await onDone() } }}>Disconnect</Action>
@@ -51,15 +52,17 @@ export function RelinkNotices({ data, onDone }: { data: D | undefined; onDone: (
     {can && <Action tone="primary" run={async () => { await relink(c); await onDone() }}>Re-link</Action>}</div>)}</>
 }
 
-export function Feeds({ data, onDone }: { data: D | undefined; onDone: () => Promise<void> }) {
+export function Feeds({ data, onDone, onImport }: { data: D | undefined; onDone: () => Promise<void>; onImport: () => void }) {
   const can = useShared().state.actor.can.record
   if (!data) return null
-  const a = data.availability
+  const a = data.availability, none = !data.connections.length
   // With nothing connected yet, connecting is the card's one action, so it leads the body instead of the head.
+  // Without live feeds set up, importing a statement is the one action that works.
   const connect = (primary: boolean) => a.available && can && <Link className={`btn ${primary ? 'btn-primary' : 'btn-secondary btn-small'}`} to="/app/bank/connect">Connect a bank or card</Link>
-  return <Card title="Bank and card feeds" actions={data.connections.length > 0 && connect(false)}>
-    {!a.available ? <p className="hint">{a.reason}</p>
-      : !data.connections.length ? <><p>Connect a bank or card once and its transactions arrive on their own. Statement files keep working beside it.</p>{connect(true)}</>
-      : data.connections.map((c: D) => <Connection key={c.id} c={c} onDone={onDone} />)}
+  return <Card title="Bank and card feeds" actions={!none && connect(false)}>
+    {none && <p>Connect a bank or card once and its transactions arrive on their own. Statement files keep working beside it.</p>}
+    {data.connections.map((c: D) => <Connection key={c.id} c={c} onDone={onDone} />)}
+    {!a.available && <p className="hint feeds-off">{a.reason}</p>}
+    {none && (a.available ? connect(true) : can && <button type="button" className="btn btn-primary" onClick={onImport}>Import a statement</button>)}
   </Card>
 }

@@ -2,6 +2,7 @@ import type { Bindings } from './auth.server'
 import { SERVICE_CHART } from './pantry/accounts'
 import { addDays, sha256 } from './pantry/core'
 import { closeMonth } from './demo/close'
+import { seedFeeds } from './demo/feeds'
 import { demoId as id, records } from './demo/records'
 
 const OWNER_NAME = 'Priya Shah', TAYLOR = 'taylor@juniperlane.example', MORGAN = 'morgan@leecpa.example'
@@ -22,7 +23,7 @@ export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail:
   if (!owner) throw new Error('Demo owner is not ready')
   r.sql('UPDATE oa_operators SET display_name = ? WHERE id = ?', OWNER_NAME, owner.id)
   r.add('oa_first_run', { singleton: 1, completed_by: owner.id, completed_at: now.getTime() })
-  r.add('pt_entity', { id: 1, legal_name: 'Juniper Lane Design LLC', entity_type: 'single-member-llc', state: 'NY', fiscal_year_start: 1, tax_method: 'cash', policies: 'Accrual books in USD. Revenue recognised when invoiced. Accountant: Morgan Lee CPA.', books_start: openingDay, revision: id('entity'), updated_by: ownerEmail, updated_at: at })
+  r.add('pt_entity', { id: 1, legal_name: 'Juniper Lane Design LLC', entity_type: 'single-member-llc', state: 'NY', fiscal_year_start: 1, tax_method: 'cash', policies: 'Accrual books in USD. Revenue recognized when invoiced. Accountant: Morgan Lee CPA.', books_start: openingDay, revision: id('entity'), updated_by: ownerEmail, updated_at: at })
   for (const [code, name, type, subtype] of [...SERVICE_CHART, ['1010', 'Savings', 'asset', 'bank']])
     r.add('pt_accounts', { id: id(code), code, name, type, subtype, revision: id(code) })
   for (const [email, name, role, post] of [[TAYLOR, 'Taylor Kim', 'bookkeeper', 0], [MORGAN, 'Morgan Lee CPA', 'accountant', 1]])
@@ -107,7 +108,8 @@ export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail:
     payment(key, contact, target, day(date), amount, direction)
   entry('accrual', today, 'Monthly bookkeeping fee on business card', 'manual', id('accrual'), [['6500', 35000, 0], ['2100', 0, 35000]], false)
   const priorClosing = OPENING + priorLines.reduce((s, l) => s + l[1], 0)
-  await statement('statement', 'checking', 'operating-checking', month, start, end, priorClosing, [[day(3), 240000, 'CEDAR STUDIO'], [day(8), -64000, 'BRIGHTLINE SOFTWARE'], [day(18), 140000, 'WILLOW SERVICES'], [day(24), -130000, 'CHECK 2052 HARBOR RENT'], [day(28), -1200, 'MONTHLY SERVICE FEE']])
+  const statementLines = [[day(3), 240000, 'CEDAR STUDIO'], [day(8), -64000, 'BRIGHTLINE SOFTWARE'], [day(18), 140000, 'WILLOW SERVICES'], [day(24), -130000, 'CHECK 2052 HARBOR RENT'], [day(28), -1200, 'MONTHLY SERVICE FEE']] as const
+  await statement('statement', 'checking', 'operating-checking', month, start, end, priorClosing, statementLines)
   for (const taskMonth of [month, today.slice(0, 7)]) tasks(taskMonth, i => i === 1, () => 'Customer balances checked against invoices.', () => ownerEmail, () => at)
   r.add('pt_agents', { id: id('agent'), name: 'Juniper books assistant', token_hash: await sha256('demo-agent-with-no-issued-token'), created_by: ownerEmail, created_at: at, revision: id('agent') })
   for (const key of ['northstar-retainer', 'cafe-menu'])
@@ -123,6 +125,9 @@ export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail:
     note: 'Reviewed with Morgan Lee CPA.',
     reconciledAt: `${day(3)}T15:40:00.000Z`, lockedAt: `${day(4)}T16:20:00.000Z`,
   })
+
+  // This month's feed lines arrive after the open statement, as a sync brings them.
+  await seedFeeds(env.DB, { ownerEmail, now, checkingBalance: priorClosing + statementLines.reduce((s, l) => s + l[1], 0) })
 
   // An agent's proposal waits for a person; added after the close, which requires none waiting.
   const later = records(env.DB)

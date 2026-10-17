@@ -18,6 +18,7 @@
   --rer-focus: #0e8659;
   --rer-link: #101a33;
   --rer-radius: 14px;
+  --rer-button-radius: 999px;
   --rer-accent: #101a33;
   --rer-accent-text: #ffffff;
   --rer-code-background: #131c38;
@@ -97,7 +98,8 @@ html.rer-themed main:has(> .rer-brand) { max-width: 560px; margin-top: 10vh; pad
 html.rer-themed .brand, html.rer-themed .rer-brand { display: flex; justify-content: center; align-items: center; gap: 12px; margin: 0 0 30px; font: 700 31px/1 var(--font-head); letter-spacing: -.035em; color: var(--ink); }
 html.rer-themed .brand::before, html.rer-themed .rer-brand::before { width: 34px; height: 34px; margin-top: -4px; }
 html.rer-themed h1 { margin: 0 0 12px; font: 800 38px/1.08 var(--font-head); letter-spacing: -.045em; color: var(--ink); text-align: center; }
-html.rer-themed main > p:not(.brand):not(.rer-brand):not(.notice):not(.secondary-link):not(.credit) { text-align: center; }
+/* A customer's invoice page (/i/…) reads left to right like the document it is. */
+html.rer-themed main:not(.invoice) > p:not(.brand):not(.rer-brand):not(.notice):not(.secondary-link):not(.credit) { text-align: center; }
 html.rer-themed h1 + form, html.rer-themed h1 + .stack, html.rer-themed h1 + .notice { margin-top: 28px; }
 html.rer-themed h2 { font: 700 20px/1.3 var(--font-head); letter-spacing: -.02em; color: var(--ink); }
 html.rer-themed p { color: var(--muted); font-size: 16px; line-height: 1.55; }

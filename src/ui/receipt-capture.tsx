@@ -31,7 +31,8 @@ export async function sendReceipt(file: File, source: 'camera' | 'upload', targe
   return value as { id: string }
 }
 
-/** "Take a photo" opens the phone's camera; "Upload a file" takes a photo, PDF or saved email. */
+/** "Take a photo" opens the phone's camera; "Upload a file" takes a photo, PDF or saved email.
+ * Compact (one per row in a list) both are white secondaries, so the page keeps its one navy action. */
 export function CaptureButtons({ target, onDone, compact = false }: { target?: { kind: string; id: string }; onDone: (id: string) => void | Promise<void>; compact?: boolean }) {
   const id = useId(), [busy, setBusy] = useState(''), [error, setError] = useState('')
   async function send(file: File | undefined, source: 'camera' | 'upload', input: HTMLInputElement) {
@@ -42,7 +43,7 @@ export function CaptureButtons({ target, onDone, compact = false }: { target?: {
     finally { setBusy(''); input.value = '' }
   }
   return <div className={`capture${compact ? ' capture-compact' : ''}`}>
-    <label className={`btn btn-primary${compact ? ' btn-small' : ''}`} htmlFor={`${id}-camera`} aria-disabled={!!busy}><Icon name="camera" /> {compact ? 'Photo' : 'Take a photo'}</label>
+    <label className={`btn ${compact ? 'btn-secondary btn-small' : 'btn-primary'}`} htmlFor={`${id}-camera`} aria-disabled={!!busy}><Icon name="camera" /> {compact ? 'Photo' : 'Take a photo'}</label>
     <input id={`${id}-camera`} className="sr-only" type="file" accept="image/*" capture="environment" disabled={!!busy} onChange={e => send(e.currentTarget.files?.[0], 'camera', e.currentTarget)} />
     <label className={`btn btn-secondary${compact ? ' btn-small' : ''}`} htmlFor={`${id}-file`} aria-disabled={!!busy}><Icon name="upload" /> {compact ? 'File' : 'Upload a file'}</label>
     <input id={`${id}-file`} className="sr-only" type="file" accept="image/*,application/pdf,.eml,message/rfc822" disabled={!!busy} onChange={e => send(e.currentTarget.files?.[0], 'upload', e.currentTarget)} />

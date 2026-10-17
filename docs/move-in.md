@@ -54,7 +54,7 @@ While nothing has been posted or edited, someone with the post grant can choose 
 
 Xero's exports carry no files, so after a Xero import the page offers **Connect Xero**.
 
-1. Xero asks you to choose the organisation you moved from. Pantry asks only to read invoices and their attachments.
+1. Xero asks you to choose the organization you moved from. Pantry asks only to read invoices and their attachments.
 2. Choose **Carry attachments over**. Pantry finds each imported invoice and bill in Xero by its number (and vendor, for bills) and keeps each attached file byte for byte as a document on that record.
 3. The table lists every file and whether it was kept. A file over Pantry's 1.5 MB limit for one document is listed and not carried; keep it from Xero. A record Xero cannot find by its number is listed too.
 4. Choose **Disconnect Xero** when you are done. This ends Pantry's access at Xero.

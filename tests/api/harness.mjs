@@ -110,7 +110,7 @@ export async function harness({ bindings = {}, outbound } = {}) {
 
 /** The business, a small chart and roles most flows start from. */
 export async function books(h) {
-  await h.command('entity.save', { legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2026-01-01', policies: 'Revenue recognised when invoiced.' })
+  await h.command('entity.save', { legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2026-01-01', policies: 'Revenue recognized when invoiced.' })
   await h.command('chart.start', {})
   const state = await h.view('state')
   const acct = Object.fromEntries(state.accounts.map(a => [a.code, a.id]))

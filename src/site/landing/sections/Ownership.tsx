@@ -19,7 +19,7 @@ export function Ownership() {
       <div className="feature-art">
         <div className="terminal" role="img" aria-label={`One command: ${COMMAND}. ${COMMENT}`}>
           <div className="terminal-bar" aria-hidden="true"><span /><span /><span /></div>
-          <pre aria-hidden="true"><span className="terminal-line"><span className="prompt">$</span>npx -y @runeditrun/rer dev <span style={{ whiteSpace: 'nowrap' }}>{REPO}</span>{'\n'}</span><span className="terminal-line">{COMMENT}{'\n'}</span></pre>
+          <pre aria-hidden="true"><span className="terminal-line"><span className="prompt">$</span>npx -y @runeditrun/rer dev <span style={{ whiteSpace: 'nowrap' }}>{REPO}</span>{'\n'}</span><span className="terminal-line comment">{COMMENT}{'\n'}</span></pre>
         </div>
       </div>
     </div>

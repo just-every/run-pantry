@@ -18,7 +18,7 @@ function ReceiptsCard({ s, onChange }: { s: D; onChange: () => Promise<void> }) 
           {can.post && (waiving === m.id
             ? <Form label="Save reason" submit={b => command('receipt.not-needed', { entryId: m.id, ...b })} onDone={async () => { setWaiving(null); await onChange() }} className="inline-form"><Field label="Why no receipt" name="reason" required /></Form>
             : <button type="button" className="btn btn-link" onClick={() => setWaiving(m.id)}>No receipt needed</button>)}</div>}</td></tr>)}
-      {bills.map((b: D) => <tr key={b.id}><td>—</td><td>Bill {b.label}</td><td className="fig">—</td><td>{open && can.record && <div className="row-actions"><span className="hint">Add receipt</span><CaptureButtons compact target={{ kind: 'bill', id: b.id }} onDone={onChange} /></div>}</td></tr>)}
+      {bills.map((b: D) => <tr key={b.id}><td>{day(b.date)}</td><td>Bill {b.label}</td><td className="fig">{usd(b.amount_cents)}</td><td>{open && can.record && <div className="row-actions"><span className="hint">Add receipt</span><CaptureButtons compact target={{ kind: 'bill', id: b.id }} onDone={onChange} /></div>}</td></tr>)}
     </Table>
     {s.receipts.waived.length > 0 && <p className="hint">No receipt needed: {s.receipts.waived.map((w: D) => `${w.memo} (${w.reason})`).join('; ')}.</p>}
   </Card>

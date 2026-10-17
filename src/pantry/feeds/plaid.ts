@@ -32,9 +32,10 @@ function managed(env: Bindings) {
 
 export function availability(env: Bindings): Availability {
   if (managed(env)) return { available: false, reason: 'Live bank feeds are not available yet on RER Managed; import statement files instead.' }
-  if (!env.PLAID_CLIENT_ID || !env.PLAID_SECRET) return { available: false, reason: 'Live bank feeds need this installation’s own Plaid keys (PLAID_CLIENT_ID and PLAID_SECRET); until then, import statement files.' }
+  // Said to the owner: what is missing in plain words, never the settings' names (those are in OPERATIONS.md).
+  if (!env.PLAID_CLIENT_ID || !env.PLAID_SECRET) return { available: false, reason: 'Live feeds need setting up on this installation before Pantry can connect a bank or card. Until then, import a statement from your bank.' }
   const environment = env.PLAID_ENV || 'sandbox'
-  if (!HOSTS[environment]) return { available: false, reason: `PLAID_ENV is "${environment}"; use sandbox or production.` }
+  if (!HOSTS[environment]) return { available: false, reason: 'Live feeds are set up for a Plaid environment Pantry does not know, so it cannot connect a bank or card yet. Until then, import a statement from your bank.' }
   return { available: true, environment }
 }
 

@@ -10,7 +10,7 @@ test('PAN-01 a business is set up with declared policies and each role is enforc
   const { acct } = await books(h)
   const e = (await h.view('state')).settings.entity
   assert.deepEqual([e.currency, e.book_basis, e.tax_method, e.state, e.fiscal_year_start], ['USD', 'accrual', 'cash', 'NY', 1])
-  assert.match(e.policies, /Revenue recognised/)
+  assert.match(e.policies, /Revenue recognized/)
   // Viewers read; they never write.
   assert.ok((await h.view('reports/trial-balance?to=2026-09-30', vic)).balanced)
   await h.command('contact.save', { kind: 'customer', name: 'Cedar Studio' }, vic, 403)

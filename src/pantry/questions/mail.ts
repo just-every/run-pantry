@@ -64,9 +64,9 @@ function questionBody(qn: Question, link: string, replies: boolean, business: st
   const facts = Object.entries(qn.facts).map(([k, v]) => `${k}: ${v}`).join('\n')
   const text = `${qn.question}\n\n${qn.why}\n\n${facts}\n\n${choices ? `${choices}\n\n` : ''}${how}\n\nOpen it in Pantry: ${link}\n\nNothing changes in the books for ${business} until you answer.\n`
   const html = `<p><strong>${escapeHtml(qn.question)}</strong></p><p>${escapeHtml(qn.why)}</p>` +
-    `<table cellpadding="4">${Object.entries(qn.facts).map(([k, v]) => `<tr><td style="color:#666">${escapeHtml(k)}</td><td>${escapeHtml(String(v))}</td></tr>`).join('')}</table>` +
-    (qn.choices.length ? `<ol>${qn.choices.map(c => `<li><strong>${escapeHtml(c.label)}</strong><br><span style="color:#555">${escapeHtml(c.effect)}</span></li>`).join('')}</ol>` : '') +
-    `<p>${escapeHtml(how)}</p><p><a href="${escapeHtml(link)}">Open it in Pantry</a></p><p style="color:#666">Nothing changes in the books for ${escapeHtml(business)} until you answer.</p>`
+    `<table cellpadding="4">${Object.entries(qn.facts).map(([k, v]) => `<tr><td style="color:#5a6178">${escapeHtml(k)}</td><td>${escapeHtml(String(v))}</td></tr>`).join('')}</table>` +
+    (qn.choices.length ? `<ol>${qn.choices.map(c => `<li><strong>${escapeHtml(c.label)}</strong><br><span style="color:#4f5670">${escapeHtml(c.effect)}</span></li>`).join('')}</ol>` : '') +
+    `<p>${escapeHtml(how)}</p><p><a href="${escapeHtml(link)}">Open it in Pantry</a></p><p style="color:#5a6178">Nothing changes in the books for ${escapeHtml(business)} until you answer.</p>`
   return { text, html }
 }
 

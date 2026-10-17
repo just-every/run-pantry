@@ -15,9 +15,9 @@ export type Availability = { available: true; environment: string; redirectUri: 
 
 export function availability(env: Bindings): Availability {
   if (managedInstall(env)) return { available: false, reason: 'Payroll from Gusto is not available yet on RER Managed: managed installs cannot reach Gusto until RER adds a provider relay.' }
-  if (!env.GUSTO_CLIENT_ID || !env.GUSTO_CLIENT_SECRET) return { available: false, reason: 'Payroll from Gusto needs this installation’s own Gusto app: set GUSTO_CLIENT_ID and GUSTO_CLIENT_SECRET (and GUSTO_ENV=production once Gusto approves it).' }
+  if (!env.GUSTO_CLIENT_ID || !env.GUSTO_CLIENT_SECRET) return { available: false, reason: 'Payroll from Gusto needs setting up on this installation before you can connect it (the Stripe and Gusto guide says how). Until then, record payroll as a journal entry.' }
   const environment = env.GUSTO_ENV || 'demo'
-  if (!HOSTS[environment]) return { available: false, reason: `GUSTO_ENV is "${environment}"; use demo or production.` }
+  if (!HOSTS[environment]) return { available: false, reason: 'Payroll from Gusto is set up for a Gusto environment Pantry does not know, so it cannot connect yet.' }
   return { available: true, environment, redirectUri: `${runtimeBindings(env).AUTH_ORIGIN}/api/pantry/gusto/callback` }
 }
 

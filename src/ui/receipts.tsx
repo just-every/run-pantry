@@ -83,13 +83,13 @@ export function Receipts() {
   return <>
     <PageHead title="Receipts" lead="Take a photo or forward the email. Pantry reads the vendor, date and total and proposes the transaction; nothing is attached or recorded until you accept." />
     {!data ? <Loading error={error} what="receipts" /> : <>
-      <Card title="Add a receipt" className="card-stone">
+      <Card title="Add a receipt">
         {state.actor.can.record ? <CaptureButtons onDone={refresh} /> : <p className="hint">Viewers see receipts; a bookkeeper, accountant or the owner adds them.</p>}
         {data.reader.unavailable ? <p className="hint">{data.reader.unavailable}</p> : data.reader.missing ? <p className="hint">{data.reader.missing} {state.actor.can.owner && <Link to="/app/settings" hash="ai-reading">Add a key</Link>}</p> : <p className="hint">Read with this install’s own AI model ({data.reader.model}). The original is kept exactly as received.</p>}
         <Forwarding inbox={data.inbox} owner={state.actor.can.owner} />
       </Card>
       {data.review.length ? data.review.map((r: D) => <ReceiptCard key={r.id + r.revision} r={r} data={data} onChange={refresh} />)
-        : <Card title="To review" className="empty-card"><span className="empty-tile" aria-hidden="true" /><p>Nothing waiting. New receipts appear here with what was read and the transaction they belong to.</p></Card>}
+        : <Card title="To review" className="empty-card"><span className="empty-lines" aria-hidden="true" /><p>Nothing waiting. New receipts appear here with what was read and the transaction they belong to.</p></Card>}
       <Card title="Attached">
         <Table heads={['Date', 'Vendor', 'Total', 'Attached to', 'By', 'Receipt']} figures={[2]} empty="No receipts attached yet.">
           {data.attached.map((r: D) => <tr key={r.id}><td>{day(r.receipt_date ?? r.decided_at)}</td><td>{r.vendor ?? '—'}</td><td className="fig">{r.total_cents ? money(r.total_cents, r.currency) : '—'}</td>

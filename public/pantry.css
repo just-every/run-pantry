@@ -111,6 +111,7 @@ table.ledger { width: 100%; border-collapse: collapse; color: var(--ink); }
 .ledger tr.grand td { font-family: var(--font-head); font-size: 16px; }
 .ledger tr.section td { padding-top: 20px; font-size: 12.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--lavender-ink); }
 .ledger tr.empty td { padding: 36px 12px 34px; color: var(--body); text-align: center; font-size: 15px; }
+.ledger tr.empty .empty-title { display: block; margin-bottom: 2px; color: var(--ink); font-size: 16px; font-weight: 600; }
 .ledger tr.empty:hover td { background: none; }
 .ledger:has(tr.empty) thead { display: none; }
 .ledger .sub, small.sub { color: var(--soft); }
@@ -406,6 +407,8 @@ ul.plain li:last-child { border-bottom: 0; }
 .preview-lines li { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; font-variant-numeric: tabular-nums; }
 .preview-lines.held li { color: var(--soft); }
 .connect-accounts { display: grid; gap: 14px; margin: 12px 0 18px; }
+/* "Import a statement" brings the import card into view below the sticky header. */
+#import { scroll-margin-top: 92px; }
 .connect-account legend { padding: 0 6px; font-weight: 600; }
 @media (max-width: 720px) {
   .card-actions .inline-fields { width: 100%; }
@@ -451,41 +454,42 @@ details.setup-steps ol { padding-left: 20px; }
 
 /* Invoices out: the sending panel, its delivery log and setup instructions. */
 .send-panel { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
-.send-panel h3, .card h3 { margin: 18px 0 8px; font-size: 15px; }
+.send-panel h3, .card-body > h3 { margin: 18px 0 8px; }
 .send-panel > h3:first-child { margin-top: 0; }
 .send-panel .action { display: inline-flex; margin: 4px 0 8px; }
 .send-log { list-style: none; margin: 0; padding: 0; }
 .send-log li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
-.send-log li small { grid-column: 1 / -1; color: var(--muted); }
+.send-log li small { grid-column: 1 / -1; color: var(--soft); }
 .send-log li > span { min-width: 0; overflow-wrap: anywhere; }
 ol.how-to { margin: 0 0 16px; padding-left: 22px; display: grid; gap: 8px; }
 ol.how-to code { overflow-wrap: anywhere; }
 .sub.block { display: block; margin-top: 2px; }
 
-/* Questions from Pantry: the record, the answers with what each changes, and the thread. */
-.question.focused { border-color: var(--glaze); box-shadow: 0 0 0 2px var(--glaze-tint), var(--card-shadow, none); }
+/* Questions from Pantry: the record, the answers with what each changes, and the thread.
+   The question in hand is the lavender current place; a picked answer is outlined in ink, as on Receipts. */
+.question.focused { border-color: color-mix(in srgb, var(--lavender-ink) 45%, var(--line)); box-shadow: 0 0 0 3px var(--lavender), var(--shadow-card); }
 .question .ask { font-size: 18px; margin-top: 4px; }
-.facts.record { margin: 14px 0 6px; padding: 14px 16px; border-radius: 10px; background: var(--paper); border: 1px solid var(--line); }
+.facts.record { margin: 14px 0 6px; padding: 14px 16px; border-radius: 12px; background: var(--row); }
+.facts.record dt { color: var(--lavender-ink); font-size: 11.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
 .facts.record dd { overflow-wrap: anywhere; }
 .choices { border: 0; margin: 16px 0 8px; padding: 0; display: grid; gap: 8px; }
 .choices legend { margin-bottom: 8px; }
-.choice { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--surface); }
-.choice:hover { border-color: var(--glaze); }
-.choice.picked { border-color: var(--glaze); background: var(--glaze-tint); }
+.choice { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; background: var(--surface); }
+.choice:hover { border-color: var(--field); background: var(--row); }
+.choice.picked { border-color: var(--ink); background: color-mix(in srgb, var(--pill) 60%, var(--surface)); }
 .choice strong { display: block; font-weight: 600; }
-.choice small { display: block; color: var(--ink); font-size: 14px; margin-top: 4px; }
+.choice small { display: block; color: var(--body); font-size: 14px; margin-top: 4px; }
 .change { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 8px; }
 .remember { display: flex; gap: 10px; align-items: center; font-size: 15px; }
-.remember input { accent-color: var(--glaze); width: 18px; height: 18px; }
 .own-words { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); }
 .own-words .field { flex: 1 1 260px; }
 .own-words textarea { min-height: 64px; }
-.receipt-upload { margin: 10px 0; }
+.receipt-upload { display: flex; gap: 12px; margin: 10px 0; }
 .thread { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.bubble { max-width: 88%; align-self: flex-start; padding: 10px 14px; border-radius: 14px 14px 14px 4px; background: var(--glaze-tint); color: var(--ink); }
-.bubble.mine { align-self: flex-end; border-radius: 14px 14px 4px 14px; background: var(--surface); border: 1px solid var(--stone-edge); }
+.bubble { max-width: 88%; align-self: flex-start; padding: 10px 14px; border-radius: 14px 14px 14px 4px; background: var(--lavender); color: var(--ink); }
+.bubble.mine { align-self: flex-end; border-radius: 14px 14px 4px 14px; background: var(--surface); border: 1px solid var(--line-strong); }
 .bubble p { margin: 0 0 4px; font-size: 15px; white-space: pre-line; overflow-wrap: anywhere; }
-.bubble small { color: var(--muted); font-size: 12px; }
+.bubble small { color: var(--soft); font-size: 12px; }
 .answered { list-style: none; margin: 0; padding: 0; }
 .answered li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
 .answered li:first-child { border-top: 0; }
@@ -499,4 +503,4 @@ ol.how-to code { overflow-wrap: anywhere; }
   .bubble { max-width: 96%; }
   .own-words .action, .own-words .btn { width: 100%; }
 }
-.choice input[type='radio'] { accent-color: var(--glaze); flex: none; width: 18px; height: 18px; min-height: 0; padding: 0; margin: 3px 0 0; }
+.choice input[type='radio'] { accent-color: var(--ink); flex: none; width: 18px; height: 18px; min-height: 0; padding: 0; margin: 3px 0 0; }

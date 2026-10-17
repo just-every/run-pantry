@@ -144,7 +144,7 @@ export const forgetCarried = () => [
   q('DELETE FROM pt_xero_attachments'), q('DELETE FROM pt_xero_items'),
 ]
 
-/** Xero sends the person back here after they choose an organisation. */
+/** Xero sends the person back here after they choose an organization. */
 export function xeroRoutes(api: Hono<{ Bindings: Bindings }>) {
   api.get('/api/pantry/xero/callback', async c => {
     const back = (query: string) => c.redirect(`/app/move-in?${query}`, 303)
@@ -157,7 +157,7 @@ export function xeroRoutes(api: Hono<{ Bindings: Bindings }>) {
       requireThat(!c.req.query('error'), `Xero did not connect: ${c.req.query('error_description') ?? c.req.query('error')}`, 409)
       const t = await exchangeCode(c.env, text(c.req.query('code'), 'Xero code', 2000))
       const chosen = (await connections(t.access)).filter(x => x.tenantType === 'ORGANISATION' && (!t.authEventId || x.authEventId === t.authEventId))
-      requireThat(chosen.length === 1, chosen.length ? 'Choose one Xero organisation when Xero asks, then connect again' : 'Xero connected no organisation; choose the one you moved from', 409)
+      requireThat(chosen.length === 1, chosen.length ? 'Choose one Xero organization when Xero asks, then connect again' : 'Xero connected no organization; choose the one you moved from', 409)
       const org = chosen[0], ctx: Context = { db: c.env.DB, env: c.env, request: c.req.raw, actor }
       await run(c.env.DB, [authority(actor, 'record'),
         q("UPDATE pt_xero_connection SET status = 'connected', state = NULL, tenant_id = ?, tenant_name = ?, connection_id = ?, tokens = ?, connected_by = ?, connected_at = ? WHERE id = 1 AND state = ?",

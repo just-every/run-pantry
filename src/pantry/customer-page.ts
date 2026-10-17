@@ -22,12 +22,18 @@ export const customer = new Hono<{ Bindings: Bindings }>()
 const escape = (s: string) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
 const TOKEN = /^[A-Za-z0-9_-]{32}$/
 
-const STYLE = '.rer-themed main.invoice{max-width:720px}.invoice .status{display:inline-block;margin:0 0 20px;padding:4px 12px;border-radius:999px;background:var(--rer-page,#f3f5f8);color:var(--rer-text,#172033);font-weight:600}'
-  + '.invoice .status.paid{background:#e3f1e6;color:#1d5b2c}.invoice .status.due{background:#fdf0dc;color:#7a4a00}'
-  + '.invoice table{width:100%;border-collapse:collapse;margin:0 0 16px}.invoice th,.invoice td{padding:8px 4px;border-bottom:1px solid var(--rer-border,#d5dbe3);text-align:left;vertical-align:top}.invoice .fig{text-align:right;white-space:nowrap}'
-  + '.invoice .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 24px;margin:0 0 24px}.invoice .facts span,.invoice .totals span{display:block;font-size:14px;color:var(--rer-muted,#475569)}.invoice .facts strong{font-weight:600}'
-  + '.invoice .totals{display:grid;grid-template-columns:1fr auto;gap:6px 24px;max-width:320px;margin:0 0 24px auto}.invoice .totals strong{text-align:right;font-weight:500}.invoice .totals .due{font-weight:700;color:var(--rer-text,#172033)}.invoice .history{list-style:none;padding:0;margin:0 0 20px}.invoice .history li{padding:6px 0;border-bottom:1px solid var(--rer-border,#d5dbe3)}'
-  + '.invoice .pay{display:grid;gap:12px;margin:0 0 20px}.invoice .pay form{margin:0}.invoice .note{font-size:14px}.invoice h2{font-size:18px;margin:28px 0 8px}.invoice .from{margin:0 0 4px;font-weight:600;color:var(--rer-text,#172033)}'
+// In Pantry's look (rer-theme.css tokens): the white card on the lavender paper, tracked-caps heads,
+// green for paid and apricot for what is due, the navy pill to pay.
+const STYLE = '.rer-themed main.invoice{max-width:720px}.rer-themed main.invoice h1{text-align:left}'
+  + '.invoice .status{display:inline-block;margin:0 0 20px;padding:4px 12px;border-radius:999px;background:var(--row);color:var(--ink);font-size:14px;font-weight:600}'
+  + '.invoice .status.paid{background:var(--green-tint);color:var(--green-ink)}.invoice .status.due{background:var(--apricot-tint);color:var(--apricot-text)}'
+  + '.invoice table{width:100%;border-collapse:collapse;margin:0 0 16px}.invoice th,.invoice td{padding:10px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;color:var(--ink)}'
+  + '.invoice th{color:var(--lavender-ink);font-size:11.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}.invoice .fig{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}'
+  + '.invoice .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 24px;margin:0 0 24px}.invoice .facts span,.invoice .totals span{display:block;font-size:14px;color:var(--soft)}.invoice .facts strong{font-weight:600;color:var(--ink)}'
+  + '.invoice .totals{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:6px 24px;max-width:320px;margin:0 0 24px auto;font-variant-numeric:tabular-nums}.invoice .totals strong{text-align:right;font-weight:500;color:var(--ink)}.invoice .totals .due{font-weight:700;color:var(--ink)}'
+  + '.invoice .history{list-style:none;padding:0;margin:0 0 20px}.invoice .history li{padding:8px 0;border-bottom:1px solid var(--line);color:var(--ink)}'
+  + '.invoice .pay{display:grid;gap:12px;margin:0 0 20px}.invoice .pay form{margin:0}.invoice .pay form+form button{background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);box-shadow:none}'
+  + '.invoice .note{font-size:14px}.invoice h2{font-size:18px;margin:28px 0 8px}.invoice .from{margin:0 0 4px;font-weight:600;color:var(--lavender-ink);font-size:13px;letter-spacing:.12em;text-transform:uppercase}'
   + '@media(max-width:480px){.invoice th:nth-child(2),.invoice td:nth-child(2){display:none}}'
 const digest = async (text: string) => btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))))
 

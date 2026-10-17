@@ -16,7 +16,7 @@ function FeedCard() {
 function ReceiptCard() {
   return <div className="card receipt-card">
     <div className="receipt-desk"><ReceiptPaper marks /></div>
-    <svg className="receipt-leads" viewBox="0 0 556 476"><path d="M124 126 70 388M326 181l84 85M417 298l17 90" /><circle cx="70" cy="388" r="3.5" /><circle cx="434" cy="388" r="3.5" /></svg>
+    <svg className="receipt-leads" viewBox="0 0 556 476"><path d="M124 126 70 388M322 166 434 388" /><circle cx="70" cy="388" r="3.5" /><circle cx="434" cy="388" r="3.5" /></svg>
     <div className="receipt-match"><Party tone="depot">HD</Party><span className="who">Home Depot</span><span className="amt">−$312.48</span><span className="date">Oct 13</span><Tick /></div>
   </div>
 }

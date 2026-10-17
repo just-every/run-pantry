@@ -25,7 +25,7 @@ export function Suggestions({ items, onPick }: { items: D[]; onPick: (s: D) => v
     <button type="button" className="btn btn-secondary btn-small" onClick={() => onPick(s)}>Make a rule</button></div>)}</>
 }
 
-export function Transactions({ data, onDone }: { data: D | undefined; onDone: () => Promise<void> }) {
+export function Transactions({ data, onDone, feeds }: { data: D | undefined; onDone: () => Promise<void>; feeds: boolean }) {
   const { state } = useShared(), [filter, setFilter] = useState<string>('All'), [account, setAccount] = useState(''), [picked, setPicked] = useState<string[]>([])
   if (!data) return null
   const rows: D[] = [...data.pending.map((p: D) => ({ ...p, pending: true, filed_to: [] })), ...data.lines]
@@ -46,7 +46,7 @@ export function Transactions({ data, onDone }: { data: D | undefined; onDone: ()
             <td data-label="Date">{day(l.posted_date)}</td><td data-label="Account">{l.bank_name}</td>
             <td data-label="Description">{l.description}{l.payee && !l.description.toLowerCase().includes(l.payee.toLowerCase()) && <small className="sub"> · {l.payee}</small>}{l.feed_txn_id && <small className="sub feed-tag">feed</small>}</td>
             <td data-label="Amount" className={`fig${l.amount_cents > 0 ? ' money-in' : ''}`}>{usd(l.amount_cents)}</td>
-            <td data-label="Filed"><Status l={l} onUndo={onDone} /></td></tr> }) : <tr className="empty"><td colSpan={6}><Empty>{data.lines.length ? 'Nothing matches this view.' : 'No transactions yet. Connect a bank or card, or import a statement.'}</Empty></td></tr>}</tbody></table></div>
+            <td data-label="Filed"><Status l={l} onUndo={onDone} /></td></tr> }) : <tr className="empty"><td colSpan={6}><Empty>{data.lines.length ? 'Nothing matches this view.' : <><strong className="empty-title">No transactions yet.</strong>{feeds ? 'Connect a bank or card, or import a statement.' : 'Import a statement and its lines appear here.'}</>}</Empty></td></tr>}</tbody></table></div>
     </Card>
     {chosen.length > 0 && <MatchPanel lines={chosen} postings={[]} bankId={chosen[0].bank_account_id} clear={() => setPicked([])} onDone={onDone} />}
   </>

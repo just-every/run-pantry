@@ -60,7 +60,7 @@ export async function desktop(browser, root, origin, dir) {
   await p.getByLabel('State of organization').selectOption('NY')
   await p.getByLabel('Books start').fill('2026-09-01')
   await p.getByLabel(/Tax accounting method/).selectOption('cash')
-  await p.getByLabel('Book and report policies').fill('Accrual books in USD. Revenue recognised when invoiced. Capitalise equipment over $2,500. Accountant: Morgan Lee CPA.')
+  await p.getByLabel('Book and report policies').fill('Accrual books in USD. Revenue recognized when invoiced. Capitalize equipment over $2,500. Accountant: Morgan Lee CPA.')
   await button(p, 'Set up the business').click(); await settle(p)
   for (const [name, email, role, grants] of [['Taylor Kim', 'bookkeeper@dev.localhost', 'bookkeeper', []], ['Morgan Lee', 'accountant@dev.localhost', 'accountant', ['Post and approve entries', 'Approve reopening']]]) {
     await p.getByLabel('Name', { exact: true }).fill(name); await p.getByLabel('Email', { exact: true }).fill(email); await p.getByLabel('Role').selectOption(role)
@@ -180,7 +180,7 @@ export async function desktop(browser, root, origin, dir) {
   await acct.page.getByRole('cell', { name: 'Reclassify studio chair to equipment' }).click(); await button(acct.page, 'Post entry').click()
   await acct.page.getByText('Posted — reverse to correct').waitFor()
   await shot(acct, dir, 'books')
-  await button(acct.page, 'Reverse').click(); await acct.page.getByLabel('Reversal date').fill('2026-09-30'); await acct.page.getByLabel('Reason').fill('Chair is under the capitalisation threshold')
+  await button(acct.page, 'Reverse').click(); await acct.page.getByLabel('Reversal date').fill('2026-09-30'); await acct.page.getByLabel('Reason').fill('Chair is under the capitalization threshold')
   await button(acct.page, 'Post reversal').click(); await acct.page.getByText('Posted and reversed').waitFor()
 
   // 7. Evidence, review tasks and the lock.

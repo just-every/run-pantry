@@ -11,7 +11,7 @@ function Import({ accounts, onDone }: { accounts: D[]; onDone: () => Promise<voi
   const file = useRef<HTMLInputElement>(null), [result, setResult] = useState<D | null>(null)
   return <Card title="Import a statement">
     <p className="hint">Download the statement from your bank as OFX (also called Web Connect or QFX) or CSV. Pantry checks the account it belongs to and skips lines it already has.</p>
-    <Form label="Import statement" submit={async b => { const f = await readFileText(file.current); return command('statement.import', { ...b, fileName: f.name, content: f.content }) }} onDone={async r => { setResult(r); await onDone() }}>
+    {!accounts.length ? <p>First add the bank or card account the statement is from, below; then choose the file here.</p> : <Form label="Import statement" submit={async b => { const f = await readFileText(file.current); return command('statement.import', { ...b, fileName: f.name, content: f.content }) }} onDone={async r => { setResult(r); await onDone() }}>
       <div className="grid-form">
         <Field label="Bank account" name="bankAccountId" required options={accounts.map(a => ({ value: a.id, label: `${a.name} (…${a.number_last4})` }))} />
         <div className="field"><label htmlFor="statement-file">Statement file</label><input id="statement-file" ref={file} type="file" accept=".csv,.ofx,.qfx,.qbo" required /></div>
@@ -20,7 +20,7 @@ function Import({ accounts, onDone }: { accounts: D[]; onDone: () => Promise<voi
         <Field label="Statement start" name="start" type="date" /><Field label="Statement end" name="end" type="date" />
         <Field label="Last four digits (CSV only)" name="confirmLast4" inputMode="numeric" hint="CSV files do not name the account; confirm it" />
       </div>
-    </Form>
+    </Form>}
     {result && <div className={`callout ${result.duplicate ? 'callout-warn' : 'callout-good'}`} role="status"><strong>{result.duplicate ? 'This file was already imported' : `Imported ${result.added} line${result.added === 1 ? '' : 's'}`}</strong><span>{result.duplicate ? 'No lines were added.' : `${result.duplicates} already in Pantry were skipped.${result.fromFeed ? ` ${result.fromFeed} came in from the feed already and joined this statement.` : ''}${result.filedByRule ? ` ${result.filedByRule} filed by your rules.` : ''}`}{result.fileBalances && !result.fileBalances.agrees ? ` The file's lines total ${usd(result.fileBalances.lineTotal)}, which does not match its balances; reconciliation will show the difference.` : ''}</span></div>}
     {result && <AutomaticResult automatic={result.automatic} />}
   </Card>
@@ -60,7 +60,7 @@ function Statements({ data, refresh, open }: { data: D; refresh: () => Promise<v
           <td>{s.reconciliation_id ? <Chip tone="good">Reconciled</Chip> : <Chip tone="warn">To reconcile</Chip>}</td><td><button type="button" className="btn btn-secondary" onClick={() => open(s.id)}>{s.reconciliation_id ? 'View' : 'Reconcile'}</button></td></tr>)}
       </Table></Card>
     </div>
-    {shared.state.actor.can.record && <div className="stack">{data.accounts.length > 0 && <Import accounts={data.accounts} onDone={refresh} />}<NewBankAccount onDone={refresh} /></div>}
+    {shared.state.actor.can.record && <div className="stack" id="import"><Import accounts={data.accounts} onDone={refresh} /><NewBankAccount onDone={refresh} /></div>}
   </div>
 }
 
@@ -76,13 +76,15 @@ export function Bank() {
   if (statement) return <Reconcile statementId={statement} back={async () => { reconcile(null); setTab('Statements'); await reload() }} />
   if (!data) return <Loading error={error} what="bank accounts" />
   const refresh = async () => { await Promise.all([reload(), lines.reload(), rules.reload(), feeds.reload(), shared.reload()]) }
+  // Importing lives on Statements: open it and bring the import card into view.
+  const importStatement = () => { go('Statements'); requestAnimationFrame(() => document.getElementById('import')?.scrollIntoView({ block: 'start' })) }
   return <>
     <PageHead title="Bank" lead="Transactions arrive from your bank and card feeds or statement files. Rules file the routine ones; you file the rest and reconcile to the statement." />
     <RelinkNotices data={feeds.data} onDone={refresh} />
     <Tabs tabs={[...TABS]} current={tab} onChange={go} />
     {tab === 'Transactions' && <div className="split split-wide-left split-bank">
-      <div className="stack"><Suggestions items={rules.data?.suggestions ?? []} onPick={s => { setDraft(fromSuggestion(s)); go('Rules') }} /><Transactions data={lines.data} onDone={refresh} /></div>
-      <div className="stack"><Feeds data={feeds.data} onDone={refresh} /></div>
+      <div className="stack"><Suggestions items={rules.data?.suggestions ?? []} onPick={s => { setDraft(fromSuggestion(s)); go('Rules') }} /><Transactions data={lines.data} onDone={refresh} feeds={!!feeds.data?.availability.available} /></div>
+      <div className="stack"><Feeds data={feeds.data} onDone={refresh} onImport={importStatement} /></div>
     </div>}
     {tab === 'Rules' && <Rules data={rules.data} draft={draft} setDraft={setDraft} onDone={refresh} />}
     {tab === 'Statements' && <Statements data={data} refresh={refresh} open={reconcile} />}

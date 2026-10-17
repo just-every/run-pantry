@@ -91,7 +91,7 @@ export function Table({ heads, figures = [], children, empty, caption }: { heads
 }
 
 export function Field({ label, name, type = 'text', defaultValue, required = false, options, hint, error, wide, empty = 'Choose…', ...rest }: {
-  label: string; name: string; type?: string; defaultValue?: any; required?: boolean; options?: { value: string; label: string }[]; hint?: string; error?: string; wide?: boolean; empty?: string; [k: string]: any
+  label: string; name: string; type?: string; defaultValue?: any; required?: boolean; options?: { value: string; label: string }[]; hint?: ReactNode; error?: string; wide?: boolean; empty?: string; [k: string]: any
 }) {
   const id = useId(), initial = 'value' in rest ? {} : { defaultValue: defaultValue ?? (options ? '' : undefined) }
   const control = options
