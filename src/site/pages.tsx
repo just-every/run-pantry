@@ -55,11 +55,11 @@ export function sitePages({ styles, contract }: SiteContext): SiteBuild {
   return {
     pages: [
       { path: '/', html: document('Pantry — Know where every dollar went', identity.tagline, <Landing />) },
-      { path: '/run', html: usSpelling(runPageHtml(siteIdentity, data, contract)) },
-      ...(contract ? [{ path: '/contract', html: contractPageHtml(siteIdentity, data, contract) }] : []),
+      { path: '/run', html: usSpelling(runPageHtml(identity, data, contract)) },
+      ...(contract ? [{ path: '/contract', html: contractPageHtml(identity, data, contract) }] : []),
       { path: '/docs', html: document(...head(), <DocsIndex />) },
       ...docsPages.map(page => ({ path: `/docs/${page.slug}`, html: document(...head(page.slug), <DocsArticle slug={page.slug} />, COPY) })),
-      { path: '/404', html: siteNotFoundHtml(siteIdentity, data, contract) },
+      { path: '/404', html: siteNotFoundHtml(identity, data, contract) },
     ],
     assets: ['rer-theme.css', 'fonts', 'brand', 'site', 'favicon.ico', 'apple-touch-icon.png'],
   }
