@@ -1,14 +1,14 @@
 {
   "id": "pantry",
   "name": "Pantry",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "maturity": "first-release-local",
   "category": "accounting",
   "spine": {
     "id": "books-and-close",
     "record": "JournalEntry \u2192 JournalLine \u2190 Match \u2192 BankLine \u2190 Statement \u2192 Reconciliation \u2192 Period lock"
   },
-  "description": "Books and close for one US business: balanced accrual ledger, invoices, bills, recorded payments, CSV/OFX statement reconciliation, period close and an accountant package, with agent proposals a person approves and a QuickBooks Online move-in kit.",
+  "description": "Books and close for one US business: a balanced accrual ledger with cash- or accrual-basis reports that open to their records, bank and card feeds through your own Plaid keys or CSV/OFX statements with rules and reconciliation, receipts read with your own AI key, invoices emailed and followed up and paid by card from the link through your own Stripe, bills and payments, Stripe payouts and Gusto payrolls booked, Pantry's questions about what doesn't add up, period close with an accountant package, agent proposals a person approves, and move-in from QuickBooks Online or Xero.",
   "capabilities": [
     {
       "id": "business-and-roles",
@@ -86,20 +86,36 @@
       "clauses": [
         "PAN-16"
       ]
+    },
+    {
+      "id": "receipts",
+      "clauses": [
+        "PAN-17"
+      ]
+    },
+    {
+      "id": "pantry-questions",
+      "clauses": [
+        "PAN-18"
+      ]
+    },
+    {
+      "id": "connected-payouts-and-payroll",
+      "clauses": [
+        "PAN-19"
+      ]
     }
   ],
   "nonGoals": [
-    "Live bank feeds",
-    "Payment initiation",
+    "Paying bills or moving money from Pantry",
     "Tax filing or tax advice",
-    "Payroll",
+    "Running payroll (Gusto runs it; Pantry books it)",
     "Multi-currency",
     "Multi-entity consolidation",
     "Inventory valuation",
     "Depreciation automation",
     "Advanced revenue recognition",
-    "Cash-basis reports",
-    "Embedded AI model"
+    "A model account held by Pantry (receipts and answers are read with the installation's own AI key)"
   ],
   "externals": [
     {
@@ -108,6 +124,65 @@
       "why": "Worker hosting",
       "data": [
         "HTTP requests"
+      ],
+      "adapters": []
+    },
+    {
+      "id": "mail-provider",
+      "required": false,
+      "why": "A hosted Pantry emails sign-in links, invitations, invoices, reminders and its questions through the owner's own Resend or SendGrid account; Pantry on your own computer sends no email.",
+      "data": [
+        "Recipient email address",
+        "Invoice PDF and customer-page link",
+        "Sign-in and invitation links"
+      ],
+      "adapters": []
+    },
+    {
+      "id": "plaid",
+      "required": false,
+      "why": "Live bank and card feeds with the owner's own Plaid keys; statement files work without it.",
+      "data": [
+        "Bank and card transactions",
+        "Account names and last four digits"
+      ],
+      "adapters": []
+    },
+    {
+      "id": "stripe",
+      "required": false,
+      "why": "Card payment from the invoice link (ACH bank debit for a US Stripe account) and payouts split into sales, fees and refunds, with the business's own Stripe key.",
+      "data": [
+        "Invoice amount and number",
+        "Payments, payouts and balance transactions"
+      ],
+      "adapters": []
+    },
+    {
+      "id": "gusto",
+      "required": false,
+      "why": "Payrolls posted as one balanced entry, through the owner's own Gusto developer app.",
+      "data": [
+        "Payroll totals by category"
+      ],
+      "adapters": []
+    },
+    {
+      "id": "xero",
+      "required": false,
+      "why": "Move-in from Xero with attachments, through the owner's own Xero app.",
+      "data": [
+        "Chart, contacts, open invoices and bills, attachments"
+      ],
+      "adapters": []
+    },
+    {
+      "id": "ai-provider",
+      "required": false,
+      "why": "Reading receipts and the owner's own words in answers, with the installation's own key; without one, details are typed in.",
+      "data": [
+        "Receipt images and text",
+        "The owner's answer text"
       ],
       "adapters": []
     }
