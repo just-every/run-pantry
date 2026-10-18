@@ -648,8 +648,8 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 5 | 67 | 48 | 120 |
-| All | 24 | 67 | 48 | 139 |
+| Target and push further | 6 | 66 | 48 | 120 |
+| All | 25 | 66 | 48 | 139 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -694,7 +694,7 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | `ITEM-001` | Products and services list | target | missing |  | No implementation; invoice lines carry an income account and tax code directly (`src/pantry/invoices.ts`). |
 | `INVOICE-001` | Branded invoice documents | target | partial | `src/pantry/invoices.ts`, `src/pantry/invoice-pdf.ts`, `src/ui/invoice-editor.tsx`, `tests/api/invoices-out.test.mjs` | Numbered invoices with terms and due dates and one PDF with the same facts as the customer page ship, the PDF's hash stored with each delivery; branding, custom fields, the start number, several templates with per-customer defaults and the PDF hash on the issued revision do not. |
 | `INVOICE-002` | Invoices sent by email | target | partial | `src/pantry/delivery.ts`, `src/ui/invoice-delivery.tsx`, `tests/api/invoices-out.test.mjs` | An issued invoice is emailed with its PDF and customer link through the installation's own mail provider with a Reply-To, and each delivery records the provider's answer; Pantry Connect mail and the mailbox routes (CONNECT-005), several recipients and CC, delivered, bounced and complained outcomes, the bounce task and a scheduled send do not exist. |
-| `INVOICE-003` | Hosted invoice page and viewed status | target | partial | `src/pantry/customer-page.ts`, `tests/api/invoices-out.test.mjs` | An unguessable link shows the invoice, its PDF and how to pay without signing in, and the first opening by someone outside the books is recorded as viewed; revoking the link, expiry after payment and payment history on the page do not exist. |
+| `INVOICE-003` | Hosted invoice page and viewed status | target | done | `src/pantry/customer-page.ts`, `src/pantry/invoice-links.ts`, `src/ui/invoice-delivery.tsx`, `tests/api/invoices-out.test.mjs` › INVOICE-003 | Unguessable signed-out page and PDF, payment options and history, first external view once, audited revocation and configurable expiry after final settlement across page, PDF and payment doors; resending creates a fresh token. |
 | `PAY-001` | Card and ACH payment from the invoice link | target | partial | `src/pantry/stripe.ts`, `src/pantry/stripe-api.ts`, `src/pantry/customer-page.ts`, `tests/api/invoices-out.test.mjs` | The owner connects the business's own Stripe key; customers pay by card, or ACH bank debit on a US account, in Stripe Checkout from the invoice link, and card and bank numbers never reach Pantry; OAuth connection, methods and partial payments chosen per customer or invoice, Apple Pay and Google Pay shown on the page, and the card surcharge do not exist. ACH is proven through real US Stripe test Checkout, including bank verification, processing and settlement into one allocated payment with its fee. |
 | `PAY-002` | Payment status follows the provider | target | partial | `src/pantry/stripe.ts`, `src/pantry/stripe-api.ts`, `tests/api/invoices-out.test.mjs` | Signature-verified Stripe webhooks name a session that Pantry reads back from Stripe before recording the payment and its fee once, with failed and expired sessions recorded; ACH processing state on the invoice, returns with linked reversals, disputes, Stripe refunds, the daily comparison and payment receipts to the payer do not exist. |
 | `PAY-003` | Payments that match themselves | target | done | `src/pantry/stripe.ts`, `src/pantry/payouts.ts`, `src/pantry/provider-match.ts`, `tests/api/connected.test.mjs` |  |

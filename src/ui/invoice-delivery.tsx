@@ -30,6 +30,12 @@ export function SendPanel({ i, data, onChange }: { i: D; data: D; onChange: () =
       <div><dt>Next reminder</dt><dd>{reminder}</dd></div>
       {i.link_token && <div><dt>Customer page</dt><dd><a href={`/i/${i.link_token}`} target="_blank" rel="noreferrer">Open the customer's view</a></dd></div>}
     </dl>
+    {state.actor.can.record && <>
+      {i.link_token ? <Action tone="danger" run={async () => { await command('invoice.link-revoke', { id: i.id }); await onChange() }}>Revoke customer link</Action> : <p className="hint">There is no active customer link. Send the invoice to create a new link.</p>}
+      <Form label="Save link expiry" submit={b => command('invoice.link-policy', { id: i.id, daysAfterPayment: b.daysAfterPayment })} onDone={onChange}>
+        <Field label="Link expires after payment (days)" name="daysAfterPayment" type="number" min={0} max={3650} defaultValue={i.link_days_after_payment} required hint="0 expires as soon as the invoice is fully paid. A payment reversal restores access while money is owed." />
+      </Form>
+    </>}
     {i.open_cents > 0 && state.actor.can.record && <Form label={i.sent_at ? 'Send again' : 'Send invoice'} submit={b => command('invoice.send', { id: i.id, to: b.to })} onDone={onChange}>
       <Field label="Send to" name="to" type="email" multiple defaultValue={i.customer_email} required hint="The PDF is attached and the email links to the customer page. Separate several addresses with commas." />
     </Form>}

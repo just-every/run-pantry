@@ -11,7 +11,7 @@ import branding from '../branding.json'
 import { pantry } from './access'
 import { Fault, longDay, now, usd, type Data } from './core'
 import { all, audit, one, run } from './db'
-import { invoice } from './invoices'
+import { invoiceByLink, LINK_TOKEN } from './invoice-links'
 import { invoiceDocument } from './delivery'
 import { invoicePdf } from './invoice-pdf'
 import { METHODS, offeredMethods, startCheckout, stripeSettings, syncCheckout } from './stripe'
@@ -20,7 +20,6 @@ import { unseal, verifySignature } from './stripe-api'
 export const customer = new Hono<{ Bindings: Bindings }>()
 
 const escape = (s: string) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
-const TOKEN = /^[A-Za-z0-9_-]{32}$/
 
 // In Pantry's look (rer-theme.css tokens): the white card on the lavender paper, tracked-caps heads,
 // green for paid and apricot for what is due, the navy pill to pay.
@@ -47,12 +46,6 @@ async function page(status: number, title: string, body: string) {
 
 const notFound = () => page(404, 'Invoice not found', '<h1>Invoice not found</h1><p>This invoice link is not valid. Ask the business that sent it for a new one.</p>')
 
-async function byToken(db: D1Database, token: string) {
-  if (!TOKEN.test(token)) return null
-  const row = await one(db, "SELECT id FROM pt_invoices WHERE link_token = ? AND kind = 'invoice' AND status = 'issued'", token)
-  return row ? invoice(db, row.id) : null
-}
-
 /** Someone signed in to these books looking at the page is not the customer viewing it. */
 async function staff(request: Request, env: Bindings) {
   return !!await operatorAuth(runtimeBindings(env)).getSession(request)
@@ -60,7 +53,7 @@ async function staff(request: Request, env: Bindings) {
 
 customer.get('/i/:token', async c => {
   const db = c.env.DB, token = c.req.param('token')
-  let inv = await byToken(db, token)
+  let inv = await invoiceByLink(db, token)
   if (!inv) return notFound()
   const returned = c.req.query('checkout')
   let outcome = ''
@@ -71,7 +64,8 @@ customer.get('/i/:token', async c => {
       outcome = r?.status === 'succeeded' ? '<p class="status paid" role="status">Thank you: your payment was received.</p>'
         : r?.status === 'processing' ? '<p class="status due" role="status">Your bank payment is processing. Banks usually take a few business days; this page shows it as paid when it clears.</p>'
         : '<p class="status due" role="status">Stripe has not confirmed a payment yet. If you paid, this page updates when it does.</p>'
-      inv = (await byToken(db, token))!
+      inv = await invoiceByLink(db, token)
+      if (!inv) return notFound()
     }
   }
   if (!inv.viewed_at && !await staff(c.req.raw, c.env)) {
@@ -100,14 +94,15 @@ customer.get('/i/:token', async c => {
 })
 
 customer.get('/i/:token/invoice.pdf', async c => {
-  const inv = await byToken(c.env.DB, c.req.param('token'))
+  const inv = await invoiceByLink(c.env.DB, c.req.param('token'))
   if (!inv) return notFound()
   return new Response(invoicePdf(await invoiceDocument(c.env.DB, inv)), { headers: { 'content-type': 'application/pdf', 'content-disposition': `inline; filename="${inv.number.replace(/[^\w.-]+/g, '_')}.pdf"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox" } })
 })
 
 customer.post('/i/:token/pay', async c => {
   const token = c.req.param('token')
-  if (!TOKEN.test(token)) return notFound()
+  if (!LINK_TOKEN.test(token)) return notFound()
+  if (!await invoiceByLink(c.env.DB, token)) return notFound()
   const form = await c.req.parseBody()
   try {
     const url = await startCheckout(c.env, c.env.DB, token, String(form.method ?? ''))

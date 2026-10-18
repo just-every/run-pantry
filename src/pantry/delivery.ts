@@ -9,6 +9,8 @@ import { authority, ownerEmail, pantry, who } from './access'
 import { addDays, daysBetween, longDay, now, optionalText, requireThat, sha256, text, uid, usd, type Data } from './core'
 import { all, audit, changed, one, q, run, type AuditActor } from './db'
 import { invoice } from './invoices'
+import { ensureLink, invoiceLinkCommands } from './invoice-links'
+export { ensureLink } from './invoice-links'
 import { invoicePdf } from './invoice-pdf'
 import type { Command } from './context'
 
@@ -28,18 +30,6 @@ export function businessDay(timeZone: string, at = new Date()) {
 }
 
 export const customerLink = (env: Bindings, token: string) => `${runtimeBindings(env).AUTH_ORIGIN}/i/${token}`
-
-function newToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(24))
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-/** The invoice's customer link token, made on first send. */
-export async function ensureLink(db: D1Database, invoiceId: string) {
-  const token = newToken()
-  await db.prepare('UPDATE pt_invoices SET link_token = ? WHERE id = ? AND link_token IS NULL').bind(token, invoiceId).run()
-  return (await one<{ link_token: string }>(db, 'SELECT link_token FROM pt_invoices WHERE id = ?', invoiceId))!.link_token
-}
 
 /** The PDF and the customer page show the same facts. */
 export async function invoiceDocument(db: D1Database, inv: Data) {
@@ -159,6 +149,7 @@ const saveSending: Command = { need: 'owner', async run(c, b) {
 } }
 
 export const deliveryCommands: Record<string, Command> = {
+  ...invoiceLinkCommands,
   'invoice.send': sendInvoice,
   'invoice.reminders': pauseReminders,
   'sending.save': saveSending,

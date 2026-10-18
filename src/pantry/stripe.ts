@@ -4,6 +4,7 @@
 // customer pays in Stripe Checkout; Pantry reads the outcome back from Stripe
 // (on return, by webhook and in due work), records the payment against the
 // invoice and books Stripe's fee. Card and bank numbers never reach Pantry.
+import { invoiceByLink } from './invoice-links'
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { authority, pantry, who } from './access'
 import { Fault, now, requireThat, text, uid, usd, type Data } from './core'
@@ -113,9 +114,8 @@ export async function offeredMethods(env: Bindings, db: D1Database): Promise<Met
 
 /** Start Stripe Checkout for the invoice's open balance; returns the address to send the customer to. */
 export async function startCheckout(env: Bindings, db: D1Database, token: string, method: string) {
-  const row = await one(db, "SELECT id FROM pt_invoices WHERE link_token = ? AND kind = 'invoice' AND status = 'issued'", token)
-  requireThat(row, 'Invoice not found', 404)
-  const inv = await invoice(db, row.id)
+  const inv = await invoiceByLink(db, token)
+  requireThat(inv, 'Invoice not found', 404)
   requireThat(inv.open_cents > 0, 'This invoice is already paid', 409)
   const offered = await offeredMethods(env, db)
   requireThat((offered as string[]).includes(method), 'That payment method is not offered for this invoice', 409)
