@@ -6,6 +6,7 @@ import { closeState } from './close'
 import { ageing, balanceSheet, fiscalYearStart, generalLedger, profitAndLoss, trialBalance } from './reports'
 import { requireEntity } from './settings'
 import { BASIS_LABEL, type Basis } from './basis'
+import { cashFlow } from './cash-flow'
 import { entryDocuments } from './receipts/attachments'
 
 export async function accountantPackage(db: D1Database, period: string, basis: Basis = 'accrual'): Promise<Data> {
@@ -21,6 +22,7 @@ export async function accountantPackage(db: D1Database, period: string, basis: B
     close: await closeState(db, period),
     trialBalance: await trialBalance(db, end, basis),
     profitAndLoss: { period: await profitAndLoss(db, start, end, basis), yearToDate: await profitAndLoss(db, fiscalYearStart(end, entity.fiscal_year_start), end, basis) },
+    cashFlow: await cashFlow(db, start, end),
     balanceSheet: await balanceSheet(db, end, entity.fiscal_year_start, basis),
     receivables: await ageing(db, 'receivable', end),
     payables: await ageing(db, 'payable', end),

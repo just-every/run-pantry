@@ -31,21 +31,21 @@ const NONE: D[] = []
 /** The transactions this receipt may belong to: those found from what was read, then, once a person
  * types or corrects the vendor, date, total or currency, those found from what they typed. */
 function useMatches(r: D) {
-  const [typed, setTyped] = useState<Typed | null>(null), [found, setFound] = useState<D[] | null>(null), [error, setError] = useState('')
+  const [typed, setTyped] = useState<Typed | null>(null), [found, setFound] = useState<D[] | null>(null), [error, setError] = useState(''), [duplicate, setDuplicate] = useState<D | null>(r.duplicate), [basis, setBasis] = useState(r.duplicate_basis)
   useEffect(() => {
     if (!typed) return
     if (!/\d/.test(typed.total)) { setFound([]); setError(''); return }
     let live = true
     const timer = setTimeout(async () => {
-      try { const v = await api('receipts/candidates?' + new URLSearchParams(typed)); if (live) { setFound(v.candidates); setError('') } }
+      try { const v = await api('receipts/candidates?' + new URLSearchParams({ ...typed, id: r.id })); if (live) { setFound(v.candidates); setDuplicate(v.duplicate); setBasis(v.duplicateBasis); setError('') } }
       catch (e) { if (live) { setFound([]); setError((e as Error).message) } }
     }, 300)
     return () => { live = false; clearTimeout(timer) }
   }, [typed?.vendor, typed?.date, typed?.total, typed?.currency])
-  const initial: Typed = { vendor: r.read_vendor ?? '', date: r.read_date ?? '', total: r.read_total_cents ? amountText(r.read_total_cents) : '', currency: r.read_currency ?? '' }
+  const initial: Typed = { vendor: r.vendor ?? r.read_vendor ?? '', date: r.receipt_date ?? r.read_date ?? '', total: (r.total_cents ?? r.read_total_cents) ? amountText(r.total_cents ?? r.read_total_cents) : '', currency: r.currency ?? r.read_currency ?? '' }
   const type = (field: keyof Typed) => (e: any) => { const value = e.target.value; setTyped(t => ({ ...(t ?? initial), [field]: value })) }
   const total = typed ? typed.total : initial.total
-  return { list: (typed ? found : r.candidates) ?? NONE, looking: !!typed && found === null && /\d/.test(total), total, error, type }
+  return { fields: typed ?? initial, duplicate, basis, list: (typed ? found : r.candidates) ?? NONE, looking: !!typed && found === null && /\d/.test(total), total, error, type }
 }
 
 function ReceiptCard({ r, data, onChange }: { r: D; data: D; onChange: () => Promise<void> }) {
@@ -57,22 +57,24 @@ function ReceiptCard({ r, data, onChange }: { r: D; data: D; onChange: () => Pro
   const canRead = !data.reader.unavailable && !data.reader.missing && r.read_status !== 'read'
   const accept = (b: D) => {
     if (!chosen) throw new Error(m.total ? 'Choose the transaction this receipt belongs to. None has this total yet: import the bank or card statement, or record the bill or payment, then come back.' : 'Enter the total to find the transaction this receipt belongs to.')
-    return command('receipt.attach', { ...b, id: r.id, revision: r.revision, targetKind: chosen.kind, targetId: chosen.id })
+    return command('receipt.attach', { ...b, id: r.id, revision: r.revision, targetKind: chosen.kind, targetId: chosen.id }).catch(async e => { await onChange(); throw e })
   }
-  return <Card title={<><Icon name="receipt" /> {r.read_vendor ?? r.file_name}{r.read_total_cents ? <> · {money(r.read_total_cents, r.read_currency)}</> : null}</>} actions={<Chip tone="warn">To review</Chip>} className="receipt-card">
+  return <Card title={<><Icon name="receipt" /> {r.read_vendor ?? r.file_name}{r.read_total_cents ? <> · {money(r.read_total_cents, r.read_currency)}</> : null}</>} actions={<Chip tone="warn">{m.duplicate ? 'Duplicate' : 'To review'}</Chip>} className="receipt-card">
     <div className="receipt-body">
       <Preview r={r} />
       <div className="receipt-fields">
+        {m.duplicate && <p className="hint" role="status">Duplicate receipt · {m.basis === 'file' ? 'same file' : 'same vendor, date and total'}. Original: <FileLink id={m.duplicate.document_id} name={m.duplicate.file_name} mediaType={m.duplicate.media_type} />{m.duplicate.status === 'attached' ? <> · already attached {day(m.duplicate.decided_at)}</> : ' · waiting for review'}. Choose Keep both with a reason, or Skip.</p>}
         <ReadLine r={r} reader={{ ...data.reader, canSet: state.actor.can.owner }} />
         {r.read_status !== 'read' && state.actor.can.record && <p className="hint">Type the vendor, date and total from the receipt: the transactions with that total are listed under <strong>Attach to</strong>.</p>}
-        {state.actor.can.record ? <Form label="Accept and attach" submit={async b => accept(b)} onDone={onChange} className="grid-form"
-          secondary={<>{canRead && <Action run={async () => { await command('receipt.read', { id: r.id }); await onChange() }}>Read again</Action>}<Action run={async () => { await command('receipt.dismiss', { id: r.id, revision: r.revision }); await onChange() }}>Not a receipt</Action></>}>
-          <Field label="Vendor" name="vendor" defaultValue={r.read_vendor ?? ''} onChange={m.type('vendor')} />
-          <Field label="Date" name="date" type="date" defaultValue={r.read_date ?? ''} onChange={m.type('date')} />
-          <Field label="Total" name="total" inputMode="decimal" defaultValue={r.read_total_cents ? amountText(r.read_total_cents) : ''} onChange={m.type('total')} />
-          <Field label="Tax" name="tax" inputMode="decimal" defaultValue={r.read_tax_cents !== null && r.read_tax_cents !== undefined ? amountText(r.read_tax_cents) : ''} />
-          <Field label="Currency" name="currency" defaultValue={r.read_currency ?? ''} maxLength={3} onChange={m.type('currency')} />
-          <Field label={chosen?.record ? 'Record to account' : 'Category'} name="accountId" defaultValue={r.read_account_id ?? ''} required={!!chosen?.record} options={data.accounts.map((a: D) => ({ value: a.id, label: `${a.code} · ${a.name}` }))} />
+        {state.actor.can.record ? <Form label={m.duplicate ? "Keep both" : "Accept and attach"} submit={async b => accept(b)} onDone={onChange} className="grid-form"
+          secondary={<>{canRead && <Action run={async () => { await command('receipt.read', { id: r.id }); await onChange() }}>Read again</Action>}<Action run={async () => { await command('receipt.dismiss', { id: r.id, revision: r.revision, ...m.fields, reason: m.duplicate ? 'Duplicate skipped' : '' }); await onChange() }}>{m.duplicate ? 'Skip' : 'Not a receipt'}</Action></>}>
+          {m.duplicate && <Field label="Reason to keep both" name="duplicateReason" required maxLength={300} wide />}
+          <Field label="Vendor" name="vendor" defaultValue={r.vendor ?? r.read_vendor ?? ''} onChange={m.type('vendor')} />
+          <Field label="Date" name="date" type="date" defaultValue={r.receipt_date ?? r.read_date ?? ''} onChange={m.type('date')} />
+          <Field label="Total" name="total" inputMode="decimal" defaultValue={(r.total_cents ?? r.read_total_cents) ? amountText(r.total_cents ?? r.read_total_cents) : ''} onChange={m.type('total')} />
+          <Field label="Tax" name="tax" inputMode="decimal" defaultValue={(r.tax_cents ?? r.read_tax_cents) !== null && (r.tax_cents ?? r.read_tax_cents) !== undefined ? amountText(r.tax_cents ?? r.read_tax_cents) : ''} />
+          <Field label="Currency" name="currency" defaultValue={r.currency ?? r.read_currency ?? ''} maxLength={3} onChange={m.type('currency')} />
+          <Field label={chosen?.record ? 'Record to account' : 'Category'} name="accountId" defaultValue={r.account_id ?? r.read_account_id ?? ''} required={!!chosen?.record} options={data.accounts.map((a: D) => ({ value: a.id, label: `${a.code} · ${a.name}` }))} />
           <fieldset className="checks field-wide match-choices" aria-busy={m.looking}><legend>Attach to</legend>
             {m.list.length ? m.list.map((c: D, i: number) => <label key={c.id} className={target === `${c.kind}:${c.id}` ? 'chosen' : ''}>
               <input type="radio" name="target" value={`${c.kind}:${c.id}`} checked={target === `${c.kind}:${c.id}`} onChange={() => setTarget(`${c.kind}:${c.id}`)} required />
@@ -114,19 +116,24 @@ export function Receipts() {
     <PageHead title="Receipts" lead="Take a photo or forward the email. Pantry reads the vendor, date and total and proposes the transaction; nothing is attached or recorded until you accept." />
     {!data ? <Loading error={error} what="receipts" /> : <>
       <Card title="Add a receipt">
-        {state.actor.can.record ? <CaptureButtons onDone={refresh} /> : <p className="hint">Viewers see receipts; a bookkeeper, accountant or the owner adds them.</p>}
+        {state.actor.can.record ? <CaptureButtons key={data.review.map((r: D) => r.id).join(':')} onDone={refresh} /> : <p className="hint">Viewers see receipts; a bookkeeper, accountant or the owner adds them.</p>}
         {data.reader.unavailable ? <p className="hint">{data.reader.unavailable}</p> : data.reader.missing ? <p className="hint">{data.reader.missing} {state.actor.can.owner && <Link to="/app/settings" hash="ai-reading">Add a key</Link>}</p> : <p className="hint">Read with this install’s own AI model ({data.reader.model}). The original is kept exactly as received.</p>}
         <Forwarding inbox={data.inbox} owner={state.actor.can.owner} />
       </Card>
-      {data.review.length ? data.review.map((r: D) => <ReceiptCard key={r.id + r.revision} r={r} data={data} onChange={refresh} />)
+      {data.review.length ? data.review.map((r: D) => <div id={`receipt-${r.id}`} key={r.id + r.revision}><ReceiptCard r={r} data={data} onChange={refresh} /></div>)
         : <Card title="To review" className="empty-card"><span className="empty-lines" aria-hidden="true" /><p>Nothing waiting. New receipts appear here with what was read and the transaction they belong to.</p></Card>}
       <Card title="Attached">
         <Table heads={['Date', 'Vendor', 'Total', 'Attached to', 'By', 'Receipt']} figures={[2]} empty="No receipts attached yet.">
-          {data.attached.map((r: D) => <tr key={r.id}><td>{day(r.receipt_date ?? r.decided_at)}</td><td>{r.vendor ?? '—'}</td><td className="fig">{r.total_cents ? money(r.total_cents, r.currency) : '—'}</td>
+          {data.attached.map((r: D) => <tr key={r.id} id={`receipt-${r.id}`}><td>{day(r.receipt_date ?? r.decided_at)}</td><td>{r.vendor ?? '—'}{r.duplicate_reason && <small className="sub"> · Kept both · {r.duplicate_reason}</small>}</td><td className="fig">{r.total_cents ? money(r.total_cents, r.currency) : '—'}</td>
             <td>{r.linked_kind && r.linked_id ? <Link to="/app/reports" search={{ record: `${r.linked_kind === 'journal' ? 'entry' : r.linked_kind}:${r.linked_id}` } as any}>{r.linked_label ?? 'Record'}</Link> : '—'}</td>
             <td>{r.rule_id ? <Chip tone="agent">Rule</Chip> : who(r.decided_by)}</td><td><FileLink id={r.document_id} name={r.file_name} mediaType={r.media_type} /></td></tr>)}
         </Table>
       </Card>
+      {data.skipped?.length > 0 && <Card title="Skipped duplicates">
+        <Table heads={['Skipped', 'Copy', 'Original']}>
+          {data.skipped.map((r: D) => <tr key={r.id}><td>{day(r.decided_at)}</td><td>{r.source === 'email' ? 'Emailed copy skipped' : 'Copy skipped'} · {r.file_name}</td><td><FileLink id={r.original_document_id} name={r.original_file_name} mediaType={r.original_media_type} />{r.original_attached_at && <small className="sub">Already attached {day(r.original_attached_at)}</small>}</td></tr>)}
+        </Table>
+      </Card>}
       {state.actor.can.owner && <Rules data={data} onChange={reload} />}
     </>}
   </>

@@ -6,13 +6,14 @@ import { Card, Chip, Loading, PageHead, Table, Tabs, day, monthName, today, usd,
 import { BASIS_NAME, FigureDetail, RecordView } from './report-detail'
 import { SalesTax } from './sales-tax'
 import { Contractors } from './contractors'
+import { CashFlow, CashFlowDetail } from './cash-flow'
 
 export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string }
 type Basis = 'cash' | 'accrual'
 
 // [tab, slug, reads on a basis, takes a date range]
 const KINDS: [string, string, boolean, boolean][] = [['Trial balance', 'trial-balance', true, false], ['General ledger', 'general-ledger', true, true], ['Profit and loss', 'profit-and-loss', true, true], ['Balance sheet', 'balance-sheet', true, false],
-  ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false]]
+  ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false]]
 
 /** A figure that opens to its records. */
 function Figure({ line, children }: { line: string; children: React.ReactNode }) {
@@ -88,6 +89,7 @@ function Report({ slug, basis, from, to }: { slug: string; basis: Basis; from: s
   if (slug === 'balance-sheet') return <><p>{r.balanced ? <Chip tone="good">Assets equal liabilities plus equity</Chip> : <Chip tone="bad">Out of balance</Chip>}</p>
     {basis === 'cash' && <p className="hint">On the cash basis, unpaid invoices and bills stay off the balance sheet with the tax on them; money received or paid but not yet applied stays in receivables or payables.</p>}
     <Statement sections={[['Assets', r.assets, r.totalAssets, 'assets'], ['Liabilities', r.liabilities, r.totalLiabilities, 'liabilities'], ['Equity', r.equity, r.totalEquity, 'equity']]} total={['Liabilities and equity', r.totalLiabilities + r.totalEquity, 'liabilities-and-equity']} /></>
+  if (slug === 'cash-flow') return <CashFlow from={from} to={to} />
   if (slug === 'sales-tax') return <SalesTax r={r} />
   return <Ageing r={r} />
 }
@@ -101,15 +103,16 @@ export function Reports() {
   const to = search.to && isDay(search.to) ? search.to : today(), from = search.from && isDay(search.from) ? search.from : to.slice(0, 8) + '01'
   // The package is for a closed month: the one the dates point at once someone chooses them, else the last month locked.
   const period = !search.to && state.overview?.lastLocked ? state.overview.lastLocked : periodOf(to), q = basis === 'cash' ? '?basis=cash' : ''
-  const detail = (slug === 'profit-and-loss' || slug === 'balance-sheet') && search.line
+  const detail = (slug === 'profit-and-loss' || slug === 'balance-sheet' || slug === 'cash-flow') && search.line
   return <>
     <PageHead title="Reports" lead="Every report is calculated from the same posted ledger, on the cash or the accrual basis."
       actions={<><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv${q}`} download>General ledger CSV · {basis === 'cash' ? 'cash' : 'accrual'}</a><a className="btn btn-primary" href={`/api/pantry/package/${period}/accountant-package.zip${q}`} download title="A ZIP of CSV reports, the close checklist and a README">Accountant package · {monthName(period)}</a></>} />
     <Tabs tabs={KINDS.map(k => k[0])} current={label} onChange={t => set({ report: KINDS.find(k => k[0] === t)![1], line: undefined, record: undefined })} pick="Report" />
     {slug === 'contractors' ? <Contractors year={Number(search.year) || Number(today().slice(0, 4))} onYear={y => set({ year: String(y) })} />
       : search.record ? <RecordView record={search.record} reportLabel={label} />
+      : detail && slug === 'cash-flow' ? <CashFlowDetail line={search.line!} from={from} to={to} />
       : detail ? <FigureDetail report={slug} line={search.line!} from={from} to={to} basis={basis} reportLabel={label} />
-      : <Card title={<>{label} <Chip tone="info">{based ? BASIS_NAME[basis] : 'Open items'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}
+      : <Card title={<>{label} <Chip tone="info">{slug === 'cash-flow' ? 'Indirect method' : based ? BASIS_NAME[basis] : 'Open items'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}
           {ranged && <div className="field inline"><label htmlFor="r-from">From</label><input id="r-from" type="date" value={from} onChange={e => isDay(e.target.value) && set({ from: e.target.value })} /></div>}
           <div className="field inline"><label htmlFor="r-to">{ranged ? 'To' : 'As of'}</label><input id="r-to" type="date" value={to} onChange={e => isDay(e.target.value) && set({ to: e.target.value })} /></div></div>}>
           <Report slug={slug} basis={basis} from={from} to={to} />

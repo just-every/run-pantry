@@ -8,6 +8,7 @@ import { all, audit, one, q, run, type AuditActor, type Sql } from '../db'
 import { documentStatements, type NewDocument } from '../documents'
 import { readReceipt, ReaderError, type Category, type Reading, type ReceiptInput } from './reader'
 import { readerState } from './settings'
+import { flagDuplicate, vendorKey } from './duplicates'
 
 export const MAX_IMAGE_TO_READ = 3_700_000
 const IMAGE = /^image\/(png|jpeg|webp|gif)$/
@@ -58,11 +59,12 @@ export async function receive(db: D1Database, env: Bindings, a: Arrival, read?: 
   const file = a.file ? await documentStatements(a.by.email, a.file) : null
   const id = uid(), cols = await readingColumns(db, outcome)
   await run(db, [...(a.guards ?? []), ...original.statements, ...(file?.statements ?? []),
-    q(`INSERT INTO pt_receipts (id, document_id, file_document_id, source, sender, subject, read_status, read_note, read_model, read_at, read_vendor, read_date, read_total_cents, read_tax_cents, read_currency, read_account_id, status, received_by, received_at, revision)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'review', ?, ?, ?)`,
+    q(`INSERT INTO pt_receipts (id, document_id, file_document_id, source, sender, subject, read_status, read_note, read_model, read_at, read_vendor, read_date, read_total_cents, read_tax_cents, read_currency, read_account_id, status, received_by, received_at, revision, vendor_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'review', ?, ?, ?, ?)`,
       id, original.id, file?.id ?? null, a.source, (a.sender ?? '').slice(0, 254), (a.subject ?? '').slice(0, 300), cols.read_status, cols.read_note, cols.read_model, cols.read_at,
-      cols.read_vendor, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, a.by.email, now(), uid()),
+      cols.read_vendor, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, a.by.email, now(), uid(), vendorKey(cols.read_vendor)),
     audit(a.by, 'receipt.receive', 'receipt', id, { source: a.source, file: a.original.name, sha256: original.sha256, read: outcome.status })])
+  await flagDuplicate(db, (await receipt(db, id))!)
   return { id, outcome }
 }
 

@@ -1,4 +1,4 @@
-**Reports** reads one set of books in several ways: the trial balance, general ledger, profit and loss, balance sheet, receivables and payables aging, sales tax by state and 1099 contractors. Every report is calculated from posted lines when you open it; nothing is typed in as a total.
+**Reports** reads one set of books in several ways: the trial balance, general ledger, profit and loss, balance sheet, cash flow, receivables and payables aging, sales tax by state and 1099 contractors. Every report is calculated from posted lines when you open it; nothing is typed in as a total.
 
 ## Every figure opens to its records
 
@@ -59,3 +59,11 @@ For each calendar year Pantry totals what you paid each contractor:
 A contractor at or over the year's threshold is flagged as the year goes on. The threshold is $600 for payments made in 2025 and earlier, and $2,000 for payments made in 2026 (raised by the One Big Beautiful Bill Act); the IRS adjusts it for inflation from 2027. Vendors not marked as contractors who were paid that much by check, ACH, wire or cash are listed so you can decide.
 
 After December 31, **1099-NEC forms** lists each form's recipient, box 1 and box 4 ($0.00: Pantry records no backup withholding), and the owner or someone with the posting grant downloads a filing CSV with the full TINs. Every download is in the activity log. **Pantry does not file with the IRS**: file the CSV through the IRS or a filing service by January 31. Whether a vendor needs a 1099 at all is your and your accountant's call.
+
+## Statement of cash flows
+
+Choose **Cash flow** on Reports and set any From and To dates. The indirect statement starts from accrual net income, adjusts for changes in working capital and noncash activity, then shows investing and financing. Its net change equals closing cash less opening cash on the balance sheet. Opening cash is the day before From. Transfers between cash accounts have no net effect; entries with no net cash are excluded from investing and financing and shown as noncash adjustments where needed.
+
+Cash defaults to asset accounts with the bank role; other assets default to investing, equity and other liabilities to financing, and the remaining accounts to operating. Under **Cash-flow account classes**, an accountant or another person allowed to record can change those classes, including identifying cash equivalents. Classes apply to all periods; income and expenses always start in net income, with classified cash activity moved to its chosen section.
+
+Choose any amount, including a section total, net change or cash balance, to see its contributing ledger entries. Open an entry to see its accounts and linked evidence. **Cash-flow CSV** exports the selected range; the monthly accountant package also includes the statement in JSON and as `cash-flow.csv`. The statement uses the indirect method regardless of the basis selected for other reports.

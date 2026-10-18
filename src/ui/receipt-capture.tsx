@@ -3,6 +3,7 @@
 // made here on the device; the original is still what Pantry keeps.
 import { useId, useState } from 'react'
 import { Icon } from './icons'
+import { Link } from '@tanstack/react-router'
 
 const READABLE = /^image\/(png|jpeg|webp)$/
 
@@ -28,17 +29,17 @@ export async function sendReceipt(file: File, source: 'camera' | 'upload', targe
   if (response.status === 401) { window.location.assign('/signin?returnTo=' + encodeURIComponent(window.location.pathname)); throw new Error('Sign in required') }
   const value: any = await response.json().catch(() => ({ error: 'The server sent an unreadable answer' }))
   if (!response.ok) throw new Error(value.error || 'Upload failed')
-  return value as { id: string }
+  return value as { id: string; duplicate: { id: string } | null }
 }
 
 /** "Take a photo" opens the phone's camera; "Upload a file" takes a photo, PDF or saved email.
  * Compact (one per row in a list) both are white secondaries, so the page keeps its one navy action. */
 export function CaptureButtons({ target, onDone, compact = false }: { target?: { kind: string; id: string }; onDone: (id: string) => void | Promise<void>; compact?: boolean }) {
-  const id = useId(), [busy, setBusy] = useState(''), [error, setError] = useState('')
+  const id = useId(), [busy, setBusy] = useState(''), [error, setError] = useState(''), [duplicate, setDuplicate] = useState('')
   async function send(file: File | undefined, source: 'camera' | 'upload', input: HTMLInputElement) {
     if (!file) return
-    setBusy(source === 'camera' ? 'Reading the photo…' : 'Reading the file…'); setError('')
-    try { const r = await sendReceipt(file, source, target); await onDone(r.id) }
+    setBusy(source === 'camera' ? 'Reading the photo…' : 'Reading the file…'); setError(''); setDuplicate('')
+    try { const r = await sendReceipt(file, source, target); if (r.duplicate) setDuplicate(r.id); await onDone(r.id) }
     catch (e) { setError((e as Error).message) }
     finally { setBusy(''); input.value = '' }
   }
@@ -48,6 +49,7 @@ export function CaptureButtons({ target, onDone, compact = false }: { target?: {
     <label className={`btn btn-secondary${compact ? ' btn-small' : ''}`} htmlFor={`${id}-file`} aria-disabled={!!busy}><Icon name="upload" /> {compact ? 'File' : 'Upload a file'}</label>
     <input id={`${id}-file`} className="sr-only" type="file" accept="image/*,application/pdf,.eml,message/rfc822" disabled={!!busy} onChange={e => send(e.currentTarget.files?.[0], 'upload', e.currentTarget)} />
     {busy && <span role="status" className="hint">{busy}</span>}
+    {duplicate && <span role="status" className="hint">Duplicate receipt; waiting for your choice. <Link to="/app/receipts" hash={`receipt-${duplicate}`}>Review duplicate</Link></span>}
     {error && <span role="alert" className="error">{error}</span>}
   </div>
 }

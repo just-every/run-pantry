@@ -186,3 +186,48 @@ test('TAXFORM-002 1099 contractors: cash payments per calendar year by the IRS r
   assert.deepEqual(y26.contractors.map(x => [x.name, x.box1, x.overThreshold]), [['Ada Okafor', 210000, true], ['Ben Ruiz Design', 0, false]])
   assert.equal((await h.send('/api/pantry/reports/contractors/2026/1099-nec.csv', undefined, { cookie: h.owner })).status, 409)
 })
+
+test('REPORT-003 indirect cash flow: activity, noncash adjustments, arbitrary periods, source entries and exports tie to cash', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const s = await october(h)
+  const loan = await h.command('account.save', { code: '2500', name: 'Equipment loan', type: 'liability' })
+  const depreciation = await h.command('account.save', { code: '1590', name: 'Accumulated depreciation', type: 'asset' })
+  const post = async (date, memo, lines) => {
+    const d = await h.command('journal.save-draft', { date, memo, lines })
+    return h.command('journal.post', { id: d.id, revision: d.revision })
+  }
+  await post('2026-10-11', 'Equipment purchase', [{ accountId: s.acct['1500'], debit: '2500.00' }, { accountId: s.acct['1000'], credit: '2500.00' }])
+  await post('2026-10-12', 'Loan proceeds', [{ accountId: s.acct['1000'], debit: '4000.00' }, { accountId: loan.id, credit: '4000.00' }])
+  await post('2026-10-13', 'Owner distribution', [{ accountId: s.acct['3000'], debit: '700.00' }, { accountId: s.acct['1000'], credit: '700.00' }])
+  await post('2026-10-31', 'Depreciation', [{ accountId: s.acct['6500'], debit: '100.00' }, { accountId: depreciation.id, credit: '100.00' }])
+  await post('2026-10-31', 'Equipment financed without cash', [{ accountId: s.acct['1500'], debit: '600.00' }, { accountId: loan.id, credit: '600.00' }])
+  const range = 'from=2026-10-01&to=2026-12-31'
+  const r = await h.view('reports/cash-flow?' + range)
+  assert.deepEqual([r.totalOperating, r.totalInvesting, r.totalFinancing], [240125, -250000, 330000])
+  assert.deepEqual([r.opening, r.closing, r.netChange, r.balanceSheetChange, r.ties], [1000000, 1320125, 320125, 320125, true])
+  assert.equal(r.operating.find(l => l.id === 'net-income').amount, 94800)
+  assert.equal(r.operating.find(l => l.id === `noncash:${depreciation.id}`).amount, 10000)
+  // Every displayed amount, including totals and cash balances, opens to entries adding to that amount.
+  for (const [id, amount] of [...[...r.operating, ...r.investing, ...r.financing].map(l => [l.id, l.amount]), ['operating', r.totalOperating], ['investing', r.totalInvesting], ['financing', r.totalFinancing], ['net-change', r.netChange], ['opening', r.opening], ['closing', r.closing]]) {
+    const d = await h.view(`reports/cash-flow/detail?${range}&line=${encodeURIComponent(id)}`)
+    assert.equal(d.figure, amount)
+    assert.equal(d.rows.reduce((n, l) => n + l.amount, 0), amount)
+    for (const row of d.rows) assert.ok((await h.view(`reports/record/entry/${row.entryId}`)).entries.length)
+  }
+  const start = await h.view('reports/balance-sheet?to=2026-09-30'), end = await h.view('reports/balance-sheet?to=2026-12-31')
+  assert.equal(r.netChange, lineOf(end, '1000') - lineOf(start, '1000'))
+  const oneDay = await h.view('reports/cash-flow?from=2026-10-11&to=2026-10-11')
+  assert.deepEqual([oneDay.totalInvesting, oneDay.netChange, oneDay.ties], [-250000, -250000, true])
+  const csv = await h.send(`/api/pantry/reports/cash-flow.csv?${range}`, undefined, { cookie: h.owner })
+  assert.equal(csv.status, 200)
+  assert.ok(csv.value.includes('3201.25') && csv.value.includes('13201.25'))
+  assert.equal((await h.view('package/2026-10')).cashFlow.ties, true)
+  const accountant = await h.member('cash-accountant@example.test', 'accountant')
+  await h.command('cash-flow.classify', { accountId: s.acct['1500'], class: 'operating' }, accountant)
+  const changed = await h.view('reports/cash-flow?' + range)
+  assert.deepEqual([changed.totalOperating, changed.totalInvesting, changed.netChange, changed.ties], [-9875, 0, 320125, true])
+  const viewer = await h.member('cash-viewer@example.test', 'viewer')
+  await h.command('cash-flow.classify', { accountId: loan.id, class: 'investing' }, viewer, 403)
+  await h.command('cash-flow.classify', { accountId: loan.id, class: 'cash' }, accountant, 400)
+  await h.view('reports/cash-flow?from=2026-12-31&to=2026-10-01', h.owner, 400)
+})

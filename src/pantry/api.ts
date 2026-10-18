@@ -24,6 +24,7 @@ import { xeroRoutes } from './cutover/xero-attachments'
 import { ageing, balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports'
 import { basisOf, BASIS_LABEL } from './basis'
 import { figureDetail } from './drilldown'
+import { cashFlow, cashFlowCommands, cashFlowCsv, cashFlowDetail } from './cash-flow'
 import { recordView } from './records'
 import { salesTax } from './sales-tax'
 import { contractorCommands, contractors, necCsv } from './contractors'
@@ -51,7 +52,7 @@ import { integrationCommands, integrationSettings } from './integrations/credent
 import { integrations } from './integrations/routes'
 
 const commands: Record<string, Command> = {
-  ...settingsCommands, ...accountCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands,
+  ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands,
   ...bankCommands, ...matchCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -107,9 +108,15 @@ view('reports/detail', async (ctx, c) => {
 })
 view('reports/record/:kind/:id', async (ctx, c) => recordView(ctx.db, c.req.param('kind')!, c.req.param('id')!))
 view('reports/contractors', async (ctx, c) => contractors(ctx.db, year(c)))
+view('reports/cash-flow/detail', async (ctx, c) => cashFlowDetail(ctx.db, day(c, 'from'), day(c, 'to'), c.req.query('line') ?? ''))
+api.get('/api/pantry/reports/cash-flow.csv', async c => {
+  const ctx = await reader(c), from = day(c, 'from'), to = day(c, 'to')
+  return new Response(cashFlowCsv(await cashFlow(ctx.db, from, to)), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-cash-flow-${from}-${to}.csv"`, 'cache-control': 'no-store' } })
+})
 view('reports/:kind', async (ctx, c) => {
   const kind = c.req.param('kind'), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01'), basis = basisOf(c.req.query('basis'))
   const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
+  if (kind === 'cash-flow') return cashFlow(ctx.db, from, to)
   if (kind === 'trial-balance') return trialBalance(ctx.db, to, basis)
   if (kind === 'general-ledger') return generalLedger(ctx.db, from, to, c.req.query('account') || undefined, basis)
   if (kind === 'profit-and-loss') return profitAndLoss(ctx.db, from, to, basis)

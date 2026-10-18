@@ -3,6 +3,7 @@
 // and the same package as JSON for software. Every figure comes from accountantPackage.
 import type { Data } from './core'
 import { accountantPackage, ledgerCsv } from './package'
+import { cashFlowCsv } from './cash-flow'
 import { zip } from './zip'
 import type { Basis } from './basis'
 
@@ -27,13 +28,15 @@ export async function packageZip(db: D1Database, period: string, basis: Basis) {
   const pl = (r: Data) => statement([['Income', r.income, r.totalIncome], ['Expenses', r.expenses, r.totalExpenses]], ['Net income', r.netIncome])
   const bs = p.balanceSheet
   const files = [
+    { name: 'cash-flow.csv', data: cashFlowCsv(p.cashFlow) },
     { name: 'README.txt', data: [
       `Accountant package for ${p.entity.legalName}, ${p.period.start} to ${p.period.end}.`,
-      `Figures are on the ${basisName.toLowerCase()}, in US dollars, recalculated from the posted ledger on ${p.generatedAt.slice(0, 10)}.`,
+      `Ledger reports are on the ${basisName.toLowerCase()}; cash-flow starts from accrual net income. Figures are in US dollars, recalculated from the posted ledger on ${p.generatedAt.slice(0, 10)}.`,
       `The month is ${p.close.status === 'locked' ? 'locked' : 'not locked yet'}.`, '',
       'trial-balance.csv            Debit and credit balance of every account at the end of the month',
       'profit-and-loss.csv          Income and expenses for the month',
       'profit-and-loss-ytd.csv      Income and expenses for the fiscal year to date',
+      'cash-flow.csv                Indirect cash flow, with opening and closing cash',
       'balance-sheet.csv            Assets, liabilities and equity at the end of the month',
       'general-ledger.csv           Every posted line in the month, by account, with running balances and receipts',
       'receivables-aging.csv        Open customer invoices at the end of the month',
