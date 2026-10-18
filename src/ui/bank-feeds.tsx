@@ -34,6 +34,8 @@ function Connection({ c, onDone }: { c: D; onDone: () => Promise<void> }) {
       <span>{a.name} <small className="sub">••{a.mask}</small></span>
       {a.bank_account_id ? <small>→ {a.bank_name} · {a.last_synced_at ? <>synced {ago(a.last_synced_at)}</> : 'not synced yet'}{a.pending ? ` · ${a.pending} pending` : ''}{a.balance_cents !== null ? ` · bank shows ${usd(a.balance_cents)}${a.kind.startsWith('credit') ? ' owed' : ''}` : ''}</small> : <small className="sub">Not brought in</small>}
     </li>)}</ul>
+    {c.status === 'active' && brought.length > 0 && <p className="hint">Next sync: {new Date(c.sync_due_at).getTime() <= Date.now() ? 'due now' : new Date(c.sync_due_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</p>}
+    {c.status === 'relink' && <p className="hint">Next sync: after you re-link.</p>}
     {c.status === 'active' && c.last_sync_error && <p className="hint">Last try: {c.last_sync_error}. Pantry tries again within the hour.</p>}
     {can && <div className="row-actions small">
       {/* The notice at the top of Bank carries the navy Re-link; here it is the quiet second door. */}

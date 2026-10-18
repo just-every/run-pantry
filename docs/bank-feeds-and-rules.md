@@ -7,7 +7,7 @@ Connect your bank and cards once and their transactions arrive in **Bank** on th
 3. Choose where each of the bank's accounts goes: an existing Pantry bank or card account, **A new bank or card account** (with its opening date and the balance on that day), or **Leave it out**.
 4. Choose **Bring transactions in**.
 
-Transactions after each account's opening date arrive at once, then on their own: when the bank tells Plaid there is news, and every few hours besides. **Bank and card feeds** shows when each account last synced. Pending card and bank transactions show as **Pending** and become ordinary lines when the bank posts them; a transaction the bank withdraws leaves, unless you already filed it.
+Transactions after each account's opening date arrive at once, then on their own: when the bank tells Plaid there is news, and every few hours besides. **Bank and card feeds** shows when each account last synced and when the connection next checks. A connection awaiting sign-in says its next sync is after you re-link. Pending card and bank transactions show as **Pending** and become ordinary lines when the bank posts them; a transaction the bank withdraws leaves, unless you already filed it.
 
 Statement files keep working beside a feed. A file line and a feed line for the same day and amount are one line, whichever arrives first.
 

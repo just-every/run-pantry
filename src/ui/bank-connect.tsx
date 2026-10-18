@@ -18,17 +18,18 @@ const nextCode = (accounts: D[], base: number, taken: string[]) => {
 
 function Choose({ connection, onDone }: { connection: D; onDone: (r: D) => void }) {
   const { state, reload } = useShared()
-  const mapped = new Set<string>()
-  const free = state.bankAccounts.filter((b: D) => !mapped.has(b.id))
+  const debt = (a: D) => a.kind.startsWith('credit') || a.kind === 'loan line of credit'
+  const compatible = (a: D, b: D) => state.accounts.some((l: D) => l.id === b.account_id && l.active && l.type === (debt(a) ? 'liability' : 'asset'))
+  const free = state.bankAccounts
   const [choices, setChoices] = useState<Record<string, Choice>>(() => Object.fromEntries(connection.accounts.map((a: D) => {
-    const same = free.find((b: D) => b.number_last4 === a.mask)
-    const balance = a.balance_cents === null ? '' : ((a.kind.startsWith('credit') ? -a.balance_cents : a.balance_cents) / 100).toFixed(2)
+    const same = free.find((b: D) => compatible(a, b) && b.number_last4 === a.mask)
+    const balance = a.balance_cents === null ? '' : ((debt(a) ? -a.balance_cents : a.balance_cents) / 100).toFixed(2)
     return [a.id, { target: a.bank_account_id ?? same?.id ?? '', name: a.name, ledger: CREATE, openingDate: today(), openingBalance: balance }]
   })))
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const set = (id: string, patch: Partial<Choice>) => setChoices(c => ({ ...c, [id]: { ...c[id], ...patch } }))
   const used = new Set(state.bankAccounts.map((b: D) => b.account_id))
-  const ledgers = accountOptions(state.accounts, a => a.subtype === 'bank' && !used.has(a.id))
+  const ledgers = (a: D) => accountOptions(state.accounts, l => l.subtype === 'bank' && l.type === (debt(a) ? 'liability' : 'asset') && !used.has(l.id))
   const submit = async () => {
     setBusy(true); setError('')
     try {
@@ -38,7 +39,7 @@ function Choose({ connection, onDone }: { connection: D; onDone: (r: D) => void 
         if (c.target !== 'new') { accounts.push({ id: a.id, bankAccountId: c.target }); continue }
         let ledger = c.ledger
         if (ledger === CREATE) {
-          const card = a.kind.startsWith('credit'), code = nextCode(state.accounts, card ? 2110 : 1020, codes)
+          const card = debt(a), code = nextCode(state.accounts, card ? 2110 : 1020, codes)
           codes.push(code)
           ledger = (await command('account.save', { code, name: c.name, type: card ? 'liability' : 'asset', subtype: 'bank' })).id
         }
@@ -53,12 +54,12 @@ function Choose({ connection, onDone }: { connection: D; onDone: (r: D) => void 
     <div className="connect-accounts">{connection.accounts.map((a: D) => { const c = choices[a.id]; return <fieldset key={a.id} className="connect-account">
       <legend>{a.name} <small className="sub">••{a.mask} · {a.kind}{a.balance_cents !== null ? ` · ${usd(a.balance_cents)}` : ''}</small></legend>
       <Field label="Brings transactions into" name={`target-${a.id}`} value={c.target} onChange={(e: any) => set(a.id, { target: e.target.value })}
-        empty="Leave it out" options={[...free.map((b: D) => ({ value: b.id, label: `${b.name} (…${b.number_last4})` })), { value: 'new', label: 'A new bank or card account' }]} />
+        empty="Leave it out" options={[...free.filter((b: D) => compatible(a, b)).map((b: D) => ({ value: b.id, label: `${b.name} (…${b.number_last4})` })), { value: 'new', label: 'A new bank or card account' }]} />
       {c.target === 'new' && <div className="grid-form">
         <Field label="Name in Pantry" name={`name-${a.id}`} value={c.name} onChange={(e: any) => set(a.id, { name: e.target.value })} />
-        <Field label="Ledger account" name={`ledger-${a.id}`} value={c.ledger} onChange={(e: any) => set(a.id, { ledger: e.target.value })} options={[{ value: CREATE, label: `Create “${c.name}” in the chart` }, ...ledgers]} />
+        <Field label="Ledger account" name={`ledger-${a.id}`} value={c.ledger} onChange={(e: any) => set(a.id, { ledger: e.target.value })} options={[{ value: CREATE, label: `Create “${c.name}” in the chart` }, ...ledgers(a)]} />
         <Field label="Opening date" name={`date-${a.id}`} type="date" value={c.openingDate} onChange={(e: any) => set(a.id, { openingDate: e.target.value })} hint="Transactions after this day come in" />
-        <Field label="Balance on that day" name={`balance-${a.id}`} inputMode="decimal" value={c.openingBalance} onChange={(e: any) => set(a.id, { openingBalance: e.target.value })} hint={a.kind.startsWith('credit') ? 'What you owed, as a negative amount' : 'From that day’s statement'} />
+        <Field label="Balance on that day" name={`balance-${a.id}`} inputMode="decimal" value={c.openingBalance} onChange={(e: any) => set(a.id, { openingBalance: e.target.value })} hint={debt(a) ? 'What you owed, as a negative amount' : 'From that day’s statement'} />
       </div>}
     </fieldset> })}</div>
     <div className="form-end"><button type="button" className="btn btn-primary" disabled={busy} onClick={submit}>{busy ? 'Bringing transactions in…' : 'Bring transactions in'}</button>{error && <p role="alert" className="error">{error}</p>}</div>

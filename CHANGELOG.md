@@ -2,6 +2,10 @@
 
 ## Unreleased (next minor)
 
+- ACH invoice payment is proven end to end on a US Stripe test account: the customer verifies their bank in Stripe Checkout, Pantry shows processing until it clears, and the payment and Stripe fee post once.
+
+- Bank feed mapping keeps deposit accounts in asset ledgers and cards or lines of credit in liability ledgers, both in the picker and on the server. Each connection shows its next sync, or that it waits for Re-link. Checking and card feeds, expired sign-in and Plaid Link update mode are proven against Plaid’s sandbox.
+
 - Use the published rer 0.2.51 package. Current package scripts and command guides replace removed queue/copy paths.
 
 - run-pantry.com's homepage follows one month of one business's books, on the owner-approved page structure (17 Oct 2026): October on one ribbon, moving in from QuickBooks Online, the ledger, receipts, invoices, a feed that breaks and is re-linked, the books agent, the close with the accountant and the reports, between the unchanged hero, interlude and closing. The old twelve-section page and its styles are removed; the painted bands gain 2304 and 3072 px plates for wide screens. `docs/CLAIMS.md` and the contract's homepage claims map every claim on the new page.

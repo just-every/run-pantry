@@ -32,6 +32,7 @@ test('Bank and card feeds: connect once, choose accounts, and transactions arriv
   const stored = await h.db.prepare('SELECT access_token FROM pt_feed_items WHERE id = ?').bind(connection.id).first()
   assert.ok(!stored.access_token.includes('access-sandbox'), 'the access token rests encrypted')
   const byMask = m => at(connection.accounts, a => a.mask === m)
+  await h.command('feed.map', { itemId: connection.id, accounts: [{ id: byMask('3333').id, bankAccountId: checking.id }] }, h.owner, 400)
   const mapped = await h.command('feed.map', { itemId: connection.id, accounts: [
     { id: byMask('0000').id, bankAccountId: checking.id },
     { id: byMask('3333').id, bankAccountId: 'new', new: { name: 'Business card', accountId: card.id, openingDate: '2026-09-30', openingBalance: '0.00' } },
@@ -48,6 +49,7 @@ test('Bank and card feeds: connect once, choose accounts, and transactions arriv
   assert.ok(!lines.some(l => l.description.startsWith('KNOTT') || l.description.startsWith('INTEREST')), 'nothing before the opening date, nothing from an account left out')
   assert.deepEqual(pending.map(p => [p.description, p.amount_cents]), [['UBER *TRIP', -1875]])
   const shown = (await h.view('bank/feeds')).connections[0]
+  assert.ok(Date.parse(shown.sync_due_at) > Date.now())
   assert.ok(at(shown.accounts, a => a.mask === '0000').last_synced_at)
   assert.equal(at(shown.accounts, a => a.mask === '1111').last_synced_at, null)
 

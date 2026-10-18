@@ -70,6 +70,12 @@ const mapAccounts: Command = { need: 'record', async run(c, b) {
     const current = known.get(String(a.id))
     requireThat(current, 'Account not found in this connection', 404)
     let bankAccountId: string | null = a.bankAccountId ? String(a.bankAccountId) : null
+    const debt = current.kind.startsWith('credit') || current.kind === 'loan line of credit'
+    const expectedType = debt ? 'liability' : 'asset'
+    const ledger = bankAccountId === 'new'
+      ? await one(c.db, 'SELECT * FROM pt_accounts WHERE id = ?', a.new?.accountId ?? '')
+      : bankAccountId ? await one(c.db, 'SELECT l.* FROM pt_accounts l JOIN pt_bank_accounts b ON b.account_id = l.id WHERE b.id = ?', bankAccountId) : null
+    if (bankAccountId) requireThat(ledger?.active && ledger.subtype === 'bank' && ledger.type === expectedType, debt ? 'Map a card or line of credit to an active liability bank account' : 'Map a deposit account to an active asset bank account')
     if (bankAccountId === 'new') bankAccountId = String((await bankCommands['bank-account.save'].run(c, { institution: row.institution_name, ...(a.new ?? {}), numberLast4: a.new?.numberLast4 || current.mask })).id)
     if (bankAccountId) requireThat(await one(c.db, 'SELECT 1 FROM pt_bank_accounts WHERE id = ?', bankAccountId), 'Bank account not found', 404)
     choices.push({ id: current.id, bankAccountId })
@@ -127,7 +133,7 @@ export const feedCommands: Record<string, Command> = {
 }
 
 async function connectionView(db: D1Database, id: string) {
-  const row = (await one(db, 'SELECT id, institution_name, status, error_code, error_message, last_sync_at, last_sync_error, connected_by, connected_at, revision FROM pt_feed_items WHERE id = ?', id))!
+  const row = (await one(db, 'SELECT id, institution_name, status, error_code, error_message, last_sync_at, sync_due_at, last_sync_error, connected_by, connected_at, revision FROM pt_feed_items WHERE id = ?', id))!
   const accounts = await all(db, `SELECT f.id, f.name, f.mask, f.kind, f.bank_account_id, f.balance_cents, f.last_synced_at, b.name AS bank_name,
       (SELECT COUNT(*) FROM pt_feed_pending p WHERE p.feed_account_id = f.id) AS pending
     FROM pt_feed_accounts f LEFT JOIN pt_bank_accounts b ON b.id = f.bank_account_id WHERE f.item_id = ? ORDER BY f.name`, id)
