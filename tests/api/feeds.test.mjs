@@ -138,6 +138,98 @@ test('Bank and card feeds: connect once, choose accounts, and transactions arriv
 
 })
 
+test('BANK-003 continuous sync of pending and posted lines', async t => {
+  const plaid = await fakePlaid()
+  // Only the provider edge is controlled. Every books action and observation
+  // below goes through the Worker's authenticated command and view routes.
+  let page, sequence = 0
+  const outbound = async request => {
+    if (new URL(request.url).pathname !== '/transactions/sync') return plaid.outbound(request)
+    assert.equal(new URL(request.url).origin, 'https://sandbox.plaid.com')
+    const body = await request.json()
+    if (!page) return Response.json({ accounts: [], added: [], modified: [], removed: [], has_more: false, next_cursor: body.cursor ?? '' })
+    const delivered = page; page = undefined
+    return Response.json({ accounts: [], added: [], modified: [], removed: [], ...delivered, has_more: false, next_cursor: `transaction-change-${++sequence}` })
+  }
+  const h = await harness({ bindings: plaid.bindings, outbound }); t.after(() => h.close())
+  const { acct } = await books(h)
+  const checking = await h.command('bank-account.save', { name: 'Operating checking', institution: 'First Platypus Bank', accountId: acct['1000'], numberLast4: '0000', openingDate: '2026-09-30', openingBalance: '0.00' })
+  const cardLedger = await h.command('account.save', { code: '2150', name: 'Business card', type: 'liability', subtype: 'bank' })
+  await h.command('bank-rule.save', { name: 'Adobe', payee: 'Adobe', direction: 'out', accountId: acct['6200'] })
+  const imported = await h.command('statement.import', { bankAccountId: checking.id, fileName: 'checking-oct-4.csv', content: csv([['10/04/2026', 'STAPLES 00123 BROOKLYN NY', -86.4]]), opening: '0.00', closing: '-86.40', start: '2026-10-01', end: '2026-10-04', confirmLast4: '0000' })
+  const first = plaid.recorded['transactions-sync-1'], second = plaid.recorded['transactions-sync-2']
+  const adobe = { ...first.added.find(x => x.merchant_name === 'Adobe'), date: '2026-10-05' }
+  const staples = second.added.find(x => x.merchant_name === 'Staples')
+  const united = second.added.find(x => x.name === 'UNITED AIRLINES')
+  const fee = second.added.find(x => x.name === 'MONTHLY SERVICE FEE')
+  const authorisation = second.added.find(x => x.pending)
+  const withdrawn = { ...fee, transaction_id: `${fee.transaction_id}-withdrawn`, name: 'TEMPORARY BANK CHARGE', date: '2026-10-08', amount: 8 }
+  page = { added: [adobe, staples, united, fee, withdrawn, authorisation] }
+  const connection = await h.command('feed.connect', { publicToken: 'synthetic-public-sandbox-b0e2c4ee-a763-4df5-bfe9-46a46bce993d', institution: { name: 'First Platypus Bank' } })
+  await h.command('feed.map', { itemId: connection.id, accounts: [
+    { id: at(connection.accounts, x => x.mask === '0000').id, bankAccountId: checking.id },
+    { id: at(connection.accounts, x => x.mask === '3333').id, bankAccountId: 'new', new: { name: 'Business card', accountId: cardLedger.id, openingDate: '2026-09-30', openingBalance: '0.00' } },
+  ] })
+  let received = await h.view('bank/lines')
+  const byTransaction = (view, id) => at(view.lines, x => x.feed_txn_id === id)
+  const adopted = byTransaction(received, staples.transaction_id)
+  assert.equal(adopted.source, 'file')
+  assert.equal(received.pending[0].amount_cents, -1875)
+  await h.command('match.approve', { bankLineIds: [authorisation.transaction_id], create: [{ type: 'fee', amount: '18.75', accountId: acct['6200'] }] }, h.owner, 404)
+  const pendingPreview = await h.command('bank-rule.preview', { name: 'Uber', payee: 'Uber', direction: 'out', accountId: acct['6200'] })
+  assert.equal(pendingPreview.files.length, 0, 'pending authorisations cannot be categorised by rules')
+  await h.command('match.approve', { bankLineIds: [byTransaction(received, united.transaction_id).id], create: [{ type: 'fee', amount: '412.50', accountId: acct['6200'] }] })
+  await h.command('match.approve', { bankLineIds: [adopted.id], create: [{ type: 'fee', amount: '86.40', accountId: acct['6200'] }] })
+  const reconciled = await h.command('reconciliation.complete', { statementId: imported.statement.id })
+  assert.ok(reconciled.completed)
+  received = await h.view('bank/lines')
+  const preserved = [adobe, united, staples].map(x => byTransaction(received, x.transaction_id))
+  const journal = await h.view('journal')
+  assert.equal((await h.view('bank/feeds')).exceptions.length, 0, 'adopting a differently described file line is not a bank modification')
+
+  const postedRide = { ...plaid.recorded['transactions-sync-3'].added[0], amount: authorisation.amount + 4.18 }
+  page = {
+    added: [postedRide],
+    modified: [{ ...fee, amount: 14, name: 'CORRECTED MONTHLY SERVICE FEE' }, { ...adobe, amount: 55.99 }, { ...staples, amount: 88.4 }],
+    removed: [{ transaction_id: united.transaction_id }, { transaction_id: withdrawn.transaction_id }, { transaction_id: authorisation.transaction_id }],
+  }
+  const hook = await plaid.webhook({ webhook_type: 'TRANSACTIONS', webhook_code: 'SYNC_UPDATES_AVAILABLE' })
+  assert.equal((await h.send('/api/pantry/feeds/plaid/webhook', JSON.parse(hook.body), { headers: { 'plaid-verification': hook.jwt } })).status, 200)
+  received = await until(async () => { const value = await h.view('bank/lines'); return value.pending.length === 0 && value }, 'posted card authorisation')
+  assert.equal(byTransaction(received, postedRide.transaction_id).amount_cents, -2293, 'the posted amount includes the $4.18 tip')
+  assert.equal(byTransaction(received, fee.transaction_id).amount_cents, -1400, 'an unposted line follows the bank modification')
+  assert.ok(!received.lines.some(x => x.feed_txn_id === withdrawn.transaction_id), 'an unposted line the bank removes leaves the queue')
+  let exceptions = (await h.view('bank/feeds')).exceptions
+  assert.deepEqual(exceptions.map(x => [x.kind, x.protection]).sort(), [['modified', 'categorised'], ['modified', 'reconciled'], ['removed', 'matched']])
+  assert.equal(at(exceptions, x => x.bank_line_id === adopted.id).providerChange.amountCents, -8840)
+  assert.ok(exceptions.every(x => x.name && x.preservedLine.description && x.bank_name), 'each exception names the bank change and preserved line')
+  assert.deepEqual(preserved.map(x => byTransaction(received, x.feed_txn_id)), preserved, 'categorised, matched and file-adopted reconciled lines remain intact')
+  assert.deepEqual(await h.view('journal'), journal, 'the webhook never rewrites or adds ledger postings')
+  assert.deepEqual((await h.view(`reconciliation/${imported.statement.id}`)).completed, reconciled.completed, 'the completed proof is untouched')
+
+  // Manual and scheduled paths cover the opposite changes on all protected states.
+  const changes = { modified: [{ ...united, amount: 422.5 }], removed: [{ transaction_id: adobe.transaction_id }, { transaction_id: staples.transaction_id }] }
+  page = { modified: changes.modified }
+  await h.command('feed.sync', { itemId: connection.id })
+  assert.equal((await h.view('bank/feeds')).exceptions.length, 4)
+  page = { removed: changes.removed }
+  // Only advance the saved due time; the actual Worker's Cron handler performs the sync.
+  await h.db.prepare('UPDATE pt_feed_items SET sync_due_at = ? WHERE id = ?').bind('2026-01-01T00:00:00Z', connection.id).run()
+  await h.cron()
+  received = await h.view('bank/lines')
+  exceptions = (await h.view('bank/feeds')).exceptions
+  assert.deepEqual(exceptions.map(x => [x.kind, x.protection]).sort(), [['modified', 'categorised'], ['modified', 'matched'], ['modified', 'reconciled'], ['removed', 'categorised'], ['removed', 'matched'], ['removed', 'reconciled']])
+  assert.equal(byTransaction(received, staples.transaction_id).feed_txn_id, adopted.feed_txn_id, 'removing an adopted statement line retains its provider identity')
+  assert.deepEqual(preserved.map(x => byTransaction(received, x.feed_txn_id)), preserved)
+  assert.deepEqual(await h.view('journal'), journal, 'manual refresh and the schedule also preserve the ledger')
+  assert.deepEqual((await h.view(`reconciliation/${imported.statement.id}`)).completed, reconciled.completed)
+  page = changes
+  await h.command('feed.sync', { itemId: connection.id })
+  assert.deepEqual((await h.view('bank/feeds')).exceptions, exceptions, 'replayed observations do not repeat named exceptions')
+  await h.command('feed.disconnect', { itemId: connection.id })
+  assert.deepEqual((await h.view('bank/feeds')).exceptions, exceptions, 'disconnecting retains unresolved bank discrepancies')
+})
+
 // Opt-in provider proof. Only credentials explicitly injected by name are used.
 // The disposable receiver sees sandbox Item callbacks only; all tokens stay in memory.
 test('BANK-004 real Plaid sandbox: login failure and signed consent webhook reach owner, dashboard and close', { skip: process.env.PLAID_LIVE_PROOF !== '1', timeout: 180000 }, async t => {

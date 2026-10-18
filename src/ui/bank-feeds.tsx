@@ -71,6 +71,12 @@ export function Feeds({ data, onDone, onImport }: { data: D | undefined; onDone:
   return <Card title="Bank and card feeds" actions={!none && connect(false)}>
     {none && <p>Connect a bank or card once and its transactions arrive on their own. Statement files keep working beside it.</p>}
     {data.connections.map((c: D) => <Connection key={c.id} c={c} notice={data.health?.find((n: D) => n.itemId === c.id)} onDone={onDone} />)}
+    {data.exceptions?.map((e: D) => <div key={e.id} className="callout callout-warn" role="status"><Icon name="alert" /><div>
+      <strong>{e.name}</strong>
+      <p>{e.bank_name} · {e.preservedLine.date} · {e.preservedLine.description} · {usd(e.preservedLine.amountCents)}</p>
+      <p>{e.kind === 'removed' ? 'The bank removed this transaction.' : `The bank now reports ${e.providerChange.date} · ${e.providerChange.description} · ${usd(e.providerChange.amountCents)}.`} The saved line, matches and ledger postings are preserved. Review the discrepancy before making a correction.</p>
+      {e.protection === 'reconciled' && <p>The completed reconciliation is preserved.</p>}
+    </div></div>)}
     {none && !a.available && (a.needsKeys ? <SetupSteps provider="plaid" reason={a.reason} summary="Set up live bank feeds" owner={can.owner} /> : <p className="hint">{a.reason}</p>)}
     {none && (a.available ? connect(true) : can.record && <button type="button" className="btn btn-primary" onClick={onImport}>Import a statement</button>)}
   </Card>

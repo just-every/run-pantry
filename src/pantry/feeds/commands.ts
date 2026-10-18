@@ -11,6 +11,7 @@ import { availability, plaid, PlaidError } from './plaid'
 import { syncItem } from './sync'
 import { open, seal } from './vault'
 import { checkFeedHealth, feedHealth } from './health'
+import { transactionExceptions } from './transaction-exceptions'
 
 const webhookUrl = (c: Context) => {
   const origin = runtimeBindings(c.env).AUTH_ORIGIN
@@ -145,5 +146,5 @@ async function connectionView(db: D1Database, id: string) {
 
 export async function feedsView(ctx: Context) {
   const items = await all<{ id: string }>(ctx.db, "SELECT id FROM pt_feed_items WHERE status <> 'disconnected' ORDER BY connected_at")
-  return { availability: availability(ctx.env), connections: await Promise.all(items.map(i => connectionView(ctx.db, i.id))), health: await feedHealth(ctx.db) }
+  return { availability: availability(ctx.env), connections: await Promise.all(items.map(i => connectionView(ctx.db, i.id))), health: await feedHealth(ctx.db), exceptions: await transactionExceptions(ctx.db) }
 }
