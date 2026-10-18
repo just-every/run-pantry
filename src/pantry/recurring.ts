@@ -12,6 +12,7 @@ import { contact } from './contacts'
 import { issueStatements, lineStatements, nextNumber, parseInvoice } from './invoices'
 import { deliver } from './delivery'
 import type { Command } from './context'
+import { amountSnapshot, priceFence, pricesFor, recurringPriceCommands } from './recurring-prices'
 
 type Unit = 'week' | 'month' | 'year'
 
@@ -27,6 +28,7 @@ export async function template(db: D1Database, id: string) {
   const row = await one(db, 'SELECT r.*, c.name AS customer_name, c.email AS customer_email FROM pt_recurring r JOIN pt_contacts c ON c.id = r.customer_id WHERE r.id = ?', id)
   requireThat(row, 'Recurring invoice not found', 404)
   row.lines = JSON.parse(row.lines)
+  row.prices = await pricesFor(db, id)
   return row
 }
 
@@ -62,6 +64,7 @@ const save: Command = { need: 'record', async run(c, b) {
     await run(c.db, [authority(c.actor, 'record'),
       q('UPDATE pt_recurring SET customer_id = ?, lines = ?, memo = ?, every = ?, unit = ?, start_date = ?, end_date = ?, next_date = ?, terms_days = ?, mode = ?, status = ?, subtotal_cents = ?, tax_cents = ?, total_cents = ?, prepared_by = ?, approved_by = NULL, approved_revision = NULL, revision = ? WHERE id = ? AND revision = ?',
         t.p.customer.id, JSON.stringify(t.lines), t.memo, t.every, t.unit, t.start, t.end, ended ? null : next, t.terms, t.mode, ended ? 'ended' : current.status === 'paused' ? 'paused' : status, t.p.subtotal, t.p.tax, t.p.total, c.actor.email, revision, current.id, b.revision), changed(),
+      q('UPDATE pt_recurring SET amount_snapshot = ? WHERE id = ?', amountSnapshot(t.p), current.id),
       audit(who(c.actor), 'recurring.edit', 'recurring', current.id, { total: t.p.total, mode: t.mode })])
     return template(c.db, current.id)
   }
@@ -70,6 +73,7 @@ const save: Command = { need: 'record', async run(c, b) {
   await run(c.db, [authority(c.actor, 'record'),
     q('INSERT INTO pt_recurring (id, number, customer_id, lines, memo, every, unit, start_date, end_date, runs, next_date, terms_days, mode, status, subtotal_cents, tax_cents, total_cents, prepared_by, revision, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       id, number, t.p.customer.id, JSON.stringify(t.lines), t.memo, t.every, t.unit, t.start, t.end, t.start, t.terms, t.mode, status, t.p.subtotal, t.p.tax, t.p.total, c.actor.email, revision, now()),
+    q('UPDATE pt_recurring SET amount_snapshot = ? WHERE id = ?', amountSnapshot(t.p), id),
     audit(who(c.actor), 'recurring.create', 'recurring', id, { number, total: t.p.total, mode: t.mode })])
   return template(c.db, id)
 } }
@@ -80,8 +84,10 @@ const approve: Command = { need: 'post', async run(c, b) {
   requireThat(current.status === 'awaiting-approval', 'Only a recurring invoice waiting for approval is approved', 409)
   requireThat(current.revision === b.revision, 'Recurring invoice changed since you reviewed it; review it again', 409)
   requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || current.prepared_by !== c.actor.email), 'Someone other than the preparer approves this recurring invoice', 403)
+  const p = await parseInvoice(c.db, { customerId: current.customer_id, issueDate: current.start_date, lines: current.lines, memo: current.memo })
+  requireThat(p.total === current.total_cents && p.tax === current.tax_cents && (!current.amount_snapshot || amountSnapshot(p) === current.amount_snapshot), 'The template amounts changed; edit and review it again', 409)
   await run(c.db, [authority(c.actor, 'post'), approval(who(c.actor), 'recurring', current.id, current.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
-    q("UPDATE pt_recurring SET status = 'active', approved_by = ?, approved_revision = revision WHERE id = ? AND revision = ? AND status = 'awaiting-approval'", c.actor.email, current.id, b.revision), changed(),
+    q("UPDATE pt_recurring SET status = 'active', approved_by = ?, approved_revision = revision, amount_snapshot = ? WHERE id = ? AND revision = ? AND status = 'awaiting-approval'", c.actor.email, amountSnapshot(p), current.id, b.revision), changed(),
     audit(who(c.actor), 'recurring.approve', 'recurring', current.id)])
   return template(c.db, current.id)
 } }
@@ -97,6 +103,7 @@ const setStatus: Command = { need: 'record', async run(c, b) {
 } }
 
 export const recurringCommands: Record<string, Command> = {
+  ...recurringPriceCommands,
   'recurring.save': save,
   'recurring.approve': approve,
   'recurring.status': setStatus,
@@ -109,6 +116,9 @@ const claimed = (error: unknown) => String((error as Error)?.message ?? error).i
 /** Create (and for an approved sending template, issue and send) one occurrence. */
 async function runOccurrence(env: Bindings, db: D1Database, t: Data) {
   const occ: string = t.next_date, next = occurrence(t.start_date, t.unit, t.every, t.runs + 1), ended = !!t.end_date && next > t.end_date
+  const price: Data | undefined = t.prices.filter((p: Data) => p.effective_date <= occ).at(-1)
+  const amounts = price ?? t, approvedBy = price?.approved_by ?? t.approved_by
+  const priceApproved = !price || (price.approved_revision === price.revision && price.template_revision === t.revision)
   const advance: Sql[] = [q('UPDATE pt_recurring SET runs = ?, next_date = ?, status = ? WHERE id = ? AND runs = ? AND revision = ? AND status = ?', t.runs + 1, ended ? null : next, ended ? 'ended' : 'active', t.id, t.runs, t.revision, 'active'), changed()]
   const claim = (invoiceId: string | null, status: string, detail: string) => q('INSERT INTO pt_recurring_runs (recurring_id, occurrence, invoice_id, status, detail, at) VALUES (?, ?, ?, ?, ?, ?)', t.id, occ, invoiceId, status, detail, now())
   const fail = async (reason: string) => {
@@ -117,31 +127,40 @@ async function runOccurrence(env: Bindings, db: D1Database, t: Data) {
   let p: Awaited<ReturnType<typeof parseInvoice>>
   try {
     const customer = await contact(db, t.customer_id, 'customer')
-    p = await parseInvoice(db, { customerId: customer.id, issueDate: occ, dueDate: addDays(occ, t.terms_days), lines: t.lines, memo: t.memo })
+    p = await parseInvoice(db, { customerId: customer.id, issueDate: occ, dueDate: addDays(occ, t.terms_days), lines: amounts.lines, memo: t.memo })
   } catch (error) { if (error instanceof Fault) return fail(error.message); throw error }
   const locked = await one(db, "SELECT id FROM pt_periods WHERE status = 'locked' AND ? BETWEEN start_date AND end_date", occ)
   if (locked) return fail(`${longDay(occ)} is in ${monthName(locked.id)}, which is locked`)
-  const approverPosts = t.approved_by && await one(db, "SELECT 1 AS ok WHERE EXISTS (SELECT 1 FROM oa_operators WHERE lower(email) = ? AND role = 'owner' AND status = 'active') OR EXISTS (SELECT 1 FROM pt_members WHERE email = ? AND active = 1 AND can_post = 1 AND role <> 'viewer')", t.approved_by, t.approved_by)
-  const sameAmounts = p.total === t.total_cents && p.tax === t.tax_cents
-  const automatic = t.mode === 'send' && t.approved_revision === t.revision && sameAmounts && !!approverPosts
+  const approverPosts = approvedBy && await one(db, "SELECT 1 AS ok WHERE EXISTS (SELECT 1 FROM oa_operators WHERE lower(email) = ? AND role = 'owner' AND status = 'active') OR EXISTS (SELECT 1 FROM pt_members WHERE email = ? AND active = 1 AND can_post = 1 AND role <> 'viewer')", approvedBy, approvedBy)
+  const sameAmounts = p.total === amounts.total_cents && p.tax === amounts.tax_cents && amountSnapshot(p) === amounts.amount_snapshot
+  const automatic = t.mode === 'send' && t.approved_revision === t.revision && priceApproved && sameAmounts && !!approverPosts
   const why = t.mode === 'draft' ? 'Created as a draft for approval'
-    : !sameAmounts ? "The amounts differ from the approved template (a tax rate changed); it waits for a person's approval"
+    : !priceApproved ? 'The price changed from ' + price!.effective_date + "; it waits for a person's approval"
+    : !sameAmounts ? "The amounts differ from the approved template; it waits for a person's approval"
     : 'The approver no longer holds the posting grant; it waits for approval'
   const id = uid(), revision = uid(), number = await nextNumber(db, 'invoice')
   // The invoice goes in first so the run's claim can refer to it; the batch is atomic either way.
-  const statements: Sql[] = [periodOpen(occ),
+  const statements: Sql[] = [periodOpen(occ), priceFence(t, price, occ),
     q("INSERT INTO pt_invoices (id, kind, number, customer_id, issue_date, due_date, status, memo, subtotal_cents, tax_cents, total_cents, opening, prepared_by, approved_by, approved_revision, revision, created_at, recurring_id) VALUES (?, 'invoice', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)",
-      id, number, p.customer.id, occ, p.dueDate, automatic ? 'approved' : 'draft', p.memo, p.subtotal, p.tax, p.total, t.prepared_by, automatic ? t.approved_by : null, automatic ? revision : null, revision, now(), t.id),
+      id, number, p.customer.id, occ, p.dueDate, automatic ? 'approved' : 'draft', p.memo, p.subtotal, p.tax, p.total, amounts.prepared_by, automatic ? approvedBy : null, automatic ? revision : null, revision, now(), t.id),
     ...lineStatements(id, p.lines), claim(id, automatic ? 'issued' : 'drafted', automatic ? 'Issued under the approved template' : why), ...advance]
   if (automatic) {
-    const issued = await issueStatements(db, { id, kind: 'invoice', number, customer_id: p.customer.id, customer_name: p.customer.name, issue_date: occ, total_cents: p.total, revision,
-      lines: p.lines.map(l => ({ account_id: l.accountId, amount_cents: l.amount, description: l.description, tax_code: l.taxCode, tax_cents: l.tax })) }, pantry('recurring'), t.prepared_by)
-    statements.push(approverStillPosts(t.approved_by), approval({ email: t.approved_by, kind: 'person' }, 'invoice', id, revision, 'approve', 'approved', `Approved through recurring invoice ${t.number}, revision ${t.approved_revision}`), ...issued.statements)
+    try {
+      const issued = await issueStatements(db, { id, kind: 'invoice', number, customer_id: p.customer.id, customer_name: p.customer.name, issue_date: occ, total_cents: p.total, revision,
+        lines: p.lines.map(l => ({ account_id: l.accountId, amount_cents: l.amount, description: l.description, tax_code: l.taxCode, tax_cents: l.tax })) }, pantry('recurring'), amounts.prepared_by)
+      statements.push(approverStillPosts(approvedBy), approval({ email: approvedBy, kind: 'person' }, 'invoice', id, revision, 'approve', 'approved', `Approved through recurring invoice ${t.number}, revision ${t.approved_revision}${price ? ', price revision ' + price.approved_revision : ''}`), ...issued.statements)
+    } catch (error) { if (error instanceof Fault) return fail(error.message); throw error }
   }
   statements.push(audit(pantry('recurring'), 'recurring.run', 'recurring', t.id, { occurrence: occ, invoice: number, issued: automatic }))
   try { await run(db, statements) } catch (error) {
     if (claimed(error)) return
-    if (error instanceof Fault) return fail(error.message)
+    if (error instanceof Fault) {
+      const fresh = await template(db, t.id)
+      // Another run, edit or approval won the race. Reload on the next due
+      // iteration instead of claiming a failed occurrence at a stale price.
+      if (fresh.revision !== t.revision || fresh.runs !== t.runs || fresh.status !== 'active' || JSON.stringify(fresh.prices) !== JSON.stringify(t.prices)) return
+      return fail(error.message)
+    }
     throw error
   }
   if (automatic) await sendRun(env, db, t.id, occ)
@@ -177,6 +196,6 @@ export async function runDueRecurring(env: Bindings, db: D1Database, today: stri
 export async function recurringView(db: D1Database) {
   const templates = await all(db, 'SELECT r.*, c.name AS customer_name FROM pt_recurring r JOIN pt_contacts c ON c.id = r.customer_id ORDER BY r.number DESC LIMIT 200')
   const runs = await all(db, 'SELECT r.*, i.number AS invoice_number FROM pt_recurring_runs r LEFT JOIN pt_invoices i ON i.id = r.invoice_id ORDER BY r.occurrence DESC')
-  for (const t of templates) { t.lines = JSON.parse(t.lines); t.runs_list = runs.filter(r => r.recurring_id === t.id).slice(0, 24) }
+  for (const t of templates) { t.lines = JSON.parse(t.lines); t.prices = await pricesFor(db, t.id); t.runs_list = runs.filter(r => r.recurring_id === t.id).slice(0, 24) }
   return templates
 }

@@ -648,8 +648,8 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 6 | 66 | 48 | 120 |
-| All | 25 | 66 | 48 | 139 |
+| Target and push further | 7 | 65 | 48 | 120 |
+| All | 26 | 65 | 48 | 139 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -701,7 +701,7 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | `PAY-004` | Payments from outside Stripe applied for you | target | partial | `src/pantry/automatch.ts`, `src/pantry/payables.ts`, `tests/api/invoices-out.test.mjs` | A deposit equal to one open invoice's balance whose text names that invoice or the customer's bank reference records the payment and matches itself with an undo, and ambiguous deposits wait with the reason; a proposal from the amount and customer alone, confirmed by one action, does not exist. |
 | `PAY-005` | Saved payment methods and autopay | target | missing |  | No implementation. |
 | `INVOICE-004` | Reminders that stop once paid | target | partial | `src/pantry/delivery.ts`, `src/pantry/due.ts`, `tests/api/invoices-out.test.mjs` | Reminders follow the business's schedule of days before and after the due date, once per step, can be paused per invoice and stop when paid; editable wording and merge fields, per-customer schedules, stopping on void, credit or dispute, pausing while ACH processes, the one-a-day limit and text reminders (INVOICE-011) do not exist. |
-| `INVOICE-005` | Recurring invoices | target | partial | `src/pantry/recurring.ts`, `src/ui/recurring.tsx`, `tests/api/invoices-out.test.mjs` | Recurring invoices run weekly to yearly with an end date, as drafts for approval or, once a second person approves the template's exact revision, issued and emailed on their own, once per occurrence, with failed runs listed with their reason; a price change taking effect from a chosen date does not exist. |
+| `INVOICE-005` | Recurring invoices | target | done | `src/pantry/recurring.ts`, `src/pantry/recurring-prices.ts`, `src/ui/recurring.tsx`, `tests/api/invoices-out.test.mjs`, `tests/api/recurring-prices.test.mjs` › INVOICE-005 | Weekly, monthly, quarterly and yearly schedules with end dates, draft or approved automatic sending, exact per-line amount approvals, dated price changes with separate revision approval, once-only catch-up and visible failed runs and mail outcomes. |
 | `INVOICE-006` | Estimates, deposits and progress invoicing | target | missing |  | No implementation. |
 | `INVOICE-007` | Billable time and expenses on invoices | target | missing |  | No implementation. |
 | `INVOICE-008` | Statements, late fees, write-offs and refunds | target | partial | `src/pantry/invoices.ts`, `src/pantry/payables.ts`, `tests/api/subledgers.test.mjs` | Credits apply to invoices and unapplied money stays visible; statements, late fees, write-offs and Stripe refunds do not exist. |
