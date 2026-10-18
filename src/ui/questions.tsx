@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Action, Card, Chip, command, day, Field, Loading, PageHead, readFileBase64, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
+import { AssignAccountant } from './ask-accountant'
 
 const STATUS: Record<string, [string, 'warn' | 'agent' | 'good' | 'neutral']> = {
   open: ['Open', 'warn'], confirm: ['Waiting for your yes', 'agent'], filed: ['Filed', 'good'], answered: ['Answered', 'good'], dismissed: ['Not a problem', 'neutral'], resolved: ['Settled itself', 'neutral'],
@@ -24,7 +25,7 @@ export function Thread({ messages }: { messages: D[] }) {
 }
 
 /** One question with its record and every way to answer it. */
-export function QuestionCard({ q, onDone, focused = false, compact = false }: { q: D; onDone: () => Promise<void>; focused?: boolean; compact?: boolean }) {
+export function QuestionCard({ q, onDone, focused = false, compact = false, accountants }: { q: D; onDone: () => Promise<void>; focused?: boolean; compact?: boolean; accountants?: D[] }) {
   const { state } = useShared(), can = state.actor.can.record, who = useWho()
   const [pick, setPick] = useState<string>(''), [remember, setRemember] = useState(false), [note, setNote] = useState(''), [words, setWords] = useState(''), [other, setOther] = useState('')
   const choice = q.choices.find((c: D) => c.id === pick)
@@ -33,16 +34,21 @@ export function QuestionCard({ q, onDone, focused = false, compact = false }: { 
   const facts = Object.entries(q.facts as Record<string, string>)
   const asked = q.email_status === 'sent' ? <>Emailed to {q.emailed_to}, {day(q.emailed_at)}</> : q.email_status === 'local' ? 'Asked here: this computer sends no email' : q.email_status === 'no-mail' ? 'Asked here: no mail provider is set up' : q.email_status === 'failed' ? <>Email failed: {q.email_detail}</> : <>Asked {day(q.asked_at)}</>
   const send = async (body: D) => { await command('question.answer', { id: q.id, ...body }); await onDone() }
-  return <Card className={`question${focused ? ' focused' : ''}`} title={<><Icon name="agent" /> {q.title}</>} actions={<StatusChip status={q.status} />}>
-    {focused && <p className="hint"><Icon name="ok" /> Opened from your email.</p>}
+  return <Card className={`question${focused ? ' focused' : ''}`} title={<><Icon name={q.kind === 'accountant' ? 'people' : 'agent'} /> {q.title}</>} actions={<StatusChip status={q.status} />}>
+    {focused && <p className="hint"><Icon name="ok" /> Opened this conversation.</p>}
     <p className="ask"><strong>{q.question}</strong></p>
     <p>{q.why}</p>
     <dl className="facts record">{facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
     <p className="hint">{asked}{q.recordLink && <> · <a href={q.recordLink}>Open the record</a></>}</p>
+    <p className="hint">For {q.assignee ? who(q.assignee) : 'the owner'}{q.assignee && <> · {q.assignee}</>}</p>
+    {can && (q.status === 'open' || q.status === 'confirm') && <AssignAccountant q={q} accountants={accountants} onDone={onDone} />}
     {q.status !== 'open' && q.status !== 'confirm' ? <div className="callout" role="status"><Icon name="ok" /><div>
       <strong>{q.answer ? <>Answered: “{q.answer}”</> : STATUS[q.status]?.[0]}</strong>
       <span>{q.answered_by ? <>{who(q.answered_by)}{q.answered_via === 'email' ? ' by email' : ' in Pantry'}, {day(q.answered_at)}. </> : null}{q.messages.filter((m: D) => m.via === 'agent').at(-1)?.body}</span>
-    </div></div> : !can ? <p className="hint">The owner or a bookkeeper answers.</p> : q.status === 'confirm' ? <div className="callout" role="status"><Icon name="agent" /><div>
+    </div></div> : !can ? <p className="hint">The owner, bookkeeper or accountant answers.</p> : q.kind === 'accountant' ? <div className="own-words">
+      <Field label="Your answer" name={`words-${q.id}`} type="textarea" value={words} maxLength={2000} onChange={(e: any) => setWords(e.target.value)} hint="Your answer is kept with this record and settles the question. It does not post an entry." />
+      <Action tone="primary" disabled={!words.trim()} run={async () => { await send({ words }); setWords('') }}>Save answer</Action>
+    </div> : q.status === 'confirm' ? <div className="callout" role="status"><Icon name="agent" /><div>
       <strong>You said: “{q.pending.read}”</strong><span>Pantry reads that as <b>{q.pending.label}</b>. {q.pending.effect}{q.pending.remember ? ' And from now on, the same for this payee (a bank rule).' : ''}</span>
       <div className="row-actions small"><Action tone="primary" run={async () => { await command('question.confirm', { id: q.id, yes: true }); await onDone() }}>Yes, do it</Action><Action run={async () => { await command('question.confirm', { id: q.id, yes: false }); await onDone() }}>Not that</Action></div>
     </div></div> : <>
@@ -128,10 +134,10 @@ export function Questions({ focus }: { focus?: string }) {
       lead="Pantry checks your books for what doesn’t add up and asks you, by email first. Your answer files it." />
     <div className="split split-wide-left">
       <div className="stack">
-        {current && <QuestionCard key={current.id} q={current} onDone={refresh} focused={current === focused} />}
+        {current && <QuestionCard key={current.id} q={current} onDone={refresh} focused={current === focused} accountants={data.accountants} />}
         {rest.length > 0 && <Card title={`Still to answer (${rest.length})`}>
           <ol className="answered">{rest.map((x: D) => <li key={x.id}>
-            <div><strong>{x.title}</strong><span className="hint">{x.why}</span></div>
+            <div><strong>{x.title}</strong><span className="hint">{x.why}</span><span className="hint">For {x.assignee ? who(x.assignee) : 'the owner'}</span></div>
             <span className="answered-end"><StatusChip status={x.status} /><button type="button" className="btn btn-secondary btn-small" onClick={() => { setPicked(x.id); window.scrollTo({ top: 0 }) }}>Answer</button></span>
           </li>)}</ol>
         </Card>}
@@ -155,10 +161,11 @@ export function Questions({ focus }: { focus?: string }) {
 export function MonthQuestions({ questions, month, onDone }: { questions: D[]; month: string; onDone: () => Promise<void> }) {
   const who = useWho(), open = questions.filter(x => x.status === 'open' || x.status === 'confirm'), next = open.find(x => x.status === 'confirm') ?? open[0]
   return <Card title={<><Icon name="agent" /> Pantry’s questions</>} actions={questions.length ? <span className="progress-count">{questions.length - open.length} of {questions.length} answered</span> : null}>
+    {open.length > 0 && <p className="hint">{open.length} open question{open.length === 1 ? '' : 's'}. Answer every question before locking the month.</p>}
     {!questions.length ? <p>Pantry has asked nothing about {month}.</p> : <>
-      {next && <QuestionCard q={next} onDone={onDone} compact />}
+      {next && <QuestionCard key={next.id} q={next} onDone={onDone} compact />}
       <ol className="answered month-thread">{questions.filter(x => x !== next).map(x => <li key={x.id}>
-        <div><strong>{x.title}</strong><span className="hint">{x.status === 'open' || x.status === 'confirm' ? x.why : x.answer ? <>“{x.answer}” — {who(x.answered_by)}{x.answered_via === 'email' ? ' by email' : ''}</> : x.messages.at(-1)?.body}</span></div>
+        <div><strong>{x.title}</strong><span className="hint">{x.status === 'open' || x.status === 'confirm' ? x.question : x.answer ? <>“{x.answer}” — {who(x.answered_by)}{x.answered_via === 'email' ? ' by email' : ''}</> : x.messages.at(-1)?.body}</span><span className="hint">For {x.assignee ? who(x.assignee) : 'the owner'}</span></div>
         <span className="answered-end"><StatusChip status={x.status} />{(x.status === 'open' || x.status === 'confirm') && <Link to="/app/questions" search={{ q: x.id }}>Answer</Link>}</span>
       </li>)}</ol>
     </>}

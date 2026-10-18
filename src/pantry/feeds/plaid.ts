@@ -66,7 +66,7 @@ export function plaid(env: Bindings) {
       ...(o.webhook ? { webhook: o.webhook } : {}), ...(o.redirectUri ? { redirect_uri: o.redirectUri } : {}),
     }),
     exchange: (publicToken: string) => call<{ access_token: string; item_id: string }>('/item/public_token/exchange', { public_token: publicToken }),
-    accounts: (accessToken: string) => call<{ accounts: PlaidAccount[]; item: { item_id: string; institution_id?: string | null } }>('/accounts/get', { access_token: accessToken }),
+    accounts: (accessToken: string) => call<{ accounts: PlaidAccount[]; item: { item_id: string; institution_id?: string | null; consent_expiration_time?: string | null } }>('/accounts/get', { access_token: accessToken }),
     sync: (accessToken: string, cursor: string) => call<SyncPage>('/transactions/sync', { access_token: accessToken, count: 500, ...(cursor ? { cursor } : {}) }),
     verificationKey: (keyId: string) => call<{ key: JsonWebKey & { kid: string; expired_at: number | null } }>('/webhook_verification_key/get', { key_id: keyId }),
     remove: (accessToken: string) => call<{ request_id: string }>('/item/remove', { access_token: accessToken }),

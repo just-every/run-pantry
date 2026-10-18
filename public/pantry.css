@@ -508,6 +508,8 @@ ol.how-to code { overflow-wrap: anywhere; }
 .choice small { display: block; color: var(--body); font-size: 14px; margin-top: 4px; }
 .change { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 8px; }
 .remember { display: flex; gap: 10px; align-items: center; font-size: 15px; }
+.record-questions { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.record-questions .form { margin-top: 12px; }
 .own-words { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); }
 .own-words .field { flex: 1 1 260px; }
 .own-words textarea { min-height: 64px; }

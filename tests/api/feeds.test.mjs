@@ -80,19 +80,129 @@ test('Bank and card feeds: connect once, choose accounts, and transactions arriv
   assert.equal(Number((await h.db.prepare("SELECT COUNT(*) AS n FROM pt_feed_syncs WHERE trigger = 'schedule' AND error_code = ''").first()).n), 1)
 
   // The bank asks the owner to sign in again: the connection says so plainly, and Re-link opens Link in update mode.
+  await h.db.prepare("UPDATE pt_feed_accounts SET last_synced_at = '2026-09-30T12:00:00.000Z' WHERE bank_account_id IS NOT NULL").run()
   plaid.state.loginRequired = true
   await h.db.prepare("UPDATE pt_feed_items SET sync_due_at = '2026-01-01T00:00:00Z'").run()
   await h.view('state')
   const relink = await until(async () => { const c = (await h.view('bank/feeds')).connections[0]; return c.status === 'relink' && c }, 'the due sync from an ordinary request')
   assert.equal(relink.error_code, 'ITEM_LOGIN_REQUIRED')
+  const health = (await h.view('bank/feeds')).health[0]
+  assert.equal(health.kind, 'broken'); assert.equal(health.requiresRelink, true)
+  await until(() => h.mail.find(m => m.subject.startsWith('Pantry:') && m.text.includes('sign in again')), 'owner feed alert')
+  const alerts = () => h.mail.filter(m => m.subject.startsWith('Pantry:'))
+  assert.ok(alerts().every(m => [m.to].flat().includes('owner@example.test')))
+  assert.ok((await h.view('state')).overview.feedHealth.some(n => n.itemId === connection.id))
+  const gap = (await h.view('close/2026-10')).checks.find(c => c.key === 'feeds')
+  assert.equal(gap.ok, false); assert.ok(gap.items.some(i => i.id === checking.id))
+
   await h.command('feed.sync', { itemId: connection.id }, h.owner, 409)
   await h.command('feed.link-token', { itemId: connection.id })
   assert.ok(plaid.state.calls.findLast(c => c.path === '/link/token/create').body.access_token, 'update mode names the connection')
   plaid.state.loginRequired = false
   const back = await h.command('feed.relinked', { itemId: connection.id })
   assert.equal(back.connection.status, 'active'); assert.equal(back.sync.error, undefined)
+  assert.equal((await h.view('bank/feeds')).health.length, 0)
+  const coveredMonth = new Date(Date.now() - 32 * 86400000).toISOString().slice(0, 7)
+  assert.equal((await h.view(`close/${coveredMonth}`)).checks.find(c => c.key === 'feeds').ok, true)
+
   const expired = await plaid.webhook({ webhook_type: 'ITEM', webhook_code: 'ERROR', error: { error_type: 'ITEM_ERROR', error_code: 'ITEM_LOGIN_REQUIRED', error_message: 'the login details of this item have changed' } })
   await h.send('/api/pantry/feeds/plaid/webhook', JSON.parse(expired.body), { headers: { 'plaid-verification': expired.jwt } })
   assert.equal((await h.view('bank/feeds')).connections[0].status, 'relink')
+  const alertCount = alerts().length
+  await h.send('/api/pantry/feeds/plaid/webhook', JSON.parse(expired.body), { headers: { 'plaid-verification': expired.jwt } })
+  assert.equal(alerts().length, alertCount, 'a repeated signed webhook does not repeat the owner email')
+  await h.command('feed.relinked', { itemId: connection.id })
+
+  // US consent warnings leave the live feed running; successful pulls cannot erase consent that the owner has not renewed.
+  const warning = await plaid.webhook({ webhook_type: 'ITEM', webhook_code: 'PENDING_DISCONNECT', disconnect_time: new Date(Date.now() + 7 * 86400000).toISOString() })
+  await h.send('/api/pantry/feeds/plaid/webhook', JSON.parse(warning.body), { headers: { 'plaid-verification': warning.jwt } })
+  let warned = await h.view('bank/feeds')
+  assert.equal(warned.connections[0].status, 'active'); assert.equal(warned.health[0].kind, 'expiring')
+  assert.ok(alerts().some(m => m.text.includes('consent expires')))
+  await h.command('feed.sync', { itemId: connection.id })
+  assert.equal((await h.view('bank/feeds')).health[0].kind, 'expiring')
+  await h.command('feed.relinked', { itemId: connection.id })
+  assert.equal((await h.view('state')).overview.feedHealth.length, 0)
+
+  // A scheduler outage is visible even without a provider error. Disconnecting clears the alert and retains received lines.
+  await h.db.prepare("UPDATE pt_feed_accounts SET last_synced_at = '2026-01-01T00:00:00Z' WHERE bank_account_id IS NOT NULL").run()
+  await h.db.prepare("UPDATE pt_feed_items SET sync_due_at = '9999-12-31T00:00:00Z'").run()
+  await h.cron()
+  assert.equal((await h.view('bank/feeds')).health[0].kind, 'stale')
+  assert.ok(alerts().some(m => m.text.includes('Transactions may be missing')))
+  const retained = await count()
+  await h.command('feed.disconnect', { itemId: connection.id })
+  assert.equal(await count(), retained)
+  assert.equal((await h.view('state')).overview.feedHealth.length, 0)
   assert.ok((await h.view('reports/trial-balance?to=2026-10-31')).balanced)
+
+})
+
+// Opt-in provider proof. Only credentials explicitly injected by name are used.
+// The disposable receiver sees sandbox Item callbacks only; all tokens stay in memory.
+test('BANK-004 real Plaid sandbox: login failure and signed consent webhook reach owner, dashboard and close', { skip: process.env.PLAID_LIVE_PROOF !== '1', timeout: 180000 }, async t => {
+  const clientId = process.env.PLAID_CLIENT_ID, secret = process.env.PLAID_SANDBOX_SECRET
+  assert.ok(clientId && secret, 'inject the named sandbox credentials for this proof')
+  const call = async (path, data) => {
+    const r = await fetch(`https://sandbox.plaid.com${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_id: clientId, secret, ...data }) })
+    const value = await r.json()
+    if (!r.ok) throw new Error(`Plaid ${path} refused (${r.status}, ${value.error_code ?? 'unknown'})`)
+    return value
+  }
+  const receiverResponse = await fetch('https://webhook.site/token', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ default_status: 200, default_content: 'Received' }) })
+  assert.equal(receiverResponse.status, 201, 'disposable sandbox webhook receiver created')
+  const receiver = (await receiverResponse.json()).uuid
+  t.after(async () => { await fetch(`https://webhook.site/token/${receiver}`, { method: 'DELETE' }) })
+  let accessToken
+  t.after(async () => { if (accessToken) await call('/item/remove', { access_token: accessToken }) })
+  const created = await call('/sandbox/public_token/create', { institution_id: 'ins_109508', initial_products: ['transactions'], options: { webhook: `https://webhook.site/${receiver}` } })
+  // The same sandbox public token can be exchanged only once, so capture its
+  // result while forwarding Pantry's genuine exchange, without changing it.
+  const outbound = async request => {
+    assert.equal(new URL(request.url).origin, 'https://sandbox.plaid.com')
+    const r = await fetch(request.url, { method: request.method, headers: { 'content-type': 'application/json', 'plaid-version': '2020-09-14' }, body: await request.text() })
+    const content = await r.text()
+    if (new URL(request.url).pathname === '/item/public_token/exchange' && r.ok) accessToken = JSON.parse(content).access_token
+    return new Response(content, { status: r.status, headers: { 'content-type': 'application/json' } })
+  }
+  const h = await harness({ bindings: { PLAID_CLIENT_ID: clientId, PLAID_SECRET: secret, PLAID_ENV: 'sandbox' }, outbound })
+  t.after(() => h.close())
+  const { acct } = await books(h)
+  const account = await h.command('bank-account.save', { name: 'Sandbox checking', institution: 'First Platypus Bank', accountId: acct['1000'], numberLast4: '0000', openingDate: '2026-01-01', openingBalance: '0.00' })
+  const connection = await h.command('feed.connect', { publicToken: created.public_token, institution: { name: 'First Platypus Bank' } })
+  const checking = connection.accounts.find(a => a.mask === '0000')
+  assert.ok(checking, 'real sandbox checking account received')
+  await h.command('feed.map', { itemId: connection.id, accounts: [{ id: checking.id, bankAccountId: account.id }] })
+  // US consent expiry uses PENDING_DISCONNECT. Plaid supplies the body and the
+  // signature; Pantry retrieves Plaid's real signing key before accepting it.
+  const fired = await call('/sandbox/item/fire_webhook', { access_token: accessToken, webhook_type: 'ITEM', webhook_code: 'PENDING_DISCONNECT' })
+  assert.equal(fired.webhook_fired, true)
+  let callback
+  for (let i = 0; i < 45 && !callback; i++) {
+    const r = await fetch(`https://webhook.site/token/${receiver}/requests?sorting=newest`)
+    if (r.ok) callback = (await r.json()).data.find(x => { try { return JSON.parse(x.content).webhook_code === 'PENDING_DISCONNECT' } catch { return false } })
+    if (!callback) await new Promise(resolve => setTimeout(resolve, 1000))
+  }
+  assert.ok(callback, 'received the actual Plaid sandbox consent callback')
+  const header = Object.entries(callback.headers).find(([name]) => name.toLowerCase() === 'plaid-verification')?.[1]
+  const jwt = Array.isArray(header) ? header[0] : header
+  assert.ok(jwt, 'Plaid signed its callback')
+  const received = await h.send('/api/pantry/feeds/plaid/webhook', undefined, { raw: callback.content, headers: { 'plaid-verification': jwt } })
+  assert.equal(received.status, 200)
+  const notices = (await h.view('state')).overview.feedHealth
+  assert.equal(notices[0].kind, 'expiring')
+  assert.ok(h.mail.some(m => m.subject.startsWith('Pantry:') && m.text.includes('consent expires')))
+  const mailCount = h.mail.length
+  assert.equal((await h.send('/api/pantry/feeds/plaid/webhook', undefined, { raw: callback.content, headers: { 'plaid-verification': jwt } })).status, 200)
+  assert.equal(h.mail.length, mailCount, 'real callback replay sends no duplicate alert')
+  await call('/sandbox/item/reset_login', { access_token: accessToken })
+  await h.db.prepare("UPDATE pt_feed_accounts SET last_synced_at = '2026-09-30T12:00:00Z' WHERE bank_account_id IS NOT NULL").run()
+  const failed = await h.command('feed.sync', { itemId: connection.id })
+  assert.equal(failed.sync.error, 'ITEM_LOGIN_REQUIRED')
+  assert.equal((await h.view('bank/feeds')).health[0].kind, 'broken')
+  assert.ok(h.mail.some(m => m.subject.startsWith('Pantry:') && m.text.includes('sign in again')))
+  assert.equal((await h.view('close/2026-10')).checks.find(c => c.key === 'feeds').ok, false)
+  await h.command('feed.link-token', { itemId: connection.id })
+
+  t.diagnostic('Real Plaid sandbox: create/exchange/accounts/sync; reset_login -> ITEM_LOGIN_REQUIRED; update-mode Link token; signed PENDING_DISCONNECT delivered and verified with live provider key; owner emails accepted at mail network edge; dashboard/close/replay checks passed. Sandbox Item and disposable receiver removed.')
 })

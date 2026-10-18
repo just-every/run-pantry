@@ -2,6 +2,7 @@
 import { allowed, type Person } from './access'
 import { addDays, longDay, period, type Data } from './core'
 import { all, one } from './db'
+import { feedHealth } from './feeds/health'
 import { entity } from './settings'
 
 export async function lookups(db: D1Database) {
@@ -41,7 +42,7 @@ export async function overview(db: D1Database) {
     questions: await n("SELECT COUNT(*) AS n FROM pt_questions WHERE status IN ('open', 'confirm')"),
   }
   const lastLocked = (await one<{ id: string | null }>(db, "SELECT MAX(id) AS id FROM pt_periods WHERE status = 'locked'"))?.id ?? null
-  return { entity: e, steps, queue, closing: await closing(db, e?.books_start), lastLocked }
+  return { entity: e, steps, queue, feedHealth: await feedHealth(db), closing: await closing(db, e?.books_start), lastLocked }
 }
 
 /** The period due to close: the month after the last lock, else the books' first month; never past this month. */

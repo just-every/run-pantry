@@ -1,11 +1,12 @@
 // Overview: the first-run checklist from completion evidence, and today's queue.
+import { FeedHealthNotices } from './bank-feeds'
 import { Link } from '@tanstack/react-router'
 import { Card, Chip, PageHead, useShared, type D } from './kit'
 
 const GO: Record<string, string> = { settings: '/app/settings', books: '/app/books', 'move-in': '/app/move-in', sales: '/app/sales', contacts: '/app/sales', bank: '/app/bank', close: '/app/close' }
 
 export function Overview() {
-  const { state } = useShared(), { steps, queue, entity } = state.overview
+  const { state, reload } = useShared(), { steps, queue, entity } = state.overview
   const done = steps.filter((s: D) => s.done).length, open = done < steps.length
   // One navy action on the page: the next step to do. Every other step, and the move-in preview, is a white secondary.
   const next = steps.find((s: D) => !s.done)?.key
@@ -19,6 +20,7 @@ export function Overview() {
   ]
   return <>
     <PageHead title={entity ? entity.legal_name : 'Get started with Pantry'} lead={!open ? 'Your books are set up. Here is what needs attention.' : 'Set up your books, move in your data, and complete your first close.'} />
+    <FeedHealthNotices notices={state.overview.feedHealth} onDone={reload} />
     <div className="split split-wide-left">
       <Card title="Setup steps" actions={<span className="progress-count">{done} of {steps.length} complete</span>}>
         <span className="progress-bar" aria-hidden="true"><span style={{ width: `${(done / steps.length) * 100}%` }} /></span>

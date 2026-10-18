@@ -6,6 +6,7 @@
 import type { Bindings } from '../../auth.server'
 import { Fault, now, sha256, uid } from '../core'
 import { one, q, run } from '../db'
+import { checkFeedHealth } from './health'
 import { plaid, relinkMessage, RELINK_CODES } from './plaid'
 
 const keys = new Map<string, CryptoKey>()
@@ -32,9 +33,9 @@ export async function verify(env: Bindings, jwt: string | null, body: string) {
 }
 
 /** Act on a verified webhook. Returns the connection to sync now, if any. */
-export async function receive(env: Bindings, body: { webhook_type?: string; webhook_code?: string; item_id?: string; error?: { error_code?: string; error_message?: string; display_message?: string } | null }) {
+export async function receive(env: Bindings, body: { webhook_type?: string; webhook_code?: string; item_id?: string; consent_expiration_time?: string; disconnect_time?: string; error?: { error_code?: string; error_message?: string; display_message?: string } | null }) {
   const item = body.item_id ? await one(env.DB, 'SELECT id, status FROM pt_feed_items WHERE item_id = ?', body.item_id) : null
-  if (!item) return null
+  if (!item || item.status === 'disconnected') return null
   const type = body.webhook_type, code = body.webhook_code
   if (type === 'TRANSACTIONS' && item.status === 'active') {
     await run(env.DB, [q('UPDATE pt_feed_items SET sync_due_at = ? WHERE id = ?', now(), item.id)])
@@ -42,13 +43,27 @@ export async function receive(env: Bindings, body: { webhook_type?: string; webh
   }
   if (type === 'ITEM') {
     const errorCode = code === 'ERROR' ? body.error?.error_code ?? '' : code ?? ''
+    if (errorCode === 'PENDING_EXPIRATION' || errorCode === 'PENDING_DISCONNECT') {
+      const raw = body.consent_expiration_time ?? body.disconnect_time
+      const expires = raw && Number.isFinite(Date.parse(raw)) ? new Date(raw).toISOString() : null
+      // Consent warnings do not stop a feed that the bank is still serving.
+      await run(env.DB, [q("UPDATE pt_feed_items SET error_code = ?, error_message = ?, consent_expires_at = ?, revision = ? WHERE id = ? AND status <> 'disconnected'", errorCode, relinkMessage(errorCode), expires, uid(), item.id)])
+      await checkFeedHealth(env)
+      return null
+    }
     if (RELINK_CODES.has(errorCode)) {
       const message = relinkMessage(errorCode, body.error?.display_message)
       await run(env.DB, [q("UPDATE pt_feed_items SET status = 'relink', error_code = ?, error_message = ?, revision = ? WHERE id = ? AND status <> 'disconnected'", errorCode, message, uid(), item.id)])
+      await checkFeedHealth(env)
+      return null
+    }
+    if (code === 'ERROR') {
+      await run(env.DB, [q("UPDATE pt_feed_items SET last_sync_error = ?, sync_due_at = ?, revision = ? WHERE id = ? AND status <> 'disconnected'", 'The bank could not provide transactions. Pantry will try again within the hour.', now(), uid(), item.id)])
+      await checkFeedHealth(env)
       return null
     }
     if (code === 'LOGIN_REPAIRED') {
-      await run(env.DB, [q("UPDATE pt_feed_items SET status = 'active', error_code = '', error_message = '', sync_due_at = ?, revision = ? WHERE id = ? AND status = 'relink'", now(), uid(), item.id)])
+      await run(env.DB, [q("UPDATE pt_feed_items SET status = 'active', error_code = '', error_message = '', consent_expires_at = NULL, sync_due_at = ?, revision = ? WHERE id = ? AND status = 'relink'", now(), uid(), item.id)])
       return item.id as string
     }
   }

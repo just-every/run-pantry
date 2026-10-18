@@ -24,7 +24,7 @@ function ReceiptsCard({ s, onChange }: { s: D; onChange: () => Promise<void> }) 
   </Card>
 }
 
-const LINK: Record<string, string> = { bank: '/app/bank', drafts: '/app/books', evidence: '/app/sales', subledgers: '/app/reports', 'trial-balance': '/app/reports', proposals: '/app/agents', questions: '/app/questions' }
+const LINK: Record<string, string> = { bank: '/app/bank', feeds: '/app/bank', drafts: '/app/books', evidence: '/app/sales', subledgers: '/app/reports', 'trial-balance': '/app/reports', proposals: '/app/agents', questions: '/app/questions' }
 
 export function Close() {
   const shared = useShared(), who = useWho(), [period, setPeriod] = useState(() => new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('period') ?? shared.state.overview.closing ?? thisMonth())

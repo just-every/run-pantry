@@ -30,7 +30,10 @@ export async function thread(db: D1Database, ids: string[]) {
 const RECORD_LINK: Record<string, (id: string) => string> = {
   'bank-line': () => '/app/bank',
   bill: id => `/app/reports?record=bill:${id}`,
-  journal: id => `/app/reports?record=journal:${id}`,
+  journal: id => `/app/reports?record=entry:${id}`,
+  entry: id => `/app/reports?record=entry:${id}`,
+  invoice: id => `/app/reports?record=invoice:${id}`,
+  'report-line': id => { const p = new URLSearchParams(JSON.parse(id)); return `/app/reports?${p}` },
   payment: id => `/app/reports?record=payment:${id}`,
   statement: id => `/app/bank?statement=${id}`,
 }

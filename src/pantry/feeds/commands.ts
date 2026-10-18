@@ -10,6 +10,7 @@ import type { Command, Context } from '../context'
 import { availability, plaid, PlaidError } from './plaid'
 import { syncItem } from './sync'
 import { open, seal } from './vault'
+import { checkFeedHealth, feedHealth } from './health'
 
 const webhookUrl = (c: Context) => {
   const origin = runtimeBindings(c.env).AUTH_ORIGIN
@@ -51,8 +52,8 @@ const connect: Command = { need: 'record', async run(c, b) {
   const name = String(institution.name ?? '').trim().slice(0, 120) || 'Bank'
   // Not due until the person chooses where its accounts go.
   await run(c.db, [authority(c.actor, 'record'),
-    q("INSERT INTO pt_feed_items (id, provider, item_id, institution_id, institution_name, access_token, status, sync_due_at, connected_by, connected_at, revision) VALUES (?, 'plaid', ?, ?, ?, ?, 'active', ?, ?, ?, ?)",
-      id, exchanged.item_id, String(institution.institution_id ?? found.item.institution_id ?? '').slice(0, 60), name, sealed, '9999-12-31T00:00:00Z', c.actor.email, now(), uid()),
+    q("INSERT INTO pt_feed_items (id, provider, item_id, institution_id, institution_name, access_token, status, sync_due_at, connected_by, connected_at, revision, consent_expires_at) VALUES (?, 'plaid', ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)",
+      id, exchanged.item_id, String(institution.institution_id ?? found.item.institution_id ?? '').slice(0, 60), name, sealed, '9999-12-31T00:00:00Z', c.actor.email, now(), uid(), found.item.consent_expiration_time ?? null),
     ...found.accounts.map(a => q('INSERT INTO pt_feed_accounts (id, item_id, provider_account_id, name, mask, kind, balance_cents, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       uid(), id, a.account_id, (a.name || a.official_name || 'Account').slice(0, 120), a.mask ?? '', [a.type, a.subtype].filter(Boolean).join(' '), typeof a.balances?.current === 'number' ? Math.round(a.balances.current * 100) : null, uid())),
     audit(who(c.actor), 'feed.connect', 'feed', id, { institution: name, accounts: found.accounts.length })])
@@ -95,7 +96,7 @@ const relinked: Command = { need: 'record', async run(c, b) {
   const row = await item(c, b.itemId)
   requireThat(row.status !== 'disconnected', 'This connection was disconnected; connect the bank again', 409)
   await run(c.db, [authority(c.actor, 'record'),
-    q("UPDATE pt_feed_items SET status = 'active', error_code = '', error_message = '', sync_due_at = ?, revision = ? WHERE id = ?", now(), uid(), row.id),
+    q("UPDATE pt_feed_items SET status = 'active', error_code = '', error_message = '', consent_expires_at = NULL, sync_due_at = ?, revision = ? WHERE id = ?", now(), uid(), row.id),
     audit(who(c.actor), 'feed.relink', 'feed', row.id, { institution: row.institution_name })])
   return { sync: await syncItem(c.env, row.id, 'person'), connection: await connectionView(c.db, row.id) }
 } }
@@ -120,6 +121,7 @@ const disconnect: Command = { need: 'record', async run(c, b) {
     q('DELETE FROM pt_feed_pending WHERE feed_account_id IN (SELECT id FROM pt_feed_accounts WHERE item_id = ?)', row.id),
     q('UPDATE pt_feed_accounts SET bank_account_id = NULL WHERE item_id = ?', row.id),
     audit(who(c.actor), 'feed.disconnect', 'feed', row.id, { institution: row.institution_name })])
+  await checkFeedHealth(c.env)
   return { id: row.id }
 } }
 
@@ -133,7 +135,7 @@ export const feedCommands: Record<string, Command> = {
 }
 
 async function connectionView(db: D1Database, id: string) {
-  const row = (await one(db, 'SELECT id, institution_name, status, error_code, error_message, last_sync_at, sync_due_at, last_sync_error, connected_by, connected_at, revision FROM pt_feed_items WHERE id = ?', id))!
+  const row = (await one(db, 'SELECT id, institution_name, status, error_code, error_message, last_sync_at, sync_due_at, last_sync_error, consent_expires_at, connected_by, connected_at, revision FROM pt_feed_items WHERE id = ?', id))!
   const accounts = await all(db, `SELECT f.id, f.name, f.mask, f.kind, f.bank_account_id, f.balance_cents, f.last_synced_at, b.name AS bank_name,
       (SELECT COUNT(*) FROM pt_feed_pending p WHERE p.feed_account_id = f.id) AS pending
     FROM pt_feed_accounts f LEFT JOIN pt_bank_accounts b ON b.id = f.bank_account_id WHERE f.item_id = ? ORDER BY f.name`, id)
@@ -143,5 +145,5 @@ async function connectionView(db: D1Database, id: string) {
 
 export async function feedsView(ctx: Context) {
   const items = await all<{ id: string }>(ctx.db, "SELECT id FROM pt_feed_items WHERE status <> 'disconnected' ORDER BY connected_at")
-  return { availability: availability(ctx.env), connections: await Promise.all(items.map(i => connectionView(ctx.db, i.id))) }
+  return { availability: availability(ctx.env), connections: await Promise.all(items.map(i => connectionView(ctx.db, i.id))), health: await feedHealth(ctx.db) }
 }

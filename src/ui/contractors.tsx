@@ -1,6 +1,7 @@
 // 1099 contractors: vendors marked for a 1099-NEC, their payments in a calendar
 // year counted by the IRS rules Pantry can apply, the threshold flag, and in
 // January the forms' figures and the filing CSV. Pantry files nothing itself.
+import { AskAccountant } from './ask-accountant'
 import { useState } from 'react'
 import { Card, Chip, Field, Form, Loading, Metrics, Table, command, day, usd, useShared, useView, type D } from './kit'
 
@@ -52,7 +53,7 @@ export function Contractors({ year, onYear }: { year: number; onYear: (y: number
       <Card title={`1099 contractors · ${year}`}>
           <Table heads={['Contractor', 'TIN', 'Box 1 (check, ACH, wire, cash)', 'Card and networks (left out)', 'Method not recorded', 'Status']} figures={[2, 3, 4]} empty="No vendor is marked as a 1099 contractor yet.">
             {r.contractors.map((c: D) => { const [label, tone] = status(c, r.threshold); return <tr key={c.id} tabIndex={0} className={selected === c.id ? 'selected' : ''} onClick={() => setSelected(c.id)} onKeyDown={k => { if (k.key === 'Enter') setSelected(c.id) }}>
-              <td>{c.name}</td><td className="nowrap">{c.tax?.tin ?? <Chip tone="warn">Missing</Chip>}</td><td className="fig">{usd(c.box1)}</td><td className="fig">{usd(c.excluded)}</td><td className="fig">{usd(c.unrecorded)}</td><td><Chip tone={tone}>{label}</Chip></td></tr> })}
+              <td>{c.name}<AskAccountant subjectKind="report-line" subjectId={JSON.stringify({ report: 'contractors', line: c.id, from: `${year}-01-01`, to: `${year}-12-31`, basis: 'cash' })} label={`1099 contractor · ${c.name} · ${year}`} /></td><td className="nowrap">{c.tax?.tin ?? <Chip tone="warn">Missing</Chip>}</td><td className="fig">{usd(c.box1)}</td><td className="fig">{usd(c.excluded)}</td><td className="fig">{usd(c.unrecorded)}</td><td><Chip tone={tone}>{label}</Chip></td></tr> })}
           </Table>
           {r.unmarked.length > 0 && <p className="hint">Paid {usd(r.threshold)} or more by check, ACH, wire or cash but not marked as contractors: {r.unmarked.map((u: D) => `${u.name} (${usd(u.box1)})`).join(', ')}.</p>}
       </Card>

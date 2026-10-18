@@ -14,6 +14,7 @@ import { matchDeposits, matchRecorded } from '../automatch'
 import { matchConnected } from '../connected-match'
 import { availability, plaid, PlaidError, relinkMessage, type PlaidTransaction, type SyncPage } from './plaid'
 import { open } from './vault'
+import { checkFeedHealth } from './health'
 
 export type Trigger = 'connect' | 'webhook' | 'schedule' | 'person'
 const LEASE_MS = 5 * 60_000, EVERY_MS = 6 * 3600_000, RETRY_MS = 3600_000
@@ -108,7 +109,7 @@ export async function syncItem(env: Bindings, itemId: string, trigger: Trigger):
     const mapped = [...accounts.values()].filter(a => a.bank_account_id)
     await run(db, [mine,
       ...mapped.map(a => q('UPDATE pt_feed_accounts SET last_synced_at = ? WHERE id = ?', now(), a.id)),
-      q("UPDATE pt_feed_items SET cursor = ?, last_sync_at = ?, last_sync_error = '', error_code = '', error_message = '', sync_due_at = ?, claim_id = NULL, claim_until = NULL, revision = ? WHERE id = ? AND claim_id = ?", cursor, now(), later(EVERY_MS), uid(), itemId, claimId)])
+      q("UPDATE pt_feed_items SET cursor = ?, last_sync_at = ?, last_sync_error = '', error_code = CASE WHEN error_code IN ('PENDING_EXPIRATION', 'PENDING_DISCONNECT') THEN error_code ELSE '' END, error_message = CASE WHEN error_code IN ('PENDING_EXPIRATION', 'PENDING_DISCONNECT') THEN error_message ELSE '' END, sync_due_at = ?, claim_id = NULL, claim_until = NULL, revision = ? WHERE id = ? AND claim_id = ?", cursor, now(), later(EVERY_MS), uid(), itemId, claimId)])
     const arrived = await all<{ id: string }>(db, 'SELECT id FROM pt_bank_lines WHERE arrived_at = ? AND source = \'feed\'', stamp)
     // Booked Stripe payouts and Gusto payrolls meet their bank lines; deposits that name exactly one open
     // invoice of their amount match themselves; rules then file what is left.
@@ -118,6 +119,7 @@ export async function syncItem(env: Bindings, itemId: string, trigger: Trigger):
     const filed = await applyRules(db, arrived.map(l => l.id), authorFiler)
     const waiting = Number((await one(db, 'SELECT COUNT(*) AS n FROM pt_feed_pending p JOIN pt_feed_accounts f ON f.id = p.feed_account_id WHERE f.item_id = ?', itemId))?.n ?? 0)
     await run(db, [q('UPDATE pt_feed_syncs SET finished_at = ?, added = ?, updated = ?, removed = ?, pending = ?, filed = ? WHERE id = ?', now(), arrived.length, counts.updated, counts.removed, waiting, filed.filed, syncId)])
+    await checkFeedHealth(env)
     return { claimed: true, added: arrived.length, updated: counts.updated, removed: counts.removed, pending: waiting, filed: filed.filed }
   } catch (e) {
     const plaidError = e instanceof PlaidError ? e : null
@@ -125,6 +127,7 @@ export async function syncItem(env: Bindings, itemId: string, trigger: Trigger):
     if (plaidError?.relink) await release("status = 'relink', error_code = ?, error_message = ?, last_sync_error = ?", code, relinkMessage(code, plaidError.display), message)
     else await release('last_sync_error = ?, sync_due_at = ?', message, later(RETRY_MS))
     await run(db, [q('UPDATE pt_feed_syncs SET finished_at = ?, error_code = ? WHERE id = ?', now(), code, syncId)])
+    await checkFeedHealth(env)
     if (!plaidError) throw e
     return { claimed: true, error: code, message }
   }
@@ -132,6 +135,7 @@ export async function syncItem(env: Bindings, itemId: string, trigger: Trigger):
 
 /** Sync connections whose time has come, at most `limit`, for the Cron trigger and ordinary requests. */
 export async function runDue(env: Bindings, limit = 3) {
+  await checkFeedHealth(env)
   if (!availability(env).available) return []
   const due = await all<{ id: string }>(env.DB, "SELECT id FROM pt_feed_items WHERE status = 'active' AND sync_due_at <= ? AND (claim_until IS NULL OR claim_until < ?) ORDER BY sync_due_at LIMIT ?", now(), now(), limit)
   const out = []

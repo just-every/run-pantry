@@ -47,6 +47,7 @@ import { gustoCommands, gustoRoutes, gustoView } from './gusto/commands'
 import { depositNotes } from './automatch'
 import { customer } from './customer-page'
 import { runDueWork } from './due'
+import { parse as parseQuestion, withThreads as questionThreads } from './questions/store'
 import { questionCommands, questionsView } from './questions/commands'
 import { integrationCommands, integrationSettings } from './integrations/credentials'
 import { integrations } from './integrations/routes'
@@ -96,6 +97,7 @@ view('bank/feeds', async ctx => feedsView(ctx))
 view('reconciliation/:statement', async (ctx, c) => { const r = await reconciliationState(ctx.db, c.req.param('statement')!); return { ...r, depositNotes: await depositNotes(ctx.db, r.lines) } })
 view('close/:period', async (ctx, c) => closeState(ctx.db, c.req.param('period')!))
 view('proposals', async ctx => ({ proposals: await proposalsView(ctx.db) }))
+view('questions/record', async (ctx, c) => ({ questions: await questionThreads(ctx.db, (await all(ctx.db, 'SELECT * FROM pt_questions WHERE subject_kind = ? AND subject_id = ? ORDER BY asked_at', c.req.query('kind') ?? '', c.req.query('id') ?? '')).map(parseQuestion)) }))
 view('questions', async (ctx, c) => questionsView(ctx, c.req.query('q') || undefined))
 view('move-in', async ctx => moveInView(ctx))
 view('activity', async ctx => activity(ctx.db))

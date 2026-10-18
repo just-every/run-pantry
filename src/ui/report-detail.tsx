@@ -3,6 +3,7 @@
 // Each level is an address, so every step links onward and back.
 import { Link, useSearch } from '@tanstack/react-router'
 import { Card, Chip, Loading, Table, day, usd, useView, type D } from './kit'
+import { AskAccountant } from './ask-accountant'
 
 export const BASIS_NAME: Record<'cash' | 'accrual', string> = { cash: 'Cash basis', accrual: 'Accrual basis' }
 
@@ -26,10 +27,11 @@ export function FigureDetail({ report, line, from, to, basis, reportLabel }: { r
     <Card title={<>{d.label} <Chip tone="info">{BASIS_NAME[basis]}</Chip></>} actions={<strong className="figure-total">{usd(d.figure)}</strong>}>
       <p>{d.from ? <>{day(d.from)} to {day(d.to)}</> : <>All posted activity through {day(d.to)}</>} · {d.rows.length} line{d.rows.length === 1 ? '' : 's'} · {d.ties ? <Chip tone="good">Adds up to the report figure</Chip> : <Chip tone="bad">Does not add up to the report figure</Chip>}</p>
       {basis === 'cash' && <p className="hint">On the cash basis an invoice, credit or bill counts as it is paid or credited: each line below is the share of a document its settlement covered, spread across the document's lines.</p>}
+      <AskAccountant key={JSON.stringify({ report, line, from, to, basis })} subjectKind="report-line" subjectId={JSON.stringify({ report, line, from, to, basis })} label={`${reportLabel} · ${d.label} · ${from || 'Beginning'} to ${to} · ${BASIS_NAME[basis]} · ${usd(d.figure)}`} />
       <Table heads={['Date', 'Record', 'What', ...(accounts ? ['Account'] : []), 'Documents', 'Bank', 'Amount']} figures={[accounts ? 6 : 5]} empty="No posted lines behind this figure.">
         {[...d.rows.map((r: D) => <tr key={r.key}>
           <td>{day(r.date)}</td>
-          <td><RecordLink r={r.record} />{r.entry?.number ? <small className="sub"> · entry {r.entry.number}</small> : null}</td>
+          <td><RecordLink r={r.record} />{r.entry?.number ? <small className="sub"> · entry {r.entry.number}</small> : null}<AskAccountant subjectKind={r.record.kind === 'entry' ? 'journal' : r.record.kind} subjectId={r.record.id} label={`${r.record.label} · ${r.date} · ${r.description}`} /></td>
           <td>{r.description}{r.lineMemo && r.lineMemo !== r.description ? <small className="sub"> · {r.lineMemo}</small> : null}{r.settlement && <small className="sub"> · settled by <RecordLink r={r.settlement.by} /> ({r.settlement.share})</small>}</td>
           {accounts && <td>{r.account.code} · {r.account.name}</td>}
           <td><Documents docs={r.documents} /></td>
@@ -62,12 +64,14 @@ export function RecordView({ record, reportLabel }: { record: string; reportLabe
             {r.method && <div><dt>Paid by</dt><dd>{METHOD[r.method] ?? r.method}{r.reference ? ` · ${r.reference}` : ''}{r.bankName ? ` · ${r.bankName}` : ''}</dd></div>}
             {r.evidenceWaived && <div><dt>No document</dt><dd>{r.evidenceWaived}</dd></div>}
           </dl>
+          <AskAccountant key={record} subjectKind={kind === 'entry' ? 'journal' : kind} subjectId={id} label={`${r.title} · ${r.date} · ${usd(r.total)}`} />
           {r.lines.length > 0 && <Table heads={['Line', 'Amount', ...(kind === 'invoice' ? ['Tax', 'Tax code'] : [])]} figures={[1, 2]}>
             {r.lines.map((l: D, i: number) => <tr key={i}><td>{l.description}</td><td className="fig">{usd(l.amount)}</td>{kind === 'invoice' && <><td className="fig">{usd(l.tax)}</td><td>{l.taxCode}</td></>}</tr>)}
           </Table>}
         </Card>
         {r.entries.map((e: D) => <Card key={e.id} title={`Journal entry ${e.number ?? '(draft)'}`}>
           <p>{day(e.date)} · {e.memo}</p>
+          <AskAccountant subjectKind="journal" subjectId={e.id} label={`Journal entry ${e.number ?? '(draft)'} · ${e.date} · ${e.memo}`} />
           <Table heads={['Account', 'Memo', 'Debit', 'Credit']} figures={[2, 3]}>
             {e.lines.map((l: D, i: number) => <tr key={i}><td>{l.account}</td><td>{l.memo}</td><td className="fig">{l.debit ? usd(l.debit) : ''}</td><td className="fig">{l.credit ? usd(l.credit) : ''}</td></tr>)}
           </Table>

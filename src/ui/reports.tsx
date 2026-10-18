@@ -7,6 +7,7 @@ import { BASIS_NAME, FigureDetail, RecordView } from './report-detail'
 import { SalesTax } from './sales-tax'
 import { Contractors } from './contractors'
 import { CashFlow, CashFlowDetail } from './cash-flow'
+import { AskAccountant } from './ask-accountant'
 
 export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string }
 type Basis = 'cash' | 'accrual'
@@ -21,9 +22,9 @@ function Figure({ line, children }: { line: string; children: React.ReactNode })
   return <Link to="/app/reports" search={{ ...search, line, record: undefined }} className="figure-link">{children}</Link>
 }
 
-function Trial({ r }: { r: D }) {
+function Trial({ r, from, to, basis }: { r: D; from: string; to: string; basis: Basis }) {
   return <Table heads={['Code', 'Account', 'Debit', 'Credit']} figures={[2, 3]} empty="No posted balances on this date.">
-    {[...r.rows.map((x: D) => <tr key={x.id}><td>{x.code}</td><td>{x.name}</td><td className="fig">{x.debitBalance ? usd(x.debitBalance) : ''}</td><td className="fig">{x.creditBalance ? usd(x.creditBalance) : ''}</td></tr>),
+    {[...r.rows.map((x: D) => <tr key={x.id}><td>{x.code}</td><td>{x.name}<AskAccountant key={JSON.stringify({ from, to, basis })} subjectKind="report-line" subjectId={JSON.stringify({ report: 'trial-balance', line: x.id, from, to, basis })} label={`Trial balance · ${x.code} · ${x.name} · ${to} · ${BASIS_NAME[basis]}`} /></td><td className="fig">{x.debitBalance ? usd(x.debitBalance) : ''}</td><td className="fig">{x.creditBalance ? usd(x.creditBalance) : ''}</td></tr>),
       <tr key="total" className="total"><td /><td>Total {r.balanced ? '' : '(out of balance)'}</td><td className="fig">{usd(r.debit)}</td><td className="fig">{usd(r.credit)}</td></tr>]}
   </Table>
 }
@@ -32,7 +33,7 @@ function Ledger({ r }: { r: D }) {
   return <>{r.accounts.length ? r.accounts.map((a: D) => <div key={a.id} className="gl-account"><h3>{a.code} · {a.name}</h3>
     <Table heads={['Date', 'Entry', 'Description', 'Debit', 'Credit', 'Balance']} figures={[3, 4, 5]}>
       {[<tr key="open" className="muted"><td /><td /><td>Opening balance</td><td /><td /><td className="fig">{usd(a.opening)}</td></tr>,
-        ...a.rows.map((l: D) => <tr key={l.id}><td>{day(l.entry_date)}</td><td>{l.number ?? '—'}</td><td>{l.entry_memo}{l.reverses_id ? ' (reversal)' : l.reversed_by_id ? ' (reversed)' : ''}</td><td className="fig">{l.debit_cents ? usd(l.debit_cents) : ''}</td><td className="fig">{l.credit_cents ? usd(l.credit_cents) : ''}</td><td className="fig">{usd(l.running)}</td></tr>)]}
+        ...a.rows.map((l: D) => <tr key={l.id}><td>{day(l.entry_date)}</td><td>{l.number ?? '—'}</td><td>{l.entry_memo}{l.reverses_id ? ' (reversal)' : l.reversed_by_id ? ' (reversed)' : ''}<AskAccountant subjectKind="journal" subjectId={l.entry_id} label={`Entry ${l.number ?? ''} · ${l.entry_date} · ${l.entry_memo}`} /></td><td className="fig">{l.debit_cents ? usd(l.debit_cents) : ''}</td><td className="fig">{l.credit_cents ? usd(l.credit_cents) : ''}</td><td className="fig">{usd(l.running)}</td></tr>)]}
     </Table></div>) : <p>No activity in this range.</p>}</>
 }
 
@@ -61,7 +62,7 @@ function Ageing({ r }: { r: D }) {
   return <>
     <p className={r.agrees ? 'tone-good' : 'tone-bad'}>{r.kind === 'receivable' ? 'Receivables' : 'Payables'} {usd(r.subledger)} {r.agrees ? 'agree to' : 'do not agree to'} {r.control ? `${r.control.name} ${usd(r.control.balance)}` : 'a control account'}{r.unapplied ? ` (after ${usd(r.unapplied)} received or credited but not yet applied)` : ''}.</p>
     <Table heads={['Who', 'Reference', 'Due', 'Days overdue', 'Bucket', 'Open']} figures={[3, 5]} empty="Nothing open.">
-      {[...r.items.map((i: D) => <tr key={i.id}><td>{i.contact}</td><td>{i.ref}</td><td>{day(i.due_date)}</td><td className="fig">{Math.max(0, i.overdue)}</td><td>{i.bucket}</td><td className="fig">{usd(i.open)}</td></tr>),
+      {[...r.items.map((i: D) => <tr key={i.id}><td>{i.contact}</td><td>{i.ref}<AskAccountant subjectKind={r.kind === 'receivable' ? 'invoice' : 'bill'} subjectId={i.id} label={`${i.ref} · ${i.contact} · ${usd(i.open)} open`} /></td><td>{day(i.due_date)}</td><td className="fig">{Math.max(0, i.overdue)}</td><td>{i.bucket}</td><td className="fig">{usd(i.open)}</td></tr>),
         <tr key="t" className="total"><td>Total</td><td /><td /><td /><td>{r.buckets.map((b: string, k: number) => `${b} ${usd(r.totals[k])}`).join(' · ')}</td><td className="fig">{usd(r.itemsTotal)}</td></tr>]}
     </Table>
   </>
@@ -82,7 +83,7 @@ function Report({ slug, basis, from, to }: { slug: string; basis: Basis; from: s
   const ranged = KINDS.find(k => k[1] === slug)![3]
   const { data: r, error } = useView<D>(`reports/${slug}?to=${to}${ranged ? `&from=${from}` : ''}&basis=${basis}`)
   if (!r) return <Loading error={error} what="the report" />
-  if (slug === 'trial-balance') return <Trial r={r} />
+  if (slug === 'trial-balance') return <Trial r={r} from={from} to={to} basis={basis} />
   if (slug === 'general-ledger') return <Ledger r={r} />
   if (slug === 'profit-and-loss') return <><p className="hint">Choose any line or total to see the records behind it.</p>
     <Statement sections={[['Income', r.income, r.totalIncome, 'income'], ['Expenses', r.expenses, r.totalExpenses, 'expenses']]} total={['Net income', r.netIncome, 'net-income']} />{r.bridge && <Bridge b={r.bridge} />}</>

@@ -114,3 +114,62 @@ test('BOOKS-AGENT the agent asks the owner what does not add up, by email first;
   assert.deepEqual(thread.slice(0, 2), ['agent', 'agent'])
   assert.ok(thread.filter(v => v === 'email').length >= 3)
 })
+
+test('ACCOUNTANT questions carry their entry or report, can be answered at close or by the invited recipient’s email, and survive agent checks', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const s = await september(h)
+  const accountant = await h.member('jordan@example.test', 'accountant', { canLock: true })
+  const viewer = await h.member('viewer@example.test', 'viewer')
+  const box = (await h.command('receipt-address.create', { mailbox: 'books@example.test' })).address
+  const entry = (await h.view('journal')).entries.find(e => e.status === 'posted')
+  const q = (await h.command('question.ask', { subjectKind: 'journal', subjectId: entry.id, question: 'Does this opening entry agree to the prior year?', assignee: 'jordan@example.test' })).question
+  assert.equal(q.subject_id, entry.id)
+  assert.equal(q.assignee, 'jordan@example.test')
+  assert.equal(q.kind, 'accountant')
+  await h.command('books-agent.run', {})
+  assert.ok((await h.view('questions')).open.some(x => x.id === q.id), 'agent does not silently settle a person’s question')
+  const close = await h.view(`close/${q.period}`, accountant)
+  assert.equal(at(close.checks, c => c.key === 'questions').ok, false)
+  assert.ok(close.questions.some(x => x.id === q.id && x.facts.Record))
+  await h.command('question.answer', { id: q.id, words: 'Agreed to the signed trial balance.' }, viewer, 403)
+  const done = await h.command('question.answer', { id: q.id, words: 'Agreed to the signed trial balance.' }, accountant)
+  assert.equal(done.heard.question.status, 'answered')
+  assert.equal(done.heard.question.answered_by, 'jordan@example.test')
+  const report = { report: 'profit-and-loss', line: 'net-income', from: '2026-09-01', to: '2026-09-30', basis: 'accrual' }
+  const figure = (await h.command('question.ask', { subjectKind: 'report-line', subjectId: JSON.stringify(report), question: 'Is this September profit ready for review?', assignee: 'jordan@example.test' })).question
+  assert.equal(figure.record_date, report.to)
+  const mail = h.mail.find(m => m.subject.includes(figure.ref))
+  assert.deepEqual([mail.to].flat(), ['jordan@example.test'])
+  await h.email(reply('owner@example.test', box, mail.subject, 'An unrelated sender cannot answer.'), { from: 'owner@example.test', to: box })
+  assert.ok((await h.view('questions')).open.some(x => x.id === figure.id))
+  await h.email(reply('jordan@example.test', box, mail.subject, 'Yes, the September income is complete.'), { from: 'jordan@example.test', to: box })
+  const answered = at((await h.view('questions')).settled, x => x.id === figure.id)
+  assert.equal(answered.status, 'answered')
+  assert.equal(answered.answered_via, 'email')
+  assert.ok(answered.messages.some(m => m.body === 'Yes, the September income is complete.'))
+  // Existing bank findings can be routed to the accountant, who uses the same supported filing choices.
+  await importStatements(h, s)
+  await h.command('books-agent.run', {})
+  const deposit = (await h.view('questions')).open.find(x => x.kind === 'unmatched-deposit')
+  assert.ok(deposit)
+  await h.command('question.assign', { id: deposit.id, assignee: 'jordan@example.test' })
+  const routed = h.mail.findLast(m => m.subject.includes(deposit.ref))
+  assert.deepEqual([routed.to].flat(), ['jordan@example.test'])
+  // The tax reports carry their server-resolved figure too, without copying tax identifiers.
+  await h.command('contractor.save', { contactId: s.c['Harbor Office Rentals'].id, is1099: true })
+  for (const scope of [
+    { report: 'sales-tax', line: 'total', from: '2026-09-01', to: '2026-09-30', basis: 'accrual' },
+    { report: 'trial-balance', line: s.acct['1000'], from: '2026-09-01', to: '2026-09-30', basis: 'accrual' },
+    { report: 'contractors', line: s.c['Harbor Office Rentals'].id, from: '2026-01-01', to: '2026-12-31', basis: 'cash' },
+  ]) {
+    const asked = (await h.command('question.ask', { subjectKind: 'report-line', subjectId: JSON.stringify(scope), question: 'Please confirm this report line.', assignee: 'jordan@example.test' })).question
+    const source = await h.view(`questions/record?kind=report-line&id=${encodeURIComponent(JSON.stringify(scope))}`)
+    assert.ok(source.questions.some(q => q.id === asked.id && q.facts.Figure && q.facts.Amount))
+    assert.ok(!Object.keys(asked.facts).some(k => /TIN/i.test(k)))
+  }
+  // Revocation closes the email door even when a reply still has the thread reference.
+  await h.db.prepare("UPDATE pt_members SET active = 0 WHERE email = ?").bind('jordan@example.test').run()
+  await h.email(reply('jordan@example.test', box, routed.subject, '1'), { from: 'jordan@example.test', to: box })
+  assert.ok((await h.view('questions')).open.some(x => x.id === deposit.id))
+  await h.command('question.ask', { subjectKind: 'journal', subjectId: 'missing', question: 'Does this exist?', assignee: 'viewer@example.test' }, h.owner, 400)
+})

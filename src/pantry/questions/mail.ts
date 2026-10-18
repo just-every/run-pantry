@@ -12,7 +12,7 @@ import { ownerEmail } from '../access'
 import { now, uid, type Data } from '../core'
 import { all, one, q, run } from '../db'
 import { pantryAddress } from '../receipts/mail'
-import { answer, confirm, hear, ownerByEmail } from './answer'
+import { answer, confirm, hear, ownerByEmail, memberByEmail } from './answer'
 import { AGENT, OPEN, parse, say, type Question } from './store'
 
 type MailResult = { status: 'accepted' | 'rejected' | 'rate_limited' | 'uncertain' | 'development'; provider: string; providerMessageId: string | null; code?: string }
@@ -53,7 +53,7 @@ async function deliver(env: Bindings, db: D1Database, to: string, subject: strin
 
 function questionBody(qn: Question, link: string, replies: boolean, business: string) {
   const choices = qn.choices.map((c, i) => `${i + 1}. ${c.label}\n   ${c.effect}${c.note ? ` Add a few words: ${c.note.toLowerCase()}.` : ''}`).join('\n')
-  const how = qn.kind === 'missing-receipt'
+  const how = qn.kind === 'accountant' ? (replies ? 'Reply with your answer; Pantry keeps it with this record.' : 'Open the link to answer in Pantry.') : qn.kind === 'missing-receipt'
     ? (replies ? 'Reply with the receipt attached and Pantry attaches it, or reply 1 and say why there is none.' : 'Open the link to upload it, or to say why there is none.')
     : replies ? `Reply with the number${qn.choices.some(c => c.learn) ? ' (add "always" to file the next ones from this payee the same way)' : ''}, or say in your own words what it was.` : 'Open the link to answer.'
   const facts = Object.entries(qn.facts).map(([k, v]) => `${k}: ${v}`).join('\n')
@@ -67,7 +67,7 @@ function questionBody(qn: Question, link: string, replies: boolean, business: st
 
 /** Email one question to the owner and record the outcome on it. */
 export async function emailQuestion(env: Bindings, db: D1Database, qn: Question) {
-  const to = await ownerEmail(db, env), s = await sender(db, env)
+  const to = qn.assignee || await ownerEmail(db, env), s = await sender(db, env)
   const { text, html } = questionBody(qn, questionLink(env, qn.id), !!await pantryAddress(db, env), s.business)
   const sent = to ? await deliver(env, db, to, `${qn.question.length <= 90 ? qn.question : qn.title} ${subjectRef(qn.ref)}`, text, html) : { status: 'no-mail' as const, detail: 'The owner has no email address.' }
   await run(db, [q('UPDATE pt_questions SET email_status = ?, emailed_at = ?, emailed_to = ?, email_detail = ? WHERE id = ?', sent.status, sent.status === 'sent' ? now() : null, to || null, sent.detail, qn.id),
@@ -77,7 +77,7 @@ export async function emailQuestion(env: Bindings, db: D1Database, qn: Question)
 
 /** After a reply Pantry read from the owner's words: what it understood, and how to say yes. */
 async function emailConfirmation(env: Bindings, db: D1Database, qn: Question, message: string) {
-  const to = await ownerEmail(db, env), link = questionLink(env, qn.id)
+  const to = qn.assignee || await ownerEmail(db, env), link = questionLink(env, qn.id)
   const text = `${message}\n\nReply YES to do it, or NO to leave it as it is. Or open it in Pantry: ${link}\n`
   await deliver(env, db, to, `Re: ${qn.question.length <= 90 ? qn.question : qn.title} ${subjectRef(qn.ref)}`, text, `<p>${escapeHtml(message)}</p><p>Reply <strong>YES</strong> to do it, or <strong>NO</strong> to leave it as it is.</p><p><a href="${escapeHtml(link)}">Open it in Pantry</a></p>`)
 }
@@ -114,11 +114,13 @@ export async function receiveReply(env: Bindings, raw: Uint8Array): Promise<Repl
   const row = await one(db, 'SELECT * FROM pt_questions WHERE ref = ?', ref)
   if (!row) return { result: 'not-mine' }
   const qn = parse(row), owner = await ownerEmail(db, env), from = String(m.from ?? '').toLowerCase()
-  // Only the owner the question went to answers by email.
-  if (!from || from !== owner || (qn.emailed_to && from !== qn.emailed_to)) return { result: 'refused', reason: 'Only the owner answers Pantry’s questions by email' }
-  const by = ownerByEmail(owner), words = replyText(m)
+  const recipient = qn.assignee || owner
+  if (!from || from !== recipient || (qn.emailed_to && from !== qn.emailed_to)) return { result: 'refused', reason: 'Only the question’s recipient answers by email' }
+  const by = qn.assignee ? await memberByEmail(db, from) : ownerByEmail(owner), words = replyText(m)
+  if (!by) return { result: 'refused', reason: 'The accountant no longer has access to these books' }
+  if (qn.kind === 'accountant' && OPEN.includes(qn.status) && words) { await hear(env, db, qn.id, words, by); return { result: 'answered', question: qn.id } }
   if (!OPEN.includes(qn.status)) {
-    await run(db, [say(qn.id, owner, 'email', words || '(an empty reply)'), say(qn.id, AGENT.email, 'agent', 'This question was already settled, so the reply changed nothing.')])
+    await run(db, [say(qn.id, by.audit.email, 'email', words || '(an empty reply)'), say(qn.id, AGENT.email, 'agent', 'This question was already settled, so the reply changed nothing.')])
     return { result: 'answered', question: qn.id }
   }
   const file = qn.kind === 'missing-receipt' ? m.attachments.find(a => RECEIPT.test(a.contentType) && a.content.length <= 1_500_000) : null
@@ -141,7 +143,7 @@ export async function receiveReply(env: Bindings, raw: Uint8Array): Promise<Repl
     }
   }
   if (!words) {
-    await run(db, [say(qn.id, owner, 'email', '(an empty reply)'), say(qn.id, AGENT.email, 'agent', 'The reply had no answer in it; the question is still open.')])
+    await run(db, [say(qn.id, by.audit.email, 'email', '(an empty reply)'), say(qn.id, AGENT.email, 'agent', 'The reply had no answer in it; the question is still open.')])
     return { result: 'unclear', question: qn.id }
   }
   const heard = await hear(env, db, qn.id, words, by)

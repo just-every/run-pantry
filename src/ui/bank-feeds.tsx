@@ -25,11 +25,11 @@ export async function relink(c: D) {
   return true
 }
 
-function Connection({ c, onDone }: { c: D; onDone: () => Promise<void> }) {
+function Connection({ c, notice, onDone }: { c: D; notice?: D; onDone: () => Promise<void> }) {
   const can = useShared().state.actor.can.record
   const brought = c.accounts.filter((a: D) => a.bank_account_id)
   return <div className="feed">
-    <div className="feed-head"><strong>{c.institution_name}</strong>{c.status === 'relink' ? <Chip tone="warn">Needs re-link</Chip> : <Chip tone="good">Live</Chip>}</div>
+    <div className="feed-head"><strong>{c.institution_name}</strong>{notice ? <Chip tone="warn">{notice.kind === 'expiring' ? 'Consent expiring' : notice.requiresRelink ? 'Needs re-link' : 'Needs attention'}</Chip> : <Chip tone="good">Live</Chip>}</div>
     <ul className="feed-accounts">{c.accounts.map((a: D) => <li key={a.id}>
       <span>{a.name} <small className="sub">••{a.mask}</small></span>
       {a.bank_account_id ? <small>→ {a.bank_name} · {a.last_synced_at ? <>synced {ago(a.last_synced_at)}</> : 'not synced yet'}{a.pending ? ` · ${a.pending} pending` : ''}{a.balance_cents !== null ? ` · bank shows ${usd(a.balance_cents)}${a.kind.startsWith('credit') ? ' owed' : ''}` : ''}</small> : <small className="sub">Not brought in</small>}
@@ -47,12 +47,17 @@ function Connection({ c, onDone }: { c: D; onDone: () => Promise<void> }) {
   </div>
 }
 
-/** A connection the bank stopped sharing, said plainly at the top of Bank where it cannot be missed. */
-export function RelinkNotices({ data, onDone }: { data: D | undefined; onDone: () => Promise<void> }) {
+/** Shared by Bank and the dashboard: show every current gap or consent warning. */
+export function FeedHealthNotices({ notices, onDone }: { notices: D[]; onDone: () => Promise<void> }) {
   const can = useShared().state.actor.can.record
-  return <>{(data?.connections ?? []).filter((c: D) => c.status === 'relink').map((c: D) => <div key={c.id} className="callout callout-warn relink" role="status"><Icon name="alert" />
-    <div><strong>{c.institution_name} needs you to sign in again to stay current.</strong><span>{c.error_message} Nothing new arrives until then.</span></div>
-    {can && <Action tone="primary" run={async () => { await relink(c); await onDone() }}>Re-link</Action>}</div>)}</>
+  return <>{notices.map(n => <div key={n.itemId} className="callout callout-warn relink" role="status"><Icon name="alert" />
+    <div><strong>{n.message}</strong><span>{n.name}. Last successful sync: {n.lastSyncedAt ? new Date(n.lastSyncedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'never'}.</span>
+      {n.notification?.detail && <small>{n.notification.detail}</small>}</div>
+    {can && <Action tone="primary" run={async () => { if (n.requiresRelink) await relink({ id: n.itemId }); else await command('feed.sync', { itemId: n.itemId }); await onDone() }}>{n.requiresRelink ? 'Re-link' : 'Sync now'}</Action>}</div>)}</>
+}
+
+export function RelinkNotices({ data, onDone }: { data: D | undefined; onDone: () => Promise<void> }) {
+  return <FeedHealthNotices notices={data?.health ?? []} onDone={onDone} />
 }
 
 export function Feeds({ data, onDone, onImport }: { data: D | undefined; onDone: () => Promise<void>; onImport: () => void }) {
@@ -65,7 +70,7 @@ export function Feeds({ data, onDone, onImport }: { data: D | undefined; onDone:
   const connect = (primary: boolean) => a.available && can.record && <Link className={`btn ${primary ? 'btn-primary' : 'btn-secondary btn-small'}`} to="/app/bank/connect">Connect a bank or card</Link>
   return <Card title="Bank and card feeds" actions={!none && connect(false)}>
     {none && <p>Connect a bank or card once and its transactions arrive on their own. Statement files keep working beside it.</p>}
-    {data.connections.map((c: D) => <Connection key={c.id} c={c} onDone={onDone} />)}
+    {data.connections.map((c: D) => <Connection key={c.id} c={c} notice={data.health?.find((n: D) => n.itemId === c.id)} onDone={onDone} />)}
     {none && !a.available && (a.needsKeys ? <SetupSteps provider="plaid" reason={a.reason} summary="Set up live bank feeds" owner={can.owner} /> : <p className="hint">{a.reason}</p>)}
     {none && (a.available ? connect(true) : can.record && <button type="button" className="btn btn-primary" onClick={onImport}>Import a statement</button>)}
   </Card>

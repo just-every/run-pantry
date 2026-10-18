@@ -1,3 +1,4 @@
+import { feedCloseExceptions } from './feeds/health'
 // Period close: calculated checks plus reviewed tasks, then a lock that both
 // people and agents' approved work must respect. Reopening is a separate
 // request approved by someone holding the reopen grant.
@@ -59,6 +60,11 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
     detail: unapplied.length ? `${unapplied.map(x => `${usd(x.left_cents)} ${x.direction === 'paid' ? 'paid to' : 'received from'} ${x.name}`).join('; ')} not applied while they have open ${unapplied.every(x => x.direction === 'paid') ? 'bills' : unapplied.every(x => x.direction !== 'paid') ? 'invoices' : 'invoices or bills'}: apply ${unapplied.length === 1 ? 'it' : 'them'} under Sales & bills › Payments`
       : 'No payment is waiting to be applied' })
 
+  const feedExceptions = await feedCloseExceptions(db, end)
+  checks.push({ key: 'feeds', title: 'Bank feeds synced through month end', ok: feedExceptions.length === 0,
+    items: feedExceptions.map(f => ({ kind: 'feed', id: f.id, label: f.label })),
+    detail: feedExceptions.length ? feedExceptions.map(f => f.label).join('; ') : 'Every connected feed is synced through month end' })
+
   const tb = await trialBalance(db, end)
   checks.push({ key: 'trial-balance', title: 'Trial balance balances', ok: tb.balanced, detail: `Debits ${usd(tb.debit)}, credits ${usd(tb.credit)}` })
 
@@ -113,6 +119,7 @@ export async function lockPlan(db: D1Database, actor: Actor, id: string, note: s
     // The checked state must still hold: no task reopened, no draft or posting added in the period meanwhile.
     guard("(SELECT COUNT(*) FROM pt_close_tasks WHERE period = ? AND status <> 'done') = 0", id),
     guard("NOT EXISTS (SELECT 1 FROM pt_journal_entries WHERE status = 'draft' AND entry_date BETWEEN ? AND ?)", state.start, state.end),
+    guard("NOT EXISTS (SELECT 1 FROM pt_feed_accounts f JOIN pt_feed_items i ON i.id = f.item_id JOIN pt_bank_accounts b ON b.id = f.bank_account_id WHERE i.status <> 'disconnected' AND b.opening_date < ? AND (f.last_synced_at IS NULL OR f.last_synced_at < ?))", state.end, `${state.end}T23:59:59.999Z`),
     guard("NOT EXISTS (SELECT 1 FROM pt_questions WHERE period = ? AND status IN ('open', 'confirm'))", id),
     state.period
       ? q("UPDATE pt_periods SET status = 'locked', locked_by = ?, locked_at = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'open'", actor.email, now(), revision, id, state.period.revision)

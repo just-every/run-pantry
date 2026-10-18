@@ -5,7 +5,7 @@
 // wrote are read by the install's model into one of those answers and wait for
 // a yes. Nothing is ever filed without the owner's answer.
 import type { Bindings } from '../../auth.server'
-import { authority, who, type Person } from '../access'
+import { authority, allowed, who, type Person } from '../access'
 import { now, optionalText, requireThat, text, uid } from '../core'
 import { all, audit, changed, guard, one, q, run, type AuditActor, type Sql } from '../db'
 import { documentInsert } from '../contacts'
@@ -27,6 +27,17 @@ export const ownerByEmail = (email: string): Answerer => ({
   authority: () => guard("EXISTS (SELECT 1 FROM oa_operators WHERE lower(email) = ? AND role = 'owner' AND status = 'active')", email),
   via: 'email',
 })
+
+/** Email answers retain the invited member's current grants, checked again in the write. */
+export async function memberByEmail(db: D1Database, email: string): Promise<Answerer | null> {
+  const m = await one(db, "SELECT m.* FROM pt_members m JOIN oa_operators o ON lower(o.email) = m.email AND o.status = 'active' WHERE m.email = ? AND m.active = 1 AND m.role = 'accountant'", email)
+  if (!m) return null
+  const person: Person = { kind: 'person', id: '', email, name: m.name, session: '', role: m.role, grants: { post: !!m.can_post, lock: !!m.can_lock, reopen: !!m.can_reopen } }
+  return { person, audit: { email, kind: 'person' }, via: 'email', authority: need => {
+    requireThat(allowed(person, need), 'This answer needs the posting grant', 403)
+    return guard(`EXISTS (SELECT 1 FROM pt_members WHERE email = ? AND active = 1 AND role = 'accountant' AND EXISTS (SELECT 1 FROM oa_operators o WHERE lower(o.email) = pt_members.email AND o.status = 'active')${need === 'post' ? ' AND can_post = 1' : ''})`, email)
+  } }
+}
 
 export type Answer = { choice?: string | null; accountId?: string | null; remember?: boolean; note?: string; document?: { name: string; mediaType: string; bytes: Uint8Array } | null; words?: string }
 
@@ -118,7 +129,7 @@ export async function answer(env: Bindings, db: D1Database, id: string, a: Answe
   return question(db, id)
 }
 
-export type Heard = { result: 'filed' | 'confirm' | 'unclear'; question: Question; message: string }
+export type Heard = { result: 'filed' | 'answered' | 'confirm' | 'unclear'; question: Question; message: string }
 
 /**
  * Words the owner wrote, in the app or in a reply. The install's model reads
@@ -129,6 +140,10 @@ export type Heard = { result: 'filed' | 'confirm' | 'unclear'; question: Questio
 export async function hear(env: Bindings, db: D1Database, id: string, words: string, by: Answerer): Promise<Heard> {
   const qn = await question(db, id), said = text(words, 'Your answer', 4000)
   requireThat(OPEN.includes(qn.status), 'This question is already answered', 409)
+  if (qn.kind === 'accountant') {
+    await run(db, [by.authority('record'), ...settle(qn, 'answered', by, said), say(qn.id, by.audit.email, by.via, said), audit(by.audit, 'question.answer', qn.subject_kind, qn.subject_id, { question: id, via: by.via })])
+    return { result: 'answered', question: await question(db, id), message: 'Answer kept with the record.' }
+  }
   const model = await modelState(db, env)
   const unclear = async (message: string) => {
     await run(db, [by.authority('record'), q("UPDATE pt_questions SET status = 'open', pending = NULL, revision = ? WHERE id = ? AND revision = ?", uid(), qn.id, qn.revision), changed(),

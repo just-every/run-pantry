@@ -5,6 +5,7 @@ import { Action, Card, Chip, command, Details, Field, Form, PageHead, Table, Tab
 import { JournalEditor } from './journal-editor'
 import { Icon } from './icons'
 import { CaptureButtons } from './receipt-capture'
+import { AskAccountant } from './ask-accountant'
 
 const TYPE: Record<string, string> = { asset: 'Asset', liability: 'Liability', equity: 'Equity', income: 'Income', expense: 'Expense' }
 const ROLE: Record<string, string> = { bank: 'Bank or card', receivable: 'Receivables control', payable: 'Payables control', tax: 'Sales tax', retained: 'Retained earnings', other: '' }
@@ -63,6 +64,7 @@ function EntryPanel({ e, onChange }: { e: D; onChange: () => Promise<void> }) {
       {e.lines.map((l: D) => <tr key={l.id}><td>{l.line_no}</td><td>{l.account_code} · {l.account_name}</td><td>{l.memo}</td><td className="fig">{l.debit_cents ? usd(l.debit_cents) : '—'}</td><td className="fig">{l.credit_cents ? usd(l.credit_cents) : '—'}</td></tr>)}
     </Table>
     <p className={`balance-line ${debit === credit ? 'tone-good' : 'tone-bad'}`}>Debits {usd(debit)} {debit === credit ? '=' : '≠'} Credits {usd(credit)}</p>
+    <AskAccountant subjectKind="journal" subjectId={e.id} label={`${e.number ? `Entry ${e.number}` : 'Draft entry'} · ${e.entry_date} · ${e.memo}`} />
     <div className="entry-receipts"><strong><Icon name="receipt" /> Receipt</strong> {e.documents.length ? e.documents.map((d: D) => <a key={d.id} className="doc-link" href={`/api/pantry/documents/${d.id}${/^image\//.test(d.media_type) ? '?view=1' : ''}`} target="_blank" rel="noreferrer">{d.name}</a>)
       : e.status === 'posted' && state.actor.can.record ? <><span className="hint">None yet.</span> <CaptureButtons compact target={{ kind: 'journal', id: e.id }} onDone={onChange} /></> : <span className="hint">None</span>}</div>
     <div className="row-actions">

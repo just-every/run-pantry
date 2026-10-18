@@ -1,5 +1,6 @@
 import { Link, useSearch } from '@tanstack/react-router'
 import { Card, Chip, Field, Form, Loading, Table, command, day, usd, useShared, useView, type D } from './kit'
+import { AskAccountant } from './ask-accountant'
 
 function Figure({ id, children }: { id: string; children: React.ReactNode }) {
   const search = useSearch({ from: '/app/reports' })
@@ -34,8 +35,9 @@ export function CashFlowDetail({ from, to, line }: { from: string; to: string; l
   return <><nav className="crumbs"><Link to="/app/reports" search={{ ...search, line: undefined, record: undefined }}>Cash flow</Link>{r && <> / {r.label}</>}</nav>
     {!r ? <Loading what="the entries" error={error} /> : <Card title={r.label} actions={<strong>{usd(r.figure)}</strong>}>
       <p>{day(from)} to {day(to)} · Indirect method. These contributions add up to {usd(r.figure)}.</p>
+      <AskAccountant key={JSON.stringify({ line, from, to })} subjectKind="report-line" subjectId={JSON.stringify({ report: 'cash-flow', line, from, to, basis: 'accrual' })} label={`Cash flow · ${r.label} · ${from} to ${to} · ${usd(r.figure)}`} />
       <Table heads={['Date', 'Entry', 'Account', 'Description', 'Contribution']} figures={[4]} empty="No posted entries contribute to this figure.">
-        {r.rows.map((l: D) => <tr key={l.key}><td>{day(l.date)}</td><td><Link to="/app/reports" search={{ ...search, record: `entry:${l.entryId}` }}>Entry {l.number}</Link></td><td>{r.accounts.find((a: D) => a.id === l.accountId)?.name}</td><td>{l.description}</td><td className="fig">{usd(l.amount)}</td></tr>)}
+        {r.rows.map((l: D) => <tr key={l.key}><td>{day(l.date)}</td><td><Link to="/app/reports" search={{ ...search, record: `entry:${l.entryId}` }}>Entry {l.number}</Link><AskAccountant subjectKind="journal" subjectId={l.entryId} label={`Entry ${l.number} · ${l.date} · ${l.description}`} /></td><td>{r.accounts.find((a: D) => a.id === l.accountId)?.name}</td><td>{l.description}</td><td className="fig">{usd(l.amount)}</td></tr>)}
       </Table>
     </Card>}
   </>

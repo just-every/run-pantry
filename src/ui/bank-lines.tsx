@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Action, Card, Chip, command, Empty, Field, day, usd, useShared, type D } from './kit'
 import { MatchPanel } from './reconcile'
 import { Icon } from './icons'
+import { AskAccountant } from './ask-accountant'
 
 const FILTERS = ['All', 'To file', 'Filed by rule', 'Pending'] as const
 
@@ -49,7 +50,7 @@ export function Transactions({ data, onDone, feeds }: { data: D | undefined; onD
             <td data-label="Date">{day(l.posted_date)}</td><td data-label="Account">{l.bank_name}</td>
             <td data-label="Description">{l.description}{l.payee && !l.description.toLowerCase().includes(l.payee.toLowerCase()) && <small className="sub"> · {l.payee}</small>}{l.feed_txn_id && <small className="sub feed-tag">feed</small>}</td>
             <td data-label="Amount" className={`fig${l.amount_cents > 0 ? ' money-in' : ''}`}>{usd(l.amount_cents)}</td>
-            <td data-label="Filed"><Status l={l} onUndo={onDone} picked={picked.includes(l.id)} onFile={() => toggle(l.id)} /></td></tr> }) : <tr className="empty"><td colSpan={6}><Empty>{data.lines.length ? 'Nothing matches this view.' : <><strong className="empty-title">No transactions yet.</strong>{feeds ? 'Connect a bank or card, or import a statement.' : 'Import a statement and its lines appear here.'}</>}</Empty></td></tr>}</tbody></table></div>
+            <td data-label="Filed"><Status l={l} onUndo={onDone} picked={picked.includes(l.id)} onFile={() => toggle(l.id)} />{!l.pending && <AskAccountant subjectKind="bank-line" subjectId={l.id} label={`${l.posted_date} · ${l.description} · ${usd(l.amount_cents)}`} />}</td></tr> }) : <tr className="empty"><td colSpan={6}><Empty>{data.lines.length ? 'Nothing matches this view.' : <><strong className="empty-title">No transactions yet.</strong>{feeds ? 'Connect a bank or card, or import a statement.' : 'Import a statement and its lines appear here.'}</>}</Empty></td></tr>}</tbody></table></div>
     </Card>
     {chosen.length > 0 && <MatchPanel lines={chosen} postings={[]} bankId={chosen[0].bank_account_id} clear={() => setPicked([])} onDone={onDone} />}
   </>

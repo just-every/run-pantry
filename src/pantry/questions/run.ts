@@ -84,7 +84,7 @@ export async function runAgent(env: Bindings, { scheduled = false } = {}): Promi
     }
   }
   const current = new Set(issues.map(i => i.fingerprint))
-  for (const qn of known.values()) if (OPEN.includes(qn.status) && !current.has(qn.fingerprint)) {
+  for (const qn of known.values()) if (qn.kind !== 'accountant' && OPEN.includes(qn.status) && !current.has(qn.fingerprint)) {
     writes.push(q("UPDATE pt_questions SET status = 'resolved', pending = NULL, revision = ? WHERE id = ? AND revision = ?", uid(), qn.id, qn.revision), say(qn.id, AGENT.email, 'agent', `No answer needed any more: ${await settledBy(db, qn)}`))
     resolved++
   }

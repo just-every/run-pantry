@@ -9,6 +9,7 @@ import { hosting, pantryAddress } from '../receipts/mail'
 import { mailState } from './mail'
 import { modelState } from './model'
 import { runAgent } from './run'
+import { accountants, accountantCommands } from './accountant'
 import { agentSettings, parse, withThreads } from './store'
 
 export async function agentView(c: Context) {
@@ -27,7 +28,7 @@ export async function questionsView(c: Context, focus?: string) {
   const open = await all(c.db, "SELECT * FROM pt_questions WHERE status IN ('open', 'confirm') ORDER BY record_date, asked_at, id")
   const settled = await all(c.db, "SELECT * FROM pt_questions WHERE status NOT IN ('open', 'confirm') ORDER BY COALESCE(answered_at, asked_at) DESC, id LIMIT 100")
   const extra = focus && ![...open, ...settled].some(r => r.id === focus) ? await all(c.db, 'SELECT * FROM pt_questions WHERE id = ?', focus) : []
-  return { open: await withThreads(c.db, open.map(parse)), settled: await withThreads(c.db, [...extra, ...settled].map(parse)), agent: await agentView(c) }
+  return { accountants: await accountants(c.db), open: await withThreads(c.db, open.map(parse)), settled: await withThreads(c.db, [...extra, ...settled].map(parse)), agent: await agentView(c) }
 }
 
 const answerCommand: Command = { need: 'record', async run(c, b) {
@@ -67,6 +68,7 @@ const saveSettings: Command = { need: 'owner', async run(c, b) {
 } }
 
 export const questionCommands: Record<string, Command> = {
+  ...accountantCommands,
   'question.answer': answerCommand,
   'question.confirm': confirmCommand,
   'question.receipt': receiptCommand,

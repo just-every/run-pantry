@@ -46,3 +46,18 @@ Pantry checks with built-in rules and says so. With the installation's own AI mo
 ## How Pantry asks
 
 The owner sets, on the Questions page, whether new questions are emailed, how many a day, after how many days a deposit or an unfiled payment is worth a question, and the receipt amount.
+
+## Questions for your accountant
+
+Invite an accountant in People & settings. From a bank transaction, journal entry,
+report figure or its source record, choose **Ask accountant**, choose the invited
+accountant and write the question. Pantry keeps the exact record and its date and
+amount (or the report, period, basis and figure) with the thread. Existing agent
+questions can also be assigned to that accountant.
+
+The accountant answers in Questions or in the month's close. With a mail provider
+and a routed Pantry address, the assigned accountant can reply to the question's
+email; the saved answer names the person and channel. Removing the accountant's
+access prevents later email replies. A plain question records an answer without
+posting an entry; the agent's filing questions retain their offered changes and
+posting grants. Open questions remain visible at close and prevent the lock.
