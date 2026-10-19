@@ -34,8 +34,8 @@ function suggested(open: D[], amount: string, lines: D[]): Record<string, string
   return pick ? { [pick.id]: (Math.min(pick.open_cents, cents) / 100).toFixed(2) } : {}
 }
 
-export function MatchPanel({ lines, postings, bankId, clear, onDone }: { lines: D[]; postings: D[]; bankId: string; clear: () => void; onDone: () => Promise<void> }) {
-  const { state } = useShared(), [items, setItems] = useState<NewItem[]>([]), [error, setError] = useState(''), [busy, setBusy] = useState(false)
+export function MatchPanel({ lines, postings, bankId, clear, onDone, suggestedCategory }: { suggestedCategory?: D; lines: D[]; postings: D[]; bankId: string; clear: () => void; onDone: () => Promise<void> }) {
+  const { state } = useShared(), [items, setItems] = useState<NewItem[]>(() => suggestedCategory && lines.length === 1 ? [{ type: suggestedCategory.billId ? 'payment' : lines[0].amount_cents < 0 ? 'fee' : 'income', amount: (Math.abs(lines[0].amount_cents) / 100).toFixed(2), accountId: suggestedCategory.accountId, contactId: suggestedCategory.contactId ?? undefined, allocations: suggestedCategory.billId ? { [suggestedCategory.billId]: (Math.abs(lines[0].amount_cents) / 100).toFixed(2) } : undefined, direction: lines[0].amount_cents < 0 ? 'out' : 'in', memo: suggestedCategory.payee }] : []), [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const sales = useView<D>(items.some(i => i.type === 'receipt' || i.type === 'payment') ? 'sales' : null).data
   // Until the person types what a payment pays, it pays what Pantry suggests from the line and the open items.
   const applies = (it: NewItem) => it.allocations ?? suggested(openItems(sales, it), it.amount, lines)
@@ -53,6 +53,7 @@ export function MatchPanel({ lines, postings, bankId, clear, onDone }: { lines: 
           <div className="grid-form">
             <Field label="Amount" name={`amount-${k}`} value={it.amount} onChange={(e: any) => set(k, { amount: e.target.value })} inputMode="decimal" />
             {(it.type === 'fee' || it.type === 'income') && <Field label="Account" name={`account-${k}`} value={it.accountId ?? ''} onChange={(e: any) => set(k, { accountId: e.target.value })} options={accountOptions(state.accounts, a => !['bank', 'receivable', 'payable'].includes(a.subtype))} />}
+            {(it.type === 'fee' || it.type === 'income') && <Field label="Payee" name={`payee-${k}`} empty="No named payee" value={it.contactId ?? ''} onChange={(e: any) => set(k, { contactId: e.target.value })} options={contactOptions(state.contacts, it.type === 'fee' ? 'vendor' : 'customer')} />}
             {it.type === 'transfer' && <><Field label="Other bank account" name={`other-${k}`} value={it.otherBankAccountId ?? ''} onChange={(e: any) => set(k, { otherBankAccountId: e.target.value })} options={state.bankAccounts.filter((b: D) => b.id !== bankId).map((b: D) => ({ value: b.id, label: b.name }))} /><Field label="Money" name={`dir-${k}`} value={it.direction ?? 'out'} onChange={(e: any) => set(k, { direction: e.target.value })} options={[{ value: 'in', label: 'Came in' }, { value: 'out', label: 'Went out' }]} /></>}
             {(it.type === 'receipt' || it.type === 'payment') && <Field label={it.type === 'receipt' ? 'Customer' : 'Vendor'} name={`contact-${k}`} value={it.contactId ?? ''} onChange={(e: any) => set(k, { contactId: e.target.value, allocations: undefined })} options={contactOptions(state.contacts, it.type === 'receipt' ? 'customer' : 'vendor')} />}
           </div>

@@ -1,3 +1,4 @@
+import { LineSuggestion, SuggestionRates } from './line-suggestions'
 // Transactions: every bank and card line from files and feeds, newest first,
 // with how it was filed. Lines filed by a rule name the rule and can be undone;
 // lines still to file can be chosen and filed here; pending ones wait for the bank.
@@ -76,9 +77,10 @@ export function Transactions({ data, onDone, feeds }: { data: D | undefined; onD
             <td data-label="Date">{day(l.posted_date)}</td><td data-label="Account">{l.bank_name}</td>
             <td data-label="Description">{l.description}{l.payee && !l.description.toLowerCase().includes(l.payee.toLowerCase()) && <small className="sub"> · {l.payee}</small>}{l.feed_txn_id && <small className="sub feed-tag">feed</small>}</td>
             <td data-label="Amount" className={`fig${l.amount_cents > 0 ? ' money-in' : ''}`}>{usd(l.amount_cents)}</td>
-            <td data-label="Filed"><Status l={l} onUndo={onDone} picked={picked.includes(l.id)} onFile={() => toggle(l.id)} /><RecordedPaymentProposal offers={['pending', 'exception'].includes(l.transfer?.status) ? undefined : data.recordedPayments?.[l.id]} canRecord={state.actor.can.record} onDone={onDone} /><DepositProposal proposal={['pending', 'exception'].includes(l.transfer?.status) ? undefined : data.depositProposals?.[l.id]} canRecord={state.actor.can.record} onDone={onDone} />{!l.pending && <AskAccountant subjectKind="bank-line" subjectId={l.id} label={`${l.posted_date} · ${l.description} · ${usd(l.amount_cents)}`} />}</td></tr> }) : <tr className="empty"><td colSpan={6}><Empty>{data.lines.length ? 'Nothing matches this view.' : <><strong className="empty-title">No transactions yet.</strong>{feeds ? 'Connect a bank or card, or import a statement.' : 'Import a statement and its lines appear here.'}</>}</Empty></td></tr>}</tbody></table></div>
+            <td data-label="Filed"><LineSuggestion suggestion={data.suggestions?.[l.id]} /><Status l={l} onUndo={onDone} picked={picked.includes(l.id)} onFile={() => toggle(l.id)} /><RecordedPaymentProposal offers={['pending', 'exception'].includes(l.transfer?.status) ? undefined : data.recordedPayments?.[l.id]} canRecord={state.actor.can.record} onDone={onDone} /><DepositProposal proposal={['pending', 'exception'].includes(l.transfer?.status) ? undefined : data.depositProposals?.[l.id]} canRecord={state.actor.can.record} onDone={onDone} />{!l.pending && <AskAccountant subjectKind="bank-line" subjectId={l.id} label={`${l.posted_date} · ${l.description} · ${usd(l.amount_cents)}`} />}</td></tr> }) : <tr className="empty"><td colSpan={6}><Empty>{data.lines.length ? 'Nothing matches this view.' : <><strong className="empty-title">No transactions yet.</strong>{feeds ? 'Connect a bank or card, or import a statement.' : 'Import a statement and its lines appear here.'}</>}</Empty></td></tr>}</tbody></table></div>
     </Card>
-    {chosen.length > 0 && <MatchPanel lines={chosen} postings={[]} bankId={chosen[0].bank_account_id} clear={() => setPicked([])} onDone={onDone} />}
+    <SuggestionRates rates={data.suggestionRates} />
+    {chosen.length > 0 && <MatchPanel key={chosen.map((l: D) => l.id).join(':')} suggestedCategory={chosen.length === 1 ? data.suggestions?.[chosen[0].id] : undefined} lines={chosen} postings={[]} bankId={chosen[0].bank_account_id} clear={() => setPicked([])} onDone={onDone} />}
   </>
 }
 

@@ -1,3 +1,4 @@
+import { lineSuggestions, suggestionStats } from './line-suggestions'
 // Bank lines across accounts, newest first, as the Transactions screen shows
 // them: how each was filed (by a person, by a rule, or not yet), where it came
 // from (file or feed), and the feed's pending transactions beside them.
@@ -26,5 +27,5 @@ export async function bankLinesView(db: D1Database): Promise<Data> {
   const pending = await all(db, `SELECT p.feed_txn_id AS id, p.txn_date AS posted_date, p.amount_cents, p.description, p.payee, f.bank_account_id, b.name AS bank_name
     FROM pt_feed_pending p JOIN pt_feed_accounts f ON f.id = p.feed_account_id JOIN pt_bank_accounts b ON b.id = f.bank_account_id ORDER BY p.txn_date DESC, p.feed_txn_id`)
   const transfers = new Map((await transferState(db)).map(t => [t.bank_line_id, t]))
-  return { recordedPayments: await recordedPaymentCandidates(db, lines), depositProposals: await depositProposals(db, lines), lines: lines.map(l => ({ ...l, rule_snapshot: l.rule_snapshot ? JSON.parse(l.rule_snapshot) : null, transfer: transfers.get(l.id) ?? null, filed_to: l.match_id ? filedTo.get(l.match_id) ?? [] : [] })), pending }
+  return { suggestions: await lineSuggestions(db, lines), suggestionRates: await suggestionStats(db), recordedPayments: await recordedPaymentCandidates(db, lines), depositProposals: await depositProposals(db, lines), lines: lines.map(l => ({ ...l, rule_snapshot: l.rule_snapshot ? JSON.parse(l.rule_snapshot) : null, transfer: transfers.get(l.id) ?? null, filed_to: l.match_id ? filedTo.get(l.match_id) ?? [] : [] })), pending }
 }

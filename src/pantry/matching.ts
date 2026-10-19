@@ -1,3 +1,4 @@
+import { suggestionDecisions } from './line-suggestions'
 // Matching statement lines to ledger postings. A match links what the bank
 // recorded to what the books already hold; it posts only the new items a person
 // names (a fee, a receipt the books lack, a transfer), so a payment already
@@ -64,10 +65,12 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
         other = await account(db, text(item.accountId, `${label} account`))
         requireThat(other.active && !['bank', 'receivable', 'payable'].includes(other.subtype), `${label}: choose an income, expense or other account`)
       }
+      const contactId = item.contactId ? text(item.contactId, `${label} payee`) : null
+      if (contactId) requireThat(await one(db, 'SELECT 1 FROM pt_contacts WHERE id = ? AND active = 1 AND kind = ?', contactId, direction === 'in' ? 'customer' : 'vendor'), 'Choose an active payee')
       const entryId = uid(), into = direction === 'in'
       statements.push(...entryStatements({ id: entryId, date: item.date ?? day, memo: memo || `${type === 'transfer' ? 'Transfer' : other.name} — ${lines[0].description}`, sourceKind: 'bank', documentId: item.documentId ?? null, preparedBy: actor.email, preparedKind: 'person', lines: [
-        { accountId: into ? bank.account_id : other.id, debit: amount, credit: 0, memo },
-        { accountId: into ? other.id : bank.account_id, debit: 0, credit: amount, memo },
+        { accountId: into ? bank.account_id : other.id, debit: amount, credit: 0, memo, contactId: into ? null : contactId },
+        { accountId: into ? other.id : bank.account_id, debit: 0, credit: amount, memo, contactId: into ? contactId : null },
       ] }, actor.email))
       created.push({ entryId, signed: into ? amount : -amount, kind: type })
     } else requireThat(false, `${label}: type is receipt, payment, fee, income or transfer`)
@@ -89,8 +92,17 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
 }
 
 const approveMatch: Command = { need: 'record', async run(c, b) {
-  const plan = await matchPlan(c.db, c.actor, matchInput(b))
-  await run(c.db, [authority(c.actor, 'record'), ...plan.statements])
+  const input = matchInput(b)
+  const plan = await matchPlan(c.db, c.actor, input)
+  const lines = await all(c.db, `SELECT * FROM pt_bank_lines WHERE id IN (${input.bankLineIds.map(() => '?').join(',')})`, ...input.bankLineIds)
+  const selected = input.create.filter(i => i.type === 'fee' || i.type === 'income').map(i => i.accountId)
+  for (const payment of input.create.filter(i => i.type === 'payment')) for (const allocation of payment.allocations ?? []) {
+    for (const line of await all(c.db, 'SELECT account_id FROM pt_bill_lines WHERE bill_id = ?', allocation.targetId)) selected.push(line.account_id)
+  }
+  // A first decision is recorded only for actual new category filings, not an
+  // existing payment/transfer match where no category was chosen.
+  const decisions = selected.length ? await suggestionDecisions(c.db, lines, selected, who(c.actor), input.create.map(i => i.contactId).filter(Boolean)) : []
+  await run(c.db, [authority(c.actor, 'record'), ...plan.statements, ...decisions])
   return { id: plan.id }
 } }
 

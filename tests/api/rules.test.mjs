@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { at, fixture, harness } from './harness.mjs'
+import { at, books, fixture, harness } from './harness.mjs'
 import { fakePlaid } from './plaid.mjs'
 import { closeReady, importStatements, matchSeptember, september } from './scenario.mjs'
 
@@ -136,4 +136,70 @@ test('RULE-002 bank rules that file routine lines', async t => {
   const viewer = await h.member('vic@example.test', 'viewer')
   await h.command('bank-rule.save', { ...adobe, name: 'Adobe again' }, viewer, 403)
   assert.ok((await h.view('reports/trial-balance?to=2026-11-30&basis=accrual')).balanced)
+})
+
+
+test('RULE-003 learned line suggestions follow human corrections and show decision rates for history, vendors and documents without posting', async t => {
+  const reading = { receipt: true, vendor: 'DOC MERCHANT', date: '2026-09-09', total: '64.18', currency: 'USD', category: '6200', note: '' }
+  const h = await harness({ outbound: async request => {
+    assert.equal(new URL(request.url).hostname, 'api.anthropic.com')
+    return Response.json({ content: [{ type: 'text', text: JSON.stringify(reading) }], stop_reason: 'end_turn' })
+  } }); t.after(() => h.close())
+  const { acct } = await books(h)
+  const bank = await h.command('bank-account.save', { name: 'Operating checking', institution: 'Chase', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-08-31', openingBalance: '10000.00' })
+  const rows = [...[1,2,3,4,5,6,7].map(day => [`09/0${day}/2026`, 'ADOBE', '-20.00']), ['09/08/2026', 'Willow Office', '-35.00'], ['09/09/2026', 'DOC MERCHANT', '-64.18']]
+  await h.command('statement.import', { bankAccountId: bank.id, fileName: 'learned-lines.csv', content: 'Posting Date,Description,Amount\n' + rows.map(r => r.join(',')).join('\n') + '\n', opening: '10000.00', closing: '9760.82', start: '2026-09-01', end: '2026-09-30', confirmLast4: '4821' })
+  const queue = () => h.view('bank/lines')
+  const file = (line, accountId) => h.command('match.approve', { bankLineIds: [line.id], create: [{ type: 'fee', amount: (Math.abs(line.amount_cents) / 100).toFixed(2), direction: 'out', accountId }] })
+  let q = await queue()
+  const adobe = q.lines.filter(l => l.description === 'ADOBE').sort((a,b) => a.posted_date.localeCompare(b.posted_date))
+  assert.equal(Object.keys(q.suggestions).length, 0)
+  for (const line of adobe.slice(0,5)) await file(line, acct['6200'])
+  q = await queue()
+  const sixth = q.suggestions[adobe[5].id]
+  assert.equal(sixth.accountId, acct['6200']); assert.equal(sixth.source, 'history'); assert.equal(sixth.evidenceCount, 5)
+  assert.ok(sixth.reason.includes(sixth.payee) && sixth.reason.includes(sixth.accountName))
+  assert.ok(sixth.confidence > 0 && sixth.confidence < 100)
+  assert.equal(q.lines.find(l => l.id === adobe[5].id).match_id, null, 'advice never posts')
+  await file(adobe[5], acct['6300'])
+  q = await queue()
+  assert.equal(q.suggestions[adobe[6].id].accountId, acct['6300'], 'latest changed choice guides the next line instead of an older majority')
+  const history = q.suggestionRates.find(r => r.source === 'history')
+  assert.deepEqual([history.accepted, history.changed], [4,1])
+  assert.equal(history.acceptanceRate, Math.round(100 * history.accepted / history.total))
+  assert.equal(history.changeRate, Math.round(100 * history.changed / history.total))
+  const historyEvents = (await h.view('activity?kind=bank-line')).audit.filter(a => a.action === 'suggestion.decision')
+  assert.equal(historyEvents.length, 5)
+  assert.ok(historyEvents.every(a => a.actor_kind === 'person'))
+
+  const vendor = await h.command('contact.save', { kind: 'vendor', name: 'Willow Office', termsDays: 30, defaultAccountId: acct['6300'] })
+  q = await queue()
+  const willow = q.lines.find(l => l.description === vendor.name), defaultSuggestion = q.suggestions[willow.id]
+  assert.deepEqual([defaultSuggestion.source, defaultSuggestion.contactId, defaultSuggestion.accountId], ['vendor', vendor.id, acct['6300']])
+  await file(willow, acct['6100'])
+  assert.deepEqual((await queue()).suggestionRates.filter(r => r.source === 'vendor').map(r => [r.accepted, r.changed]), [[0,1]])
+
+  await h.command('reader.save', { provider: 'anthropic', model: 'claude-sonnet-5-5', key: 'synthetic-reader-key' })
+  const form = new FormData(); form.set('file', new Blob(['Documented software receipt $64.18'], { type: 'text/plain' }), 'software-receipt.txt')
+  const captured = await fetch(`${h.origin}/api/pantry/receipts/capture`, { method: 'POST', headers: { origin: h.origin, cookie: h.owner }, body: form })
+  assert.equal(captured.status, 200)
+  const capturedId = (await captured.json()).id
+  const receipt = (await h.view('receipts')).review.find(r => r.id === capturedId)
+  const docVendor = await h.command('contact.save', { kind: 'vendor', name: reading.vendor, termsDays: 30 })
+  const bill = await h.command('bill.save', { vendorId: docVendor.id, reference: 'DOC-64', billDate: '2026-09-09', lines: [{ description: 'Documented software', accountId: acct['6200'], amount: '64.18' }], post: true })
+  await h.command('receipt.attach', { id: receipt.id, revision: receipt.revision, targetKind: 'bill', targetId: bill.id })
+  q = await queue()
+  const documented = q.lines.find(l => l.description === reading.vendor)
+  assert.deepEqual([q.suggestions[documented.id].source, q.suggestions[documented.id].accountId], ['document', acct['6200']])
+  assert.ok(q.suggestions[documented.id].reason.includes('software-receipt.txt'))
+  assert.equal(q.suggestions[documented.id].billId, bill.id)
+  await h.command('match.approve', { bankLineIds: [documented.id], create: [{ type: 'payment', contactId: docVendor.id, amount: '64.18', allocations: [{ targetId: bill.id, amount: '64.18' }] }] })
+  assert.equal((await h.view('sales')).bills.find(b => b.id === bill.id).open_cents, 0)
+  assert.equal((await h.view('reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=accrual')).expenses.find(a => a.id === acct['6200']).amount, 16418, 'payment settles the bill without posting its expense twice')
+  assert.deepEqual((await queue()).suggestionRates.filter(r => r.source === 'document').map(r => [r.accepted, r.changed]), [[1,0]])
+  await h.command('bank-rule.save', { name: 'Adobe owner review', payee: 'Adobe', accountId: acct['6200'], mode: 'suggest' })
+  q = await queue()
+  assert.equal(q.suggestions[adobe[6].id], undefined, 'a covering rule owns this line in either mode')
+  assert.equal(q.lines.find(l => l.id === adobe[6].id).match_id, null)
+  assert.ok((await h.view('reports/trial-balance?to=2026-09-30&basis=accrual')).balanced)
 })
