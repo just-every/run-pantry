@@ -590,7 +590,7 @@ Every capability claimed on the homepage rebuilt on the owner-approved page stru
 | 7 | Hero cards | Chase Business ••4417 feed, 2,847 transactions | BANK-001, BANK-004 | done on installations holding their own Plaid keys |
 | 8 | Hero cards | Home Depot receipt read into vendor, date, category | PAN-17, CAPTURE-003 | done with the installation's own AI key (PAN-17) |
 | 9 | Hero cards | Stripe payout matched to 23 charges, fees split | PAN-19, PROC-001 | done (PAN-19, `tests/api/connected.test.mjs`) |
-| 10 | Hero cards | INV-0231 "Paid via ACH" | PAY-003 | done: the customer's ACH transfer arrives on the bank feed and matches its invoice by itself (`src/pantry/automatch.ts`) |
+| 10 | Hero cards | INV-0231 "Paid via ACH" | PAY-004 | partial: the customer's outside-Stripe ACH transfer proposes its invoice for one confirmation (`src/pantry/automatch.ts`, `deposit-confirm.ts`); the homepage automatic claim is not backed |
 | 11 | Hero cards | "Looks right, closing October · Reviewed by your accountant" | PAN-13 | done |
 | 12 | A month in the books | "one bank, one card, Stripe, Gusto and an accountant" | BANK-001, PAN-19, PAN-01 | done |
 | 13 | A month in the books | "Oct 1 · 2,847 transactions backfilled" | BANK-002 | done for a new connection's 730 days of history without duplicating imported lines (`src/pantry/feeds/plaid.ts`, `sync.ts`); BANK-002's start-date choices are partial |
@@ -611,7 +611,7 @@ Every capability claimed on the homepage rebuilt on the owner-approved page stru
 | 28 | Snap it or forward it. | "files each receipt once" ("Emailed copy skipped · already attached") | CAPTURE-005 | done for receipt bytes and vendor/date/total, with Skip or an audited Keep both; the clause remains partial for invoice-number matching and other documents |
 | 29 | Sent. Reminded. Paid. Matched. | "Email the invoice with a card … link" | INVOICE-002, PAY-001 | done for card through the business's own Stripe |
 | 30 | Sent. Reminded. Paid. Matched. | "Reminders go out on schedule" | INVOICE-004 | done |
-| 31 | Sent. Reminded. Paid. Matched. | "the payment matches itself" (emailed, viewed, reminded, paid by ACH bank transfer, matched) | INVOICE-002, INVOICE-003, PAY-003 | done |
+| 31 | Sent. Reminded. Paid. Matched. | "the payment matches itself" (emailed, viewed, reminded, paid by ACH bank transfer, matched) | INVOICE-002, INVOICE-003, PAY-003, PAY-004 | partial: outside-Stripe bank deposits require one confirmation; provider payout matching is automatic |
 | 32 | Sent. Reminded. Paid. Matched. | Recurring INV-0240; Receivables aging | INVOICE-005, REPORT-004 | done |
 | 33 | Sent. Reminded. Paid. Matched. | "… or ACH link" | PAY-001 | done: real US Stripe test Checkout, bank verification, processing, payment and fee recorded once |
 | 34 | When a feed breaks, you see it. | Connection status, last successful sync, the plain-words sign-in error and Re-link | BANK-004 | done |
@@ -648,8 +648,8 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 8 | 64 | 48 | 120 |
-| All | 27 | 64 | 48 | 139 |
+| Target and push further | 9 | 63 | 48 | 120 |
+| All | 28 | 63 | 48 | 139 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -698,7 +698,7 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | `PAY-001` | Card and ACH payment from the invoice link | target | partial | `src/pantry/stripe.ts`, `src/pantry/stripe-api.ts`, `src/pantry/customer-page.ts`, `tests/api/invoices-out.test.mjs` | The owner connects the business's own Stripe key; customers pay by card, or ACH bank debit on a US account, in Stripe Checkout from the invoice link, and card and bank numbers never reach Pantry; OAuth connection, methods and partial payments chosen per customer or invoice, Apple Pay and Google Pay shown on the page, and the card surcharge do not exist. ACH is proven through real US Stripe test Checkout, including bank verification, processing and settlement into one allocated payment with its fee. |
 | `PAY-002` | Payment status follows the provider | target | partial | `src/pantry/stripe.ts`, `src/pantry/stripe-api.ts`, `tests/api/invoices-out.test.mjs` | Signature-verified Stripe webhooks name a session that Pantry reads back from Stripe before recording the payment and its fee once, with failed and expired sessions recorded; ACH processing state on the invoice, returns with linked reversals, disputes, Stripe refunds, the daily comparison and payment receipts to the payer do not exist. |
 | `PAY-003` | Payments that match themselves | target | done | `src/pantry/stripe.ts`, `src/pantry/payouts.ts`, `src/pantry/provider-match.ts`, `tests/api/connected.test.mjs` |  |
-| `PAY-004` | Payments from outside Stripe applied for you | target | partial | `src/pantry/automatch.ts`, `src/pantry/payables.ts`, `tests/api/invoices-out.test.mjs` | A deposit equal to one open invoice's balance whose text names that invoice or the customer's bank reference records the payment and matches itself with an undo, and ambiguous deposits wait with the reason; a proposal from the amount and customer alone, confirmed by one action, does not exist. |
+| `PAY-004` | Payments from outside Stripe applied for you | target | done | `src/pantry/automatch.ts`, `src/pantry/deposit-confirm.ts`, `src/ui/deposit-proposal.tsx`, `tests/api/invoices-out.test.mjs` › PAY-004 | Feed and file deposits propose by invoice number, customer reference or one unique exact amount; one authorised confirmation records and allocates the receipt and matches the deposit atomically. Ambiguity waits, repeated confirmation/import cannot double-post, and undo reopens the invoice. |
 | `PAY-005` | Saved payment methods and autopay | target | missing |  | No implementation. |
 | `INVOICE-004` | Reminders that stop once paid | target | partial | `src/pantry/delivery.ts`, `src/pantry/due.ts`, `tests/api/invoices-out.test.mjs` | Reminders follow the business's schedule of days before and after the due date, once per step, can be paused per invoice and stop when paid; editable wording and merge fields, per-customer schedules, stopping on void, credit or dispute, pausing while ACH processes, the one-a-day limit and text reminders (INVOICE-011) do not exist. |
 | `INVOICE-005` | Recurring invoices | target | done | `src/pantry/recurring.ts`, `src/pantry/recurring-prices.ts`, `src/ui/recurring.tsx`, `tests/api/invoices-out.test.mjs`, `tests/api/recurring-prices.test.mjs` › INVOICE-005 | Weekly, monthly, quarterly and yearly schedules with end dates, draft or approved automatic sending, exact per-line amount approvals, dated price changes with separate revision approval, once-only catch-up and visible failed runs and mail outcomes. |

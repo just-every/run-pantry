@@ -24,7 +24,7 @@ export function matchInput(b: Data): MatchInput {
 }
 
 /** Validate a match and build its batch. Pantry's own matches are `automatic` and name the receipt they record. */
-export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchInput, { automatic = false } = {}) {
+export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchInput, { automatic = false, recordedReceipt = false } = {}) {
   const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE id IN (${input.bankLineIds.map(() => '?').join(',')})`, ...input.bankLineIds)
   requireThat(lines.length === input.bankLineIds.length, 'A statement line was not found', 404)
   const bankId = lines[0].bank_account_id
@@ -77,7 +77,7 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
 
   const id = uid()
   statements.push(
-    q("INSERT INTO pt_matches (id, bank_account_id, status, proposal_id, note, approved_by, approved_at, revision, automatic, payment_id) VALUES (?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?)", id, bank.id, input.proposalId ?? null, input.note ?? '', actor.email, now(), uid(), automatic ? 1 : 0, automatic ? created.find(x => x.paymentId)?.paymentId ?? null : null),
+    q("INSERT INTO pt_matches (id, bank_account_id, status, proposal_id, note, approved_by, approved_at, revision, automatic, payment_id) VALUES (?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?)", id, bank.id, input.proposalId ?? null, input.note ?? '', actor.email, now(), uid(), automatic ? 1 : 0, automatic || recordedReceipt ? created.find(x => x.paymentId)?.paymentId ?? null : null),
     ...lines.map(l => q('INSERT INTO pt_match_bank_lines (match_id, bank_line_id, active) VALUES (?, ?, 1)', id, l.id)),
     ...postings.map(p => q('INSERT INTO pt_match_postings (match_id, journal_line_id, active) VALUES (?, ?, 1)', id, p.id)),
     // The new postings' bank-account lines join the match inside the same batch.
@@ -101,10 +101,10 @@ const undoMatch: Command = { need: 'record', async run(c, b) {
   const days = await all(c.db, 'SELECT l.posted_date FROM pt_match_bank_lines m JOIN pt_bank_lines l ON l.id = m.bank_line_id WHERE m.match_id = ?', match.id)
   for (const d of days) await assertOpen(c.db, d.posted_date)
   const reversal: Sql[] = []
-  if (match.automatic && match.payment_id) {
+  if (match.payment_id) {
     const payment = (await one(c.db, 'SELECT * FROM pt_payments WHERE id = ?', match.payment_id))!
     const original = await entry(c.db, payment.journal_id)
-    const r = await reversalStatements(c.db, who(c.actor), original, original.entry_date, `Undo of an automatic match: ${original.memo}`, { unmatching: true })
+    const r = await reversalStatements(c.db, who(c.actor), original, original.entry_date, `Undo of a bank match: ${original.memo}`, { unmatching: true })
     reversal.push(...r.statements, q('UPDATE pt_payments SET reversal_id = ? WHERE id = ? AND reversal_id IS NULL', r.id, payment.id), changed())
   }
   await run(c.db, [authority(c.actor, 'record'),

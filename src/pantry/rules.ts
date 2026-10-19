@@ -4,6 +4,7 @@
 // contact, a tax code, a memo). Filing posts a balanced bank entry and matches
 // the line to it, marked with the rule; undo reverses that entry. Rules never
 // file a line in a locked month or inside a reconciled statement period.
+import { depositProposals } from './automatch'
 import { authority, who } from './access'
 import { cents, Fault, now, optionalText, requireThat, scale, text, uid, type Data } from './core'
 import { all, audit, changed, guard, one, periodOpen, q, run, type AuditActor, type Sql } from './db'
@@ -138,7 +139,9 @@ export async function applyRules(db: D1Database, lineIds: string[], filer: (rule
   for (let i = 0; i < lineIds.length; i += 100) {
     const chunk = lineIds.slice(i, i + 100)
     const lines = await all(db, `${OPEN_LINES} AND l.id IN (${chunk.map(() => '?').join(',')}) ORDER BY l.posted_date, l.id`, ...chunk)
+    const depositSuggestions = await depositProposals(db, lines)
     for (const line of lines) {
+      if (depositSuggestions[line.id]) continue
       const rule = active.find(r => ruleMatches(r, line))
       if (!rule) continue
       if (await blocked(db, line)) { result.skipped++; continue }

@@ -1,9 +1,6 @@
-// Deposits that match their invoice by themselves. When a bank line arrives
-// (imported today, from a feed later) whose amount equals one open invoice's
-// balance and whose text names that invoice or its customer's bank reference,
-// Pantry records the receipt and matches it, marked "matched automatically"
-// with an undo. Anything less certain is left for a person, with the reason.
-// A payment already recorded meets its own bank line the same way (matchRecorded).
+// Deposit suggestions are recalculated from current open invoices. Confirmation
+// records the receipt and clears the bank line atomically. Recorded payments
+// still clear automatically without another posting.
 import { pantry } from './access'
 import { Fault, usd, type Data } from './core'
 import { all, one, run } from './db'
@@ -31,34 +28,29 @@ export function judge(line: Data, invoices: Candidate[]): { invoice?: Candidate;
   if (byNumber.length === 1) return { invoice: byNumber[0], possible: same }
   const byCustomer = same.filter(i => plain(i.bank_reference).length >= 3 && words.includes(plain(i.bank_reference)))
   if (!byNumber.length && byCustomer.length === 1) return { invoice: byCustomer[0], possible: same }
+  if (!byNumber.length && !byCustomer.length && same.length === 1) return { invoice: same[0], possible: same }
   const named = byNumber.length ? byNumber : byCustomer
   if (named.length > 1) return { possible: named, reason: `${named.length} open invoices of ${usd(line.amount_cents)} fit this deposit (${named.map(i => i.number).join(', ')}); choose the one it pays` }
   return { possible: same, reason: `Same amount as ${same.map(i => `${i.number} (${i.customer_name})`).join(', ')}, but the deposit names neither the invoice nor the customer's bank reference; confirm it` }
 }
 
-/** Match the given new lines where exactly one invoice fits; return what was matched and what waits for a person. */
+/** Suggest incoming deposits; importing a bank line never records a new receipt. */
 export async function matchDeposits(db: D1Database, lineIds: string[]) {
-  const matched: Data[] = [], needsPerson: Data[] = []
-  if (!lineIds.length) return { matched, needsPerson }
-  const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE amount_cents > 0 AND id IN (${lineIds.map(() => '?').join(',')}) ORDER BY posted_date, id`, ...lineIds)
+  if (!lineIds.length) return { matched: [], needsPerson: [], proposed: [] }
+  const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE amount_cents > 0 AND removed_at IS NULL AND id IN (${lineIds.map(() => '?').join(',')}) ORDER BY posted_date, id`, ...lineIds)
+  const proposals = await depositProposals(db, lines), invoices = await openInvoices(db)
+  return { matched: [], proposed: Object.values(proposals), needsPerson: lines.filter(l => !proposals[l.id]).flatMap(l => { const reason = judge(l, invoices).reason; return reason ? [{ lineId: l.id, reason }] : [] }) }
+}
+
+/** Current suggestions, shared by the transaction queue and reconciliation. */
+export async function depositProposals(db: D1Database, lines: Data[]) {
+  const invoices = await openInvoices(db), proposals: Record<string, Data> = {}
   for (const line of lines) {
-    const verdict = judge(line, await openInvoices(db))
-    if (!verdict.invoice) { if (verdict.reason) needsPerson.push({ lineId: line.id, description: line.description, amount: line.amount_cents, reason: verdict.reason }); continue }
-    const inv = verdict.invoice, amount = (line.amount_cents / 100).toFixed(2)
-    try {
-      const plan = await matchPlan(db, pantry('auto-match'), {
-        bankLineIds: [line.id], journalLineIds: [],
-        create: [{ type: 'receipt', amount, contactId: inv.customer_id, date: line.posted_date, reference: line.reference || inv.number, memo: `Matched automatically to ${inv.number}`, allocations: [{ targetId: inv.id, amount }] }],
-        note: `Matched automatically: ${usd(line.amount_cents)} from ${inv.customer_name} pays ${inv.number}`,
-      }, { automatic: true })
-      await run(db, plan.statements)
-      matched.push({ lineId: line.id, matchId: plan.id, invoice: inv.number, customer: inv.customer_name, amount: line.amount_cents })
-    } catch (error) {
-      if (!(error instanceof Fault)) throw error
-      needsPerson.push({ lineId: line.id, description: line.description, amount: line.amount_cents, reason: `Pantry could not match it to ${inv.number}: ${error.message}` })
-    }
+    if (line.match_id || line.removed_at) continue
+    const inv = judge(line, invoices).invoice
+    if (inv) proposals[line.id] = { lineId: line.id, invoiceId: inv.id, invoice: inv.number, customerId: inv.customer_id, customer: inv.customer_name, amount: line.amount_cents }
   }
-  return { matched, needsPerson }
+  return proposals
 }
 
 /** Payments recorded before their bank line arrived. A new line of exactly a recorded payment's amount, on its bank

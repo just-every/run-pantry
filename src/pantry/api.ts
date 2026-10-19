@@ -44,7 +44,8 @@ import { recurringCommands, recurringView } from './recurring'
 import { stripeCommands, stripeView } from './stripe'
 import { payoutCommands, payoutsView } from './payouts'
 import { gustoCommands, gustoRoutes, gustoView } from './gusto/commands'
-import { depositNotes } from './automatch'
+import { depositNotes, depositProposals } from './automatch'
+import { depositCommands } from './deposit-confirm'
 import { customer } from './customer-page'
 import { runDueWork } from './due'
 import { parse as parseQuestion, withThreads as questionThreads } from './questions/store'
@@ -54,7 +55,7 @@ import { integrations } from './integrations/routes'
 
 const commands: Record<string, Command> = {
   ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands,
-  ...bankCommands, ...matchCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
+  ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
 }
@@ -94,7 +95,7 @@ view('bank', async ctx => bankView(ctx.db))
 view('bank/lines', async ctx => bankLinesView(ctx.db))
 view('bank/rules', async ctx => rulesView(ctx.db))
 view('bank/feeds', async ctx => feedsView(ctx))
-view('reconciliation/:statement', async (ctx, c) => { const r = await reconciliationState(ctx.db, c.req.param('statement')!); return { ...r, depositNotes: await depositNotes(ctx.db, r.lines) } })
+view('reconciliation/:statement', async (ctx, c) => { const r = await reconciliationState(ctx.db, c.req.param('statement')!); return { ...r, depositNotes: await depositNotes(ctx.db, r.lines), depositProposals: await depositProposals(ctx.db, r.lines) } })
 view('close/:period', async (ctx, c) => closeState(ctx.db, c.req.param('period')!))
 view('proposals', async ctx => ({ proposals: await proposalsView(ctx.db) }))
 view('questions/record', async (ctx, c) => ({ questions: await questionThreads(ctx.db, (await all(ctx.db, 'SELECT * FROM pt_questions WHERE subject_kind = ? AND subject_id = ? ORDER BY asked_at', c.req.query('kind') ?? '', c.req.query('id') ?? '')).map(parseQuestion)) }))
