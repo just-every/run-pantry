@@ -7,7 +7,14 @@ import { fakePlaid } from './plaid.mjs'
 const count = async (h, sql) => Number((await h.db.prepare(sql).first()).n)
 
 test('CHECK-001 write expense and bill checks, align and print both stocks, export bank positive pay, void with reversal and clear exact numbers without duplicate postings', async t => {
-  const h = await harness(); t.after(() => h.close())
+  const plaid = await fakePlaid(), accountId = at(plaid.recorded['accounts-get'].accounts, a => a.mask === '0000').account_id
+  const feedRows = [['1001', 125.25], ['001002', 280.10], ['1003', 42], ['10010 ACME SONS', 125.25], ['1001', 999]].map(([number, amount], i) => ({ account_id: accountId, transaction_id: `check-clearing-${i}`, date: '2026-10-10', authorized_date: '2026-10-10', amount, name: `CHECK ${number}`, merchant_name: 'Acme & Sons', check_number: number, pending: false, iso_currency_code: 'USD' }))
+  let synced = false
+  const h = await harness({ bindings: plaid.bindings, outbound: request => {
+    if (new URL(request.url).pathname !== '/transactions/sync') return plaid.outbound(request)
+    const added = synced ? [] : feedRows; synced = true
+    return Response.json({ accounts: [], added, modified: [], removed: [], has_more: false, next_cursor: 'checks-cursor', transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE', request_id: 'check-clearing' })
+  } }); t.after(() => h.close())
   const { acct } = await books(h)
   const bank = await h.command('bank-account.save', { name: 'Checking', institution: 'Community Bank', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-08-31', openingBalance: '0' })
   const vendor = await h.command('contact.save', { kind: 'vendor', name: 'Acme & Sons', termsDays: 30 })
@@ -57,8 +64,16 @@ test('CHECK-001 write expense and bill checks, align and print both stocks, expo
   assert.match(csv.value, /"1003","4200","09022026","Acme & Sons","CANCEL"/)
   assert.equal((await h.send(exported.url, undefined, { cookie: viewer })).status, 403)
   const beforeMatch = (await h.view('journal')).entries.length
+  const connection = await h.command('feed.connect', { publicToken: 'synthetic-checks-token', institution: { name: 'Community Bank' } })
+  await h.command('feed.map', { itemId: connection.id, accounts: [{ id: at(connection.accounts, a => a.mask === '0000').id, bankAccountId: bank.id }] })
+  const fed = await h.view('bank/lines'), cleared = fed.lines.filter(l => l.bank_account_id === bank.id && l.match_id)
+  assert.deepEqual(cleared.map(l => l.feed_txn_id).sort(), ['check-clearing-0', 'check-clearing-1'])
+  assert.equal((await h.view('journal')).entries.length, beforeMatch, 'provider-feed clearing never posts a second payment')
+  await h.command('feed.sync', { itemId: connection.id })
+  assert.equal((await h.view('bank/lines')).lines.filter(l => l.feed_txn_id?.startsWith('check-clearing-')).length, 5)
+  assert.equal((await h.view('journal')).entries.length, beforeMatch, 'replaying a sync never duplicates a check payment')
   const statement = await h.command('statement.import', { bankAccountId: bank.id, fileName: 'cleared-checks.csv', content: 'Posting Date,Description,Amount\n10/10/2026,CHECK 1001,-125.25\n10/10/2026,CHECK 001002,-280.10\n10/10/2026,CHECK 1003,-42.00\n10/10/2026,CHECK 10010 ACME SONS,-125.25\n10/10/2026,CHECK 1001,-999.00\n', opening: '0', closing: '-1571.60', start: '2026-10-01', end: '2026-10-31', confirmLast4: '4821' })
-  assert.deepEqual(statement.recorded.map(c => c.payment).sort(), batch.checks.slice(0, 2).map(c => c.payment_id).sort())
+  assert.equal(statement.fromFeed, 5, 'statement import reuses the fed checks, retaining their existing matches')
   assert.equal((await h.view('journal')).entries.length, beforeMatch)
   const reconciliation = await h.view('reconciliation/' + statement.statement.id)
   assert.equal(reconciliation.lines.filter(l => l.match_id).length, 2)
