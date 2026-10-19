@@ -11,14 +11,15 @@ export type Line = { accountId: string; debit: number; credit: number; memo?: st
 export type Entry = {
   id: string; date: string; memo: string; sourceKind: string; sourceId?: string | null
   preparedBy: string; preparedKind: 'person' | 'agent' | 'import'; proposalId?: string | null; documentId?: string | null; revision?: string
+  adjusting?: boolean
   lines: Line[]
 }
 
 /** Insert an entry as a draft; with `postedBy`, post it in the same batch (the trigger checks balance and locks). */
 export function entryStatements(e: Entry, postedBy?: string): Sql[] {
   const statements: Sql[] = [
-    q('INSERT INTO pt_journal_entries (id, entry_date, memo, source_kind, source_id, status, prepared_by, prepared_kind, proposal_id, document_id, revision, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      e.id, e.date, e.memo, e.sourceKind, e.sourceId ?? null, 'draft', e.preparedBy, e.preparedKind, e.proposalId ?? null, e.documentId ?? null, e.revision ?? uid(), now()),
+    q('INSERT INTO pt_journal_entries (id, entry_date, memo, source_kind, source_id, status, prepared_by, prepared_kind, proposal_id, document_id, revision, created_at, adjusting) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      e.id, e.date, e.memo, e.sourceKind, e.sourceId ?? null, 'draft', e.preparedBy, e.preparedKind, e.proposalId ?? null, e.documentId ?? null, e.revision ?? uid(), now(), e.adjusting ? 1 : 0),
     ...e.lines.map((l, i) => q('INSERT INTO pt_journal_lines (id, entry_id, line_no, account_id, debit_cents, credit_cents, memo, contact_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       uid(), e.id, i + 1, l.accountId, l.debit, l.credit, l.memo ?? '', l.contactId ?? null)),
   ]
@@ -61,22 +62,36 @@ export async function parseLines(db: D1Database, raw: unknown, { control = false
 export async function entry(db: D1Database, id: string) {
   const row = await one(db, 'SELECT * FROM pt_journal_entries WHERE id = ?', id)
   requireThat(row, 'Journal entry not found', 404)
+  row.adjusting = Boolean(row.adjusting)
   row.lines = await all(db, 'SELECT l.*, a.code AS account_code, a.name AS account_name FROM pt_journal_lines l JOIN pt_accounts a ON a.id = l.account_id WHERE l.entry_id = ? ORDER BY l.line_no', id)
   return row
 }
 
-const draftSnapshot = (e: Data) => ({ revision: e.revision, date: e.entry_date, memo: e.memo, documentId: e.document_id, status: e.status,
+const draftSnapshot = (e: Data) => ({ revision: e.revision, date: e.entry_date, memo: e.memo, documentId: e.document_id, status: e.status, adjusting: Boolean(e.adjusting),
   lines: e.lines.map((l: Data) => ({ accountId: l.account_id, debit: l.debit_cents, credit: l.credit_cents, memo: l.memo, contactId: l.contact_id })) })
+
+async function assertAdjustingDate(db: D1Database, day: string) {
+  const entity = await one(db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
+  requireThat(entity, 'Set up the business before recording an adjusting entry')
+  const endMonth = entity.fiscal_year_start === 1 ? 12 : entity.fiscal_year_start - 1
+  const end = new Date(day + 'T00:00:00Z')
+  end.setUTCMonth(endMonth, 0)
+  const endDay = end.toISOString().slice(0, 10)
+  requireThat(day === endDay, `Adjusting entries must be dated on the fiscal year end (${endDay})`)
+}
 
 const saveDraft: Command = { need: 'record', async run(c, b) {
   const day = date(b.date, 'Entry date'), memo = text(b.memo, 'Description', 500)
+  requireThat(b.adjusting === undefined || typeof b.adjusting === 'boolean', 'Adjusting entry must be true or false')
+  const adjusting = b.adjusting ?? false
+  if (adjusting) await assertAdjustingDate(c.db, day)
   await assertOpen(c.db, day)
   const lines = await parseLines(c.db, b.lines)
   const documentId = b.documentId ? text(b.documentId, 'Document') : null
   if (documentId) requireThat(await one(c.db, 'SELECT 1 FROM pt_documents WHERE id = ?', documentId), 'Document not found', 404)
   if (!b.id) {
     const id = uid(), revision = uid()
-    await run(c.db, [authority(c.actor, 'record'), ...entryStatements({ id, revision, date: day, memo, sourceKind: 'manual', preparedBy: c.actor.email, preparedKind: 'person', documentId, lines }), audit(who(c.actor), 'journal.draft', 'journal', id, { date: day, memo, before: null, after: { revision, date: day, memo, documentId, status: 'draft', lines } })])
+    await run(c.db, [authority(c.actor, 'record'), ...entryStatements({ id, revision, date: day, memo, sourceKind: 'manual', preparedBy: c.actor.email, preparedKind: 'person', documentId, adjusting, lines }), audit(who(c.actor), 'journal.draft', 'journal', id, { date: day, memo, before: null, after: { revision, date: day, memo, documentId, adjusting, status: 'draft', lines } })])
     return entry(c.db, id)
   }
   const current = await entry(c.db, text(b.id, 'Entry'))
@@ -84,10 +99,10 @@ const saveDraft: Command = { need: 'record', async run(c, b) {
   requireThat(current.revision === b.revision, 'Entry changed; reload', 409)
   const revision = uid()
   await run(c.db, [authority(c.actor, 'record'),
-    q('UPDATE pt_journal_entries SET entry_date = ?, memo = ?, document_id = ?, prepared_by = ?, revision = ? WHERE id = ? AND revision = ? AND status = ?', day, memo, documentId, c.actor.email, revision, current.id, b.revision, 'draft'), changed(),
+    q('UPDATE pt_journal_entries SET entry_date = ?, memo = ?, document_id = ?, adjusting = ?, prepared_by = ?, revision = ? WHERE id = ? AND revision = ? AND status = ?', day, memo, documentId, adjusting ? 1 : 0, c.actor.email, revision, current.id, b.revision, 'draft'), changed(),
     q('DELETE FROM pt_journal_lines WHERE entry_id = ?', current.id),
     ...lines.map((l, i) => q('INSERT INTO pt_journal_lines (id, entry_id, line_no, account_id, debit_cents, credit_cents, memo, contact_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', uid(), current.id, i + 1, l.accountId, l.debit, l.credit, l.memo ?? '', l.contactId ?? null)),
-    audit(who(c.actor), 'journal.edit', 'journal', current.id, { date: day, memo, before: draftSnapshot(current), after: { revision, date: day, memo, documentId, status: 'draft', lines } })])
+    audit(who(c.actor), 'journal.edit', 'journal', current.id, { date: day, memo, before: draftSnapshot(current), after: { revision, date: day, memo, documentId, adjusting, status: 'draft', lines } })])
   return entry(c.db, current.id)
 } }
 
@@ -105,6 +120,7 @@ const post: Command = { need: 'post', async run(c, b) {
   requireThat(current.source_kind === 'manual', 'Opening balances post through the cutover sign-off', 409)
   requireThat(current.revision === b.revision, 'Entry changed since you reviewed it; review it again', 409)
   requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || current.prepared_by !== c.actor.email), 'Someone other than the preparer approves this entry', 403)
+  if (current.adjusting) await assertAdjustingDate(c.db, current.entry_date)
   await assertOpen(c.db, current.entry_date)
   await run(c.db, [authority(c.actor, 'post'), approval(who(c.actor), 'journal', current.id, current.revision, 'post', 'approved', optionalText(b.note, 'Note', 500)), ...postStatements(current.id, c.actor.email, current.revision), audit(who(c.actor), 'journal.post', 'journal', current.id, { before: draftSnapshot(current), after: { status: 'posted', postedBy: c.actor.email } })])
   return entry(c.db, current.id)
@@ -157,6 +173,6 @@ export async function journalView(db: D1Database) {
   const ids = entries.map(e => e.id)
   const lines = ids.length ? await all(db, `SELECT l.*, a.code AS account_code, a.name AS account_name FROM pt_journal_lines l JOIN pt_accounts a ON a.id = l.account_id WHERE l.entry_id IN (${ids.map(() => '?').join(',')}) ORDER BY l.line_no`, ...ids) : []
   const docs = await entryDocuments(db)
-  for (const e of entries) { e.lines = lines.filter(l => l.entry_id === e.id); e.documents = docs[e.id] ?? [] }
+  for (const e of entries) { e.adjusting = Boolean(e.adjusting); e.lines = lines.filter(l => l.entry_id === e.id); e.documents = docs[e.id] ?? [] }
   return entries
 }

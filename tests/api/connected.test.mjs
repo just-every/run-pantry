@@ -103,7 +103,7 @@ test('PAYOUT-001 a Stripe payout is split into gross sales, Stripe fees and refu
   await m.command('stripe.payouts', { bankAccountId: 'x', salesAccountId: mb.acct['4000'], from: '2026-10-01' }, m.owner, 409)
 })
 
-test('PAYROLL-001 a Gusto payroll posts as one balanced entry (wages, employer taxes, withholdings, net pay) matched to its bank debits, once', async t => {
+test('CLOSE-005 / PAYROLL-001 a Gusto payroll posts as one balanced entry (wages, employer taxes, withholdings, net pay) matched to its bank debits, once', async t => {
   const [token, info, company, payrolls] = await Promise.all(['gusto/oauth-token.json', 'gusto/token-info.json', 'gusto/company.json', 'gusto/payrolls.json'].map(json))
   const GUSTO = { GUSTO_CLIENT_ID: 'demo-client-id', GUSTO_CLIENT_SECRET: 'demo-client-secret', GUSTO_ENV: 'demo' }
   const refreshes = [], live = new Set([token.access_token])
@@ -185,6 +185,12 @@ test('PAYROLL-001 a Gusto payroll posts as one balanced entry (wages, employer t
   assert.equal(net(tb, 'Payroll taxes'), 77843 + 67650)
   assert.equal(net(tb, 'Operating checking'), -(1000343 + 857650), 'the two debits, against no opening entry in this test')
   assert.equal((await h.view('connected')).gusto.connected.error, '')
+
+  const yearEnd = await h.view('year-end/2026')
+  assert.deepEqual(yearEnd.payroll.map(p => [p.uuid, p.ties]).sort(), [[p1.uuid, true], [p2.uuid, true], [p3.uuid, false]].sort())
+  assert.equal(yearEnd.payrollTotals.gross, payrolls.filter(p => p.processed && !p.external).reduce((sum, p) => sum + Math.round(Number(p.totals.gross_pay) * 100), 0))
+  assert.equal(yearEnd.checks.find(c => c.key === 'year-end-payroll').ok, false)
+  assert.ok(yearEnd.checks.find(c => c.key === 'year-end-payroll').items.some(p => p.id === p3.uuid))
 
   // RER Managed cannot reach Gusto yet: one plain line, and connecting is refused.
   const m = await harness({ bindings: { ...GUSTO, ...MANAGED } }); t.after(() => m.close())

@@ -16,6 +16,7 @@ export const changed = (n = 1) => q(`INSERT INTO pt_guard SELECT CASE WHEN chang
 export function faultFrom(error: unknown): Fault | null {
   const message = String((error as Error)?.message ?? error)
   if (message.includes('PANTRY_PERIOD_LOCKED')) return new Fault(409, 'That date is in a locked period; ask for the period to be reopened first')
+  if (message.includes('PANTRY_ADJUSTING_YEAR_END')) return new Fault(409, 'Adjusting entries must be dated at fiscal year end; review the business fiscal year setting')
   if (message.includes('PANTRY_UNBALANCED')) return new Fault(400, 'Entry does not balance: debits must equal credits')
   if (message.includes('PANTRY_POSTED_IMMUTABLE')) return new Fault(409, 'Posted entries cannot change; reverse the entry to correct it')
   if (message.includes('CHECK constraint failed: ok = 1')) return new Fault(409, 'The books or your access changed while you worked; reload and try again')

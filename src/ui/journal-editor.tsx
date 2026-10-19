@@ -17,12 +17,13 @@ export function JournalEditor({ entry, onDone }: { entry?: D; onDone: (saved: D)
   return <form className="form" onSubmit={async e => {
     e.preventDefault(); const f = new FormData(e.currentTarget)
     setBusy(true); setError('')
-    try { onDone(await command('journal.save-draft', { id: entry?.id, revision: entry?.revision, date: f.get('date'), memo: f.get('memo'), lines })) } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+    try { onDone(await command('journal.save-draft', { id: entry?.id, revision: entry?.revision, date: f.get('date'), memo: f.get('memo'), adjusting: f.get('adjusting') === 'on', lines })) } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
   }}>
     <div className="grid-form">
       <Field label="Entry date" name="date" type="date" defaultValue={entry?.entry_date ?? today()} required />
       <Field label="Description" name="memo" defaultValue={entry?.memo} required wide />
     </div>
+    <label><input type="checkbox" name="adjusting" defaultChecked={Boolean(entry?.adjusting)} /> Adjusting entry (fiscal year end)</label>
     <div className="table-wrap"><table className="ledger lines-editor"><thead><tr><th>#</th><th>Account</th><th>Line memo</th><th className="fig">Debit</th><th className="fig">Credit</th><th /></tr></thead>
       <tbody>{lines.map((l, i) => <tr key={i}>
         <td data-label="#">{i + 1}</td>

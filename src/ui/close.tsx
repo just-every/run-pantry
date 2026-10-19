@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router'
 import { Action, Card, Chip, command, Field, Form, Loading, PageHead, Table, day, monthName, thisMonth, usd, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
 import { CaptureButtons } from './receipt-capture'
+import { YearEnd } from './year-end'
 import { RecurringJournals } from './recurring-journals'
 import { MonthQuestions } from './questions'
 
@@ -25,7 +26,7 @@ function ReceiptsCard({ s, onChange }: { s: D; onChange: () => Promise<void> }) 
   </Card>
 }
 
-const LINK: Record<string, string> = { bank: '/app/bank', feeds: '/app/bank', drafts: '/app/books', evidence: '/app/sales', subledgers: '/app/reports', 'trial-balance': '/app/reports', proposals: '/app/agents', questions: '/app/questions' }
+const LINK: Record<string, string> = { bank: '/app/bank', feeds: '/app/bank', drafts: '/app/books', evidence: '/app/sales', subledgers: '/app/reports', 'trial-balance': '/app/reports', proposals: '/app/agents', 'year-end-1099': '/app/reports?report=contractors', 'year-end-payroll': '/app/settings', questions: '/app/questions' }
 
 export function Close() {
   const shared = useShared(), who = useWho(), [period, setPeriod] = useState(() => new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('period') ?? shared.state.overview.closing ?? thisMonth())
@@ -46,7 +47,7 @@ export function Close() {
         </Card>
         <RecurringJournals />
         <MonthQuestions questions={s.questions} month={monthName(period)} onDone={refresh} />
-        <Card title="Review tasks" actions={s.status !== 'locked' && can.record && !s.tasks.length && <Action tone="primary" run={async () => { await command('close.tasks', { period }); await reload() }}>Add the standard review tasks</Action>}>
+        <Card title="Review tasks" actions={s.status !== 'locked' && can.record && (!s.tasks.length || s.checks.some((c: D) => c.key === 'year-end-reviews' && !c.ok)) && <Action tone="primary" run={async () => { await command('close.tasks', { period }); await reload() }}>Add the standard review tasks</Action>}>
           <Table heads={['Task', 'Status', 'Completed by', '']} empty="No review tasks yet. Add the standard ones, or your own.">
             {s.tasks.map((t: D) => <tr key={t.id}><td>{t.title}{t.note && <small className="sub"> — {t.note}</small>}</td><td>{t.status === 'done' ? <Chip tone="good">Done</Chip> : <Chip tone="warn">Open</Chip>}</td><td>{t.done_by ? <>{who(t.done_by)}, {day(t.done_at)}</> : '—'}</td>
               <td>{s.status !== 'locked' && can.record && <Action run={async () => { await command('close.task', { id: t.id, revision: t.revision, done: t.status !== 'done' }); await reload() }}>{t.status === 'done' ? 'Reopen task' : 'Mark done'}</Action>}</td></tr>)}
@@ -76,5 +77,6 @@ export function Close() {
         </Card>
       </div>
     </div>}
+    <YearEnd period={period} />
   </>
 }

@@ -187,7 +187,7 @@ test('SALESTAX-002 sales tax by state and code for a period, from invoice lines,
   await h.command('tax-code.save', { name: 'Nowhere', rate: '5', accountId: s.acct['2200'], state: 'XX' }, h.owner, 400)
 })
 
-test('TAXFORM-002 1099 contractors: cash payments per calendar year by the IRS rules Pantry can apply, flagged at the threshold, forms and CSV in January', async t => {
+test('CLOSE-005 / TAXFORM-002 1099 contractors: cash payments per calendar year by the IRS rules Pantry can apply, flagged at the threshold, forms and CSV in January', async t => {
   const h = await harness(); t.after(() => h.close())
   const { acct } = await books(h)
   const bank = await h.command('bank-account.save', { name: 'Operating checking', institution: 'Chase', accountId: acct['1000'], numberLast4: '4821', openingDate: '2024-12-31', openingBalance: '0.00' })
@@ -202,6 +202,9 @@ test('TAXFORM-002 1099 contractors: cash payments per calendar year by the IRS r
   const bea = await h.member('bea@example.test', 'bookkeeper')
   await h.command('contractor.save', { contactId: v['Ada Okafor'].id, is1099: true }, bea)
   await h.command('contractor.save', { contactId: v['Ben Ruiz Design'].id, is1099: true, legalName: 'Benjamin Ruiz', tinKind: 'ssn', tin: '12345678', address: '1 Main St', city: 'Albany', state: 'NY', zip: '12207' }, bea, 400)
+
+  const readiness = (await h.view('year-end/2025')).checks.find(c => c.key === 'year-end-1099')
+  assert.equal(readiness.ok, false); assert.ok(readiness.items.some(c => c.id === v['Ada Okafor'].id))
 
   let y25 = await h.view('reports/contractors?year=2025', bea)
   assert.deepEqual([y25.threshold, y25.yearEnded], [60000, true])

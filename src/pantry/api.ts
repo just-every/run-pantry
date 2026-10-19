@@ -17,6 +17,8 @@ import { payableCommands, billsView, paymentsView } from './payables'
 import { bankCommands, bankView } from './bank'
 import { matchCommands } from './matching'
 import { reconcileCommands, reconciliationState } from './reconcile'
+import { yearEndCommands, yearEndState, adjustingEntries } from './year-end'
+import { reportPdf } from './report-pdf'
 import { closeCommands, closeState } from './close'
 import { proposalCommands, proposalsView, agentContext, fileProposal, proposal } from './proposals'
 import { moveInCommands, moveInView } from './cutover/commands'
@@ -65,7 +67,7 @@ import { exemptionCommands, exemptionView } from './exemptions'
 
 const commands: Record<string, Command> = {
   ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
-  ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
+  ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
 }
@@ -109,6 +111,16 @@ view('bank/lines', async ctx => bankLinesView(ctx.db))
 view('bank/rules', async ctx => rulesView(ctx.db))
 view('bank/feeds', async ctx => feedsView(ctx))
 view('reconciliation/:statement', async (ctx, c) => { const r = await reconciliationState(ctx.db, c.req.param('statement')!); return { ...r, depositNotes: await depositNotes(ctx.db, r.lines), depositProposals: await depositProposals(ctx.db, r.lines), recordedPayments: await recordedPaymentCandidates(ctx.db, r.lines) } })
+view('year-end/:year', async (ctx, c) => yearEndState(ctx.db, Number(c.req.param('year'))))
+api.get('/api/pantry/year-end/:year/adjusting-entries.pdf', async c => {
+  const ctx = await reader(c), basis = await reportBasis(ctx.db, c.req.query('basis')), r = await adjustingEntries(ctx.db, Number(c.req.param('year'))), entity = await one(ctx.db, 'SELECT legal_name FROM pt_entity WHERE id = 1')
+  return new Response(reportPdf({ business: entity!.legal_name, title: 'Adjusting entries', basis: BASIS_LABEL[basis], range: `${r.start} to ${r.end}`,
+    rows: r.entries.flatMap(e => e.lines.flatMap((l: Data) => [
+      ...(l.debit_cents ? [{ description: `Entry ${e.number} · ${e.memo} · ${l.code} ${l.name} · debit`, amount: l.debit_cents }] : []),
+      ...(l.credit_cents ? [{ description: `Entry ${e.number} · ${e.memo} · ${l.code} ${l.name} · credit`, amount: l.credit_cents }] : [])])),
+    totals: [{ description: 'Total debits', amount: r.debit }, { description: 'Total credits', amount: r.credit }] }),
+    { headers: { 'content-type': 'application/pdf', 'content-disposition': `attachment; filename="adjusting-entries-${r.year}.pdf"`, 'cache-control': 'no-store' } })
+})
 view('close/:period', async (ctx, c) => closeState(ctx.db, c.req.param('period')!))
 view('proposals', async ctx => ({ proposals: await proposalsView(ctx.db) }))
 view('questions/record', async (ctx, c) => ({ questions: await questionThreads(ctx.db, (await all(ctx.db, 'SELECT * FROM pt_questions WHERE subject_kind = ? AND subject_id = ? ORDER BY asked_at', c.req.query('kind') ?? '', c.req.query('id') ?? '')).map(parseQuestion)) }))
@@ -124,6 +136,7 @@ view('reports/detail', async (ctx, c) => {
   return figureDetail(ctx.db, { report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: await reportBasis(ctx.db, c.req.query('basis')) }, Number(e?.fiscal_year_start ?? 1))
 })
 view('reports/record/:kind/:id', async (ctx, c) => recordView(ctx.db, c.req.param('kind')!, c.req.param('id')!))
+view('reports/adjusting-entries', async (ctx, c) => ({ ...await adjustingEntries(ctx.db, year(c)), basis: await reportBasis(ctx.db, c.req.query('basis')) }))
 view('reports/contractors', async (ctx, c) => contractors(ctx.db, year(c)))
 view('reports/cash-flow/detail', async (ctx, c) => cashFlowDetail(ctx.db, day(c, 'from'), day(c, 'to'), c.req.query('line') ?? ''))
 api.get('/api/pantry/reports/cash-flow.csv', async c => {

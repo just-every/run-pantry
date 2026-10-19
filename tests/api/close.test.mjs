@@ -252,3 +252,63 @@ test('CLOSE-001 draft schedules preserve month anchors and failed preparation wa
   assert.equal(new Set(caught.runs_list.map(r => r.occurrence)).size, 14)
   assert.equal(caught.status, 'ended')
 })
+
+test('CLOSE-005 fiscal year closes by calculation with two exact-revision accountant adjustments, readiness reviews and twelve locked months', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const { acct } = await books(h)
+  const ann = await h.member('ann@example.test', 'accountant', { canPost: true, canLock: true }), bea = await h.member('bea@example.test', 'bookkeeper')
+  const payload = { date: '2025-12-31', memo: 'Year-end revenue adjustment', adjusting: true, lines: [{ accountId: acct['1500'], debit: '1000.00' }, { accountId: acct['4000'], credit: '1000.00' }] }
+  await h.command('journal.save-draft', { ...payload, date: '2025-12-30' }, ann, 400)
+  let a = await h.command('journal.save-draft', { ...payload, adjusting: false }, ann)
+  const old = a.revision
+  a = await h.command('journal.save-draft', { ...payload, id: a.id, revision: a.revision }, ann)
+  await h.command('journal.post', { id: a.id, revision: old }, h.owner, 409)
+  a = await h.command('journal.post', { id: a.id, revision: a.revision })
+  const liability = await h.command('account.save', { code: '2500', name: 'Accrued expenses', type: 'liability' })
+  let b = await h.command('journal.save-draft', { date: '2025-12-31', memo: 'Year-end software accrual', adjusting: true, lines: [{ accountId: acct['6200'], debit: '200.00' }, { accountId: liability.id, credit: '200.00' }] }, ann)
+  b = await h.command('journal.post', { id: b.id, revision: b.revision })
+  assert.equal(a.adjusting, true); assert.equal(b.adjusting, true)
+  await assert.rejects(h.db.prepare('UPDATE pt_journal_entries SET adjusting = 0, reverses_id = ? WHERE id = ?').bind(b.id, a.id).run(), /PANTRY_POSTED_IMMUTABLE/)
+  let year = await h.view('year-end/2025')
+  assert.deepEqual(year.adjusting.entries.map(e => e.id), [a.id, b.id]); assert.equal(year.adjusting.debit, 120000); assert.equal(year.adjusting.credit, 120000)
+  assert.ok(year.checks.some(c => c.key === 'year-end-1099')); assert.ok(year.checks.some(c => c.key === 'year-end-payroll'))
+  const earnings = (bs, id) => bs.equity.find(e => e.id === id)?.amount ?? 0
+  assert.deepEqual([earnings(year.closingBalanceSheet, 'current-earnings'), earnings(year.openingBalanceSheet, 'prior-earnings'), earnings(year.openingBalanceSheet, 'current-earnings')], [80000, 80000, 0])
+  assert.equal((await h.view('journal')).entries.filter(e => e.status === 'posted').length, 2, 'earnings rollover writes no closing entry')
+  await h.command('year-end.lock', { year: 2025, revision: year.revision }, bea, 403)
+  await h.command('year-end.lock', { year: 2025, revision: year.revision }, h.owner, 409)
+  await h.command('close.tasks', { period: year.finalPeriod, title: 'Existing review task' })
+  assert.equal((await h.view(`close/${year.finalPeriod}`)).checks.find(c => c.key === 'year-end-reviews').ok, false)
+  for (const period of year.periods) {
+    const close = await h.command('close.tasks', { period })
+    if (period === year.finalPeriod) assert.ok(close.tasks.some(t => /1099/.test(t.title)) && close.tasks.some(t => /payroll/i.test(t.title)))
+    for (const task of close.tasks) await h.command('close.task', { id: task.id, revision: task.revision, done: true })
+  }
+  year = await h.view('year-end/2025'); assert.ok(year.ready)
+  const revision = year.revision
+  await h.command('contact.save', { kind: 'customer', name: 'Late review change' })
+  await h.command('year-end.lock', { year: 2025, revision }, ann, 409)
+  year = await h.view('year-end/2025')
+  const pdf = await h.send('/api/pantry/year-end/2025/adjusting-entries.pdf?basis=accrual', undefined, { cookie: h.owner })
+  assert.equal(pdf.status, 200); assert.match(pdf.value, /Year-end revenue adjustment/); assert.match(pdf.value, /Year-end software accrual/); assert.match(pdf.value, /Accrual basis/)
+  for (const basis of ['cash', 'accrual']) {
+    const list = await h.view(`reports/adjusting-entries?year=2025&basis=${basis}`)
+    assert.equal(list.basis, basis); assert.equal(list.debit, 120000)
+    const exportPdf = await h.send(`/api/pantry/year-end/2025/adjusting-entries.pdf?basis=${basis}`, undefined, { cookie: h.owner })
+    assert.match(exportPdf.value, new RegExp(basis === 'cash' ? 'Cash basis' : 'Accrual basis'))
+  }
+  year = await h.command('year-end.lock', { year: 2025, revision: year.revision }, ann)
+  assert.equal(year.locked, true); assert.equal(year.months.filter(m => m.status === 'locked').length, 12)
+  assert.ok((await h.view('activity')).audit.some(e => e.action === 'year-end.lock'))
+  await h.command('journal.save-draft', { ...payload, date: '2025-06-30', adjusting: false }, h.owner, 409)
+  await h.command('journal.reverse', { id: b.id, date: '2025-12-31' }, h.owner, 409)
+  assert.equal((await h.view('journal')).entries.filter(e => e.status === 'posted').length, 2)
+  const other = await harness(); t.after(() => other.close())
+  const chart = await books(other), entity = (await other.view('state')).settings.entity
+  await other.command('entity.save', { revision: entity.revision, legalName: entity.legal_name, entityType: entity.entity_type, state: entity.state, fiscalYearStart: 7, taxMethod: entity.tax_method, booksStart: entity.books_start })
+  const june = await other.command('journal.save-draft', { date: '2025-06-30', memo: 'June fiscal adjustment', adjusting: true, lines: [{ accountId: chart.acct['1500'], debit: '50.00' }, { accountId: chart.acct['4000'], credit: '50.00' }] })
+  await other.command('journal.post', { id: june.id, revision: june.revision })
+  const nonCalendar = await other.view('year-end/2025')
+  assert.deepEqual([nonCalendar.start, nonCalendar.end, nonCalendar.taxYear], ['2024-07-01', '2025-06-30', 2024])
+  assert.equal(nonCalendar.openingBalanceSheet.equity.find(e => e.id === 'prior-earnings').amount, 5000)
+})

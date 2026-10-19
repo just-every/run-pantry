@@ -59,7 +59,7 @@ function EntryPanel({ e, onChange }: { e: D; onChange: () => Promise<void> }) {
   if (editing) return <Card title="Edit draft"><JournalEditor entry={e} onDone={async () => { setEditing(false); await onChange() }} /></Card>
   return <Card title={<>{e.number ? `Entry ${e.number}` : 'Draft entry'} — {e.memo}</>} actions={e.status === 'posted' ? <Chip tone="good">Posted</Chip> : <Chip tone="warn">Draft</Chip>}>
     {e.status === 'posted' && <div className="callout callout-good"><Icon name="ok" /><div><strong>{e.reversed_by_id ? 'Posted and reversed' : 'Posted — reverse to correct'}</strong><span>{e.reverses_id ? 'This entry reverses an earlier one. ' : ''}Posted entries never change; a reversal keeps both in the history.</span></div></div>}
-    <dl className="facts"><div><dt>Date</dt><dd>{day(e.entry_date)}</dd></div><div><dt>Source</dt><dd>{SOURCE[e.source_kind]}</dd></div><div><dt>Prepared by</dt><dd>{e.prepared_kind === 'agent' && <Icon name="agent" />}{who(e.prepared_by)}</dd></div><div><dt>{e.status === 'posted' ? 'Posted by' : 'Approver'}</dt><dd>{e.posted_by ? who(e.posted_by) : 'The owner, or someone else with the posting grant'}</dd></div></dl>
+    <dl className="facts"><div><dt>Date</dt><dd>{day(e.entry_date)}</dd></div><div><dt>Source</dt><dd>{SOURCE[e.source_kind]}{e.adjusting && <> · <Chip tone="info">Adjusting</Chip></>}</dd></div><div><dt>Prepared by</dt><dd>{e.prepared_kind === 'agent' && <Icon name="agent" />}{who(e.prepared_by)}</dd></div><div><dt>{e.status === 'posted' ? 'Posted by' : 'Approver'}</dt><dd>{e.posted_by ? who(e.posted_by) : 'The owner, or someone else with the posting grant'}</dd></div></dl>
     <Table heads={['#', 'Account', 'Description', 'Debit', 'Credit']} figures={[3, 4]}>
       {e.lines.map((l: D) => <tr key={l.id}><td>{l.line_no}</td><td>{l.account_code} · {l.account_name}</td><td>{l.memo}</td><td className="fig">{l.debit_cents ? usd(l.debit_cents) : '—'}</td><td className="fig">{l.credit_cents ? usd(l.credit_cents) : '—'}</td></tr>)}
     </Table>
@@ -88,7 +88,7 @@ function Journal() {
     <Card title="Journal entries" actions={state.actor.can.record && <button type="button" className="btn btn-primary" onClick={() => { setCreating(true); setSelected(null) }}>New journal entry</button>}>
       <Table heads={['Date', 'Entry', 'Description', 'Status', 'Amount']} figures={[4]} empty="No entries yet. Invoices, bills and payments post here as you record them.">
         {data.entries.map((e: D) => <tr key={e.id} className={selected === e.id ? 'selected' : ''} onClick={() => { setSelected(e.id); setCreating(false) }} tabIndex={0} onKeyDown={k => { if (k.key === 'Enter') { setSelected(e.id); setCreating(false) } }}>
-          <td>{day(e.entry_date)}</td><td>{e.number ?? '—'}</td><td>{e.memo}</td><td>{e.status === 'posted' ? (e.reversed_by_id ? <Chip>Reversed</Chip> : <Chip tone="good">Posted</Chip>) : e.prepared_kind === 'import' ? <Chip tone="info">Staged</Chip> : <Chip tone="warn">Draft</Chip>}</td>
+          <td>{day(e.entry_date)}</td><td>{e.number ?? '—'}</td><td>{e.memo}{e.adjusting && <> <Chip tone="info">Adjusting</Chip></>}</td><td>{e.status === 'posted' ? (e.reversed_by_id ? <Chip>Reversed</Chip> : <Chip tone="good">Posted</Chip>) : e.prepared_kind === 'import' ? <Chip tone="info">Staged</Chip> : <Chip tone="warn">Draft</Chip>}</td>
           <td className="fig">{usd(e.lines.reduce((s: number, l: D) => s + l.debit_cents, 0))}</td></tr>)}
       </Table>
     </Card>

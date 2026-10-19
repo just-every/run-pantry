@@ -1,3 +1,4 @@
+import { YEAR_END_TASKS, yearEndChecks } from './year-end-checks'
 import { feedCloseExceptions } from './feeds/health'
 // Period close: calculated checks plus reviewed tasks, then a lock that both
 // people and agents' approved work must respect. Reopening is a separate
@@ -76,7 +77,11 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
   checks.push({ key: 'questions', title: 'Pantry’s questions answered', ok: waiting.length === 0, items: waiting.map(x => ({ kind: 'question', id: x.id, label: x.title })),
     detail: waiting.length ? openSummary(waiting) : questions.length ? `All ${questions.length} answered or settled` : 'Pantry has asked nothing about this month' })
 
+  const entity = await requireEntity(db)
+  const yearEnd = Number(id.slice(5)) === (Number(entity.fiscal_year_start) + 10) % 12 + 1
+  if (yearEnd) checks.push(...(await yearEndChecks(db, Number(id.slice(0, 4)), entity.fiscal_year_start)).checks)
   const tasks = await all(db, 'SELECT * FROM pt_close_tasks WHERE period = ? ORDER BY title, id', id)
+  if (yearEnd) checks.push({ key: 'year-end-reviews', title: 'Year-end review tasks added', ok: YEAR_END_TASKS.every(title => tasks.some(t => t.title === title)), detail: 'Add the standard review tasks to include 1099 classification and payroll year-end review.' })
   const requests = await all(db, 'SELECT * FROM pt_reopen_requests WHERE period = ? ORDER BY requested_at DESC, id', id)
   const approvals = await all(db, "SELECT * FROM pt_approvals WHERE subject_kind = 'period' AND subject_id = ? ORDER BY at DESC, id", id)
   const notes = await all(db, 'SELECT * FROM pt_notes WHERE period = ? ORDER BY approved_at DESC, id', id)
@@ -88,8 +93,10 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
 
 const ensureTasks: Command = { need: 'record', async run(c, b) {
   const id = text(b.period, 'Period'); monthBounds(id)
-  const existing = await one(c.db, 'SELECT COUNT(*) AS n FROM pt_close_tasks WHERE period = ?', id)
-  const titles = b.title ? [text(b.title, 'Task', 200)] : Number(existing?.n) ? [] : DEFAULT_TASKS
+  const existing = await all(c.db, 'SELECT title FROM pt_close_tasks WHERE period = ?', id)
+  const entity = await requireEntity(c.db), isYearEnd = Number(id.slice(5)) === (Number(entity.fiscal_year_start) + 10) % 12 + 1
+  const defaults = [...DEFAULT_TASKS, ...(isYearEnd ? YEAR_END_TASKS : [])]
+  const titles = b.title ? [text(b.title, 'Task', 200)] : existing.length ? (isYearEnd ? YEAR_END_TASKS.filter(title => !existing.some(t => t.title === title)) : []) : defaults
   await run(c.db, [authority(c.actor, 'record'), guard("NOT EXISTS (SELECT 1 FROM pt_periods WHERE id = ? AND status = 'locked')", id),
     ...titles.map(t => q("INSERT INTO pt_close_tasks (id, period, title, status, revision) VALUES (?, ?, ?, 'open', ?)", uid(), id, t, uid())),
     audit(who(c.actor), 'close.tasks', 'period', id, { added: titles })])
