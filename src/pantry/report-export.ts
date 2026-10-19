@@ -5,14 +5,17 @@ import { BASIS_LABEL, type Basis } from './basis'
 import { balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports'
 import { salesTax } from './sales-tax'
 import { contactTotals } from './contact-totals'
+import { statementColumns } from './statement-columns'
+import { statementExport } from './statement-export'
 import { reportPdf } from './report-pdf'
 
 type Row = { description: string; amount: number }
 const money = (n: number) => (n / 100).toFixed(2)
 const cell = (v: unknown) => `"${String(v).replaceAll('"', '""')}"`
 
-export async function reportExport(db: D1Database, kind: string, from: string, to: string, basis: Basis, format: string) {
+export async function reportExport(db: D1Database, kind: string, from: string, to: string, basis: Basis, format: string, columns?: string) {
   const entity = await one(db, 'SELECT * FROM pt_entity WHERE id = 1')
+  if (columns && columns !== 'single' && (kind === 'profit-and-loss' || kind === 'balance-sheet')) return statementExport(await statementColumns(db, kind, columns, from, to, Number(entity?.fiscal_year_start ?? 1), basis), entity?.legal_name ?? 'Pantry', format)
   let title: string, rows: Row[] = [], totals: Row[] = []
   const row = (description: string, amount: number) => ({ description, amount })
   const statement = (section: string, lines: Data[]) => lines.map(l => row(`${section} · ${l.code ? l.code + ' · ' : ''}${l.name}`, l.amount))

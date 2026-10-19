@@ -7,6 +7,99 @@ import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
 
+test('REPORT-001 statement column modes persist, reconcile and download on cash and accrual at 1440 and 390', async t => {
+  const app = await worker(); t.after(() => app.close())
+  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
+  const owner = await browser.newContext()
+  assert.equal((await owner.request.post(`${app.origin}/auth/bootstrap`, { headers: { origin: app.origin }, data: { token: TOKEN, displayName: 'Rosa Rivera' }, maxRedirects: 0 })).status(), 303)
+  assert.equal((await owner.request.post(`${app.origin}/setup`, { headers: { origin: app.origin }, form: { confirm: 'yes' }, maxRedirects: 0 })).status(), 303)
+  const command = async (op, data) => {
+    const response = await owner.request.post(`${app.origin}/api/pantry/command/${op}`, { headers: { origin: app.origin }, data })
+    assert.equal(response.status(), 200, `${op}: ${await response.text()}`); return response.json()
+  }
+  await command('entity.save', { legalName: 'Rivera Design Studio LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 4, taxMethod: 'cash', booksStart: '2025-01-01', policies: '' })
+  await command('chart.start', {})
+  const state = await (await owner.request.get(`${app.origin}/api/pantry/state`)).json(), acct = Object.fromEntries(state.accounts.map(a => [a.code, a.id]))
+  const bank = await command('bank-account.save', { name: 'Operating checking', institution: 'Chase', accountId: acct['1000'], numberLast4: '4821', routing: '', openingDate: '2025-01-01', openingBalance: '0' })
+  const cedar = await command('contact.save', { kind: 'customer', name: 'Cedar Studio', termsDays: 30 })
+  const maple = await command('contact.save', { kind: 'customer', name: 'Maple Workshop', termsDays: 30 })
+  for (const [date, amount, contactId] of [['2025-09-10', '40.00', cedar.id], ['2026-08-10', '80.00', cedar.id], ['2026-09-10', '120.00', cedar.id], ['2026-09-15', '60.00', maple.id]]) {
+    const entry = await command('journal.save-draft', { date, memo: 'Design consultation received', lines: [{ accountId: acct['1000'], debit: amount }, { accountId: acct['4000'], credit: amount, contactId }] })
+    await command('journal.post', { id: entry.id, revision: entry.revision })
+  }
+  const expense = await command('journal.save-draft', { date: '2026-09-20', memo: 'Studio subscription', lines: [{ accountId: acct['6200'], debit: '25.00' }, { accountId: acct['1000'], credit: '25.00' }] })
+  await command('journal.post', { id: expense.id, revision: expense.revision })
+  const invoice = await command('invoice.save-draft', { customerId: cedar.id, issueDate: '2026-09-12', lines: [{ description: 'Brand consultation', quantity: '1', rate: '150.00', accountId: acct['4000'], taxCode: 'exempt' }] })
+  await command('invoice.approve', { id: invoice.id, revision: invoice.revision }); await command('invoice.issue', { id: invoice.id })
+  await command('payment.record', { direction: 'received', contactId: cedar.id, date: '2026-09-25', amount: '90.00', bankAccountId: bank.id, allocations: [{ targetId: invoice.id, amount: '90.00' }] })
+  const storageState = await owner.storageState(), money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }), number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
+  const display = (value, unit) => value === null ? '—' : unit === 'percent' ? `${number.format(value)}%` : `${value < 0 ? '−' : ''}${money.format(Math.abs(value) / 100)}`
+  for (const width of [1440, 390]) {
+    const context = await browser.newContext({ storageState, viewport: { width, height: width === 390 ? 844 : 1000 } })
+    const page = await context.newPage(), errors = []; page.on('pageerror', e => errors.push(String(e)))
+    await page.goto(`${app.origin}/app/reports?report=profit-and-loss&from=2026-09-01&to=2026-09-30`)
+    for (const [label, slug] of [['Profit and loss', 'profit-and-loss'], ['Balance sheet', 'balance-sheet']]) {
+      if (width === 1440) await page.getByRole('tab', { name: label, exact: true }).click()
+      else await page.getByLabel('Report', { exact: true }).selectOption(label)
+      const picker = page.getByLabel('Columns', { exact: true })
+      await picker.waitFor()
+      assert.equal(await picker.locator('option[value="customer"]').count(), slug === 'profit-and-loss' ? 1 : 0)
+      for (const basis of ['accrual', 'cash']) {
+        await page.getByRole('radio', { name: basis === 'cash' ? 'Cash' : 'Accrual', exact: true }).click()
+        for (const mode of ['single', 'prior-period', 'prior-year', 'months', 'quarters', 'ytd', ...(slug === 'profit-and-loss' ? ['customer'] : [])]) {
+          await picker.selectOption(mode)
+          const query = `from=2026-09-01&to=2026-09-30&basis=${basis}&columns=${mode}`
+          const response = await context.request.get(`${app.origin}/api/pantry/reports/${slug}?${query}`)
+          assert.equal(response.status(), 200, await response.text())
+          const report = await response.json()
+          if (mode === 'single') {
+            await page.getByRole('link', { name: slug === 'profit-and-loss' ? 'Net income' : 'Liabilities and equity', exact: true }).first().waitFor()
+            await page.getByRole('link', { name: slug === 'profit-and-loss' ? 'Net income' : 'Liabilities and equity', exact: true }).first().click()
+            await page.getByText('Adds up to the report figure', { exact: true }).waitFor()
+            await page.getByRole('link', { name: label, exact: true }).click()
+          } else {
+            const table = page.getByRole('table', { name: `${label} · ${mode} · ${basis} basis`, exact: true })
+            await table.waitFor()
+            for (const total of report.totals) {
+              const row = table.getByRole('row').filter({ has: page.getByRole('rowheader', { name: total.name, exact: true }) })
+              await row.getByRole('rowheader', { name: total.name, exact: true }).waitFor()
+              assert.deepEqual(await row.locator('td.fig').allTextContents(), total.values.map((value, i) => display(value, report.columns[i].unit)), `${slug}/${basis}/${mode} ${total.name} at ${width}`)
+            }
+            if (mode === 'customer') for (const name of ['Cedar Studio', 'Maple Workshop', 'Unassigned', 'Total']) assert.ok(report.columns.some(c => c.label === name))
+            if (mode === 'prior-year') assert.ok(report.rows.some(row => row.values.at(-1) === null), 'zero prior percentages stay undefined')
+          }
+          assert.equal(new URL(page.url()).searchParams.get('columns'), mode)
+          for (const format of ['csv', 'pdf']) {
+            const link = page.getByRole('link', { name: `Download ${format.toUpperCase()} · ${basis}`, exact: true }), href = new URL(await link.getAttribute('href'), app.origin)
+            assert.equal(href.searchParams.get('columns'), mode); assert.equal(href.searchParams.get('basis'), basis)
+            const download = await context.request.get(href.href)
+            assert.equal(download.status(), 200, await download.text())
+            assert.match(download.headers()['content-type'], new RegExp(format === 'pdf' ? 'application/pdf' : 'text/csv'))
+            const contents = (await download.body()).toString(format === 'pdf' ? 'latin1' : 'utf8')
+            assert.match(contents, new RegExp(`${basis === 'cash' ? 'Cash' : 'Accrual'} basis`))
+            if (format === 'csv' && mode !== 'single') {
+              const rows = contents.trim().split(/\r?\n/).map(line => [...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(match => match[1].replaceAll('""', '"')))
+              for (const total of report.totals) assert.deepEqual(rows.find(row => row[0] === total.name)?.slice(4), total.values.map((value, i) => value === null ? 'Not comparable (prior is zero)' : report.columns[i].unit === 'percent' ? `${value}%` : (value / 100).toFixed(2)), `${slug}/${basis}/${mode} CSV ${total.name}`)
+            }
+            if (mode === 'prior-period') {
+              const [file] = await Promise.all([page.waitForEvent('download'), link.click()])
+              assert.equal(await file.failure(), null)
+              assert.ok(file.suggestedFilename().endsWith(`.${format}`))
+            }
+          }
+          if (basis === 'accrual') await page.screenshot({ path: `/tmp/sx-pantry-r9-report-${width}-${slug === 'balance-sheet' ? 'balance-sheet-' : ''}${mode}.png`, fullPage: true })
+          assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${slug}/${mode} fits ${width}`)
+        }
+      }
+    }
+    await page.reload()
+    await page.getByLabel('Columns', { exact: true }).waitFor()
+    assert.equal(await page.getByLabel('Columns', { exact: true }).inputValue(), 'ytd', 'columns survive reload')
+    assert.deepEqual(errors, [], `no page errors at ${width}`)
+    await context.close()
+  }
+})
+
 test('REPORT-002 every report opens by clicking it, at 1440 and 390, and a payment made from its bank line pays its bill', async t => {
   const app = await worker(); t.after(() => app.close())
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())

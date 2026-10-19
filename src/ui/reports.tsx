@@ -8,8 +8,9 @@ import { SalesTax } from './sales-tax'
 import { Contractors } from './contractors'
 import { CashFlow, CashFlowDetail } from './cash-flow'
 import { AskAccountant } from './ask-accountant'
+import { ColumnPicker, StatementColumns, columnMode, type ColumnMode, type ColumnStatement } from './statement-columns'
 
-export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string }
+export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string; columns?: string }
 type Basis = 'cash' | 'accrual'
 
 // [tab, slug, reads on a basis, takes a date range]
@@ -79,10 +80,11 @@ const DAY = /^(\d{4})-(\d{2})-\d{2}$/
 const isDay = (v: string) => DAY.test(v)
 const periodOf = (v: string) => { const m = DAY.exec(v); return `${String(Number(m![1])).padStart(4, '0')}-${String(Number(m![2])).padStart(2, '0')}` }
 
-function Report({ slug, basis, from, to }: { slug: string; basis: Basis; from: string; to: string }) {
+function Report({ slug, basis, from, to, columns }: { slug: string; basis: Basis; from: string; to: string; columns: ColumnMode }) {
   const ranged = KINDS.find(k => k[1] === slug)![3]
-  const { data: r, error } = useView<D>(`reports/${slug}?to=${to}${ranged ? `&from=${from}` : ''}&basis=${basis}`)
+  const { data: r, error } = useView<D>(`reports/${slug}?to=${to}${ranged || columns !== 'single' ? `&from=${from}` : ''}&basis=${basis}${columns !== 'single' ? `&columns=${columns}` : ''}`)
   if (!r) return <Loading error={error} what="the report" />
+  if (columns !== 'single') return <StatementColumns report={r as ColumnStatement} />
   if (slug === 'trial-balance') return <Trial r={r} from={from} to={to} basis={basis} />
   if (slug === 'general-ledger') return <Ledger r={r} />
   if (slug === 'profit-and-loss') return <><p className="hint">Choose any line or total to see the records behind it.</p>
@@ -102,6 +104,7 @@ export function Reports() {
   const search = useSearch({ from: '/app/reports' }), navigate = useNavigate({ from: '/app/reports' }), { state } = useShared()
   const set = (patch: ReportSearch) => navigate({ search: (s: ReportSearch) => ({ ...s, ...patch }), replace: !('report' in patch || 'line' in patch || 'record' in patch) })
   const kind = KINDS.find(k => k[1] === search.report) ?? KINDS[0], [label, slug, based, ranged] = kind
+  const statement = slug === 'profit-and-loss' || slug === 'balance-sheet', columns = statement ? columnMode(search.columns, slug) : 'single'
   // The declared tax method picks the basis a report opens on; the switch changes only what is shown.
   const basis: Basis = search.basis === 'cash' || search.basis === 'accrual' ? search.basis : state.settings?.entity?.tax_method === 'cash' ? 'cash' : 'accrual'
   const to = search.to && isDay(search.to) ? search.to : today(), from = search.from && isDay(search.from) ? search.from : to.slice(0, 8) + '01'
@@ -117,10 +120,11 @@ export function Reports() {
       : detail && slug === 'cash-flow' ? <CashFlowDetail line={search.line!} from={from} to={to} />
       : detail ? <FigureDetail report={slug} line={search.line!} from={from} to={to} basis={basis} reportLabel={label} />
       : <Card title={<>{label} <Chip tone="info">{slug === 'cash-flow' ? 'Indirect method · accrual starting income' : based ? BASIS_NAME[basis] : 'Open items · accrual basis'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}
+          {statement && <ColumnPicker mode={columns} kind={slug} onChange={mode => set({ columns: mode, line: undefined, record: undefined })} />}
           {ranged && <div className="field inline"><label htmlFor="r-from">From</label><input id="r-from" type="date" value={from} onChange={e => isDay(e.target.value) && set({ from: e.target.value })} /></div>}
           <div className="field inline"><label htmlFor="r-to">{ranged ? 'To' : 'As of'}</label><input id="r-to" type="date" value={to} onChange={e => isDay(e.target.value) && set({ to: e.target.value })} /></div></div>}>
-          {based && <p className="row-actions"><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?from=${from}&to=${to}&basis=${basis}&format=pdf`} download>Download PDF · {basis}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?from=${from}&to=${to}&basis=${basis}&format=csv`} download>Download CSV · {basis}</a></p>}
-          <Report slug={slug} basis={basis} from={from} to={to} />
+          {based && <p className="row-actions"><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}&format=pdf`} download>Download PDF · {basis}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}&format=csv`} download>Download CSV · {basis}</a></p>}
+          <Report slug={slug} basis={basis} from={from} to={to} columns={columns} />
         </Card>}
   </>
 }

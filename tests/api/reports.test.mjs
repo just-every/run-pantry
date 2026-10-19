@@ -395,3 +395,80 @@ test('REPORT-008 dashboard figures tie to reports, waiting work has destinations
   assert.equal((await fresh.view('dashboard?to=2026-10-31')).currentThrough, '2026-09-30', 'one unreconciled account prevents a later fully-reconciled date')
 
 })
+
+test('REPORT-001 financial statements with comparisons, fiscal periods, YTD and customer columns tie to single reports on both bases', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const s = await october(h)
+  await s.issue('Cedar Studio', '2025-10-05', [{ description: 'Prior-year design', quantity: '1', rate: '450.00', accountId: s.acct['4000'], taxCode: 'exempt' }])
+  const job = await h.command('journal.save-draft', { date: '2026-10-12', memo: 'Cedar job materials', lines: [{ accountId: s.acct['6000'], contactId: s.c['Cedar Studio'].id, debit: '50.00' }, { accountId: s.acct['1000'], credit: '50.00' }] })
+  await h.command('journal.post', { id: job.id, revision: job.revision })
+  await h.command('entity.save', { revision: (await h.view('state')).settings.entity.revision, legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 4, taxMethod: 'cash', booksStart: '2026-01-01' })
+  const before = (await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results
+  const keys = { 'profit-and-loss': ['totalIncome', 'totalExpenses', 'netIncome'], 'balance-sheet': ['totalAssets', 'totalLiabilities', 'totalEquity', 'liabilities-and-equity'] }
+  for (const basis of ['cash', 'accrual']) for (const kind of ['profit-and-loss', 'balance-sheet']) {
+    for (const mode of ['prior-period', 'prior-year', 'months', 'quarters', 'ytd', ...(kind === 'profit-and-loss' ? ['customer'] : [])]) {
+      const path = `reports/${kind}?${OCT}&basis=${basis}&columns=${mode}`
+      const r = await h.view(path)
+      assert.equal(r.basis, basis); assert.equal(r.mode, mode)
+      if (basis === 'cash') assert.deepEqual(await h.view(`reports/${kind}?${OCT}&columns=${mode}`), r, 'declared cash method is the default for every variant')
+      const moneyColumns = r.columns.filter(c => c.unit === 'money' && c.id !== 'change')
+      if (mode === 'months' || mode === 'quarters') {
+        assert.equal(moneyColumns[0].from, '2026-04-01'); assert.equal(moneyColumns.at(-1).to, '2027-03-31')
+        assert.equal(moneyColumns.length, mode === 'months' ? 12 : 4)
+      }
+      if (mode === 'ytd') assert.deepEqual([r.columns[0].from, r.columns[0].to], ['2026-04-01', '2026-10-31'])
+      if (mode === 'prior-period') assert.deepEqual([r.columns[1].from, r.columns[1].to], ['2026-08-31', '2026-09-30'])
+      if (mode === 'prior-year') assert.deepEqual([r.columns[1].from, r.columns[1].to], ['2025-10-01', '2025-10-31'])
+      if (mode === 'customer') {
+        assert.ok(r.columns.some(c => c.id === s.c['Cedar Studio'].id)); assert.ok(r.columns.some(c => c.id === 'unassigned'))
+        for (const l of [...r.rows, ...r.totals]) assert.equal(l.values.slice(0, -1).reduce((a, b) => a + b, 0), l.values.at(-1), `customer sum ${l.name}`)
+        assert.equal(r.rows.find(l => l.code === '6000').values[r.columns.findIndex(c => c.id === s.c['Cedar Studio'].id)], 5000)
+      }
+      for (const [i, c] of r.columns.entries()) {
+        if (c.unit !== 'money' || c.id === 'change' || (mode === 'customer' && c.id !== 'total')) continue
+        const single = await h.view(`reports/${kind}?from=${c.from}&to=${c.to}&basis=${basis}`)
+        for (const row of r.rows) assert.equal(row.values[i], row.code ? lineOf(single, row.code) : [...(single.equity ?? [])].find(l => l.id === row.id)?.amount ?? 0, `${path}: ${c.label}: ${row.name}`)
+        assert.deepEqual(r.totals.map(l => l.values[i]), keys[kind].map(k => k === 'liabilities-and-equity' ? single.totalLiabilities + single.totalEquity : single[k]))
+      }
+      if (mode.startsWith('prior-')) for (const row of [...r.rows, ...r.totals]) {
+        assert.equal(row.values[2], row.values[0] - row.values[1])
+        assert.equal(row.values[3], row.values[1] === 0 ? null : Math.round((row.values[0] - row.values[1]) / Math.abs(row.values[1]) * 10000) / 100)
+      }
+      for (const format of ['csv', 'pdf']) {
+        const x = await h.send(`/api/pantry/reports/${kind}/export?${OCT}&basis=${basis}&columns=${mode}&format=${format}`, undefined, { cookie: h.owner })
+        assert.equal(x.status, 200, x.value)
+        if (basis === 'cash') {
+          const declaredExport = await h.send(`/api/pantry/reports/${kind}/export?${OCT}&columns=${mode}&format=${format}`, undefined, { cookie: h.owner })
+          assert.equal(declaredExport.status, 200); assert.equal(declaredExport.value, x.value, 'exports inherit the declared basis')
+        }
+        const label = basis === 'cash' ? 'Cash basis' : 'Accrual basis'
+        if (format === 'pdf') {
+          assert.equal((x.value.match(new RegExp(label, 'g')) ?? []).length, x.value.match(/\/Type \/Page\b/g).length, 'every exported page labels its basis')
+          for (const l of r.totals) for (const [i, v] of l.values.entries()) {
+            if (v === null) continue
+            const printed = r.columns[i].unit === 'percent' ? `${v}%` : `${v < 0 ? '-' : ''}$${(Math.abs(v) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            assert.ok(x.value.includes(printed), `PDF ${l.name} ${r.columns[i].label} ${printed}`)
+          }
+        }
+        else {
+          assert.match(x.value, new RegExp(label)); assert.match(x.value, /2026-10-31|2027-03-31/)
+          for (const l of r.totals) {
+            const exported = x.value.split('\r\n').find(row => row.startsWith(`"${l.name}",`))
+            assert.ok(exported, l.name)
+            for (const [i, v] of l.values.entries()) assert.ok(exported.includes(v === null ? 'Not comparable (prior is zero)' : r.columns[i].unit === 'percent' ? `${v}%` : (v / 100).toFixed(2)), `export ${l.name} ${i}`)
+          }
+        }
+      }
+    }
+  }
+  const octoberComparison = await h.view(`reports/profit-and-loss?${OCT}&columns=prior-year&basis=accrual`)
+  assert.deepEqual(octoberComparison.totals.find(l => l.id === 'net-income').values, [99800, 45000, 54800, 121.78])
+  const declared = await h.view(`reports/profit-and-loss?${OCT}&columns=prior-year`)
+  assert.equal(declared.basis, 'cash')
+  const leap = await h.view('reports/profit-and-loss?from=2024-02-29&to=2024-02-29&columns=prior-year')
+  assert.deepEqual([leap.columns[1].from, leap.columns[1].to], ['2023-02-28', '2023-02-28'])
+  await h.view(`reports/balance-sheet?${OCT}&columns=customer`, h.owner, 400)
+  await h.view(`reports/profit-and-loss?${OCT}&columns=unknown`, h.owner, 400)
+  await h.view('reports/profit-and-loss?from=2026-11-01&to=2026-10-01&columns=months', h.owner, 400)
+  assert.deepEqual((await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results, before, 'columns, basis switches and exports never write to the ledger')
+})

@@ -28,6 +28,7 @@ import { basisOf, reportBasis, BASIS_LABEL } from './basis'
 import { figureDetail } from './drilldown'
 import { cashFlow, cashFlowCommands, cashFlowCsv, cashFlowDetail } from './cash-flow'
 import { contactTotals } from './contact-totals'
+import { statementColumns } from './statement-columns'
 import { reportExport } from './report-export'
 import { recordView } from './records'
 import { salesTax } from './sales-tax'
@@ -151,7 +152,7 @@ api.get('/api/pantry/reports/cash-flow.csv', async c => {
 })
 api.get('/api/pantry/reports/:kind/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
-  return reportExport(ctx.db, c.req.param('kind')!, from, to, await reportBasis(ctx.db, c.req.query('basis')), c.req.query('format') ?? 'pdf')
+  return reportExport(ctx.db, c.req.param('kind')!, from, to, await reportBasis(ctx.db, c.req.query('basis')), c.req.query('format') ?? 'pdf', c.req.query('columns'))
 })
 view('reports/:kind', async (ctx, c) => {
   const kind = c.req.param('kind'), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01'), basis = await reportBasis(ctx.db, c.req.query('basis'))
@@ -160,6 +161,7 @@ view('reports/:kind', async (ctx, c) => {
   if (kind === 'cash-flow') return cashFlow(ctx.db, from, to)
   if (kind === 'trial-balance') return trialBalance(ctx.db, to, basis)
   if (kind === 'general-ledger') return generalLedger(ctx.db, from, to, c.req.query('account') || undefined, basis)
+  if ((kind === 'profit-and-loss' || kind === 'balance-sheet') && c.req.query('columns') && c.req.query('columns') !== 'single') return statementColumns(ctx.db, kind, c.req.query('columns')!, from, to, Number(e?.fiscal_year_start ?? 1), basis)
   if (kind === 'profit-and-loss') return profitAndLoss(ctx.db, from, to, basis)
   if (kind === 'balance-sheet') return balanceSheet(ctx.db, to, Number(e?.fiscal_year_start ?? 1), basis)
   if (kind === 'sales-tax') return salesTax(ctx.db, from, to, basis)
