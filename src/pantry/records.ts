@@ -16,12 +16,13 @@ export async function recordLabels(db: D1Database) {
   const bills = new Map((await all(db, 'SELECT b.id, b.reference, c.name FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id')).map(r => [r.id, `Bill ${r.reference} · ${r.name}`]))
   const payments = new Map((await all(db, 'SELECT p.id, p.direction, p.payment_date, c.name FROM pt_payments p JOIN pt_contacts c ON c.id = p.contact_id')).map(r => [r.id, `Payment ${r.direction === 'received' ? 'from' : 'to'} ${r.name}`]))
   const entries = new Map((await all(db, "SELECT id, number FROM pt_journal_entries WHERE status = 'posted'")).map(r => [r.id, `Journal entry ${r.number}`]))
-  return { label: (kind: string, id: string) => (kind === 'invoice' ? invoices : kind === 'bill' ? bills : kind === 'payment' ? payments : entries).get(id) ?? 'Record' }
+  const vendorCreditEntries = new Map((await all(db, 'SELECT id, journal_id FROM pt_vendor_credits')).map(v => [v.id, v.journal_id]))
+  return { vendorCreditEntries, label: (kind: string, id: string) => (kind === 'invoice' ? invoices : kind === 'bill' ? bills : kind === 'payment' ? payments : entries).get(id) ?? 'Record' }
 }
 
 /** The record a posted entry came from. */
 export function recordOf(e: Data, labels: Awaited<ReturnType<typeof recordLabels>>): RecordRef {
-  const kind = e.source_kind === 'invoice' || e.source_kind === 'credit' ? 'invoice' : e.source_kind === 'bill' ? 'bill' : e.source_kind === 'payment' ? 'payment' : 'entry'
+  const kind = labels.vendorCreditEntries.has(e.source_id) ? 'entry' : e.source_kind === 'invoice' || e.source_kind === 'credit' ? 'invoice' : e.source_kind === 'bill' ? 'bill' : e.source_kind === 'payment' ? 'payment' : 'entry'
   const id = kind === 'entry' ? e.entry_id : e.source_id!
   return { kind, id, label: labels.label(kind, id) }
 }
@@ -97,11 +98,11 @@ export async function recordView(db: D1Database, kind: string, id: string) {
   }
   if (kind === 'bill') {
     const b = await bill(db, id)
-    const applied = await all(db, "SELECT a.*, p.reversal_id FROM pt_allocations a JOIN pt_payments p ON p.id = a.source_id WHERE a.target_kind = 'bill' AND a.target_id = ? ORDER BY a.allocation_date, a.created_at", id)
+    const applied = await all(db, "SELECT a.*, p.reversal_id FROM pt_allocations a LEFT JOIN pt_payments p ON p.id = a.source_id AND a.source_kind = 'payment' WHERE a.target_kind = 'bill' AND a.target_id = ? ORDER BY a.allocation_date, a.created_at", id)
     return { kind, id, title: labels.label('bill', id), date: b.bill_date, status: b.status, total: b.total_cents, open: b.open_cents,
       lines: b.lines.map((l: Data) => ({ description: l.description, amount: l.amount_cents })),
       entries: [await entryView(db, b.journal_id)].filter(Boolean),
-      links: applied.map(a => ref('payment', a.source_id, `${(a.amount_cents / 100).toFixed(2)} applied ${a.allocation_date}${a.reversal_id ? ' (payment reversed)' : ''}`)),
+      links: applied.map(a => ref(a.source_kind === 'credit' ? 'entry' : 'payment', labels.vendorCreditEntries.get(a.source_id) ?? a.source_id, `${(a.amount_cents / 100).toFixed(2)} applied ${a.allocation_date}${a.reversal_id ? ' (payment reversed)' : ''}`)),
       documents: docs.forRecords([{ kind: 'bill', id }, ...(b.journal_id ? [{ kind: 'entry' as const, id: b.journal_id }] : []), ...applied.map(a => ({ kind: 'payment' as const, id: a.source_id }))]),
       evidenceWaived: b.evidence_waived, bank: applied.flatMap(a => bank.forPayment(a.source_id)) }
   }
@@ -117,7 +118,7 @@ export async function recordView(db: D1Database, kind: string, id: string) {
   requireThat(kind === 'entry', 'Unknown record', 404)
   const e = await entry(db, id)
   const source = e.source_kind === 'reversal' ? ref('entry', e.source_id, 'The entry this reverses')
-    : ['invoice', 'credit'].includes(e.source_kind) ? ref('invoice', e.source_id, 'Source record') : e.source_kind === 'bill' ? ref('bill', e.source_id, 'Source record') : e.source_kind === 'payment' ? ref('payment', e.source_id, 'Source record') : null
+    : labels.vendorCreditEntries.has(e.source_id) ? null : ['invoice', 'credit'].includes(e.source_kind) ? ref('invoice', e.source_id, 'Source record') : e.source_kind === 'bill' ? ref('bill', e.source_id, 'Source record') : e.source_kind === 'payment' ? ref('payment', e.source_id, 'Source record') : null
   const links = [source, e.reversed_by_id ? ref('entry', e.reversed_by_id, 'Reversed by') : null].filter(Boolean)
   return { kind, id, title: labels.label('entry', id), date: e.entry_date, status: e.status, total: e.lines.reduce((s: number, l: Data) => s + l.debit_cents, 0),
     lines: [], entries: [await entryView(db, id)], links, documents: docs.forRecords([{ kind: 'entry', id }], e.document_id), bank: bank.forEntry(id) }

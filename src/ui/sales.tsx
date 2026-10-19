@@ -140,6 +140,9 @@ function likelyAllocation(open: D[], amount: string): Record<string, string> {
 
 function Payments({ data, reload }: { data: D; reload: () => Promise<void> }) {
   const { state } = useShared(), [direction, setDirection] = useState('received'), [contact, setContact] = useState(''), [selected, setSelected] = useState<string | null>(null)
+  const [bankId, setBankId] = useState('')
+  const payingBank = state.bankAccounts.find((b: D) => b.id === bankId)
+  const card = direction === 'paid' && state.accounts.some((a: D) => a.id === payingBank?.account_id && a.type === 'liability')
   const open = openFor(data, direction, contact)
   const [alloc, setAllocState] = useState<Record<string, string>>({}), [formKey, setFormKey] = useState(0), [amount, setAmount] = useState(''), [typed, setTyped] = useState(false)
   // The open item the amount pays is filled in for you; once you change an allocation yourself, it is yours.
@@ -150,29 +153,53 @@ function Payments({ data, reload }: { data: D; reload: () => Promise<void> }) {
     <Card title="Payments recorded">
       <p className="hint">Payments received at your bank, paid online from an invoice link through your Stripe account, or made to vendors. Pantry records them; it never moves money itself. Choose a payment with an unapplied amount to apply it to an invoice or bill.</p>
       <Table heads={['Date', 'Direction', 'Customer or vendor', 'Bank', 'Amount', 'Unapplied']} figures={[4, 5]} empty="No payments recorded yet.">
-        {(data.payments as D[]).map(p => <tr key={p.id} className={p.reversal_id ? 'muted' : selected === p.id ? 'selected' : ''} tabIndex={0} onClick={() => setSelected(p.id)} onKeyDown={k => { if (k.key === 'Enter') setSelected(p.id) }}><td>{day(p.payment_date)}</td><td>{p.direction === 'received' ? 'Received' : 'Paid'}{p.reversal_id ? ' (reversed)' : ''}</td><td>{p.contact_name}</td><td>{p.bank_name}</td><td className="fig">{usd(p.amount_cents)}</td><td className="fig">{usd(p.unallocated_cents)}{!p.reversal_id && p.unallocated_cents > 0 && state.actor.can.record && <> <button type="button" className="btn btn-link" onClick={() => setSelected(p.id)}>Apply</button></>}</td></tr>)}
+        {(data.payments as D[]).map(p => <tr key={p.id} className={p.reversal_id ? 'muted' : selected === p.id ? 'selected' : ''} tabIndex={0} onClick={() => setSelected(p.id)} onKeyDown={k => { if (k.key === 'Enter') setSelected(p.id) }}><td>{day(p.payment_date)}</td><td>{p.direction === 'received' ? 'Received' : 'Paid'}{p.reversal_id ? ' (reversed)' : ''}</td><td>{p.contact_name}</td><td>{p.bank_name}<small className="sub block">{p.method}{p.card_last4 ? ` · …${p.card_last4}` : ''}</small></td><td className="fig">{usd(p.amount_cents)}</td><td className="fig">{usd(p.unallocated_cents)}{!p.reversal_id && p.unallocated_cents > 0 && state.actor.can.record && <> <button type="button" className="btn btn-link" onClick={() => setSelected(p.id)}>Apply</button></>}</td></tr>)}
       </Table>
     </Card>
     <div className="stack">
     {current && state.actor.can.record && <ApplyPayment key={current.id + current.unallocated_cents} p={current} data={data} onDone={async () => { setSelected(null); await reload() }} />}
     {state.actor.can.record && <Card title="Record a payment">
-      <Form key={formKey} label="Record payment" submit={b => command('payment.record', { ...b, allocations: Object.entries(alloc).filter(([, v]) => v).map(([targetId, amount]) => ({ targetId, amount })) })} onDone={async () => { setAllocState({}); setTyped(false); setAmount(''); setContact(''); setFormKey(k => k + 1); await reload() }}>
+      <Form key={formKey} label="Record payment" submit={b => command('payment.record', { ...b, allocations: Object.entries(alloc).filter(([, v]) => v).map(([targetId, amount]) => ({ targetId, amount })) })} onDone={async () => { setAllocState({}); setTyped(false); setAmount(''); setContact(''); setBankId(''); setFormKey(k => k + 1); await reload() }}>
         <div className="grid-form">
           <Field label="Direction" name="direction" value={direction} onChange={(e: any) => { setDirection(e.target.value); setContact(''); choose('', amount, e.target.value) }} required options={[{ value: 'received', label: 'Received from a customer' }, { value: 'paid', label: 'Paid to a vendor' }]} />
           <Field label={direction === 'received' ? 'Customer' : 'Vendor'} name="contactId" value={contact} onChange={(e: any) => { setContact(e.target.value); choose(e.target.value, amount) }} required options={contactOptions(state.contacts, direction === 'received' ? 'customer' : 'vendor')} />
           <Field label="Date" name="date" type="date" defaultValue={today()} required />
           <Field label="Amount" name="amount" required inputMode="decimal" value={amount} onChange={(e: any) => { setAmount(e.target.value); if (!typed) setAllocState(likelyAllocation(open, e.target.value)) }} />
-          {state.bankAccounts.length ? <Field label="Bank account" name="bankAccountId" required options={state.bankAccounts.map((b: D) => ({ value: b.id, label: b.name }))} />
+          {state.bankAccounts.length ? <Field label="Bank or card account" name="bankAccountId" required value={bankId} onChange={(e: any) => setBankId(e.target.value)} options={state.bankAccounts.map((b: D) => ({ value: b.id, label: `${b.name} (…${b.number_last4})` }))} />
             : <div role="status" className="callout callout-warn field-wide"><strong>Add a bank account first</strong><span>A payment is recorded against the bank account it went through, and this Pantry has none yet. Add one under <a href="/app/bank?tab=statements">Bank › Statements › Add a bank or card account</a>, linked to a ledger account such as 1000 Operating checking, then record the payment here.</span></div>}
           <Field label="Reference" name="reference" />
-          <Field label="How it was paid" name="method" options={[{ value: 'check', label: 'Check' }, { value: 'ach', label: 'ACH' }, { value: 'wire', label: 'Wire' }, { value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }, { value: 'payment-network', label: 'Payment network (e.g. PayPal)' }]} hint="Card and payment-network payments stay out of 1099-NEC totals" />
+          {card ? <p className="hint">Card payment · …{payingBank.number_last4}. Kept out of 1099-NEC totals.</p> : <Field label="How it was paid" name="method" options={[{ value: 'check', label: 'Check' }, { value: 'ach', label: 'ACH' }, { value: 'wire', label: 'Wire' }, { value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }, { value: 'payment-network', label: 'Payment network (e.g. PayPal)' }]} hint="Card and payment-network payments stay out of 1099-NEC totals" />}
         </div>
         {open.length > 0 && <><OpenItems open={open} alloc={alloc} setAlloc={setAlloc} legend={`Pays these open ${direction === 'received' ? 'invoices' : 'bills'}`} />
           <p className="hint">The {direction === 'received' ? 'invoice' : 'bill'} this amount pays is filled in, so recording the payment also marks it paid. Change the amounts, or clear them to record the payment unapplied.</p></>}
       </Form>
     </Card>}
+    <VendorCredits data={data} reload={reload} />
     </div>
   </div>
+}
+
+function VendorCredits({ data, reload }: { data: D; reload: () => Promise<void> }) {
+  const { state } = useShared(), [selected, setSelected] = useState(''), [alloc, setAlloc] = useState<Record<string, string>>({}), [formKey, setFormKey] = useState(0)
+  const credits = (data.vendorCredits ?? []) as D[], current = credits.find(c => c.id === selected && c.unallocated_cents > 0)
+  const open = current ? openFor(data, 'paid', current.vendor_id) : []
+  return <Card title="Vendor credits">
+    <Table heads={['Vendor', 'Reference', 'Credit', 'Unapplied']} figures={[2, 3]} empty="No vendor credits recorded.">
+      {credits.map(c => <tr key={c.id}><td>{c.vendor_name}</td><td>{c.reference}</td><td className="fig">{usd(c.amount_cents)}</td><td className="fig">{usd(c.unallocated_cents)}{c.unallocated_cents > 0 && state.actor.can.record && <button type="button" className="btn btn-link" onClick={() => { setSelected(c.id); setAlloc({}) }}>Apply credit</button>}</td></tr>)}
+    </Table>
+    {current && state.actor.can.record && <Form label="Apply vendor credit" submit={b => command('vendor-credit.allocate', { ...b, creditId: current.id, allocations: Object.entries(alloc).filter(([, amount]) => amount).map(([targetId, amount]) => ({ targetId, amount })) })} onDone={async () => { setSelected(''); setAlloc({}); await reload() }}>
+      <p>{current.vendor_name} · {current.reference}: {usd(current.unallocated_cents)} available.</p>
+      <Field label="Application date" name="date" type="date" defaultValue={today()} required />
+      <OpenItems open={open} alloc={alloc} setAlloc={setAlloc} legend="Apply credit to these bills" />
+    </Form>}
+    {state.actor.can.record && <Form key={formKey} label="Record vendor credit" submit={b => command('vendor-credit.record', b)} onDone={async () => { setFormKey(k => k + 1); await reload() }}>
+      <Field label="Vendor" name="vendorId" required options={contactOptions(state.contacts, 'vendor')} />
+      <Field label="Vendor's credit reference" name="reference" required />
+      <Field label="Credit date" name="date" type="date" defaultValue={today()} required />
+      <Field label="Credit amount" name="amount" inputMode="decimal" required />
+      <Field label="Original expense or asset account" name="accountId" required options={accountOptions(state.accounts, a => ['expense', 'asset'].includes(a.type) && !['bank', 'receivable', 'payable'].includes(a.subtype))} />
+    </Form>}
+  </Card>
 }
 
 function Contacts() {
@@ -189,7 +216,7 @@ function Contacts() {
         <Field label="Name" name="name" defaultValue={editing?.name} required />
         <Field label="Email" name="email" type="email" defaultValue={editing?.email} />
         <Field label="Payment terms (days)" name="termsDays" type="number" defaultValue={editing?.terms_days ?? 30} min={0} max={365} />
-        {(editing ? editing.kind === 'customer' : true) && <Field label="How their payments read on your bank statement (customers)" name="bankReference" defaultValue={editing?.bank_reference} hint="For example CEDAR STUDIO LLC. A deposit naming this, or the invoice number, for exactly an open invoice's amount matches itself." />}
+        {(editing ? editing.kind === 'customer' : true) && <Field label="How their payments read on your bank statement (customers)" name="bankReference" defaultValue={editing?.bank_reference} hint="For example CEDAR STUDIO LLC. A deposit naming this, or the invoice number, for exactly an open invoice's amount proposes that invoice for confirmation." />}
         {editing && <Field label="Status" name="active" defaultValue={editing.active ? 'yes' : 'no'} options={[{ value: 'yes', label: 'Active' }, { value: 'no', label: 'Inactive' }]} />}
       </Form>
     </Card>}

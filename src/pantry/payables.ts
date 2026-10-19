@@ -82,7 +82,7 @@ const waiveEvidence: Command = { need: 'post', async run(c, b) {
 type Allocation = { targetId: string; amount: number }
 
 /** Validate allocations against the current open balances; the batch guards repeat the check. */
-async function allocations(db: D1Database, direction: 'received' | 'paid', contactId: string, raw: unknown, available: number): Promise<{ list: Allocation[]; guards: Sql[] }> {
+export async function allocations(db: D1Database, direction: 'received' | 'paid', contactId: string, raw: unknown, available: number): Promise<{ list: Allocation[]; guards: Sql[] }> {
   const items = (Array.isArray(raw) ? raw : []).filter((a: Data) => a && (a.amount ?? '') !== '').map((a: Data, i: number) => ({ targetId: text(a.targetId, `Allocation ${i + 1} item`), amount: cents(a.amount, `Allocation ${i + 1} amount`) }))
   requireThat(items.reduce((s, a) => s + a.amount, 0) <= available, 'Allocations exceed the amount available')
   const kind = direction === 'received' ? 'invoice' : 'bill', guards: Sql[] = []
@@ -106,11 +106,14 @@ export async function paymentStatements(db: D1Database, actor: AuditActor, b: Da
   requireThat(direction === 'received' || direction === 'paid', 'A payment is received or paid')
   const who_ = await contact(db, text(b.contactId, direction === 'received' ? 'Customer' : 'Vendor'), direction === 'received' ? 'customer' : 'vendor')
   const day = date(b.date, 'Payment date'), amount = cents(b.amount, 'Amount')
-  const method = optionalText(b.method, 'Payment method') || 'unrecorded'
+  let method = optionalText(b.method, 'Payment method') || 'unrecorded'
   requireThat((['unrecorded', ...METHODS] as string[]).includes(method), 'Payment method is check, ACH, wire, cash, card or a payment network')
   await assertOpen(db, day)
-  const bank = await one(db, 'SELECT * FROM pt_bank_accounts WHERE id = ?', text(b.bankAccountId, 'Bank account'))
+  const bank = await one(db, 'SELECT b.*, a.type AS ledger_type, a.active AS ledger_active FROM pt_bank_accounts b JOIN pt_accounts a ON a.id = b.account_id WHERE b.id = ?', text(b.bankAccountId, 'Bank account'))
   requireThat(bank, 'Bank account not found', 404)
+  requireThat(bank.ledger_active, 'The paying account is inactive')
+  const cardLast4 = direction === 'paid' && bank.ledger_type === 'liability' ? bank.number_last4 : null
+  if (cardLast4) method = 'card'
   const control = await controlAccount(db, direction === 'received' ? 'receivable' : 'payable')
   const allocated = await allocations(db, direction, who_.id, b.allocations, amount)
   const id = uid(), journalId = uid(), received = direction === 'received'
@@ -119,10 +122,10 @@ export async function paymentStatements(db: D1Database, actor: AuditActor, b: Da
     : [{ accountId: control.id, debit: amount, credit: 0, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }, { accountId: bank.account_id, debit: 0, credit: amount, memo: `Paid to ${who_.name}` }]
   const statements: Sql[] = [
     ...entryStatements({ id: journalId, date: day, memo: `${received ? 'Payment from' : 'Payment to'} ${who_.name}`, sourceKind: 'payment', sourceId: id, preparedBy: actor.email, preparedKind: actor.kind === 'system' ? 'import' : 'person', lines }, actor.email),
-    q('INSERT INTO pt_payments (id, direction, contact_id, payment_date, amount_cents, bank_account_id, reference, memo, method, journal_id, recorded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      id, direction, who_.id, day, amount, bank.id, optionalText(b.reference, 'Reference', 80), optionalText(b.memo, 'Memo', 500), method, journalId, actor.email, now()),
+    q('INSERT INTO pt_payments (id, direction, contact_id, payment_date, amount_cents, bank_account_id, reference, memo, method, card_last4, journal_id, recorded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      id, direction, who_.id, day, amount, bank.id, optionalText(b.reference, 'Reference', 80), optionalText(b.memo, 'Memo', 500), method, cardLast4, journalId, actor.email, now()),
     ...allocated.list.map(a => allocationInsert(actor, id, received ? 'invoice' : 'bill', a, day)), ...allocated.guards,
-    audit(who(actor), 'payment.record', 'payment', id, { direction, amount, allocations: allocated.list }),
+    audit(who(actor), 'payment.record', 'payment', id, { direction, amount, method, cardLast4, allocations: allocated.list }),
   ]
   return { id, journalId, bankLedgerAccount: bank.account_id, statements, signed: received ? amount : -amount }
 }

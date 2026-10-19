@@ -648,8 +648,8 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 10 | 62 | 48 | 120 |
-| All | 29 | 62 | 48 | 139 |
+| Target and push further | 11 | 61 | 48 | 120 |
+| All | 30 | 61 | 48 | 139 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -713,7 +713,7 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | `INVOICE-009` | Customer records with the whole history | target | partial | `src/pantry/contacts.ts`, `src/ui/sales.tsx` | Customers with terms and linked invoices exist; several contacts, email history, exemption certificates and a customer history view do not. |
 | `BILL-001` | Bill inbox and lifecycle | target | partial | `src/pantry/payables.ts`, `src/pantry/integrations/postings.ts`, `src/ui/sales.tsx`, `tests/api/integrations.test.mjs`, `tests/api/subledgers.test.mjs` | Bills post with due dates and payable status. Scoped siblings record received and ready-to-pay flags idempotently; both are visible on the bill, separate from its payment balance. Captured/approval/scheduled states, vendor credits and recurring bills remain absent. |
 | `BILL-002` | Bill approval workflow | target | missing |  | No implementation; bills post without an approval step (approvals exist for invoices and journals, `src/pantry/db.ts` `approval`). |
-| `BILL-003` | Bills paid by credit card or line of credit | target | partial | `src/pantry/payables.ts`, `src/pantry/contractors.ts`, `tests/api/feeds.test.mjs` | A card account kept as a liability account with feeds can be the paying account of a recorded payment with the method "card", and card payments stay out of 1099 totals; the card's last four on the payment, the review queue offering the bill payment first, and a test that pays bills from a card and clears them with the card's feed line do not exist. |
+| `BILL-003` | Bills paid by credit card or line of credit | target | done | `src/pantry/payables.ts`, `vendor-credits.ts`, `recorded-payments.ts`, `src/pantry/contractors.ts`, `src/ui/sales.tsx`, `tests/api/bank.test.mjs` › BILL-003 | One or several bills, partial allocations and vendor credits settle against card/LOC liabilities with a stored card method and last four. Existing bill payments are offered before expense rules and clear feed/file lines without reposting. Card-funded payments are excluded from 1099 totals; paying the card from checking is one transfer. Payables and cash/accrual reports retain credit tie-outs. |
 | `BILLPAY-001` | Pay bills through a provider | target | missing |  | No implementation; Pantry records payments made elsewhere (PAN-06). |
 | `BILLPAY-002` | Payment fraud controls | target | missing |  | No implementation. |
 | `CHECK-001` | Write and print checks | target | missing |  | No implementation. |

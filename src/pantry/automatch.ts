@@ -5,6 +5,7 @@ import { pantry } from './access'
 import { Fault, usd, type Data } from './core'
 import { all, one, run } from './db'
 import { matchPlan } from './matching'
+import { recordedPaymentCandidates } from './recorded-payments'
 
 const plain = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]+/g, '')
 
@@ -62,21 +63,18 @@ export async function matchRecorded(db: D1Database, lineIds: string[]) {
   const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE removed_at IS NULL AND id IN (${lineIds.map(() => '?').join(',')}) ORDER BY posted_date, id`, ...lineIds)
   for (const line of lines) {
     if (await one(db, 'SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = ? AND active = 1', line.id)) continue
-    const candidates = await all(db, `SELECT p.id, p.direction, p.payment_date, p.reference, c.name, c.bank_reference, l.id AS journal_line_id
-      FROM pt_payments p JOIN pt_contacts c ON c.id = p.contact_id JOIN pt_bank_accounts b ON b.id = p.bank_account_id
-      JOIN pt_journal_lines l ON l.entry_id = p.journal_id AND l.account_id = b.account_id
-      WHERE p.bank_account_id = ? AND p.reversal_id IS NULL AND l.debit_cents - l.credit_cents = ?
-        AND p.payment_date BETWEEN date(?, '-7 days') AND date(?, '+7 days')
-        AND NOT EXISTS (SELECT 1 FROM pt_match_postings mp WHERE mp.journal_line_id = l.id AND mp.active = 1)`, line.bank_account_id, line.amount_cents, line.posted_date, line.posted_date)
-    const words = plain(`${line.description} ${line.reference}`)
-    const named = candidates.filter(p => [p.name, p.bank_reference, p.reference].some(t => plain(t ?? '').length >= 3 && words.includes(plain(t))))
+    const candidates = (await recordedPaymentCandidates(db, [line]))[line.id] ?? []
+    // Card-funded bill payments wait for the person's review; other recorded
+    // payments retain their established automatic clearing behaviour.
+    const named = candidates.filter(p => p.named)
     if (named.length !== 1) continue
     const p = named[0]
+    if (p.direction === 'paid' && p.method === 'card') continue
     try {
-      const plan = await matchPlan(db, pantry('auto-match'), { bankLineIds: [line.id], journalLineIds: [p.journal_line_id], create: [],
-        note: `Matched automatically: the ${usd(Math.abs(line.amount_cents))} payment ${p.direction === 'paid' ? 'to' : 'from'} ${p.name} recorded on ${p.payment_date}` }, { automatic: true })
+      const plan = await matchPlan(db, pantry('auto-match'), { bankLineIds: [line.id], journalLineIds: [p.journalLineId], create: [],
+        note: `Matched automatically: the ${usd(Math.abs(line.amount_cents))} payment ${p.direction === 'paid' ? 'to' : 'from'} ${p.vendor} recorded on ${p.payment_date}` }, { automatic: true })
       await run(db, plan.statements)
-      matched.push({ lineId: line.id, matchId: plan.id, payment: p.id, contact: p.name, amount: line.amount_cents })
+      matched.push({ lineId: line.id, matchId: plan.id, payment: p.paymentId, contact: p.vendor, amount: line.amount_cents })
     } catch (error) { if (!(error instanceof Fault)) throw error }
   }
   return matched

@@ -83,13 +83,19 @@ async function documents(db: D1Database): Promise<Map<string, Doc>> {
   for (const b of bills) docs.set(b.id, { kind: 'bill', id: b.id, ref: b.reference, journalId: b.journal_id, total: b.total_cents, contactId: b.vendor_id, contactName: b.contact_name,
     control: { accountId: control.get('payable')!, sign: -1, magnitude: b.total_cents, role: 'control', description: `${b.contact_name} ${b.reference}`, taxCode: null },
     parts: billLines.filter(l => l.bill_id === b.id).map(l => ({ accountId: l.account_id, sign: 1, magnitude: l.amount_cents, role: 'expense', description: l.description, taxCode: null })) })
+  const vendorCredits = await all(db, `SELECT v.*, c.name AS contact_name FROM pt_vendor_credits v JOIN pt_contacts c ON c.id = v.vendor_id
+    WHERE v.id IN (SELECT source_id FROM pt_allocations WHERE source_kind = 'credit' AND target_kind = 'bill')`)
+  for (const v of vendorCredits) docs.set(v.id, { kind: 'credit', id: v.id, ref: v.reference, journalId: v.journal_id, total: v.amount_cents, contactId: v.vendor_id, contactName: v.contact_name,
+    control: { accountId: control.get('payable')!, sign: 1, magnitude: v.amount_cents, role: 'control', description: `${v.contact_name} ${v.reference}`, taxCode: null },
+    parts: [{ accountId: v.account_id, sign: -1, magnitude: v.amount_cents, role: 'expense', description: `Vendor credit ${v.reference}`, taxCode: null }] })
   return docs
 }
 
 async function events(db: D1Database, docs: Map<string, Doc>): Promise<Event[]> {
-  const rows = await all(db, `SELECT a.*, p.reference AS payment_reference, p.journal_id AS payment_journal, p.reversal_id, r.entry_date AS reversal_date, cr.number AS credit_number, ti.number AS target_number
+  const rows = await all(db, `SELECT a.*, p.reference AS payment_reference, p.journal_id AS payment_journal, p.reversal_id, r.entry_date AS reversal_date, COALESCE(cr.number, vc.reference) AS credit_number, COALESCE(ti.number, tb.reference) AS target_number
     FROM pt_allocations a LEFT JOIN pt_payments p ON a.source_kind = 'payment' AND p.id = a.source_id LEFT JOIN pt_journal_entries r ON r.id = p.reversal_id
     LEFT JOIN pt_invoices cr ON a.source_kind = 'credit' AND cr.id = a.source_id LEFT JOIN pt_invoices ti ON a.target_kind = 'invoice' AND ti.id = a.target_id
+    LEFT JOIN pt_vendor_credits vc ON a.source_kind = 'credit' AND vc.id = a.source_id LEFT JOIN pt_bills tb ON a.target_kind = 'bill' AND tb.id = a.target_id
     ORDER BY a.allocation_date, a.created_at, a.id`)
   const out: Event[] = []
   for (const a of rows) {

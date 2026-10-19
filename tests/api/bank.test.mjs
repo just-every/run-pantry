@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { at, fixture, harness } from './harness.mjs'
+import { at, books, fixture, harness } from './harness.mjs'
 import { importStatements, matchSeptember, september } from './scenario.mjs'
+import { fakePlaid } from './plaid.mjs'
 
 const count = async (h, sql) => Number((await h.db.prepare(sql).first()).n)
 
@@ -98,14 +99,13 @@ test('PAN-09 a statement reconciles only when its balances are proven, and every
 test('PAN-08 a payment recorded from its bank line is applied to its bill, and a payment recorded first meets its own bank line', async t => {
   const h = await harness(); t.after(() => h.close())
   const s = await september(h)
-  // The starter chart's credit card is a bank or card account from the start.
-  const card = await h.command('bank-account.save', { name: 'Business card', institution: 'Chase', accountId: s.acct['2100'], numberLast4: '5555', routing: '', openingDate: '2026-08-31', openingBalance: '0.00' })
+  const bank = s.checking
   const acme = await h.command('contact.save', { kind: 'vendor', name: 'Acme Contractors', termsDays: 30 })
   const bill = await h.command('bill.save', { vendorId: acme.id, reference: 'A-778', billDate: '2026-09-10', lines: [{ description: 'Contract design', accountId: s.acct['6000'], amount: '1500.00' }], post: true })
   // Recorded before the statement arrives: the check meets its line by itself, with nothing posted twice.
-  const check = await h.command('payment.record', { direction: 'paid', contactId: s.c['Harbor Office Rentals'].id, date: '2026-09-25', amount: '75.00', bankAccountId: card.id, reference: '2061', method: 'check' })
+  const check = await h.command('payment.record', { direction: 'paid', contactId: s.c['Harbor Office Rentals'].id, date: '2026-09-25', amount: '75.00', bankAccountId: bank.id, reference: '2061', method: 'check' })
   const csv = 'Posting Date,Description,Amount\n09/24/2026,ACH DEBIT ACME CONTRACTORS A-778,-1500.00\n09/26/2026,CHECK 2061,-75.00\n'
-  const imported = await h.command('statement.import', { bankAccountId: card.id, fileName: 'card-2026-09.csv', content: csv, opening: '0', closing: '-1575.00', start: '2026-09-01', end: '2026-09-30', confirmLast4: '5555' })
+  const imported = await h.command('statement.import', { bankAccountId: bank.id, fileName: 'checking-payments-2026-09.csv', content: csv, opening: '0', closing: '-1575.00', start: '2026-09-01', end: '2026-09-30', confirmLast4: '4821' })
   assert.deepEqual(imported.recorded.map(m => [m.payment, m.amount]), [[check.id, -7500]])
   const r = await h.view(`reconciliation/${imported.statement.id}`)
   assert.ok(at(r.lines, l => l.description === 'CHECK 2061').automatic)
@@ -127,4 +127,80 @@ test('PAN-08 a payment recorded from its bank line is applied to its bill, and a
   close = await h.view('close/2026-09')
   assert.equal(at(close.checks, c => c.key === 'unapplied').ok, true)
   assert.ok(!(await h.view('reports/payables?to=2026-09-30')).items.some(i => i.ref === 'A-778'), 'A-778 leaves the payables aging')
+})
+
+
+test('BILL-003 bills paid by credit card or line of credit', async t => {
+  const plaid = await fakePlaid()
+  const h = await harness({ bindings: plaid.bindings, outbound: plaid.outbound }); t.after(() => h.close())
+  const { acct } = await books(h)
+  const card = await h.command('bank-account.save', { name: 'American Express', institution: 'American Express', accountId: acct['2100'], numberLast4: '3333', openingDate: '2026-09-30', openingBalance: '0' })
+  const bank = await h.command('bank-account.save', { name: 'Checking', institution: 'Chase', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-09-30', openingBalance: '0' })
+  const vendor = await h.command('contact.save', { kind: 'vendor', name: 'Acme Contractors', termsDays: 30 })
+  await h.command('contractor.save', { contactId: vendor.id, is1099: true })
+  const bill = (reference, amount) => h.command('bill.save', { vendorId: vendor.id, reference, billDate: '2026-10-01', post: true, lines: [{ description: 'Contract design', accountId: acct['6000'], amount }] })
+  const first = await bill('ACME-1', '600.00'), second = await bill('ACME-2', '400.00')
+  const credit = await h.command('vendor-credit.record', { vendorId: vendor.id, reference: 'ACME-C1', date: '2026-10-02', amount: '150.00', accountId: acct['6000'], allocations: [{ targetId: first.id, amount: '100.00' }] })
+  await h.command('vendor-credit.allocate', { creditId: credit.id, date: '2026-10-03', allocations: [{ targetId: second.id, amount: '50.00' }] })
+  await h.command('vendor-credit.allocate', { creditId: credit.id, allocations: [{ targetId: second.id, amount: '1.00' }] }, h.owner, 400)
+  const taxBefore = at((await h.view('reports/contractors?year=2026')).contractors, v => v.id === vendor.id)
+  const payment = await h.command('payment.record', { direction: 'paid', contactId: vendor.id, date: '2026-10-04', amount: '700.00', bankAccountId: card.id, reference: 'ACME-BATCH', allocations: [{ targetId: first.id, amount: '500.00' }, { targetId: second.id, amount: '200.00' }] })
+  assert.deepEqual([payment.method, payment.card_last4], ['card', '3333'])
+  await h.command('payment.set-method', { id: payment.id, method: 'check' }, h.owner, 400)
+  let sales = await h.view('sales')
+  assert.deepEqual([at(sales.bills, b => b.id === first.id).open_cents, at(sales.bills, b => b.id === second.id).open_cents], [0, 15000])
+  assert.equal(at(sales.vendorCredits, c => c.id === credit.id).unallocated_cents, 0)
+  const cash = await h.view('reports/profit-and-loss?from=2026-10-01&to=2026-10-31&basis=cash')
+  assert.equal(at(cash.expenses, e => e.code === '6000').amount, 70000, 'applied vendor credits offset their settled bill shares on the cash basis')
+  assert.ok((await h.view('reports/receivables?to=2026-10-31')).agrees, 'vendor credits do not reduce customer receivables')
+  const source = await h.view('reports/record/entry/' + credit.journal_id)
+  assert.equal(source.total, 15000)
+  const creditedBill = await h.view('reports/record/bill/' + first.id)
+  assert.ok(creditedBill.links.some(l => l.kind === 'entry' && l.id === credit.journal_id))
+  await h.command('journal.reverse', { id: first.journal_id, revision: at((await h.view('journal')).entries, e => e.id === first.journal_id).revision, date: '2026-10-04' }, h.owner, 409)
+  const journal = at((await h.view('journal')).entries, e => e.id === payment.journal_id)
+  assert.deepEqual(journal.lines.map(l => [l.account_code, l.debit_cents, l.credit_cents]), [['2000', 70000, 0], ['2100', 0, 70000]])
+  const ap = await h.view('reports/payables?to=2026-10-31')
+  assert.equal(ap.itemsTotal, 15000); assert.ok(ap.agrees)
+  const taxAfter = at((await h.view('reports/contractors?year=2026')).contractors, v => v.id === vendor.id)
+  assert.equal(taxAfter.box1, taxBefore.box1); assert.equal(taxAfter.excluded - taxBefore.excluded, 70000)
+
+  // A feed charge meets both bills' existing payment before an expense rule can claim it.
+  const feedCharge = at(plaid.recorded['transactions-sync-2'].added, x => x.name === 'UNITED AIRLINES')
+  Object.assign(feedCharge, { amount: 700, name: 'ACME CONTRACTORS ACME-BATCH', merchant_name: vendor.name })
+  await h.command('bank-rule.save', { name: 'Acme expense', payee: vendor.name, direction: 'out', accountId: acct['6000'] })
+  const connection = await h.command('feed.connect', { publicToken: 'synthetic-public-token', institution: { institution_id: 'ins_109508', name: 'American Express' } })
+  const beforeFeed = (await h.view('journal')).entries.length
+  await h.command('feed.map', { itemId: connection.id, accounts: [{ id: at(connection.accounts, a => a.mask === '3333').id, bankAccountId: card.id }] })
+  let lines = await h.view('bank/lines')
+  const charge = at(lines.lines, l => l.feed_txn_id === feedCharge.transaction_id)
+  assert.equal(charge.match_id, null)
+  const offer = lines.recordedPayments[charge.id][0]
+  assert.equal(offer.paymentId, payment.id)
+  await h.command('match.approve', { bankLineIds: [charge.id], journalLineIds: [offer.journalLineId], create: [] })
+  assert.equal((await h.view('journal')).entries.length, beforeFeed, 'clearing the card charge posts no second expense or payment')
+  assert.ok(at((await h.view('bank/lines')).lines, l => l.id === charge.id).match_id)
+
+  // Paying American Express from checking is one transfer, clearing both account lines.
+  const checking = await h.command('statement.import', { bankAccountId: bank.id, fileName: 'checking-card-payment.csv', content: 'Posting Date,Description,Amount\n10/10/2026,AMERICAN EXPRESS PAYMENT,-700.00\n', opening: '0', closing: '-700', start: '2026-10-01', end: '2026-10-31', confirmLast4: '4821' })
+  const out = at((await h.view('reconciliation/' + checking.statement.id)).lines, l => l.description === 'AMERICAN EXPRESS PAYMENT')
+  const beforeTransfer = (await h.view('journal')).entries.length
+  await h.command('match.approve', { bankLineIds: [out.id], create: [{ type: 'transfer', amount: '700.00', direction: 'out', otherBankAccountId: card.id }] })
+  const entries = (await h.view('journal')).entries
+  assert.equal(entries.length, beforeTransfer + 1)
+  const transfer = at(entries, e => e.source_kind === 'bank' && e.memo.includes('AMERICAN EXPRESS PAYMENT'))
+  assert.deepEqual(transfer.lines.map(l => [l.account_code, l.debit_cents, l.credit_cents]), [['2100', 70000, 0], ['1000', 0, 70000]])
+  const statement = await h.command('statement.import', { bankAccountId: card.id, fileName: 'amex-october.csv', content: 'Posting Date,Description,Amount\n10/05/2026,ACME CONTRACTORS ACME-BATCH,-700.00\n10/10/2026,PAYMENT THANK YOU,700.00\n', opening: '0', closing: '0', start: '2026-10-01', end: '2026-10-31', confirmLast4: '3333' })
+  const r = await h.view('reconciliation/' + statement.statement.id)
+  await h.command('match.approve', { bankLineIds: [at(r.lines, l => l.description === 'PAYMENT THANK YOU').id], journalLineIds: [at(r.postings, p => p.id === at(transfer.lines, l => l.account_code === '2100').id).id], create: [] })
+  assert.equal((await h.view('journal')).entries.length, entries.length)
+  assert.ok((await h.view('reconciliation/' + statement.statement.id)).ready)
+  // The remaining partial bill can be funded from a line of credit the same way.
+  const locAccount = await h.command('account.save', { code: '2160', name: 'Business line of credit', type: 'liability', subtype: 'bank' })
+  const loc = await h.command('bank-account.save', { name: 'Line of credit', institution: 'Chase', accountId: locAccount.id, numberLast4: '9090', openingDate: '2026-09-30', openingBalance: '0' })
+  const balance = await h.command('payment.record', { direction: 'paid', contactId: vendor.id, date: '2026-10-12', amount: '150.00', bankAccountId: loc.id, allocations: [{ targetId: second.id, amount: '150.00' }] })
+  assert.deepEqual([balance.method, balance.card_last4], ['card', '9090'])
+  assert.equal(at((await h.view('sales')).bills, b => b.id === second.id).open_cents, 0)
+  assert.ok((await h.view('reports/payables?to=2026-10-31')).agrees)
+  assert.ok((await h.view('activity')).audit.some(a => a.action === 'vendor-credit.allocate' && a.subject_id === credit.id))
 })

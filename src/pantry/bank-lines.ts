@@ -3,6 +3,7 @@
 // from (file or feed), and the feed's pending transactions beside them.
 import type { Data } from './core'
 import { all } from './db'
+import { recordedPaymentCandidates } from './recorded-payments'
 import { depositProposals } from './automatch'
 
 export async function bankLinesView(db: D1Database): Promise<Data> {
@@ -23,5 +24,5 @@ export async function bankLinesView(db: D1Database): Promise<Data> {
   }
   const pending = await all(db, `SELECT p.feed_txn_id AS id, p.txn_date AS posted_date, p.amount_cents, p.description, p.payee, f.bank_account_id, b.name AS bank_name
     FROM pt_feed_pending p JOIN pt_feed_accounts f ON f.id = p.feed_account_id JOIN pt_bank_accounts b ON b.id = f.bank_account_id ORDER BY p.txn_date DESC, p.feed_txn_id`)
-  return { depositProposals: await depositProposals(db, lines), lines: lines.map(l => ({ ...l, filed_to: l.match_id ? filedTo.get(l.match_id) ?? [] : [] })), pending }
+  return { recordedPayments: await recordedPaymentCandidates(db, lines), depositProposals: await depositProposals(db, lines), lines: lines.map(l => ({ ...l, filed_to: l.match_id ? filedTo.get(l.match_id) ?? [] : [] })), pending }
 }

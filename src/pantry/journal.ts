@@ -132,8 +132,8 @@ const reverse: Command = { need: 'post', async run(c, b) {
   const r = await reversalStatements(c.db, c.actor, original, day, memo)
   const extra: Sql[] = []
   if (original.source_kind === 'bill') {
-    const allocated = await one(c.db, "SELECT 1 FROM pt_allocations a JOIN pt_payments p ON p.id = a.source_id AND a.source_kind = 'payment' WHERE a.target_kind = 'bill' AND a.target_id = ? AND p.reversal_id IS NULL", original.source_id)
-    requireThat(!allocated, 'This bill has payments allocated; reverse those payments first', 409)
+    const allocated = await one(c.db, "SELECT 1 FROM pt_allocations a LEFT JOIN pt_payments p ON p.id = a.source_id AND a.source_kind = 'payment' WHERE a.target_kind = 'bill' AND a.target_id = ? AND (a.source_kind = 'credit' OR p.reversal_id IS NULL)", original.source_id)
+    requireThat(!allocated, 'This bill has payments or vendor credits allocated; resolve those allocations first', 409)
     extra.push(q("UPDATE pt_bills SET status = 'void', revision = ? WHERE id = ? AND status = 'posted'", uid(), original.source_id), changed())
   }
   if (original.source_kind === 'payment') extra.push(q('UPDATE pt_payments SET reversal_id = ? WHERE journal_id = ? AND reversal_id IS NULL', r.id, original.id), changed())

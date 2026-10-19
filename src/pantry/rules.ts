@@ -4,6 +4,7 @@
 // contact, a tax code, a memo). Filing posts a balanced bank entry and matches
 // the line to it, marked with the rule; undo reverses that entry. Rules never
 // file a line in a locked month or inside a reconciled statement period.
+import { recordedPaymentCandidates } from './recorded-payments'
 import { depositProposals } from './automatch'
 import { authority, who } from './access'
 import { cents, Fault, now, optionalText, requireThat, scale, text, uid, type Data } from './core'
@@ -139,9 +140,9 @@ export async function applyRules(db: D1Database, lineIds: string[], filer: (rule
   for (let i = 0; i < lineIds.length; i += 100) {
     const chunk = lineIds.slice(i, i + 100)
     const lines = await all(db, `${OPEN_LINES} AND l.id IN (${chunk.map(() => '?').join(',')}) ORDER BY l.posted_date, l.id`, ...chunk)
-    const depositSuggestions = await depositProposals(db, lines)
+    const depositSuggestions = await depositProposals(db, lines), recorded = await recordedPaymentCandidates(db, lines)
     for (const line of lines) {
-      if (depositSuggestions[line.id]) continue
+      if (depositSuggestions[line.id] || recorded[line.id]?.length) continue
       const rule = active.find(r => ruleMatches(r, line))
       if (!rule) continue
       if (await blocked(db, line)) { result.skipped++; continue }
@@ -163,10 +164,11 @@ const personFiler = (c: Context) => (): Filer => ({ actor: who(c.actor), authori
 async function preview(db: D1Database, rule: Rule, others: Rule[]) {
   const candidates = (await all(db, `${OPEN_LINES} ORDER BY l.posted_date DESC, l.id LIMIT 5000`)).filter(l => ruleMatches(rule, l))
   const files: Data[] = [], held: Data[] = [], earlier: Data[] = []
+  const deposits = await depositProposals(db, candidates), recorded = await recordedPaymentCandidates(db, candidates)
   for (const l of candidates) {
     const first = others.find(r => r.position < (rule.position ?? Infinity) && ruleMatches(r, l))
     if (first) { earlier.push({ ...l, reason: `rule ${first.name} files it first` }); continue }
-    const why = await blocked(db, l)
+    const why = deposits[l.id] ? 'Review the proposed invoice payment first' : recorded[l.id]?.length ? 'Match the recorded payment first' : await blocked(db, l)
     if (why) held.push({ ...l, reason: why }); else files.push(l)
   }
   return { files, held, earlier, total: files.reduce((n, l) => n + l.amount_cents, 0) }
