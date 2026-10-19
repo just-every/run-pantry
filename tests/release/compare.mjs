@@ -55,7 +55,11 @@ export async function readUpgraded(root, persist, before) {
     assert.equal(owner.value.actor?.role, 'owner', 'the owner stays signed in')
     assert.equal((await send('/api/pantry/state', undefined, before.accountant)).value.actor?.role, 'accountant', 'the accountant stays signed in')
     for (const [path, pick] of Object.entries(picks(before.statements))) {
-      const now = await send('/api/pantry/' + path)
+      // Compare the same accounting basis across versions; REPORT-002 made the
+      // declared method the default, without changing the underlying books.
+      const oldBasis = path.startsWith('reports/') ? before.views[path].basis : null
+      const now = await send('/api/pantry/' + path + (oldBasis ? `&basis=${oldBasis}` : ''))
+      if (oldBasis) assert.equal(now.value.basis, oldBasis, 'upgrade comparison retains the original report basis')
       assert.equal(now.status, 200, `${path}: ${JSON.stringify(now.value).slice(0, 400)}`)
       assert.deepEqual(pick(now.value), pick(before.views[path]), `${path} reads the same`)
       after.views[path] = 'same'
