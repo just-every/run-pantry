@@ -16,7 +16,7 @@ function Status({ l, onUndo, picked, onFile }: { l: D; onUndo: () => Promise<voi
   if (l.pending) return <Chip>Pending</Chip>
   if (l.removed_at) return <Chip tone="bad">Removed by the bank</Chip>
   if (l.transfer && (['pending', 'exception'].includes(l.transfer.status) || (l.transfer.status === 'paired' && l.transfer.pair_status === 'paired'))) return <TransferStatus l={l} onDone={onUndo} />
-  if (l.rule_id) return <span className="filed"><Chip tone="good">Filed by rule · {l.rule_name}</Chip><small className="sub">{l.filed_to.join(', ')}</small>
+  if (l.rule_id) return <span className="filed"><Chip tone="good">Filed by rule · {l.rule_name}</Chip><small className="sub">{l.filed_to.join(', ')} · {l.rule_snapshot?.legacy ? 'Legacy filing; original conditions not recorded' : <>Revision <abbr title={l.rule_revision}>{l.rule_revision?.slice(0, 8)}</abbr></>}</small>
     {can && !l.reconciliation_id && <Action run={async () => { await command('bank-rule.undo', { matchId: l.match_id }); await onUndo() }}>Undo</Action>}</span>
   if (l.match_id) return <span className="filed"><Chip tone="good">{l.automatic ? 'Matched automatically' : 'Filed'}</Chip><small className="sub">{l.filed_to.join(', ')}</small>
     {can && l.payment_id && !l.reconciliation_id && <Action run={async () => { await command('match.undo', { id: l.match_id }); await onUndo() }}>Undo</Action>}</span>

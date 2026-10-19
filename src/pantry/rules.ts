@@ -12,7 +12,7 @@ import { all, audit, changed, guard, one, periodOpen, q, run, type AuditActor, t
 import { entryStatements, reversalStatements, entry } from './journal'
 import type { Command, Context } from './context'
 
-export type Split = { accountId: string; share: number }
+export type Split = { accountId: string; share?: number; amountCents?: number }
 export type Rule = Data & { id: string; name: string; splits: Split[] }
 /** Who files: the person who triggered it, or for a feed sync, the rule's author. */
 export type Filer = { actor: AuditActor; authority: Sql }
@@ -32,7 +32,10 @@ export function ruleMatches(rule: Data, line: Data) {
   if (rule.direction === 'out' && line.amount_cents > 0) return false
   if (rule.direction === 'in' && line.amount_cents < 0) return false
   if (rule.payee && ![line.payee, line.description].some(t => t && words(t).includes(words(rule.payee)))) return false
-  if (rule.description_contains && !String(line.description).toLowerCase().includes(String(rule.description_contains).toLowerCase())) return false
+  if (rule.description_contains) {
+    const description = String(line.description).toLowerCase(), condition = String(rule.description_contains).toLowerCase()
+    if (rule.description_mode === 'equals' ? description !== condition : !description.includes(condition)) return false
+  }
   const abs = Math.abs(line.amount_cents)
   if (rule.amount_min_cents && abs < rule.amount_min_cents) return false
   if (rule.amount_max_cents && abs > rule.amount_max_cents) return false
@@ -53,6 +56,10 @@ async function ruleInput(db: D1Database, b: Data) {
   const optionalCents = (v: unknown, label: string) => v === undefined || v === null || v === '' ? null : cents(v, label)
   const r = {
     name: text(b.name, 'Rule name', 120),
+    priority: b.priority === undefined || b.priority === '' ? null : Number(b.priority),
+    mode: optionalText(b.mode, 'Rule mode') || 'automatic',
+    descriptionMode: optionalText(b.descriptionMode, 'Description match') || 'contains',
+    splitMode: optionalText(b.splitMode, 'Split type') || 'percent',
     bankAccountId: b.bankAccountId ? text(b.bankAccountId, 'Bank account') : null,
     direction: optionalText(b.direction, 'Money in or out') || 'any',
     payee: optionalText(b.payee, 'Payee', 120),
@@ -64,14 +71,23 @@ async function ruleInput(db: D1Database, b: Data) {
     memo: optionalText(b.memo, 'Memo', 300),
     splits: [] as Split[],
   }
+  requireThat(r.priority === null || ((typeof b.priority === 'number' || typeof b.priority === 'string') && Number.isSafeInteger(r.priority) && r.priority >= 0), 'Priority is a nonnegative whole number')
+  requireThat(['automatic', 'suggest'].includes(r.mode), 'Rule mode is automatic or suggest')
+  requireThat(['contains', 'equals'].includes(r.descriptionMode), 'Description match is contains or equals')
+  requireThat(['percent', 'amount'].includes(r.splitMode), 'Split type is percent or amount')
   requireThat(['out', 'in', 'any'].includes(r.direction), 'Money in or out is "out", "in" or "any"')
   requireThat(r.payee || r.descriptionContains || r.amountMin || r.amountMax, 'Give the rule a payee, description text or amount to match')
   requireThat(!r.amountMin || !r.amountMax || r.amountMin <= r.amountMax, 'The smallest amount is more than the largest')
   if (r.bankAccountId) requireThat(await one(db, 'SELECT 1 FROM pt_bank_accounts WHERE id = ?', r.bankAccountId), 'Bank account not found', 404)
   const raw = Array.isArray(b.splits) && b.splits.length ? b.splits : [{ accountId: b.accountId, percent: '100' }]
   requireThat(raw.length <= 10, 'A rule splits into at most 10 categories')
-  r.splits = raw.map((s: Data, i: number) => ({ accountId: text(s.accountId, raw.length > 1 ? `Split ${i + 1} category` : 'Category'), share: share(s.percent, `Split ${i + 1} percentage`) }))
-  requireThat(r.splits.reduce((n, s) => n + s.share, 0) === 10000, 'Split percentages add up to 100')
+  r.splits = raw.map((s: Data, i: number) => {
+    const accountId = text(s.accountId, raw.length > 1 ? `Split ${i + 1} category` : 'Category')
+    requireThat(r.splitMode === 'amount' ? s.percent === undefined || s.percent === '' : s.amount === undefined || s.amount === '', 'Use either amounts or percentages for all splits')
+    return r.splitMode === 'amount' ? { accountId, amountCents: cents(s.amount, `Split ${i + 1} amount`) } : { accountId, share: share(s.percent, `Split ${i + 1} percentage`) }
+  })
+  if (r.splitMode === 'percent') requireThat(r.splits.reduce((n, s) => n + s.share!, 0) === 10000, 'Split percentages add up to 100')
+  else requireThat(Number.isSafeInteger(r.splits.reduce((n, s) => n + s.amountCents!, 0)), 'Split amounts are too large')
   requireThat(new Set(r.splits.map(s => s.accountId)).size === r.splits.length, 'Each split uses a different category')
   const accounts = new Map((await all(db, 'SELECT id, name, subtype, active FROM pt_accounts')).map(a => [a.id, a]))
   for (const s of r.splits) {
@@ -84,11 +100,14 @@ async function ruleInput(db: D1Database, b: Data) {
 }
 
 /** The rule as stored, from input (for previews of a rule not yet saved). */
-const asRow = (r: Awaited<ReturnType<typeof ruleInput>>, extra: Data = {}): Rule => ({ id: '', name: r.name, bank_account_id: r.bankAccountId, direction: r.direction, payee: r.payee, description_contains: r.descriptionContains, amount_min_cents: r.amountMin, amount_max_cents: r.amountMax, contact_id: r.contactId, tax_code_id: r.taxCodeId, memo: r.memo, splits: r.splits, ...extra })
+const asRow = (r: Awaited<ReturnType<typeof ruleInput>>, extra: Data = {}): Rule => ({ id: '', name: r.name, bank_account_id: r.bankAccountId, direction: r.direction, payee: r.payee, description_contains: r.descriptionContains, amount_min_cents: r.amountMin, amount_max_cents: r.amountMax, contact_id: r.contactId, tax_code_id: r.taxCodeId, memo: r.memo, splits: r.splits, priority: r.priority, mode: r.mode, description_mode: r.descriptionMode, split_mode: r.splitMode, ...extra })
 
 export async function rules(db: D1Database, { active = true } = {}): Promise<Rule[]> {
-  return (await all(db, `SELECT * FROM pt_bank_rules ${active ? 'WHERE active = 1' : ''} ORDER BY position, created_at`)).map(r => ({ ...r, splits: JSON.parse(r.splits) })) as Rule[]
+  return (await all(db, `SELECT * FROM pt_bank_rules ${active ? 'WHERE active = 1' : ''} ORDER BY priority, created_at, id`)).map(r => ({ ...r, splits: JSON.parse(r.splits) })) as Rule[]
 }
+
+const precedes = (a: Rule, b: Rule) => a.priority - b.priority || (String(a.created_at) < String(b.created_at) ? -1 : String(a.created_at) > String(b.created_at) ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+const splitHold = (rule: Rule, line: Data) => rule.split_mode === 'amount' && rule.splits.reduce((n, s) => n + s.amountCents!, 0) !== Math.abs(line.amount_cents) ? 'Split amounts must equal the statement line amount' : null
 
 /** Lines no match holds, the bank has not removed and no undo has taken out of rules. */
 const OPEN_LINES = `SELECT l.* FROM pt_bank_lines l WHERE l.removed_at IS NULL AND l.rules_off = 0
@@ -107,12 +126,14 @@ const notReconciled = (line: Data) => guard('NOT EXISTS (SELECT 1 FROM pt_reconc
 
 /** The batch that files one line by a rule: a posted bank entry and a match naming the rule. */
 export async function fileStatements(db: D1Database, rule: Rule, line: Data, filer: Filer): Promise<Sql[]> {
+  requireThat(rule.mode !== 'suggest', 'Suggest-only rules never post entries', 409)
+  requireThat(!splitHold(rule, line), 'Split amounts must equal the statement line amount', 409)
   const bank = (await one(db, 'SELECT * FROM pt_bank_accounts WHERE id = ?', line.bank_account_id))!
   const abs = Math.abs(line.amount_cents), out = line.amount_cents < 0
   const code = rule.tax_code_id ? await one(db, 'SELECT * FROM pt_tax_codes WHERE id = ?', rule.tax_code_id) : null
   const tax = code ? scale(abs, code.rate_milli_percent, 100000 + code.rate_milli_percent) : 0
   const net = abs - tax
-  const parts = rule.splits.map((s, i) => ({ accountId: s.accountId, amount: i < rule.splits.length - 1 ? scale(net, s.share, 10000) : 0 }))
+  const parts = rule.splits.map((s, i) => ({ accountId: s.accountId, amount: i < rule.splits.length - 1 ? rule.split_mode === 'amount' ? scale(net, s.amountCents!, abs) : scale(net, s.share!, 10000) : 0 }))
   parts[parts.length - 1].amount = net - parts.slice(0, -1).reduce((n, p) => n + p.amount, 0)
   if (code && tax) parts.push({ accountId: code.account_id, amount: tax })
   const memo = rule.memo || line.description
@@ -126,7 +147,7 @@ export async function fileStatements(db: D1Database, rule: Rule, line: Data, fil
     guard("NOT EXISTS (SELECT 1 FROM pt_transfer_halves WHERE bank_line_id = ? AND status IN ('pending', 'exception'))", line.id),
     guard('EXISTS (SELECT 1 FROM pt_bank_rules WHERE id = ? AND revision = ? AND active = 1)', rule.id, rule.revision),
     ...entryStatements({ id: entryId, date: line.posted_date, memo: `${memo} · by rule ${rule.name}`, sourceKind: 'bank', sourceId: line.id, preparedBy: filer.actor.email, preparedKind: 'person', lines }, filer.actor.email),
-    q("INSERT INTO pt_matches (id, bank_account_id, status, proposal_id, note, approved_by, approved_at, revision, rule_id) VALUES (?, ?, 'approved', NULL, ?, ?, ?, ?, ?)", matchId, bank.id, `Filed by rule "${rule.name}"`, filer.actor.email, now(), uid(), rule.id),
+    q("INSERT INTO pt_matches (id, bank_account_id, status, proposal_id, note, approved_by, approved_at, revision, rule_id, rule_revision, rule_snapshot) VALUES (?, ?, 'approved', NULL, ?, ?, ?, ?, ?, ?, ?)", matchId, bank.id, `Filed by rule "${rule.name}"`, filer.actor.email, now(), uid(), rule.id, rule.revision, JSON.stringify(rule)),
     q('INSERT INTO pt_match_bank_lines (match_id, bank_line_id, active) VALUES (?, ?, 1)', matchId, line.id),
     q('INSERT INTO pt_match_postings (match_id, journal_line_id, active) SELECT ?, id, 1 FROM pt_journal_lines WHERE entry_id = ? AND account_id = ?', matchId, entryId, bank.account_id),
     audit(filer.actor, 'bank-rule.file', 'match', matchId, { rule: rule.name, ruleId: rule.id, line: line.id, amount: line.amount_cents, description: line.description }),
@@ -147,7 +168,7 @@ export async function applyRules(db: D1Database, lineIds: string[], filer: (rule
       if (depositSuggestions[line.id] || recorded[line.id]?.length) continue
       const rule = active.find(r => ruleMatches(r, line))
       if (!rule) continue
-      if (await blocked(db, line)) { result.skipped++; continue }
+      if (rule.mode === 'suggest' || splitHold(rule, line) || await blocked(db, line)) { result.skipped++; continue }
       try { await run(db, await fileStatements(db, rule, line, filer(rule))); result.filed++ }
       catch (e) { if (e instanceof Fault && e.status === 409) result.skipped++; else throw e }
     }
@@ -162,36 +183,38 @@ export const authorFiler = (rule: Rule): Filer => ({
 })
 const personFiler = (c: Context) => (): Filer => ({ actor: who(c.actor), authority: authority(c.actor, 'record') })
 
-/** The open lines a rule would file, and the ones it matches but may not touch. */
+/** Open matches, and the six latest matching charges including already-filed history. */
 async function preview(db: D1Database, rule: Rule, others: Rule[]) {
-  const candidates = (await all(db, `${OPEN_LINES} ORDER BY l.posted_date DESC, l.id LIMIT 5000`)).filter(l => ruleMatches(rule, l))
-  const files: Data[] = [], held: Data[] = [], earlier: Data[] = []
+  const candidates = (await all(db, `${OPEN_LINES} ORDER BY l.posted_date DESC, l.id`)).filter(l => ruleMatches(rule, l))
+  const earlier = (await all(db, 'SELECT l.* FROM pt_bank_lines l WHERE l.removed_at IS NULL ORDER BY l.posted_date DESC, l.id')).filter(l => ruleMatches(rule, l)).slice(0, 6)
+  const files: Data[] = [], held: Data[] = [], preceded: Data[] = [], suggested: Data[] = []
   const deposits = await depositProposals(db, candidates), recorded = await recordedPaymentCandidates(db, candidates)
   for (const l of candidates) {
-    const first = others.find(r => r.position < (rule.position ?? Infinity) && ruleMatches(r, l))
-    if (first) { earlier.push({ ...l, reason: `rule ${first.name} files it first` }); continue }
-    const why = deposits[l.id] ? 'Review the proposed invoice payment first' : recorded[l.id]?.length ? 'Match the recorded payment first' : await blocked(db, l)
-    if (why) held.push({ ...l, reason: why }); else files.push(l)
+    const first = others.find(r => precedes(r, rule) < 0 && ruleMatches(r, l))
+    if (first) { preceded.push({ ...l, reason: `rule ${first.name} takes precedence` }); continue }
+    const why = deposits[l.id] ? 'Review the proposed invoice payment first' : recorded[l.id]?.length ? 'Match the recorded payment first' : await blocked(db, l) || splitHold(rule, l)
+    if (why) held.push({ ...l, reason: why })
+    else if (rule.mode === 'suggest') suggested.push({ ...l, reason: 'Suggest only; a person must file this line' })
+    else files.push(l)
   }
-  return { files, held, earlier, total: files.reduce((n, l) => n + l.amount_cents, 0) }
+  return { files, held, earlier, preceded, suggested, total: files.reduce((n, l) => n + l.amount_cents, 0) }
 }
 
 const previewRule: Command = { need: 'record', async run(c, b) {
-  const input = await ruleInput(c.db, b)
-  const current = b.id ? (await rules(c.db)).find(r => r.id === b.id) : null
-  const others = (await rules(c.db)).filter(r => r.id !== b.id)
-  const p = await preview(c.db, asRow(input, { position: current?.position ?? Infinity }), others)
-  return { ...p, files: p.files.slice(0, 200), held: p.held.slice(0, 50), earlier: p.earlier.slice(0, 50), count: p.files.length }
+  const input = await ruleInput(c.db, b), active = await rules(c.db)
+  const current = b.id ? active.find(r => r.id === b.id) : null
+  const p = await preview(c.db, asRow(input, { id: current?.id ?? '~', priority: input.priority ?? current?.priority ?? (Math.max(0, ...active.map(r => r.priority)) + 1), created_at: current?.created_at ?? now() }), active.filter(r => r.id !== b.id))
+  return { ...p, files: p.files.slice(0, 200), held: p.held.slice(0, 50), preceded: p.preceded.slice(0, 50), suggested: p.suggested.slice(0, 200), count: p.files.length }
 } }
 
-const ruleFields = (input: Awaited<ReturnType<typeof ruleInput>>) => [input.name, input.bankAccountId, input.direction, input.payee, input.descriptionContains, input.amountMin, input.amountMax, JSON.stringify(input.splits), input.contactId, input.taxCodeId, input.memo]
-const ruleInsert = (id: string, fields: unknown[], by: string) =>
-  q('INSERT INTO pt_bank_rules (id, name, bank_account_id, direction, payee, description_contains, amount_min_cents, amount_max_cents, splits, contact_id, tax_code_id, memo, position, active, created_by, created_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM pt_bank_rules), 1, ?, ?, ?)', id, ...fields, by, now(), uid())
+const ruleFields = (input: Awaited<ReturnType<typeof ruleInput>>) => [input.name, input.bankAccountId, input.direction, input.payee, input.descriptionContains, input.amountMin, input.amountMax, JSON.stringify(input.splits), input.contactId, input.taxCodeId, input.memo, input.mode, input.descriptionMode, input.splitMode]
+const ruleInsert = (id: string, fields: unknown[], by: string, priority: number | null) =>
+  q('INSERT INTO pt_bank_rules (id, name, bank_account_id, direction, payee, description_contains, amount_min_cents, amount_max_cents, splits, contact_id, tax_code_id, memo, mode, description_mode, split_mode, position, priority, active, created_by, created_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM pt_bank_rules), COALESCE(?, (SELECT COALESCE(MAX(priority), 0) + 1 FROM pt_bank_rules)), 1, ?, ?, ?)', id, ...fields, priority, by, now(), uid())
 
 /** A new rule from rule input (the same checks as a saved one), for a write the caller authorises. */
 export async function newRuleStatements(db: D1Database, b: Data, by: AuditActor) {
   const input = await ruleInput(db, b), id = uid()
-  return { id, statements: [ruleInsert(id, ruleFields(input), by.email), audit(by, 'bank-rule.create', 'bank-rule', id, { name: input.name })] }
+  return { id, statements: [ruleInsert(id, ruleFields(input), by.email, input.priority), audit(by, 'bank-rule.create', 'bank-rule', id, { name: input.name })] }
 }
 
 const saveRule: Command = { need: 'record', async run(c, b) {
@@ -200,15 +223,15 @@ const saveRule: Command = { need: 'record', async run(c, b) {
   let id: string
   if (b.id) {
     const current = await one(c.db, 'SELECT * FROM pt_bank_rules WHERE id = ?', text(b.id, 'Rule'))
-    requireThat(current, 'Rule not found', 404)
+    requireThat(current && current.active, 'Active rule not found', 404)
     requireThat(current.revision === b.revision, 'This rule changed since you opened it; reload', 409)
     id = current.id
     await run(c.db, [authority(c.actor, 'record'),
-      q('UPDATE pt_bank_rules SET name = ?, bank_account_id = ?, direction = ?, payee = ?, description_contains = ?, amount_min_cents = ?, amount_max_cents = ?, splits = ?, contact_id = ?, tax_code_id = ?, memo = ?, revision = ? WHERE id = ? AND revision = ?', ...fields, uid(), id, b.revision), changed(),
+      q('UPDATE pt_bank_rules SET name = ?, bank_account_id = ?, direction = ?, payee = ?, description_contains = ?, amount_min_cents = ?, amount_max_cents = ?, splits = ?, contact_id = ?, tax_code_id = ?, memo = ?, mode = ?, description_mode = ?, split_mode = ?, priority = COALESCE(?, priority), revision = ? WHERE id = ? AND revision = ?', ...fields, input.priority, uid(), id, b.revision), changed(),
       audit(who(c.actor), 'bank-rule.edit', 'bank-rule', id, { name: input.name })])
   } else {
     id = uid()
-    await run(c.db, [authority(c.actor, 'record'), ruleInsert(id, fields, c.actor.email), audit(who(c.actor), 'bank-rule.create', 'bank-rule', id, { name: input.name })])
+    await run(c.db, [authority(c.actor, 'record'), ruleInsert(id, fields, c.actor.email, input.priority), audit(who(c.actor), 'bank-rule.create', 'bank-rule', id, { name: input.name })])
   }
   // Filing what the preview showed is the person's choice, made with the save.
   let filed = { filed: 0, skipped: 0 }
@@ -282,9 +305,20 @@ export async function suggestions(db: D1Database, active: Rule[]) {
 
 export async function rulesView(db: D1Database) {
   const all_ = await rules(db, { active: true })
+  const open = await all(db, `${OPEN_LINES} ORDER BY l.posted_date DESC, l.id`)
+  const suggestedLines: Data[] = []
+  const deposits = await depositProposals(db, open), recorded = await recordedPaymentCandidates(db, open)
+  for (const line of open) {
+    const rule = all_.find(r => ruleMatches(r, line))
+    if (rule?.mode !== 'suggest') continue
+    const reason = deposits[line.id] ? 'Review the proposed invoice payment first' : recorded[line.id]?.length ? 'Match the recorded payment first' : await blocked(db, line) || splitHold(rule, line) || 'Review and file this suggestion'
+    suggestedLines.push({ ...line, ruleId: rule.id, ruleName: rule.name, ruleRevision: rule.revision, splits: rule.splits, splitMode: rule.split_mode, reason })
+  }
   const counts = new Map((await all(db, "SELECT rule_id, COUNT(*) AS n, MAX(approved_at) AS last FROM pt_matches WHERE status = 'approved' AND rule_id IS NOT NULL GROUP BY rule_id")).map(r => [r.rule_id, r]))
   return {
     rules: all_.map(r => ({ ...r, filed: Number(counts.get(r.id)?.n ?? 0), lastFiled: counts.get(r.id)?.last ?? null })),
     suggestions: await suggestions(db, all_),
+    suggestedLines,
+    filings: (await all(db, `SELECT m.id, m.rule_id, m.rule_revision, m.rule_snapshot, m.status, mb.bank_line_id FROM pt_matches m JOIN pt_match_bank_lines mb ON mb.match_id = m.id WHERE m.rule_id IS NOT NULL ORDER BY m.approved_at DESC, m.id LIMIT 300`)).map(m => ({ ...m, rule_snapshot: JSON.parse(m.rule_snapshot) })),
   }
 }
