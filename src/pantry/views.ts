@@ -75,7 +75,7 @@ export async function activity(db: D1Database) {
 }
 
 export async function documents(db: D1Database) {
-  return all(db, `SELECT d.id, d.name, d.media_type, d.size, d.sha256, d.linked_kind, d.linked_id, d.note, d.uploaded_by, d.uploaded_at, CASE d.linked_kind
+  return all(db, `SELECT d.id, d.name, d.media_type, d.size, d.sha256, d.linked_kind, d.linked_id, d.note, d.uploaded_by, d.uploaded_at, d.duplicate_of, d.duplicate_basis, d.duplicate_reason, d.duplicate_decision, CASE d.linked_kind
       WHEN 'bill' THEN (SELECT 'Bill ' || b.reference FROM pt_bills b WHERE b.id = d.linked_id)
       WHEN 'invoice' THEN (SELECT CASE i.kind WHEN 'credit' THEN 'Credit note ' ELSE 'Invoice ' END || i.number FROM pt_invoices i WHERE i.id = d.linked_id)
       WHEN 'journal' THEN (SELECT 'Journal entry' || COALESCE(' ' || j.number, '') FROM pt_journal_entries j WHERE j.id = d.linked_id)

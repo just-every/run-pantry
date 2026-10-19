@@ -25,7 +25,7 @@ function ReadLine({ r, reader }: { r: D; reader: D }) {
   return <p className="read-line"><Chip tone="warn">Not read</Chip> <span>{r.read_note}</span></p>
 }
 
-type Typed = { vendor: string; date: string; total: string; currency: string }
+type Typed = { vendor: string; invoiceNumber: string; date: string; total: string; currency: string }
 const NONE: D[] = []
 
 /** The transactions this receipt may belong to: those found from what was read, then, once a person
@@ -34,15 +34,14 @@ function useMatches(r: D) {
   const [typed, setTyped] = useState<Typed | null>(null), [found, setFound] = useState<D[] | null>(null), [error, setError] = useState(''), [duplicate, setDuplicate] = useState<D | null>(r.duplicate), [basis, setBasis] = useState(r.duplicate_basis)
   useEffect(() => {
     if (!typed) return
-    if (!/\d/.test(typed.total)) { setFound([]); setError(''); return }
     let live = true
     const timer = setTimeout(async () => {
       try { const v = await api('receipts/candidates?' + new URLSearchParams({ ...typed, id: r.id })); if (live) { setFound(v.candidates); setDuplicate(v.duplicate); setBasis(v.duplicateBasis); setError('') } }
       catch (e) { if (live) { setFound([]); setError((e as Error).message) } }
     }, 300)
     return () => { live = false; clearTimeout(timer) }
-  }, [typed?.vendor, typed?.date, typed?.total, typed?.currency])
-  const initial: Typed = { vendor: r.vendor ?? r.read_vendor ?? '', date: r.receipt_date ?? r.read_date ?? '', total: (r.total_cents ?? r.read_total_cents) ? amountText(r.total_cents ?? r.read_total_cents) : '', currency: r.currency ?? r.read_currency ?? '' }
+  }, [typed?.vendor, typed?.invoiceNumber, typed?.date, typed?.total, typed?.currency])
+  const initial: Typed = { vendor: r.vendor ?? r.read_vendor ?? '', invoiceNumber: r.invoice_number ?? r.read_invoice_number ?? '', date: r.receipt_date ?? r.read_date ?? '', total: (r.total_cents ?? r.read_total_cents) ? amountText(r.total_cents ?? r.read_total_cents) : '', currency: r.currency ?? r.read_currency ?? '' }
   const type = (field: keyof Typed) => (e: any) => { const value = e.target.value; setTyped(t => ({ ...(t ?? initial), [field]: value })) }
   const total = typed ? typed.total : initial.total
   return { fields: typed ?? initial, duplicate, basis, list: (typed ? found : r.candidates) ?? NONE, looking: !!typed && found === null && /\d/.test(total), total, error, type }
@@ -63,13 +62,14 @@ function ReceiptCard({ r, data, onChange }: { r: D; data: D; onChange: () => Pro
     <div className="receipt-body">
       <Preview r={r} />
       <div className="receipt-fields">
-        {m.duplicate && <p className="hint" role="status">Duplicate receipt · {m.basis === 'file' ? 'same file' : 'same vendor, date and total'}. Original: <FileLink id={m.duplicate.document_id} name={m.duplicate.file_name} mediaType={m.duplicate.media_type} />{m.duplicate.status === 'attached' ? <> · already attached {day(m.duplicate.decided_at)}</> : ' · waiting for review'}. Choose Keep both with a reason, or Skip.</p>}
+        {m.duplicate && <p className="hint" role="status">Duplicate receipt · {m.basis === 'file' ? 'same file' : m.basis === 'vendor-invoice' ? 'same vendor and invoice number' : 'same vendor, date and total'}. Original: <FileLink id={m.duplicate.document_id} name={m.duplicate.file_name} mediaType={m.duplicate.media_type} />{m.duplicate.status === 'attached' ? <> · already attached {day(m.duplicate.decided_at)}</> : ' · waiting for review'}. Choose Keep both with a reason, or Skip.</p>}
         <ReadLine r={r} reader={{ ...data.reader, canSet: state.actor.can.owner }} />
         {r.read_status !== 'read' && state.actor.can.record && <p className="hint">Type the vendor, date and total from the receipt: the transactions with that total are listed under <strong>Attach to</strong>.</p>}
         {state.actor.can.record ? <Form label={m.duplicate ? "Keep both" : "Accept and attach"} submit={async b => accept(b)} onDone={onChange} className="grid-form"
           secondary={<>{canRead && <Action run={async () => { await command('receipt.read', { id: r.id }); await onChange() }}>Read again</Action>}<Action run={async () => { await command('receipt.dismiss', { id: r.id, revision: r.revision, ...m.fields, reason: m.duplicate ? 'Duplicate skipped' : '' }); await onChange() }}>{m.duplicate ? 'Skip' : 'Not a receipt'}</Action></>}>
           {m.duplicate && <Field label="Reason to keep both" name="duplicateReason" required maxLength={300} wide />}
           <Field label="Vendor" name="vendor" defaultValue={r.vendor ?? r.read_vendor ?? ''} onChange={m.type('vendor')} />
+          <Field label="Invoice number" name="invoiceNumber" defaultValue={r.invoice_number ?? r.read_invoice_number ?? ''} maxLength={80} onChange={m.type('invoiceNumber')} />
           <Field label="Date" name="date" type="date" defaultValue={r.receipt_date ?? r.read_date ?? ''} onChange={m.type('date')} />
           <Field label="Total" name="total" inputMode="decimal" defaultValue={(r.total_cents ?? r.read_total_cents) ? amountText(r.total_cents ?? r.read_total_cents) : ''} onChange={m.type('total')} />
           <Field label="Tax" name="tax" inputMode="decimal" defaultValue={(r.tax_cents ?? r.read_tax_cents) !== null && (r.tax_cents ?? r.read_tax_cents) !== undefined ? amountText(r.tax_cents ?? r.read_tax_cents) : ''} />
@@ -122,6 +122,13 @@ export function Receipts() {
       </Card>
       {data.review.length ? data.review.map((r: D) => <div id={`receipt-${r.id}`} key={r.id + r.revision}><ReceiptCard r={r} data={data} onChange={refresh} /></div>)
         : <Card title="To review" className="empty-card"><span className="empty-lines" aria-hidden="true" /><p>Nothing waiting. New receipts appear here with what was read and the transaction they belong to.</p></Card>}
+      {data.duplicateDocuments?.map((d: D) => <div key={d.id} id={`document-${d.id}`}><Card title="Duplicate document" actions={<Chip tone="warn">Duplicate</Chip>}>
+        <p><FileLink id={d.id} name={d.name} mediaType={d.media_type} /> · {d.duplicate_basis === 'file' ? 'same file' : d.duplicate_basis === 'vendor-invoice' ? 'same vendor and invoice number' : 'same vendor, date and total'}. Original: <FileLink id={d.duplicate.document_id} name={d.duplicate.file_name} mediaType={d.duplicate.media_type} /></p>
+        {state.actor.can.record && <Form label="Keep both" submit={b => command('document.duplicate-decide', { id: d.id, decision: 'keep', reason: b.reason })} onDone={refresh} className="grid-form"
+          secondary={<Action run={async () => { await command('document.duplicate-decide', { id: d.id, decision: 'skip', reason: 'Duplicate skipped' }); await refresh() }}>Skip</Action>}>
+          <Field label="Reason to keep both" name="reason" required maxLength={300} wide />
+        </Form>}
+      </Card></div>)}
       <Card title="Attached">
         <Table heads={['Date', 'Vendor', 'Total', 'Attached to', 'By', 'Receipt']} figures={[2]} empty="No receipts attached yet.">
           {data.attached.map((r: D) => <tr key={r.id} id={`receipt-${r.id}`}><td>{day(r.receipt_date ?? r.decided_at)}</td><td>{r.vendor ?? '—'}{r.duplicate_reason && <small className="sub"> · Kept both · {r.duplicate_reason}</small>}</td><td className="fig">{r.total_cents ? money(r.total_cents, r.currency) : '—'}</td>

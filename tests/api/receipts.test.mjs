@@ -170,8 +170,8 @@ test('Receipts: an email forwarded to the private Pantry address is kept whole, 
 })
 
 
-test('Receipts: duplicate email attachments and normalized receipt facts wait for Skip or a reasoned Keep both, including rule and chosen-target captures', async t => {
-  let reading = { receipt: true, vendor: 'Brightline Software', date: '2026-09-08', total: '640.00', tax: null, currency: 'USD', category: '6200', note: '' }
+test('CAPTURE-005: duplicate email attachments, invoice numbers and normalized receipt facts wait for Skip or a reasoned Keep both, including rule and chosen-target captures', async t => {
+  let reading = { receipt: true, invoiceNumber: 'BL-3391', vendor: 'Brightline Software', date: '2026-09-08', total: '640.00', tax: null, currency: 'USD', category: '6200', note: '' }
   const { model } = fakeModel(() => reading)
   const h = await harness({ outbound: model }); t.after(() => h.close())
   const { acct } = await books(h)
@@ -204,7 +204,7 @@ test('Receipts: duplicate email attachments and normalized receipt facts wait fo
 
   // Different image bytes and case/punctuation/spacing still name the same
   // receipt. Choosing a target on capture cannot bypass review either.
-  reading = { ...reading, vendor: '  BRIGHTLINE - SOFTWARE!  ' }
+  reading = { ...reading, invoiceNumber: null, vendor: '  BRIGHTLINE - SOFTWARE!  ' }
   const copy = await capture(h, Buffer.from('different photo bytes'), { targetKind: original.target_kind, targetId: original.target_id })
   assert.equal(copy.duplicate.id, original.id)
   view = await h.view('receipts')
@@ -227,13 +227,50 @@ test('Receipts: duplicate email attachments and normalized receipt facts wait fo
   assert.equal(JSON.parse(audit.detail).duplicateReason, kept.duplicate_reason)
   assert.deepEqual(await h.db.prepare("SELECT COUNT(*) AS n FROM pt_journal_entries WHERE status = 'posted'").first(), postedBefore, 'Skip and keeping an extra copy on the same transaction create no new expense')
 
+  // Invoice identity catches a new photo even when its amount and date differ.
+  reading = { ...reading, invoiceNumber: ' bl 3391 ', date: '2026-10-01', total: '641.00' }
+  const invoiceCopy = await capture(h, Buffer.from('a different invoice photo'))
+  view = await h.view('receipts')
+  const invoiceDuplicate = at(view.review, r => r.id === invoiceCopy.id)
+  assert.equal(invoiceCopy.duplicate.id, original.id)
+  assert.equal(invoiceDuplicate.duplicate_basis, 'vendor-invoice')
+  assert.equal(invoiceDuplicate.read_invoice_number, 'bl 3391')
+  await h.command('receipt.dismiss', { id: invoiceCopy.id, revision: invoiceDuplicate.revision, reason: 'Same vendor invoice' })
+  const skipAudit = at((await h.view('activity')).audit, a => a.action === 'receipt.dismiss' && a.subject_id === invoiceCopy.id)
+  assert.equal(JSON.parse(skipAudit.detail).reason, 'Same vendor invoice')
+  assert.equal(JSON.parse(skipAudit.detail).duplicateOf, original.id)
+  assert.equal((await h.view('sales')).bills.length, 0, 'recapturing the invoice creates no bill')
+
   // A recurring purchase on a different receipt date is a different receipt.
-  reading = { ...reading, date: '2026-10-08' }
+  reading = { ...reading, invoiceNumber: 'BL-NEW', date: '2026-10-08' }
   const nextPeriod = await capture(h, Buffer.from('October photo bytes'))
   assert.equal(nextPeriod.duplicate, null)
+
+  // A bill already captured through Documents is also the original for email
+  // and camera intake; neither door can turn another representation into a bill.
+  const vendor = await h.command('contact.save', { kind: 'vendor', name: 'Harbor Services', email: 'billing@harbor.example' })
+  const bill = await h.command('bill.save', { vendorId: vendor.id, reference: 'HB-29', billDate: '2026-09-12', lines: [{ description: 'Service', accountId: acct['6200'], amount: '250.00' }] })
+  const billDocument = await h.command('document.upload', { name: 'HB-29.pdf', mediaType: 'application/pdf', base64: Buffer.from('%PDF-1.4 Harbor Services HB-29 original').toString('base64'), linkedKind: 'bill', linkedId: bill.id })
+  reading = { ...reading, vendor: 'Harbor Services', invoiceNumber: 'HB-29', date: '2026-09-12', total: '250.00' }
+  await deliver(h, address, email({ to: address, subject: 'Harbor bill', attachment: Buffer.from('%PDF-1.4 emailed Harbor bill') }))
+  view = await h.view('receipts')
+  const billEmail = at(view.review, r => r.subject === 'Harbor bill')
+  assert.equal(billEmail.duplicate.document_id, billDocument.id)
+  assert.equal(billEmail.duplicate_basis, 'vendor-invoice')
+  reading = { ...reading, invoiceNumber: null }
+  const billPhone = await capture(h, Buffer.from('phone photograph of Harbor bill'), { targetKind: 'bill', targetId: bill.id })
+  view = await h.view('receipts')
+  const billPhoto = at(view.review, r => r.id === billPhone.id)
+  assert.equal(billPhoto.duplicate.document_id, billDocument.id)
+  assert.equal(billPhoto.duplicate_basis, 'vendor-date-total')
+  assert.equal((await h.view('sales')).bills.length, 1)
+  const overridden = await h.command('receipt.attach', { id: billPhoto.id, revision: billPhoto.revision, targetKind: 'bill', targetId: bill.id, duplicateReason: 'Retain the legible photograph with the original bill' })
+  assert.equal(overridden.linked_id, bill.id)
+  assert.equal(overridden.duplicate_document_id, billDocument.id)
+  assert.equal((await h.view('sales')).bills.length, 1)
 })
 
-test('Receipts: duplicate bytes need no reader key, and typed facts cannot bypass duplicate review', async t => {
+test('CAPTURE-005: duplicate bytes need no reader key, and typed facts cannot bypass duplicate review', async t => {
   const h = await harness(); t.after(() => h.close())
   const { acct } = await books(h)
   const { depot } = await cardWithCharges(h, acct)
@@ -271,4 +308,35 @@ test('Receipts: duplicate bytes need no reader key, and typed facts cannot bypas
   assert.equal(view.review.length, 0)
   assert.equal(view.skipped.length, 2)
   assert.equal(view.attached.length, 1)
+
+  // The ordinary Documents door sees the phone original without a reader.
+  const uploaded = await h.command('document.upload', { name: 'same-photo.jpg', mediaType: 'image/jpeg', base64: bytes.toString('base64'), linkedKind: 'journal', linkedId: original.linked_id ?? (await h.view('receipts')).attached[0].linked_id })
+  assert.equal(uploaded.duplicate_of, original.document_id)
+  assert.equal(uploaded.linked_kind, null, 'a duplicate upload cannot file itself on another record')
+  const docs = await h.view('documents')
+  assert.equal(at(docs.documents, d => d.id === uploaded.id).duplicate_basis, 'file')
+  assert.equal(at((await h.view('receipts')).duplicateDocuments, d => d.id === uploaded.id).duplicate.id, original.id)
+  await h.command('document.duplicate-decide', { id: uploaded.id, decision: 'keep', reason: '   ' }, h.owner, 400)
+  const keptDocument = await h.command('document.duplicate-decide', { id: uploaded.id, decision: 'keep', reason: 'Grant evidence copy' })
+  assert.equal(keptDocument.linked_kind, 'journal')
+  assert.equal(keptDocument.duplicate_reason, 'Grant evidence copy')
+  const keptAudit = at((await h.view('activity')).audit, a => a.action === 'document.duplicate-keep' && a.subject_id === uploaded.id)
+  assert.equal(JSON.parse(keptAudit.detail).reason, 'Grant evidence copy')
+  await h.command('document.duplicate-decide', { id: uploaded.id, decision: 'skip' }, h.owner, 409)
+
+  // Conversely, an archived ordinary upload is the original for phone intake.
+  const archivedBytes = Buffer.from('previously uploaded original')
+  const archived = await h.command('document.upload', { name: 'original.jpg', mediaType: 'image/jpeg', base64: archivedBytes.toString('base64') })
+  const phone = await capture(h, archivedBytes)
+  assert.equal(phone.duplicate.document_id, archived.id)
+  view = await h.view('receipts')
+  const phoneReview = at(view.review, r => r.id === phone.id)
+  await h.command('receipt.dismiss', { id: phone.id, revision: phoneReview.revision, reason: 'Original already archived' })
+  assert.equal(at((await h.view('receipts')).skipped, r => r.id === phone.id).original_document_id, archived.id)
+  const skipDocument = await h.command('document.upload', { name: 'archive-copy.jpg', mediaType: 'image/jpeg', base64: archivedBytes.toString('base64') })
+  const skippedDocument = await h.command('document.duplicate-decide', { id: skipDocument.id, decision: 'skip', reason: 'Already archived' })
+  assert.equal(skippedDocument.duplicate_of, archived.id)
+  assert.equal(skippedDocument.linked_kind, null)
+  const documentSkipAudit = at((await h.view('activity')).audit, a => a.action === 'document.duplicate-skip' && a.subject_id === skipDocument.id)
+  assert.equal(JSON.parse(documentSkipAudit.detail).reason, 'Already archived')
 })

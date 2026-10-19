@@ -11,15 +11,15 @@ import type { Command, Context } from '../context'
 import { candidates, vendorLikeness, type Candidate } from './attachments'
 import { readable, readingColumns, readWith, receipt } from './intake'
 import { emailReadable } from './mail'
-import { flagDuplicate, noDuplicate, readFingerprint, vendorKey } from './duplicates'
+import { flagDuplicate, noDuplicate, readFingerprint, vendorKey, type Duplicate } from './duplicates'
 
-export type Fields = { vendor: string | null; date: string | null; total: number | null; tax: number | null; currency: string | null; accountId: string | null }
+export type Fields = { vendor: string | null; invoiceNumber?: string | null; date: string | null; total: number | null; tax: number | null; currency: string | null; accountId: string | null }
 type Target = { kind: Candidate['kind']; id: string }
 
 /** The record the document will belong to, and the statements that make it so. */
-async function attachPlan(db: D1Database, actor: Actor, r: Data, target: Target, f: Fields, duplicateReason = ''): Promise<{ statements: Sql[]; linked: { kind: string; id: string } }> {
+async function attachPlan(db: D1Database, actor: Actor, r: Data, target: Target, f: Fields, duplicateReason = '', duplicate?: Duplicate | null): Promise<{ statements: Sql[]; linked: { kind: string; id: string } }> {
   const statements: Sql[] = [
-    ...(duplicateReason ? [] : [noDuplicate(r.id, f)]),
+    noDuplicate(r.id, f, duplicateReason ? duplicate : null),
     guard("? <> '' OR NOT EXISTS (SELECT 1 FROM pt_receipts WHERE status = 'attached' AND target_kind = ? AND target_id = ?)", duplicateReason, target.kind, target.id),
   ]
   let linked: { kind: string; id: string }
@@ -54,8 +54,8 @@ async function attachPlan(db: D1Database, actor: Actor, r: Data, target: Target,
   const docs = [r.document_id, r.file_document_id].filter(Boolean)
   statements.push(
     q(`UPDATE pt_documents SET linked_kind = ?, linked_id = ? WHERE id IN (${docs.map(() => '?').join(', ')}) AND linked_kind IS NULL`, linked.kind, linked.id, ...docs), changed(docs.length),
-    q(`UPDATE pt_receipts SET status = 'attached', vendor = ?, receipt_date = ?, total_cents = ?, tax_cents = ?, currency = ?, account_id = ?, target_kind = ?, target_id = ?, linked_kind = ?, linked_id = ?, decided_by = ?, decided_at = ?, revision = ?, vendor_key = ?, duplicate_reason = ? WHERE id = ? AND revision = ? AND status = 'review'`,
-      f.vendor, f.date, f.total, f.tax, f.currency, f.accountId, target.kind, target.id, linked.kind, linked.id, actor.email, now(), uid(), vendorKey(f.vendor), duplicateReason || null, r.id, r.revision), changed())
+    q(`UPDATE pt_receipts SET status = 'attached', vendor = ?, receipt_date = ?, total_cents = ?, tax_cents = ?, currency = ?, account_id = ?, target_kind = ?, target_id = ?, linked_kind = ?, linked_id = ?, decided_by = ?, decided_at = ?, revision = ?, vendor_key = ?, invoice_number = ?, duplicate_reason = ?, duplicate_of = ?, duplicate_document_id = ?, duplicate_basis = ? WHERE id = ? AND revision = ? AND status = 'review'`,
+      f.vendor, f.date, f.total, f.tax, f.currency, f.accountId, target.kind, target.id, linked.kind, linked.id, actor.email, now(), uid(), vendorKey(f.vendor), f.invoiceNumber ?? null, duplicateReason || null, duplicate?.receipt_id ?? null, duplicate?.document_id ?? null, duplicate?.basis ?? null, r.id, r.revision), changed())
   return { statements, linked }
 }
 
@@ -64,11 +64,11 @@ const amount = (v: unknown, label: string, zero = false) => v === undefined || v
 function fieldsFrom(b: Data): Fields {
   const currency = optionalText(b.currency, 'Currency', 3).toUpperCase() || null
   requireThat(!currency || /^[A-Z]{3}$/.test(currency), 'Currency is a three-letter code like USD')
-  return { vendor: optionalText(b.vendor, 'Vendor', 200) || null, date: b.date ? date(b.date, 'Receipt date') : null, total: amount(b.total, 'Total'), tax: amount(b.tax, 'Tax', true), currency, accountId: optionalText(b.accountId, 'Account', 80) || null }
+  return { vendor: optionalText(b.vendor, 'Vendor', 200) || null, invoiceNumber: optionalText(b.invoiceNumber, 'Invoice number', 80) || null, date: b.date ? date(b.date, 'Receipt date') : null, total: amount(b.total, 'Total'), tax: amount(b.tax, 'Tax', true), currency, accountId: optionalText(b.accountId, 'Account', 80) || null }
 }
 
-const corrected = (r: Data, f: Fields) => (['vendor', 'date', 'total', 'tax', 'currency', 'accountId'] as const).filter(k => {
-  const read = { vendor: r.read_vendor, date: r.read_date, total: r.read_total_cents, tax: r.read_tax_cents, currency: r.read_currency, accountId: r.read_account_id }[k]
+const corrected = (r: Data, f: Fields) => (['vendor', 'invoiceNumber', 'date', 'total', 'tax', 'currency', 'accountId'] as const).filter(k => {
+  const read = { vendor: r.read_vendor, invoiceNumber: r.read_invoice_number, date: r.read_date, total: r.read_total_cents, tax: r.read_tax_cents, currency: r.read_currency, accountId: r.read_account_id }[k]
   return r.read_status === 'read' && (read ?? null) !== (f[k] ?? null)
 })
 
@@ -80,21 +80,21 @@ const attach: Command = { need: 'record', async run(c, b) {
   const kind = text(b.targetKind, 'Transaction') as Target['kind']
   requireThat(['bankline', 'bill', 'payment', 'journal'].includes(kind), 'Choose a bank or card line, bill, payment or entry')
   const entered = fieldsFrom(b)
-  const f: Fields = { vendor: entered.vendor ?? r.read_vendor, date: entered.date ?? r.read_date, total: entered.total ?? r.read_total_cents, tax: entered.tax ?? r.read_tax_cents, currency: entered.currency ?? r.read_currency, accountId: entered.accountId ?? r.read_account_id }
+  const f: Fields = { vendor: entered.vendor ?? r.vendor ?? r.read_vendor, invoiceNumber: entered.invoiceNumber ?? r.invoice_number ?? r.read_invoice_number, date: entered.date ?? r.read_date, total: entered.total ?? r.read_total_cents, tax: entered.tax ?? r.read_tax_cents, currency: entered.currency ?? r.read_currency, accountId: entered.accountId ?? r.read_account_id }
   const duplicate = await flagDuplicate(c.db, r, f)
   const duplicateReason = optionalText(b.duplicateReason, 'Reason to keep both', 300)
   if (duplicate && !duplicateReason) {
     // Keep the person's typed facts so a receipt read without a key can show
     // the warning and offer the same transaction on its next review.
     await run(c.db, [authority(c.actor, 'record'),
-      q("UPDATE pt_receipts SET vendor = ?, receipt_date = ?, total_cents = ?, tax_cents = ?, currency = ?, account_id = ?, vendor_key = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'review'",
-        f.vendor, f.date, f.total, f.tax, f.currency, f.accountId, vendorKey(f.vendor), uid(), r.id, r.revision), changed()])
+      q("UPDATE pt_receipts SET vendor = ?, receipt_date = ?, total_cents = ?, tax_cents = ?, currency = ?, account_id = ?, invoice_number = ?, vendor_key = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'review'",
+        f.vendor, f.date, f.total, f.tax, f.currency, f.accountId, f.invoiceNumber ?? null, vendorKey(f.vendor), uid(), r.id, r.revision), changed()])
     requireThat(false, 'Duplicate receipt: review the original, then choose Keep both with a reason or Skip', 409)
   }
   if (f.accountId) { const a = await account(c.db, f.accountId); requireThat(a.active && !['bank', 'receivable', 'payable'].includes(a.subtype), 'Choose an expense or other account') }
-  const plan = await attachPlan(c.db, c.actor, r, { kind, id: text(b.targetId, 'Transaction') }, f, duplicate ? duplicateReason : '')
+  const plan = await attachPlan(c.db, c.actor, r, { kind, id: text(b.targetId, 'Transaction') }, f, duplicate ? duplicateReason : '', duplicate)
   await run(c.db, [authority(c.actor, 'record'), ...plan.statements,
-    audit(who(c.actor), 'receipt.attach', 'receipt', r.id, { target: `${kind}:${b.targetId}`, linked: `${plan.linked.kind}:${plan.linked.id}`, corrected: corrected(r, f), duplicateOf: duplicate?.id ?? null, duplicateReason: duplicate ? duplicateReason : null })])
+    audit(who(c.actor), 'receipt.attach', 'receipt', r.id, { target: `${kind}:${b.targetId}`, linked: `${plan.linked.kind}:${plan.linked.id}`, corrected: corrected(r, f), duplicateOf: duplicate?.id ?? null, duplicateDocumentId: duplicate?.document_id ?? null, duplicateReason: duplicate ? duplicateReason : null })])
   return (await receipt(c.db, r.id))!
 } }
 
@@ -117,8 +117,8 @@ const readAgain: Command = { need: 'record', async run(c, b) {
   const input = file.mediaType === 'message/rfc822' ? emailReadable(file.bytes, file.name) : readable({ name: file.name, mediaType: file.mediaType, bytes: file.bytes })
   const cols = await readingColumns(c.db, await readWith(c.db, c.env, input))
   await run(c.db, [authority(c.actor, 'record'),
-    q("UPDATE pt_receipts SET read_status = ?, read_note = ?, read_model = ?, read_at = ?, read_vendor = ?, read_date = ?, read_total_cents = ?, read_tax_cents = ?, read_currency = ?, read_account_id = ?, revision = ?, vendor_key = ? WHERE id = ? AND status = 'review'",
-      cols.read_status, cols.read_note, cols.read_model, cols.read_at, cols.read_vendor, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, uid(), vendorKey(cols.read_vendor), r.id), changed(),
+    q("UPDATE pt_receipts SET read_status = ?, read_note = ?, read_model = ?, read_at = ?, read_vendor = ?, read_invoice_number = ?, read_date = ?, read_total_cents = ?, read_tax_cents = ?, read_currency = ?, read_account_id = ?, revision = ?, vendor_key = ? WHERE id = ? AND status = 'review'",
+      cols.read_status, cols.read_note, cols.read_model, cols.read_at, cols.read_vendor, cols.read_invoice_number, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, uid(), vendorKey(cols.read_vendor), r.id), changed(),
     audit(who(c.actor), 'receipt.read', 'receipt', r.id, { read: cols.read_status })])
   await flagDuplicate(c.db, (await receipt(c.db, r.id))!)
   return (await receipt(c.db, r.id))!
@@ -160,7 +160,7 @@ export const reviewCommands: Record<string, Command> = {
 /** A person chose the transaction (from the close list): attach with whatever was read. */
 export async function attachChosen(c: Context, receiptId: string, target: Target) {
   const r = (await receipt(c.db, receiptId))!
-  const f: Fields = { vendor: r.read_vendor, date: r.read_date, total: r.read_total_cents, tax: r.read_tax_cents, currency: r.read_currency, accountId: r.read_account_id }
+  const f: Fields = { vendor: r.read_vendor, invoiceNumber: r.read_invoice_number, date: r.read_date, total: r.read_total_cents, tax: r.read_tax_cents, currency: r.read_currency, accountId: r.read_account_id }
   if (await flagDuplicate(c.db, r, f)) return false
   const plan = await attachPlan(c.db, c.actor, r, target, f)
   try {
@@ -190,7 +190,7 @@ export async function applyRules(db: D1Database, receiptId: string) {
   if (!owner || owner.role !== 'owner') return null
   // The rule acts with the authority of the owner who set it; the audit names the rule.
   const actor: Actor = { kind: 'person', id: 'rule', email: rule.created_by, name: 'Receipt rule', session: '', role: 'owner', grants: { post: true, lock: true, reopen: true } }
-  const f: Fields = { vendor: r.read_vendor, date: r.read_date, total: r.read_total_cents, tax: r.read_tax_cents, currency: r.read_currency, accountId: rule.account_id }
+  const f: Fields = { vendor: r.read_vendor, invoiceNumber: r.read_invoice_number, date: r.read_date, total: r.read_total_cents, tax: r.read_tax_cents, currency: r.read_currency, accountId: rule.account_id }
   const plan = await attachPlan(db, actor, r, { kind: found[0].kind, id: found[0].id }, f)
   const by: AuditActor = { email: rule.created_by, kind: 'person' }
   try {
