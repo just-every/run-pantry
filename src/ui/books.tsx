@@ -6,6 +6,7 @@ import { JournalEditor } from './journal-editor'
 import { Icon } from './icons'
 import { CaptureButtons } from './receipt-capture'
 import { AskAccountant } from './ask-accountant'
+import { NexusWatch } from './nexus'
 
 const TYPE: Record<string, string> = { asset: 'Asset', liability: 'Liability', equity: 'Equity', income: 'Income', expense: 'Expense' }
 const ROLE: Record<string, string> = { bank: 'Bank or card', receivable: 'Receivables control', payable: 'Payables control', tax: 'Sales tax', retained: 'Retained earnings', other: '' }
@@ -106,6 +107,6 @@ export function Books() {
     <Tabs tabs={['Chart of accounts', 'Journal entries', 'Sales tax']} current={tab} onChange={setTab} />
     {tab === 'Chart of accounts' && <div className="split"><Chart balances={balances} />{state.actor.can.record && <NewAccount />}</div>}
     {tab === 'Journal entries' && <Journal />}
-    {tab === 'Sales tax' && <TaxCodes />}
+    {tab === 'Sales tax' && <><TaxCodes /><NexusWatch /></>}
   </>
 }

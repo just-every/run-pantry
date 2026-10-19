@@ -64,9 +64,10 @@ import { transferCommands } from './transfers'
 import { vendorHistory } from './vendor-history'
 import { billApprovalCommands } from './bill-approval'
 import { exemptionCommands, exemptionView } from './exemptions'
+import { nexusCommands, nexusWatch } from './nexus'
 
 const commands: Record<string, Command> = {
-  ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -128,6 +129,7 @@ view('questions', async (ctx, c) => questionsView(ctx, c.req.query('q') || undef
 view('move-in', async ctx => moveInView(ctx))
 view('activity', async (ctx, c) => activity(ctx.db, c.req.query()))
 view('exemptions', async ctx => exemptionView(ctx.db))
+view('sales-tax/nexus', async ctx => nexusWatch(ctx.db))
 view('documents', async ctx => ({ documents: await documents(ctx.db) }))
 const year = (c: C) => { const y = Number(c.req.query('year') ?? new Date().getUTCFullYear()); requireThat(Number.isInteger(y) && y >= 2000 && y <= 2100, 'Choose a tax year'); return y }
 view('reports/detail', async (ctx, c) => {

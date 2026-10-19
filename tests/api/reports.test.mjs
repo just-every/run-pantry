@@ -187,6 +187,56 @@ test('SALESTAX-002 sales tax by state and code for a period, from invoice lines,
   await h.command('tax-code.save', { name: 'Nowhere', rate: '5', accountId: s.acct['2200'], state: 'XX' }, h.owner, 400)
 })
 
+test('SALESTAX-004 economic nexus: a year of New Jersey invoices alerts owner and accountant at 80% then 100%, and the accountant records the decision on the state row', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const { today } = await h.view('sales-tax/nexus'), last = Number(today.slice(0, 4)) - 1
+  await h.command('entity.save', { legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'accrual', booksStart: `${last}-01-01`, policies: '' })
+  await h.command('chart.start', {})
+  const acct = Object.fromEntries((await h.view('state')).accounts.map(a => [a.code, a.id]))
+  const cpa = await h.member('cpa@example.test', 'accountant')
+  const nj = await h.command('tax-code.save', { name: 'New Jersey', rate: '6.625', accountId: acct['2200'], state: 'NJ' })
+  const customer = await h.command('contact.save', { kind: 'customer', name: 'Hudson Rail Partners', termsDays: 30 })
+  const issue = async (issueDate, rate, { destinationState = 'NJ', taxCode = 'exempt', ...extra } = {}) => {
+    const d = await h.command('invoice.save-draft', { customerId: customer.id, destinationState, issueDate, lines: [{ description: 'Signal design', quantity: '1', rate, accountId: acct['4000'], taxCode }], ...extra })
+    await h.command('invoice.approve', { id: d.id, revision: d.revision })
+    return h.command('invoice.issue', { id: d.id })
+  }
+  // A year of monthly invoices shipped to New Jersey: $84,000 is 84% of its $100,000 previous-calendar-year threshold.
+  for (let month = 1; month <= 11; month++) await issue(`${last}-${String(month).padStart(2, '0')}-15`, '7000.00')
+  await issue(`${last}-12-15`, '7000.00', { destinationState: '', taxCode: nj.id })
+  await issue(`${last}-12-16`, '900.00', { destinationState: '' })
+  let watch = await h.view('sales-tax/nexus')
+  const row = () => at(watch.states, s => s.state === 'NJ')
+  assert.deepEqual([row().thresholdSales, row().thresholdTransactions, row().test, row().period, row().sales, row().transactions, row().reached, row().level],
+    [10000000, 200, 'or', `Calendar year ${last}`, 8400000, 12, 8400, 80])
+  assert.deepEqual(watch.unassigned, { sales: 90000, documents: 1 }, 'a sale with no ship-to state and no state tax code is listed, not guessed')
+  assert.match(row().source, /New Jersey Division of Taxation/); assert.equal(row().version, watch.version)
+  const alerts = () => h.mail.filter(m => /economic-nexus threshold/.test(m.subject))
+  await h.cron(); await h.cron()
+  assert.equal(alerts().length, 1, 'one 80% alert however often due work runs')
+  assert.deepEqual(alerts()[0].to.sort(), ['cpa@example.test', 'owner@example.test'])
+  assert.match(alerts()[0].subject, /NJ sales at 80%/); assert.match(alerts()[0].text, /\$84,000\.00 of \$100,000\.00/)
+  // One more invoice crosses 100%.
+  const big = await issue(`${last}-12-20`, '20000.00')
+  await h.cron()
+  assert.equal(alerts().length, 2); assert.match(alerts()[1].subject, /NJ sales at 100%/)
+  watch = await h.view('sales-tax/nexus')
+  assert.deepEqual([row().sales, row().transactions, row().level, row().alerts.map(a => [a.level, a.resolved_at, a.email_status])], [10400000, 13, 100, [[100, null, 'accepted'], [80, null, 'accepted']]])
+  // A credit brings sales back under; the 100% alert resolves and the 80% one stays open.
+  await issue(`${last}-12-28`, '5000.00', { kind: 'credit', creditFor: big.id })
+  await h.cron()
+  watch = await h.view('sales-tax/nexus')
+  assert.deepEqual([row().sales, row().transactions, row().level], [9900000, 13, 80])
+  assert.ok(at(row().alerts, a => a.level === 100).resolved_at); assert.equal(at(row().alerts, a => a.level === 80).resolved_at, null)
+  // Registering is the accountant's decision, recorded with the figures it was made on.
+  const refused = await h.command('nexus.decide', { state: 'NJ', decision: 'register', note: 'Owner guess' }, h.owner, 403)
+  assert.match(refused.error, /accountant/)
+  watch = await h.command('nexus.decide', { state: 'NJ', decision: 'register', note: 'Register from 1 January; collect 6.625% on taxable lines.' }, cpa)
+  assert.deepEqual([row().decision.decision, row().decision.decided_by, row().decision.sales_cents, row().decision.threshold_version, row().decision.note],
+    ['register', 'cpa@example.test', 9900000, watch.version, 'Register from 1 January; collect 6.625% on taxable lines.'])
+  assert.equal((await h.view('sales-tax/nexus')).states.find(s => s.state === 'NJ').decision.decision, 'register')
+})
+
 test('CLOSE-005 / TAXFORM-002 1099 contractors: cash payments per calendar year by the IRS rules Pantry can apply, flagged at the threshold, forms and CSV in January', async t => {
   const h = await harness(); t.after(() => h.close())
   const { acct } = await books(h)
