@@ -24,6 +24,7 @@ import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppSalesRouteImport } from './routes/app.sales'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppBankConnectRouteImport } from './routes/app.bank_.connect'
+import { Route as AppSalesBillBillIdRouteImport } from './routes/app.sales_.bill.$billId'
 
 const AppRoute = AppRouteImport.update({
   id: '/app',
@@ -100,6 +101,11 @@ const AppBankConnectRoute = AppBankConnectRouteImport.update({
   path: '/bank/connect',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSalesBillBillIdRoute = AppSalesBillBillIdRouteImport.update({
+  id: '/sales_/bill/$billId',
+  path: '/sales/bill/$billId',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/app/settings': typeof AppSettingsRoute
   '/app/': typeof AppIndexRoute
   '/app/bank/connect': typeof AppBankConnectRoute
+  '/app/sales/bill/$billId': typeof AppSalesBillBillIdRoute
 }
 export interface FileRoutesByTo {
   '/app/activity': typeof AppActivityRoute
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/app/settings': typeof AppSettingsRoute
   '/app': typeof AppIndexRoute
   '/app/bank/connect': typeof AppBankConnectRoute
+  '/app/sales/bill/$billId': typeof AppSalesBillBillIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/app/settings': typeof AppSettingsRoute
   '/app/': typeof AppIndexRoute
   '/app/bank_/connect': typeof AppBankConnectRoute
+  '/app/sales_/bill/$billId': typeof AppSalesBillBillIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/'
     | '/app/bank/connect'
+    | '/app/sales/bill/$billId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/app/activity'
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app'
     | '/app/bank/connect'
+    | '/app/sales/bill/$billId'
   id:
     | '__root__'
     | '/app'
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/'
     | '/app/bank_/connect'
+    | '/app/sales_/bill/$billId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -316,6 +328,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBankConnectRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/sales_/bill/$billId': {
+      id: '/app/sales_/bill/$billId'
+      path: '/sales/bill/$billId'
+      fullPath: '/app/sales/bill/$billId'
+      preLoaderRoute: typeof AppSalesBillBillIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -334,6 +353,7 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppBankConnectRoute: typeof AppBankConnectRoute
+  AppSalesBillBillIdRoute: typeof AppSalesBillBillIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -351,6 +371,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
   AppBankConnectRoute: AppBankConnectRoute,
+  AppSalesBillBillIdRoute: AppSalesBillBillIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

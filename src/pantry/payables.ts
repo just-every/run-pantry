@@ -9,6 +9,8 @@ import { entryStatements, type Line } from './journal'
 import { invoice, openBalance } from './invoices'
 import type { Command, Context } from './context'
 import { METHODS } from './contractors'
+import { requiresOwner } from './receipts/draft-approval'
+import { billRulePayload, billRules, manualBillPostingApproval } from './bill-approval'
 
 export async function bill(db: D1Database, id: string) {
   const row = await one(db, 'SELECT b.*, c.name AS vendor_name FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id WHERE b.id = ?', id)
@@ -19,7 +21,7 @@ export async function bill(db: D1Database, id: string) {
   return row
 }
 
-async function parseBill(db: D1Database, b: Data) {
+export async function parseBill(db: D1Database, b: Data) {
   const vendor = await contact(db, text(b.vendorId, 'Vendor'), 'vendor')
   requireThat(vendor.active, 'Vendor is inactive')
   const billDate = date(b.billDate, 'Bill date'), dueDate = b.dueDate ? date(b.dueDate, 'Due date') : addDays(billDate, vendor.terms_days)
@@ -30,7 +32,7 @@ async function parseBill(db: D1Database, b: Data) {
     requireThat(a && a.active && !['receivable', 'payable', 'bank'].includes(a.subtype), `Line ${i + 1}: choose an active expense or asset account`)
     return { description: text(l.description, `Line ${i + 1} description`, 500), accountId: a.id, amount: cents(l.amount, `Line ${i + 1} amount`) }
   })
-  return { vendor, billDate, dueDate, lines, total: lines.reduce((s, l) => s + l.amount, 0), reference: text(b.reference, "Vendor's invoice number", 80), memo: optionalText(b.memo, 'Memo', 1000) }
+  return { vendor, billDate, dueDate, lines, total: lines.reduce((s, l) => s + l.amount, 0), reference: text(b.reference, "Vendor's invoice number", 80), memo: optionalText(b.memo, 'Memo', 1000), className: optionalText(b.className, 'Class', 100) }
 }
 
 /** Build one bill's complete write batch, also used by the idempotent integration API. */
@@ -40,10 +42,11 @@ export async function billStatements(c: Context, b: Data) {
   // A locked month refuses bills dated in it, drafts included (PAN-13).
   await assertOpen(c.db, p.billDate)
   const payable = post ? await controlAccount(c.db, 'payable') : null
-  const journalId = uid()
-  const statements: Sql[] = [authority(c.actor, 'record'), periodOpen(p.billDate),
-    q("INSERT INTO pt_bills (id, vendor_id, reference, bill_date, due_date, status, memo, total_cents, opening, prepared_by, revision, created_at) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, 0, ?, ?, ?)",
-      id, p.vendor.id, p.reference, p.billDate, p.dueDate, p.memo, p.total, c.actor.email, uid(), now()),
+  const journalId = uid(), rules = await billRules(c.db, { total: p.total, vendorId: p.vendor.id, lines: p.lines, className: p.className })
+  requireThat(!post || !rules.ownerRequired, 'Save this bill as a draft for owner approval before posting', 409)
+  const statements: Sql[] = [authority(c.actor, 'record'), periodOpen(p.billDate), ...(post ? rules.guards : []),
+    q("INSERT INTO pt_bills (id, vendor_id, reference, bill_date, due_date, status, memo, total_cents, opening, prepared_by, revision, created_at, class_name, updated_at) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, 0, ?, ?, ?, ?, ?)",
+      id, p.vendor.id, p.reference, p.billDate, p.dueDate, p.memo, p.total, c.actor.email, uid(), now(), p.className, now()),
     ...p.lines.map((l, i) => q('INSERT INTO pt_bill_lines (id, bill_id, line_no, description, account_id, amount_cents) VALUES (?, ?, ?, ?, ?, ?)', uid(), id, i + 1, l.description, l.accountId, l.amount))]
   if (payable) statements.push(...postBill(c.actor, { id, journalId, payable: payable.id, vendor: p.vendor, reference: p.reference, date: p.billDate, lines: p.lines.map(l => ({ account_id: l.accountId, amount_cents: l.amount, description: l.description })), total: p.total }))
   statements.push(audit(who(c.actor), post ? 'bill.record' : 'bill.draft', 'bill', id, { vendor: p.vendor.name, reference: p.reference, total: p.total }))
@@ -68,7 +71,7 @@ const recordBill: Command = { need: 'record', async run(c, b) {
   requireThat(!await one(c.db, 'SELECT 1 FROM pt_capture_drafts WHERE bill_id = ?', current.id), 'Review and approve this captured draft in Receipts before posting it', 409)
   await assertOpen(c.db, current.bill_date)
   const payable = await controlAccount(c.db, 'payable'), vendor = await contact(c.db, current.vendor_id)
-  await run(c.db, [authority(c.actor, 'record'), ...postBill(c.actor, { id: current.id, journalId: uid(), payable: payable.id, vendor, reference: current.reference, date: current.bill_date, lines: current.lines, total: current.total_cents }), audit(who(c.actor), 'bill.record', 'bill', current.id)])
+  await run(c.db, [authority(c.actor, 'record'), ...await manualBillPostingApproval(c.db, current), ...postBill(c.actor, { id: current.id, journalId: uid(), payable: payable.id, vendor, reference: current.reference, date: current.bill_date, lines: current.lines, total: current.total_cents }), audit(who(c.actor), 'bill.record', 'bill', current.id)])
   return bill(c.db, current.id)
 } }
 
@@ -166,10 +169,12 @@ export async function billsView(db: D1Database) {
   const lines = await all(db, 'SELECT * FROM pt_bill_lines ORDER BY bill_id, line_no')
   const docs = await all(db, "SELECT id, name, linked_id FROM pt_documents WHERE linked_kind = 'bill'")
   const captured = await all(db, 'SELECT receipt_id, bill_id FROM pt_capture_drafts WHERE bill_id IS NOT NULL')
+  const approvalRules = await all(db, 'SELECT * FROM pt_capture_approval_rules')
   for (const r of rows) {
     r.lines = lines.filter(l => l.bill_id === r.id)
     r.documents = docs.filter(d => d.linked_id === r.id)
     r.capture_receipt_id = captured.find(d => d.bill_id === r.id)?.receipt_id ?? null
+    r.owner_required = await requiresOwner(db, billRulePayload(r), approvalRules)
     r.open_cents = r.status === 'void' ? 0 : await openBalance(db, 'bill', r.id, r.total_cents)
   }
   return rows

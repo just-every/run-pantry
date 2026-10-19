@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { VendorHistory } from './vendor-history'
 import { Action, command, Field, Form, usd, useShared, useView, type D } from './kit'
 
 const amount = (n?: number | null) => n == null ? '' : (n / 100).toFixed(2)
@@ -16,7 +17,7 @@ export function ReceiptDraft({ r, accounts, onChange }: { r: D; accounts: D[]; o
     {saved && !editing ? <>
       <p>{p.vendor} · {usd(p.total)} · {p.lines.map((l: D) => l.description).join(', ')}. Tax {usd(p.tax)}. {p.termsDays} day terms{p.kind === 'bill' ? `; due ${p.dueDate}` : ''}.{p.className ? ` Class: ${p.className}.` : ''}</p>
       <p className="hint">{saved.ownerRequired ? 'Owner approval required. ' : ''}The original document stays attached. Review its coding and vendor history before approving this revision. {p.is1099 ? '1099 vendor.' : ''}</p>
-      <p><a href="/app/sales">Open vendor bills and payment history</a></p>
+      <VendorHistory key={r.vendor_id + saved.revision} vendorId={r.vendor_id} />
       <div className="row-actions">
         <button type="button" className="btn btn-secondary" onClick={() => setEditing(true)}>Edit document draft</button>
         {saved.status === 'draft' && state.actor.can.post && <Action run={async () => { await command('capture-draft.approve', { id: saved.id, revision: saved.revision }); await onChange() }}>Approve draft</Action>}

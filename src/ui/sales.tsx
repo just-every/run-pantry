@@ -1,8 +1,9 @@
 // Sales & bills: invoices and credits (sent, viewed, reminded, paid online),
 // recurring invoices, bills with their evidence, payments recorded from outside
 // Pantry, every delivery, and the customers and vendors behind them.
-import { useRef, useState } from 'react'
-import { Action, Card, Chip, command, contactOptions, Details, Field, Form, Loading, Metrics, PageHead, Table, Tabs, accountOptions, day, readFileBase64, today, usd, useShared, useView, useWho, type D } from './kit'
+import { useState } from 'react'
+import { Action, Card, Chip, command, contactOptions, Details, Field, Form, Loading, Metrics, PageHead, Table, Tabs, accountOptions, day, today, usd, useShared, useView, useWho, type D } from './kit'
+import { Bills } from './bills'
 import { InvoiceEditor } from './invoice-editor'
 import { Deliveries, SendPanel } from './invoice-delivery'
 import { Recurring } from './recurring'
@@ -57,55 +58,6 @@ function Invoices({ data, reload }: { data: D; reload: () => Promise<void> }) {
       {current ? <InvoicePanel key={current.id + current.revision} i={current} data={data} onChange={reload} onEdit={() => setEditing({ invoice: current })} onCredit={() => setEditing({ creditFor: current })} /> : <Card title="Invoice"><p>Choose an invoice to review, approve or issue it.</p></Card>}
     </div>
   </>
-}
-
-function BillForm({ onDone }: { onDone: () => Promise<void> }) {
-  const { state } = useShared(), [lines, setLines] = useState([{ description: '', accountId: '', amount: '' }])
-  const set = (i: number, patch: D) => setLines(ls => ls.map((l, j) => j === i ? { ...l, ...patch } : l))
-  const expense = accountOptions(state.accounts, a => !['bank', 'receivable', 'payable'].includes(a.subtype) && (a.type === 'expense' || a.type === 'asset'))
-  return <Form label="Record bill" submit={b => command('bill.save', { ...b, post: b.post === 'on', lines })} onDone={async () => { setLines([{ description: '', accountId: '', amount: '' }]); await onDone() }}>
-    <div className="grid-form">
-      <Field label="Vendor" name="vendorId" required options={contactOptions(state.contacts, 'vendor')} />
-      <Field label="Vendor's invoice number" name="reference" required />
-      <Field label="Bill date" name="billDate" type="date" defaultValue={today()} required />
-      <Field label="Due date" name="dueDate" type="date" hint="Blank uses the vendor's terms" />
-    </div>
-    {lines.map((l, i) => <div className="grid-form line" key={i}>
-      <Field label={`Line ${i + 1} description`} name={`d${i}`} value={l.description} onChange={(e: any) => set(i, { description: e.target.value })} required />
-      <Field label={`Line ${i + 1} account`} name={`a${i}`} value={l.accountId} onChange={(e: any) => set(i, { accountId: e.target.value })} required options={expense} />
-      <Field label={`Line ${i + 1} amount`} name={`m${i}`} value={l.amount} onChange={(e: any) => set(i, { amount: e.target.value })} required inputMode="decimal" />
-    </div>)}
-    <button type="button" className="btn btn-secondary" onClick={() => setLines(ls => [...ls, { description: '', accountId: '', amount: '' }])}>Add line</button>
-    <label className="check"><input type="checkbox" name="post" defaultChecked /> Record it now (post to payables)</label>
-  </Form>
-}
-
-function Bills({ data, reload }: { data: D; reload: () => Promise<void> }) {
-  const { state } = useShared(), file = useRef<HTMLInputElement>(null), [selected, setSelected] = useState<string | null>(null)
-  const current = (data.bills as D[]).find(b => b.id === selected)
-  return <div className="split split-wide-left">
-    <Card title="Bills">
-      <Table heads={['Vendor', 'Reference', 'Bill date', 'Due', 'Amount', 'Open', 'Evidence', 'Status']} figures={[4, 5]} empty="No bills yet.">
-        {(data.bills as D[]).map(b => <tr key={b.id} className={selected === b.id ? 'selected' : ''} tabIndex={0} onClick={() => setSelected(b.id)} onKeyDown={k => { if (k.key === 'Enter') setSelected(b.id) }}>
-          <td>{b.vendor_name}</td><td className="nowrap">{b.reference}</td><td>{day(b.bill_date)}</td><td>{day(b.due_date)}</td><td className="fig">{usd(b.total_cents)}</td><td className="fig">{usd(b.open_cents)}</td>
-          <td>{b.documents.length ? <Chip tone="good">Attached</Chip> : b.evidence_waived ? <Chip>Reason recorded</Chip> : <Chip tone="warn">Missing</Chip>}</td>
-          <td>{b.status === 'void' ? <Chip>Void</Chip> : b.status === 'draft' ? <Chip>Draft</Chip> : b.open_cents === 0 ? <Chip tone="good">Paid</Chip> : <Chip tone="info">{b.opening ? 'Open (moved in)' : 'To pay'}</Chip>}</td></tr>)}
-      </Table>
-    </Card>
-    <div className="stack">
-      {current && <Card title={`${current.vendor_name} ${current.reference}`}>
-        <p>{usd(current.total_cents)} due {day(current.due_date)}; {usd(current.open_cents)} open.</p>
-        {!!current.received && <p><Chip tone="good">Received</Chip> {current.ready_to_pay ? <Chip tone="good">Ready to pay</Chip> : <Chip>Not ready to pay</Chip>}</p>}
-        {current.status === 'draft' && current.capture_receipt_id && <a href={`/app/receipts#receipt-${current.capture_receipt_id}`}>Review and approve document draft</a>}
-        {current.status === 'draft' && !current.capture_receipt_id && state.actor.can.record && <Action tone="primary" run={async () => { await command('bill.record', { id: current.id, revision: current.revision }); await reload() }}>Record bill</Action>}
-        {current.documents.map((d: D) => <p key={d.id}><a href={`/api/pantry/documents/${d.id}`}>{d.name}</a></p>)}
-        {state.actor.can.record && <Form label="Attach source document" submit={async () => command('document.upload', { ...(await readFileBase64(file.current)), linkedKind: 'bill', linkedId: current.id })} onDone={reload}><div className="field"><label htmlFor="bill-file">Document</label><input id="bill-file" ref={file} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv" required /></div></Form>}
-        {!current.documents.length && !current.evidence_waived && state.actor.can.post && <Form label="Record why there is no document" submit={b => command('bill.waive-evidence', { id: current.id, revision: current.revision, ...b })} onDone={reload}><Field label="Reason" name="reason" required /></Form>}
-        {current.evidence_waived && <p className="hint">No document: {current.evidence_waived}</p>}
-      </Card>}
-      {state.actor.can.record && <Card title="Record a bill or expense"><BillForm onDone={reload} /></Card>}
-    </div>
-  </div>
 }
 
 /** A customer's open invoices or a vendor's open bills, the items a payment can pay. */
@@ -226,14 +178,14 @@ function Contacts() {
   </div>
 }
 
-export function Sales() {
+export function Sales({ billId }: { billId?: string } = {}) {
   // Overview's Customers and vendors step opens this page at ?tab=contacts.
-  const [tab, setTab] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'contacts' ? 'Customers & vendors' : 'Invoices'), { data, error, reload } = useView<D>('sales'), shared = useShared()
+  const [tab, setTab] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'contacts' ? 'Customers & vendors' : billId ? 'Bills' : typeof window !== 'undefined' && window.location.hash.startsWith('#bill-') ? 'Bills' : 'Invoices'), { data, error, reload } = useView<D>('sales'), shared = useShared()
   const refresh = async () => { await reload(); await shared.reload() }
   return <>
     <PageHead title="Sales & bills" lead="Invoices you send and follow up, recurring invoices, bills and their evidence, and payments." />
     <Tabs tabs={['Invoices', 'Recurring', 'Bills', 'Payments', 'Deliveries', 'Customers & vendors']} current={tab} onChange={setTab} pick="Show" />
     {tab === 'Customers & vendors' ? <><Contacts /><ExemptionCertificates /></> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
-      : tab === 'Bills' ? <Bills data={data} reload={refresh} /> : tab === 'Deliveries' ? <Card title="Deliveries"><p className="hint">Every invoice and reminder Pantry has sent, with the mail provider's answer. Accepted means the provider took the message, not that the customer read it; "Viewed" on an invoice means the customer opened its link.</p><Deliveries data={data} /></Card> : <Payments data={data} reload={refresh} />}
+      : tab === 'Bills' ? <Bills initialBillId={billId} data={data} reload={refresh} /> : tab === 'Deliveries' ? <Card title="Deliveries"><p className="hint">Every invoice and reminder Pantry has sent, with the mail provider's answer. Accepted means the provider took the message, not that the customer read it; "Viewed" on an invoice means the customer opened its link.</p><Deliveries data={data} /></Card> : <Payments data={data} reload={refresh} />}
   </>
 }

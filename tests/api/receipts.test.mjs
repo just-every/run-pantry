@@ -492,28 +492,44 @@ test('CAPTURE-007 captured bills and paid receipts become approved revision-spec
   const reconciled = await h.view(`reconciliation/${statement.statement.id}`)
   assert.ok(reconciled.lines[0].match_id)
   assert.deepEqual((await h.view('close/2026-09')).receipts.missing, [], 'all split expense entries carry the original source')
+  const history = await h.view(`vendors/${vendor.id}/history`, ann)
+  assert.equal(at(history.rows, x => x.id === draft.id).posted_expense, true)
+  assert.equal(at(history.rows, x => x.id === draft.id).documents.length, 1)
   const tb = await h.view('reports/trial-balance?to=2026-09-30'); assert.ok(tb.balanced)
 })
 
 test('BILL-002 captured draft reminders send once per pending revision and stop after owner approval', async t => {
-  const { model } = fakeModel(() => ({ receipt: true, vendor: 'Valley Electric LLC', invoiceNumber: 'VE-2043', date: '2026-09-15', total: '1850.00', tax: '100.00', currency: 'USD', category: '6000', note: '', draft: { kind: 'bill', dueDate: null, termsDays: null, lines: [{ description: 'Electrical repairs', amount: '1750.00', accountCode: '6000' }] } }))
+  let reading = { receipt: true, vendor: 'Valley Electric LLC', invoiceNumber: 'VE-2043', date: '2026-09-15', total: '3100.00', tax: '100.00', currency: 'USD', category: '6000', note: '', draft: { kind: 'bill', dueDate: null, termsDays: null, lines: [{ description: 'Electrical repairs', amount: '3000.00', accountCode: '6000' }] } }
+  const { model } = fakeModel(() => reading)
   const h = await harness({ outbound: model }); t.after(() => h.close())
   const { acct } = await books(h)
+  const ann = await h.member('captured-approver@example.test', 'accountant', { canPost: true })
+  await h.command('capture-approval-rule.save', { minimum: '2500.00' })
   await h.command('reader.save', { provider: 'anthropic', key: 'sk-ant-test-key-2043' })
   const vendor = await h.command('contact.save', { kind: 'vendor', name: 'Valley Electric LLC', termsDays: 30, defaultAccountId: acct['6000'], defaultClass: '', is1099: false })
   const photo = await capture(h, Buffer.from('Valley Electric bill VE-2043'))
   let r = at((await h.view('receipts')).review, x => x.id === photo.id)
   await h.command('receipt.vendor-confirm', { id: r.id, revision: r.revision, vendorId: vendor.id, vendorRevision: vendor.revision, confirm: true })
   r = at((await h.view('receipts')).review, x => x.id === photo.id)
-  const fields = { id: r.id, revision: r.revision, kind: 'bill', date: r.read_date, total: '1850.00', tax: '100.00', invoiceNumber: 'VE-2043', termsDays: 30, lines: r.draftProposal.lines.map(l => ({ ...l, amount: (l.amount / 100).toFixed(2) })) }
+  const fields = { id: r.id, revision: r.revision, kind: 'bill', date: r.read_date, total: '3100.00', tax: '100.00', invoiceNumber: 'VE-2043', termsDays: 30, lines: r.draftProposal.lines.map(l => ({ ...l, amount: (l.amount / 100).toFixed(2) })) }
   let draft = (await h.command('receipt.draft-save', fields)).saved
+
+  assert.equal(at((await h.view('receipts')).review, x => x.id === r.id).draftProposal.saved.ownerRequired, true)
+  reading = { ...reading, invoiceNumber: 'VE-900', total: '900.00', tax: '0', draft: { ...reading.draft, lines: [{ description: 'Routine maintenance', amount: '900.00', accountCode: '6000' }] } }
+  const smallPhoto = await capture(h, Buffer.from('Valley Electric routine maintenance VE-900'))
+  let small = at((await h.view('receipts')).review, x => x.id === smallPhoto.id)
+  await h.command('receipt.vendor-confirm', { id: small.id, revision: small.revision, vendorId: vendor.id, vendorRevision: vendor.revision, confirm: true })
+  small = at((await h.view('receipts')).review, x => x.id === smallPhoto.id)
+  const low = await h.command('receipt.draft-save', { ...fields, id: small.id, revision: small.revision, invoiceNumber: 'VE-900', total: '900.00', tax: '0', lines: [{ description: 'Routine maintenance', amount: '900.00', accountId: acct['6000'] }] })
+  assert.equal(at((await h.view('receipts')).review, x => x.id === small.id).draftProposal.saved.ownerRequired, false)
+  await h.command('capture-draft.approve', { id: low.saved.id, revision: low.saved.revision }, ann)
 
   const agePending = async () => h.db.prepare('UPDATE pt_capture_drafts SET updated_at = ? WHERE id = ?').bind(new Date(Date.now() - 86_401_000).toISOString(), draft.id).run()
   await agePending()
   await h.cron()
   let reminders = await h.db.prepare('SELECT * FROM pt_capture_approval_reminders WHERE draft_id = ? ORDER BY revision').bind(draft.id).all()
   assert.equal(reminders.results.length, 1)
-  assert.deepEqual([reminders.results[0].recipient, reminders.results[0].email_status, reminders.results[0].email_detail], ['owner@example.test', 'accepted', 'resend: test-1'])
+  assert.deepEqual([reminders.results[0].recipient, reminders.results[0].email_status], ['owner@example.test', 'accepted']); assert.match(reminders.results[0].email_detail, /^resend: test-/)
   let sent = h.mail.filter(m => m.subject.includes('captured bill needs approval'))
   assert.equal(sent.length, 1)
   assert.equal(sent[0].to[0], 'owner@example.test')
@@ -532,6 +548,7 @@ test('BILL-002 captured draft reminders send once per pending revision and stop 
   assert.equal(reminders.results.length, 2, 'the edited revision has its own once-only reminder')
   assert.equal(h.mail.filter(m => m.subject.includes('captured bill needs approval')).length, 2)
 
+  await h.command('capture-draft.approve', { id: draft.id, revision: draft.revision }, ann, 403)
   await h.command('capture-draft.approve', { id: draft.id, revision: draft.revision }, h.owner)
   await agePending()
   await h.cron()
