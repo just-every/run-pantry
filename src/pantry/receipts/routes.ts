@@ -7,20 +7,21 @@ import { cents, date, Fault, optionalText, requireThat, type Data } from '../cor
 import { all } from '../db'
 import { MAX_DOCUMENT_BYTES } from '../documents'
 import type { Command, Context } from '../context'
-import { candidates } from './attachments'
+import { candidates, matchFacts } from './matches'
 import { documentDuplicates } from './document-intake'
 import { categories, readable, receive, receipt } from './intake'
 import { duplicateDetails, duplicateOf, readFingerprint } from './duplicates'
 import { emailReadable, inboxView, mailCommands, MAX_EMAIL_BYTES, tryLocally } from './mail'
 import { applyRules, attachChosen, reviewCommands } from './review'
 import { readerCommands, readerView } from './settings'
+import { cashReceiptCommands } from './cash'
 import { captureDraftCommands } from './drafts'
 import { requiresOwner } from './draft-approval'
 import { documentDraftProposal } from './draft-proposal'
 import { receiptVendorCommands } from './vendor-confirm'
 import { receiptVendorProposal } from './vendor-match'
 
-export const receiptCommands: Record<string, Command> = { ...readerCommands, ...mailCommands, ...reviewCommands, ...receiptVendorCommands, ...captureDraftCommands }
+export const receiptCommands: Record<string, Command> = { ...cashReceiptCommands, ...readerCommands, ...mailCommands, ...reviewCommands, ...receiptVendorCommands, ...captureDraftCommands }
 
 const MEDIA = /^(application\/pdf|image\/(png|jpeg|webp|gif|heic|heif)|text\/plain|message\/rfc822)$/
 const TARGETS = ['bankline', 'bill', 'payment', 'journal']
@@ -66,7 +67,7 @@ export async function receiptsView(c: Context): Promise<Data> {
     r.account_id ??= r.vendorProposal.defaults?.accountId
     r.draftProposal = await documentDraftProposal(c.db, r)
     if (r.draftProposal.saved) r.draftProposal.saved.ownerRequired = await requiresOwner(c.db, r.draftProposal.saved.payload)
-    r.candidates = (await candidates(c.db, r.total_cents ?? r.read_total_cents, r.receipt_date ?? r.read_date, r.vendor ?? r.read_vendor, r.currency ?? r.read_currency)).slice(0, 6)
+    r.candidates = (await candidates(c.db, r.total_cents ?? r.read_total_cents, r.receipt_date ?? r.read_date, r.vendor ?? r.read_vendor, r.currency ?? r.read_currency, matchFacts(r))).slice(0, 6)
     offerOriginal(r.candidates, r.duplicate, readFingerprint(r))
   }
   const attached = await all(c.db, `SELECT r.id, r.vendor, r.receipt_date, r.total_cents, r.tax_cents, r.currency, r.source, r.target_kind, r.target_id, r.linked_kind, r.linked_id, r.rule_id, r.decided_by, r.decided_at, r.document_id, r.file_document_id, r.duplicate_of, r.duplicate_document_id, r.invoice_number, r.duplicate_reason, d.name AS file_name, d.media_type, d.sha256,
@@ -125,7 +126,7 @@ export function receiptRoutes(api: Hono<{ Bindings: Bindings }>) {
     const r = q.id ? await receipt(c.env.DB, optionalText(q.id, 'Receipt', 80)) : null
     const duplicate = r?.status === 'review' ? await duplicateOf(c.env.DB, r.id, facts) : null
     const original = await duplicateDetails(c.env.DB, duplicate?.document_id ?? null)
-    const found = (await candidates(c.env.DB, facts.total, facts.date, facts.vendor, currency)).slice(0, 6)
+    const found = (await candidates(c.env.DB, facts.total, facts.date, facts.vendor, currency, { tip: q.tip ? cents(q.tip, 'Tip', { zero: true }) : null, chargedUsd: q.chargedUsd ? cents(q.chargedUsd, 'USD charge') : null, cardLast4: /^\d{4}$/.test(q.cardLast4 ?? '') ? q.cardLast4 : null })).slice(0, 6)
     return c.json({ candidates: offerOriginal(found, original, facts), duplicate: original, duplicateBasis: duplicate?.basis ?? null })
   })
 

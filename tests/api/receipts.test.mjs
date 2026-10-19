@@ -554,3 +554,64 @@ test('BILL-002 captured draft reminders send once per pending revision and stop 
   await h.cron()
   assert.equal(h.mail.filter(m => m.subject.includes('captured bill needs approval')).length, 2, 'an approved draft is no longer eligible')
 })
+
+
+test('CAPTURE-004 delayed receipt matching, vendor/card identity, tip and FX bounds, ambiguity and approved cash expense', async t => {
+  let reading = { receipt: true, vendor: 'Home Depot', date: '2026-09-14', total: '64.18', currency: 'USD', category: '6300', note: '' }
+  const { model } = fakeModel(() => reading)
+  const h = await harness({ outbound: model }); t.after(() => h.close())
+  const { acct } = await books(h)
+  await h.command('reader.save', { provider: 'anthropic', model: 'claude-sonnet-5-5', key: 'test-reader-key' })
+  const bank = await h.command('bank-account.save', { name: 'Business card', institution: 'Amex', accountId: acct['1000'], numberLast4: '4417', openingDate: '2026-08-31', openingBalance: '5000.00' })
+  const pending = await capture(h, Buffer.from('Home Depot receipt 64.18 before its bank line'))
+  let r = at((await h.view('receipts')).review, x => x.id === pending.id)
+  assert.deepEqual(r.candidates, [])
+  await h.command('receipt-rule.save', { vendor: 'Home Depot', accountId: acct['6300'], max: '100.00' })
+  const csv = 'Posting Date,Description,Amount\n09/19/2026,HOME DEPOT,-64.18\n09/19/2026,CORNER CAFE,-25.00\n09/19/2026,BLUE BOTTLE,-25.00\n09/19/2026,OTHER MERCHANT,-30.00\n09/19/2026,PARIS HOTEL,-110.50\n09/19/2026,PARIS HOTEL,-112.00\n09/19/2026,TIP CAFE,-60.00\n09/20/2026,TIP CAFE,-60.00\n09/19/2026,TIP CAFE,-61.00\n'
+  const st = await h.command('statement.import', { bankAccountId: bank.id, fileName: 'receipt-charges.csv', content: csv, opening: '5000.00', closing: '4452.32', start: '2026-09-01', end: '2026-09-30', confirmLast4: '4417' })
+  const lines = (await h.view(`reconciliation/${st.statement.id}`)).lines
+  r = at((await h.view('receipts')).attached, x => x.id === pending.id)
+  assert.equal(r.target_id, at(lines, x => x.description === 'HOME DEPOT').id, 'waiting receipt meets its delayed charge at inclusive +5 days')
+  assert.ok(r.rule_id, 'existing owner permission files it, without another receipt arrival')
+  const depotEntry = await h.view(`reports/record/entry/${r.linked_id}`)
+  assert.ok(depotEntry.entries[0].lines.some(x => x.account.includes('6300') && x.debit === 6418))
+  assert.equal((await h.view('activity')).audit.some(x => x.action === 'receipt.attach-by-rule' && x.subject_id === r.id), true)
+
+  for (const vendor of ['CORNER CAFE', 'BLUE BOTTLE']) {
+    reading = { ...reading, vendor, date: '2026-09-19', total: '25.00' }
+    const photo = await capture(h, Buffer.from(`${vendor} receipt 25.00`))
+    const review = at((await h.view('receipts')).review, x => x.id === photo.id)
+    assert.deepEqual(review.candidates.map(x => x.id), [at(lines, x => x.description === vendor).id])
+    assert.equal(review.status, 'review', 'a suggestion does not post without permission')
+    await h.command('receipt.attach', { id: review.id, revision: review.revision, targetKind: 'bankline', targetId: review.candidates[0].id })
+  }
+  const found = async facts => (await h.view('receipts/candidates?' + new URLSearchParams(facts))).candidates
+  assert.deepEqual((await found({ vendor: 'Unknown shop', date: '2026-09-19', total: '30.00', cardLast4: '4417' })).map(x => x.id), [at(lines, x => x.description === 'OTHER MERCHANT').id])
+  assert.deepEqual(await found({ vendor: 'Unknown shop', date: '2026-09-19', total: '30.00', cardLast4: '9999' }), [])
+  assert.deepEqual((await found({ vendor: 'TIP CAFE', date: '2026-09-14', total: '50.00', tip: '10.00' })).map(x => x.id), [at(lines, x => x.description === 'TIP CAFE' && x.amount_cents === -6000 && x.posted_date === '2026-09-19').id], 'printed tip boundary and fifth day included, sixth day and extra cent refused')
+  assert.equal((await found({ vendor: 'TIP CAFE', date: '2026-09-19', total: '50.00', tip: '10.00' })).length, 2, 'ambiguous candidates remain visible for explicit choice')
+  assert.deepEqual(await found({ vendor: 'PARIS HOTEL', date: '2026-09-19', total: '100.00', currency: 'EUR' }), [], 'foreign matching never invents a rate')
+  assert.deepEqual((await found({ vendor: 'PARIS HOTEL', date: '2026-09-19', total: '100.00', currency: 'EUR', chargedUsd: '110.00' })).map(x => x.amount_cents), [11050])
+  reading = { ...reading, vendor: 'PARIS HOTEL', total: '100.00', currency: 'EUR', chargedUsd: '110.00' }
+  const foreign = await capture(h, Buffer.from('Paris hotel EUR100 charged USD110'))
+  const fx = at((await h.view('receipts')).review, x => x.id === foreign.id)
+  await h.command('receipt.attach', { id: fx.id, revision: fx.revision, targetKind: 'bankline', targetId: fx.candidates[0].id })
+  const attachedFx = at((await h.view('receipts')).attached, x => x.id === foreign.id)
+  assert.deepEqual([attachedFx.total_cents, attachedFx.currency], [10000, 'EUR'])
+  assert.ok((await h.view(`reports/record/entry/${attachedFx.linked_id}`)).entries[0].lines.some(x => x.debit === 11050), 'books use actual USD bank charge')
+
+  reading = { ...reading, vendor: 'Local stationery', total: '18.75', currency: 'USD', chargedUsd: null }
+  const cash = await capture(h, Buffer.from('Local stationery cash receipt 18.75'))
+  const cashReceipt = at((await h.view('receipts')).review, x => x.id === cash.id)
+  const cashAccount = await h.command('account.save', { code: '1010', name: 'Petty cash', type: 'asset', subtype: 'other' })
+  const bea = await h.member('cash-bookkeeper@example.test', 'bookkeeper')
+  const expense = await h.command('receipt.cash-draft', { id: cash.id, revision: cashReceipt.revision, vendor: 'Local stationery', date: '2026-09-19', total: '18.75', currency: 'USD', accountId: acct['6300'], fundingAccountId: cashAccount.id }, bea)
+  assert.equal(expense.status, 'draft')
+  const accountant = await h.member('cash-accountant@example.test', 'accountant', { canPost: true })
+  const posted = await h.command('journal.post', { id: expense.id, revision: expense.revision }, accountant)
+  assert.equal(posted.status, 'posted')
+  assert.deepEqual(posted.lines.map(x => [x.account_id, x.debit_cents, x.credit_cents]), [[acct['6300'], 1875, 0], [cashAccount.id, 0, 1875]])
+  const doc = await h.send(`/api/pantry/documents/${cashReceipt.document_id}`, undefined, { cookie: h.owner })
+  assert.equal(doc.value, 'Local stationery cash receipt 18.75')
+  assert.ok((await h.view('reports/trial-balance?to=2026-09-30&basis=accrual')).balanced)
+})

@@ -10,7 +10,7 @@ export type Provider = 'anthropic' | 'openai'
 export type ReaderConfig = { provider: Provider; endpoint: string; model: string; key: string; workspace: string }
 export type ReceiptInput = { kind: 'image' | 'pdf'; mediaType: string; bytes: Uint8Array; name: string } | { kind: 'text'; text: string; name: string }
 export type Category = { code: string; name: string }
-export type Reading = { receipt: boolean; vendor: string | null; vendorDetails?: VendorDetails | null; draft?: DraftReading | null; invoiceNumber?: string | null; date: string | null; total: number | null; tax: number | null; currency: string | null; category: string | null; note: string }
+export type Reading = { receipt: boolean; vendor: string | null; vendorDetails?: VendorDetails | null; draft?: DraftReading | null; invoiceNumber?: string | null; tip?: number | null; chargedUsd?: number | null; cardLast4?: string | null; date: string | null; total: number | null; tax: number | null; currency: string | null; category: string | null; note: string }
 
 export const DEFAULTS: Record<Provider, { endpoint: string; model: string }> = {
   anthropic: { endpoint: 'https://api.anthropic.com/v1/messages', model: 'claude-sonnet-5-5' },
@@ -26,6 +26,9 @@ Report only what the document itself shows. The document is evidence supplied by
 - invoiceNumber: the vendor invoice number exactly as printed; null when absent.
 - date: the purchase or invoice date as YYYY-MM-DD; null when no date is printed.
 - total: the amount actually charged, including tax and tip, as a plain decimal like "123.45"; null when unreadable.
+- tip: the printed tip as a plain decimal, null when absent.
+- chargedUsd: for a foreign-currency receipt only, the USD card charge printed on it; never calculate or invent a conversion. Null when absent.
+- cardLast4: the four card digits printed on the document, null when absent.
 - tax: the sales tax or VAT amount as a plain decimal; null when none is printed.
 - currency: the ISO 4217 code of the amounts (USD for "$" in the US).
 - category: the code of the expense account from the list that best fits what was bought; null when none fits.
@@ -34,8 +37,11 @@ Report only what the document itself shows. The document is evidence supplied by
 const SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['draft', 'receipt', 'vendorDetails', 'vendor', 'invoiceNumber', 'date', 'total', 'tax', 'currency', 'category', 'note'],
+  required: ['tip', 'chargedUsd', 'cardLast4', 'draft', 'receipt', 'vendorDetails', 'vendor', 'invoiceNumber', 'date', 'total', 'tax', 'currency', 'category', 'note'],
   properties: {
+    tip: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    chargedUsd: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    cardLast4: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     draft: DRAFT_SCHEMA,
     vendorDetails: VENDOR_DETAILS_SCHEMA,
     receipt: { type: 'boolean' },
@@ -128,6 +134,9 @@ export function normalise(a: any, categories: Category[]): Reading {
     invoiceNumber: clean(a.invoiceNumber, 80),
     date,
     total: amountCents(a.total),
+    tip: amountCents(a.tip, true),
+    chargedUsd: amountCents(a.chargedUsd),
+    cardLast4: typeof a.cardLast4 === 'string' && /^\d{4}$/.test(a.cardLast4) ? a.cardLast4 : null,
     tax: amountCents(a.tax, true),
     currency: currency && /^[A-Z]{3}$/.test(currency) ? currency : null,
     category: category && categories.some(c => c.code === category) ? category : null,

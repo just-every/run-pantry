@@ -1,7 +1,7 @@
 // Which documents belong to which ledger entry. A document attaches to a bill,
 // invoice, payment or journal entry; an entry keeps every document of the
 // record it came from, and a bill payment keeps the bill's.
-import { addDays, type Data } from '../core'
+import { type Data } from '../core'
 import { all } from '../db'
 
 // D1 limits compound SELECTs, so each path is its own query or EXISTS term.
@@ -56,45 +56,4 @@ export function vendorLikeness(vendor: string | null, text: string) {
   return v.filter(w => t.includes(w) || (w.length >= 4 && compact.includes(w))).length / v.length
 }
 
-export type Candidate = { kind: 'bankline' | 'bill' | 'payment' | 'journal'; id: string; date: string; amount_cents: number; label: string; detail: string; entry_id: string | null; record: boolean; score: number }
-
-/** Transactions a receipt of this total, date and vendor may belong to, best first. */
-export async function candidates(db: D1Database, total: number | null, day: string | null, vendor: string | null, currency: string | null = 'USD'): Promise<Candidate[]> {
-  if (!total) return []
-  // A receipt in another currency was charged in dollars: its card line is found by date and vendor instead.
-  if (currency && currency !== 'USD') {
-    if (!day || !vendor) return []
-    const lines = await all(db, `SELECT l.id, l.posted_date, l.amount_cents, l.description, b.name AS bank,
-        (SELECT jl.entry_id FROM pt_match_bank_lines mb JOIN pt_match_postings mp ON mp.match_id = mb.match_id AND mp.active = 1 JOIN pt_journal_lines jl ON jl.id = mp.journal_line_id WHERE mb.bank_line_id = l.id AND mb.active = 1 LIMIT 1) AS entry_id
-      FROM pt_bank_lines l JOIN pt_bank_accounts b ON b.id = l.bank_account_id
-      WHERE l.amount_cents < 0 AND l.posted_date BETWEEN ? AND ? AND NOT EXISTS (SELECT 1 FROM pt_receipts r WHERE r.status = 'attached' AND r.target_kind = 'bankline' AND r.target_id = l.id) ORDER BY l.posted_date LIMIT 200`, addDays(day, -3), addDays(day, 10))
-    return lines.map(l => ({ kind: 'bankline' as const, id: l.id, date: l.posted_date, amount_cents: -l.amount_cents, label: l.description, detail: `${l.bank} · charged in dollars · ${l.entry_id ? 'matched in the books' : 'not in the books yet'}`, entry_id: l.entry_id, record: !l.entry_id, score: Math.round(30 * vendorLikeness(vendor, l.description) + 20 - Math.abs(Date.parse(l.posted_date) - Date.parse(day)) / 86400000) }))
-      .filter(c => vendorLikeness(vendor, c.label) >= 0.67).sort((a, b) => b.score - a.score)
-  }
-  const from = day ? addDays(day, -10) : '0000-01-01', to = day ? addDays(day, 10) : '9999-12-31', lineFrom = day ? addDays(day, -3) : from
-  const out: Candidate[] = []
-  const lines = await all(db, `SELECT l.id, l.posted_date, l.amount_cents, l.description, b.name AS bank,
-      (SELECT jl.entry_id FROM pt_match_bank_lines mb JOIN pt_match_postings mp ON mp.match_id = mb.match_id AND mp.active = 1 JOIN pt_journal_lines jl ON jl.id = mp.journal_line_id WHERE mb.bank_line_id = l.id AND mb.active = 1 LIMIT 1) AS entry_id
-    FROM pt_bank_lines l JOIN pt_bank_accounts b ON b.id = l.bank_account_id
-    WHERE l.amount_cents = ? AND l.posted_date BETWEEN ? AND ? AND NOT EXISTS (SELECT 1 FROM pt_receipts r WHERE r.status = 'attached' AND r.target_kind = 'bankline' AND r.target_id = l.id)
-    ORDER BY l.posted_date LIMIT 20`, -total, lineFrom, to)
-  for (const l of lines) out.push({ kind: 'bankline', id: l.id, date: l.posted_date, amount_cents: -l.amount_cents, label: l.description, detail: l.entry_id ? `${l.bank} · matched in the books` : `${l.bank} · not in the books yet`, entry_id: l.entry_id, record: !l.entry_id, score: 0 })
-  const bills = await all(db, `SELECT b.id, b.bill_date, b.total_cents, b.reference, b.journal_id, c.name AS vendor FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id
-    WHERE b.status <> 'void' AND b.total_cents = ? AND b.bill_date BETWEEN ? AND ? AND NOT EXISTS (SELECT 1 FROM pt_documents d WHERE d.linked_kind = 'bill' AND d.linked_id = b.id) LIMIT 20`, total, from, to)
-  for (const b of bills) out.push({ kind: 'bill', id: b.id, date: b.bill_date, amount_cents: b.total_cents, label: `${b.vendor} — bill ${b.reference}`, detail: 'Bill', entry_id: b.journal_id, record: false, score: 0 })
-  const payments = await all(db, `SELECT p.id, p.payment_date, p.amount_cents, p.journal_id, c.name AS vendor FROM pt_payments p JOIN pt_contacts c ON c.id = p.contact_id JOIN pt_journal_entries j ON j.id = p.journal_id
-    WHERE p.direction = 'paid' AND p.reversal_id IS NULL AND p.amount_cents = ? AND p.payment_date BETWEEN ? AND ? AND NOT ${hasDocument('j')} LIMIT 20`, total, lineFrom, to)
-  for (const p of payments) out.push({ kind: 'payment', id: p.id, date: p.payment_date, amount_cents: p.amount_cents, label: `Payment to ${p.vendor}`, detail: 'Payment', entry_id: p.journal_id, record: false, score: 0 })
-  const entries = await all(db, `SELECT e.id, e.entry_date, e.memo FROM pt_journal_entries e
-    WHERE e.status = 'posted' AND e.reversed_by_id IS NULL AND e.source_kind IN ('manual', 'bank') AND e.entry_date BETWEEN ? AND ? AND NOT ${hasDocument('e')}
-      AND EXISTS (SELECT 1 FROM pt_journal_lines l JOIN pt_accounts a ON a.id = l.account_id WHERE l.entry_id = e.id AND a.subtype = 'bank' AND l.credit_cents = ?) LIMIT 20`, lineFrom, to, total)
-  for (const e of entries) out.push({ kind: 'journal', id: e.id, date: e.entry_date, amount_cents: total, label: e.memo, detail: 'Journal entry', entry_id: e.id, record: false, score: 0 })
-  // One entry is offered once: through its bank line when it has one.
-  const seen = new Set<string>()
-  const unique = out.filter(c => !c.entry_id || (seen.has(c.entry_id) ? false : (seen.add(c.entry_id), true)))
-  for (const c of unique) {
-    const days = day ? Math.abs(Date.parse(c.date) - Date.parse(day)) / 86400000 : 5
-    c.score = Math.round(50 + Math.max(0, 20 - 2 * days) + 30 * vendorLikeness(vendor, c.label))
-  }
-  return unique.sort((a, b) => b.score - a.score)
-}
+export { candidates, type Candidate } from './matches'

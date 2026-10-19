@@ -2,13 +2,14 @@
 // transaction. A bank or card line not yet in the books is recorded to the
 // account the person (or the business's rule) chose, in the same batch.
 import { authority, who, type Actor } from '../access'
-import { cents, date, now, optionalText, requireThat, text, uid, type Data } from '../core'
+import { cents, date, Fault, now, optionalText, requireThat, text, uid, type Data } from '../core'
 import { all, audit, changed, guard, one, q, run, type AuditActor, type Sql } from '../db'
 import { account } from '../accounts'
 import { documentFile } from '../documents'
 import { matchPlan } from '../matching'
 import type { Command, Context } from '../context'
-import { candidates, vendorLikeness, type Candidate } from './attachments'
+import { vendorLikeness } from './attachments'
+import { candidates, matchFacts, type Candidate } from './matches'
 import { readable, readingColumns, readWith, receipt } from './intake'
 import { emailReadable } from './mail'
 import { flagDuplicate, noDuplicate, readFingerprint, vendorKey, type Duplicate } from './duplicates'
@@ -118,8 +119,8 @@ const readAgain: Command = { need: 'record', async run(c, b) {
   const input = file.mediaType === 'message/rfc822' ? emailReadable(file.bytes, file.name) : readable({ name: file.name, mediaType: file.mediaType, bytes: file.bytes })
   const cols = await readingColumns(c.db, await readWith(c.db, c.env, input))
   await run(c.db, [authority(c.actor, 'record'),
-    q("UPDATE pt_receipts SET read_status = ?, read_note = ?, read_model = ?, read_at = ?, read_vendor = ?, read_invoice_number = ?, read_date = ?, read_total_cents = ?, read_tax_cents = ?, read_currency = ?, read_account_id = ?, read_vendor_details = ?, read_draft_fields = ?, vendor_id = NULL, vendor = NULL, account_id = NULL, vendor_terms_days = NULL, vendor_is_1099 = NULL, vendor_class = NULL, vendor_confirmed_by = NULL, vendor_confirmed_at = NULL, revision = ?, vendor_key = ? WHERE id = ? AND status = 'review'",
-      cols.read_status, cols.read_note, cols.read_model, cols.read_at, cols.read_vendor, cols.read_invoice_number, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, cols.read_vendor_details, cols.read_draft_fields, uid(), vendorKey(cols.read_vendor), r.id), changed(),
+    q("UPDATE pt_receipts SET read_status = ?, read_note = ?, read_model = ?, read_at = ?, read_vendor = ?, read_invoice_number = ?, read_date = ?, read_total_cents = ?, read_tax_cents = ?, read_currency = ?, read_account_id = ?, read_vendor_details = ?, read_draft_fields = ?, read_match_fields = ?, vendor_id = NULL, vendor = NULL, account_id = NULL, vendor_terms_days = NULL, vendor_is_1099 = NULL, vendor_class = NULL, vendor_confirmed_by = NULL, vendor_confirmed_at = NULL, revision = ?, vendor_key = ? WHERE id = ? AND status = 'review'",
+      cols.read_status, cols.read_note, cols.read_model, cols.read_at, cols.read_vendor, cols.read_invoice_number, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, cols.read_vendor_details, cols.read_draft_fields, cols.read_match_fields, uid(), vendorKey(cols.read_vendor), r.id), changed(),
     audit(who(c.actor), 'receipt.read', 'receipt', r.id, { read: cols.read_status })])
   await flagDuplicate(c.db, (await receipt(c.db, r.id))!)
   return (await receipt(c.db, r.id))!
@@ -175,7 +176,7 @@ export async function attachChosen(c: Context, receiptId: string, target: Target
 
 /**
  * The business's rule: a receipt whose vendor the rule names, up to its amount,
- * that matches exactly one transaction by amount, within three days and by
+ * that matches exactly one transaction by amount, within five days and by
  * vendor, is attached (and recorded to the rule's account) without waiting.
  */
 export async function applyRules(db: D1Database, receiptId: string) {
@@ -185,7 +186,7 @@ export async function applyRules(db: D1Database, receiptId: string) {
   const rules = await all(db, 'SELECT * FROM pt_receipt_rules WHERE active = 1 ORDER BY created_at')
   const rule = rules.find(x => vendorLikeness(x.vendor, r.read_vendor) === 1 && r.read_total_cents <= x.max_cents)
   if (!rule) return null
-  const found = (await candidates(db, r.read_total_cents, r.read_date, r.read_vendor, r.read_currency)).filter(x => Math.abs(Date.parse(x.date) - Date.parse(r.read_date)) <= 3 * 86400000 && vendorLikeness(r.read_vendor, x.label) > 0)
+  const found = (await candidates(db, r.read_total_cents, r.read_date, r.read_vendor, r.read_currency, matchFacts(r))).filter(x => (r.read_currency ?? 'USD') === 'USD' && x.amount_cents === r.read_total_cents)
   if (found.length !== 1) return null
   const owner = await one<{ email: string; role: string }>(db, "SELECT email, role FROM oa_operators WHERE lower(email) = lower(?) AND status = 'active'", rule.created_by)
   if (!owner || owner.role !== 'owner') return null
@@ -203,4 +204,15 @@ export async function applyRules(db: D1Database, receiptId: string) {
     throw error
   }
   return rule.id as string
+}
+
+/** New feed/file lines revisit waiting receipts under their existing owner rule.
+ * Receipts without a rule remain suggestions, recomputed by the review door. */
+export async function matchWaitingReceipts(db: D1Database) {
+  for (const r of await all(db, "SELECT id FROM pt_receipts WHERE status = 'review' AND read_status = 'read' ORDER BY received_at, id")) {
+    try { await applyRules(db, r.id) } catch (error) {
+      // A lock/reconciliation or a concurrent decision leaves the receipt for review.
+      if (!(error instanceof Fault) || error.status !== 409) throw error
+    }
+  }
 }

@@ -148,3 +148,60 @@ test('BILL-002 owner reviews coding, original documents and vendor history, appr
     await context.close()
   }
 })
+
+
+test('CAPTURE-004 phone and desktop receipt suggestions wait for their line, attach and create an approved cash expense', async t => {
+  const app = await worker(); t.after(() => app.close())
+  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
+  let savedCookies
+  for (const width of [1440, 390]) {
+    const context = await browser.newContext({ viewport: { width, height: width > 500 ? 900 : 844 } })
+    const page = await context.newPage(), origin = app.origin
+    if (width === 1440) {
+      assert.equal((await context.request.post(`${origin}/auth/bootstrap`, { headers: { origin }, data: { token: TOKEN, displayName: 'Rosa Rivera' }, maxRedirects: 0 })).status(), 303)
+      await context.request.post(`${origin}/setup`, { headers: { origin }, form: { confirm: 'yes' }, maxRedirects: 0 })
+      await books(context.request, origin)
+    } else await context.addCookies(savedCookies)
+    const cmd = async (op, data) => { const r = await context.request.post(`${origin}/api/pantry/command/${op}`, { headers: { origin }, data }); assert.equal(r.status(), 200, await r.text()); return r.json() }
+    const state = await (await context.request.get(`${origin}/api/pantry/state`)).json(), acct = Object.fromEntries(state.accounts.map(a => [a.code, a.id]))
+    await page.goto(`${origin}/app/receipts`)
+    const name = `Home Depot ${width}.txt`
+    await page.getByLabel('Upload a file', { exact: true }).setInputFiles({ name, mimeType: 'text/plain', buffer: Buffer.from(`Home Depot receipt $64.18 ${width}`) })
+    const receipt = page.locator('.receipt-card').filter({ has: page.getByRole('heading', { name }) })
+    await receipt.getByLabel('Vendor', { exact: true }).fill('Home Depot')
+    await receipt.getByLabel('Date', { exact: true }).fill(width === 1440 ? '2026-10-01' : '2026-11-01')
+    await receipt.getByLabel('Total', { exact: true }).fill('64.18')
+    await receipt.getByText('No transaction with this total yet.', { exact: false }).waitFor()
+    await page.screenshot({ path: `/tmp/sx-pantry-r7-waiting-${width}.png`, fullPage: true })
+    const month = width === 1440 ? '10' : '11'
+    await cmd('statement.import', { bankAccountId: state.bankAccounts[0].id, fileName: `depot-${width}.csv`, content: `Posting Date,Description,Amount\n${month}/02/2026,HOME DEPOT,-64.18\n`, opening: '8440.01', closing: '8375.83', start: `2026-${month}-01`, end: `2026-${month}-30`, confirmLast4: '4821' })
+    // Keep the typed facts: refresh the candidates with a field correction.
+    await receipt.getByLabel('Vendor', { exact: true }).fill('The Home Depot')
+    await receipt.getByText('HOME DEPOT', { exact: true }).waitFor()
+    await receipt.getByLabel('Record to account', { exact: true }).selectOption(acct['6300'])
+    await page.screenshot({ path: `/tmp/sx-pantry-r7-candidate-${width}.png`, fullPage: true })
+    await receipt.getByRole('button', { name: 'Accept and attach', exact: true }).click()
+    await receipt.waitFor({ state: 'detached' })
+    await page.getByRole('heading', { name: 'Attached', exact: true }).waitFor()
+    await page.screenshot({ path: `/tmp/sx-pantry-r7-attached-${width}.png`, fullPage: true })
+    await page.getByLabel('Upload a file', { exact: true }).setInputFiles({ name: `Stationery ${width}.txt`, mimeType: 'text/plain', buffer: Buffer.from(`Stationery cash receipt ${width}`) })
+    const cash = page.locator('.receipt-card').filter({ has: page.getByRole('heading', { name: `Stationery ${width}.txt` }) })
+    await cash.getByLabel('Cash receipt vendor').fill(`Local Stationery ${width}`)
+    await cash.getByLabel('Cash receipt date').fill(`2026-${month}-03`)
+    await cash.getByLabel('Cash receipt total').fill('18.75')
+    await cash.getByLabel('Cash expense account').selectOption(acct['6300'])
+    await cash.getByLabel('Cash paid from').selectOption(acct['3000'])
+    await page.screenshot({ path: `/tmp/sx-pantry-r7-cash-${width}.png`, fullPage: true })
+    await cash.getByRole('button', { name: 'Save cash expense draft' }).click()
+    await page.getByRole('heading', { name: 'Cash expense draft saved' }).waitFor()
+    await page.getByRole('link', { name: 'Review in Books' , exact: false }).click()
+    await page.getByRole('tab', { name: 'Journal entries' }).click()
+    await page.getByRole('row', { name: new RegExp(`Local Stationery ${width}.*cash receipt`) }).click()
+    await page.getByRole('button', { name: 'Post entry', exact: true }).click()
+    await page.getByText('Posted — reverse to correct', { exact: true }).waitFor()
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    await page.screenshot({ path: `/tmp/sx-pantry-r7-posted-${width}.png`, fullPage: true })
+    if (width === 1440) savedCookies = await context.cookies()
+    await context.close()
+  }
+})

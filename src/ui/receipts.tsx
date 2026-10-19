@@ -1,3 +1,4 @@
+import { ReceiptCash } from './receipt-cash'
 import { CaptureApprovalRules } from './capture-approval-rules'
 import { ReceiptDraft } from './receipt-draft'
 import { ReceiptVendor } from './receipt-vendor'
@@ -28,7 +29,7 @@ function ReadLine({ r, reader }: { r: D; reader: D }) {
   return <p className="read-line"><Chip tone="warn">Not read</Chip> <span>{r.read_note}</span></p>
 }
 
-type Typed = { vendor: string; invoiceNumber: string; date: string; total: string; currency: string }
+type Typed = { vendor: string; invoiceNumber: string; date: string; total: string; currency: string; tip: string; chargedUsd: string; cardLast4: string }
 const NONE: D[] = []
 
 /** The transactions this receipt may belong to: those found from what was read, then, once a person
@@ -43,8 +44,9 @@ function useMatches(r: D) {
       catch (e) { if (live) { setFound([]); setError((e as Error).message) } }
     }, 300)
     return () => { live = false; clearTimeout(timer) }
-  }, [typed?.vendor, typed?.invoiceNumber, typed?.date, typed?.total, typed?.currency])
-  const initial: Typed = { vendor: r.vendor ?? r.read_vendor ?? '', invoiceNumber: r.invoice_number ?? r.read_invoice_number ?? '', date: r.receipt_date ?? r.read_date ?? '', total: (r.total_cents ?? r.read_total_cents) ? amountText(r.total_cents ?? r.read_total_cents) : '', currency: r.currency ?? r.read_currency ?? '' }
+  }, [typed?.vendor, typed?.invoiceNumber, typed?.date, typed?.total, typed?.currency, typed?.tip, typed?.chargedUsd, typed?.cardLast4])
+  const match = r.read_match_fields ? JSON.parse(r.read_match_fields) : {}
+  const initial: Typed = { tip: match.tip ? amountText(match.tip) : '', chargedUsd: match.chargedUsd ? amountText(match.chargedUsd) : '', cardLast4: match.cardLast4 ?? '', vendor: r.vendor ?? r.read_vendor ?? '', invoiceNumber: r.invoice_number ?? r.read_invoice_number ?? '', date: r.receipt_date ?? r.read_date ?? '', total: (r.total_cents ?? r.read_total_cents) ? amountText(r.total_cents ?? r.read_total_cents) : '', currency: r.currency ?? r.read_currency ?? '' }
   const type = (field: keyof Typed) => (e: any) => { const value = e.target.value; setTyped(t => ({ ...(t ?? initial), [field]: value })) }
   const total = typed ? typed.total : initial.total
   return { fields: typed ?? initial, duplicate, basis, list: (typed ? found : r.candidates) ?? NONE, looking: !!typed && found === null && /\d/.test(total), total, error, type }
@@ -69,6 +71,7 @@ function ReceiptCard({ r, data, onChange }: { r: D; data: D; onChange: () => Pro
         <ReadLine r={r} reader={{ ...data.reader, canSet: state.actor.can.owner }} />
         {r.read_status !== 'read' && state.actor.can.record && <p className="hint">Type the vendor, date and total from the receipt: the transactions with that total are listed under <strong>Attach to</strong>.</p>}
         {state.actor.can.record && <ReceiptVendor r={r} accounts={data.accounts} vendors={state.contacts.filter((v: D) => v.kind === 'vendor')} onChange={onChange} />}
+        {state.actor.can.record && <ReceiptCash r={r} onChange={onChange} />}
         {state.actor.can.record && <ReceiptDraft r={r} accounts={data.accounts} onChange={onChange} />}
         {!r.draftProposal?.saved && (state.actor.can.record ? <Form label={m.duplicate ? "Keep both" : "Accept and attach"} submit={async b => accept(b)} onDone={onChange} className="grid-form"
           secondary={<>{canRead && <Action run={async () => { await command('receipt.read', { id: r.id }); await onChange() }}>Read again</Action>}<Action run={async () => { await command('receipt.dismiss', { id: r.id, revision: r.revision, ...m.fields, reason: m.duplicate ? 'Duplicate skipped' : '' }); await onChange() }}>{m.duplicate ? 'Skip' : 'Not a receipt'}</Action></>}>
@@ -79,6 +82,9 @@ function ReceiptCard({ r, data, onChange }: { r: D; data: D; onChange: () => Pro
           <Field label="Total" name="total" inputMode="decimal" defaultValue={(r.total_cents ?? r.read_total_cents) ? amountText(r.total_cents ?? r.read_total_cents) : ''} onChange={m.type('total')} />
           <Field label="Tax" name="tax" inputMode="decimal" defaultValue={(r.tax_cents ?? r.read_tax_cents) !== null && (r.tax_cents ?? r.read_tax_cents) !== undefined ? amountText(r.tax_cents ?? r.read_tax_cents) : ''} />
           <Field label="Currency" name="currency" defaultValue={r.currency ?? r.read_currency ?? ''} maxLength={3} onChange={m.type('currency')} />
+          <Field label="Printed tip" name="tip" inputMode="decimal" defaultValue={m.fields.tip} onChange={m.type('tip')} hint="Allows this much difference from the receipt total" />
+          <Field label="USD charge on receipt or card evidence" name="chargedUsd" inputMode="decimal" defaultValue={m.fields.chargedUsd} onChange={m.type('chargedUsd')} hint="Required for foreign currency; never an estimated exchange rate" />
+          <Field label="Card last four" name="cardLast4" maxLength={4} defaultValue={m.fields.cardLast4} onChange={m.type('cardLast4')} />
           <Field label={chosen?.record ? 'Record to account' : 'Category'} name="accountId" defaultValue={r.account_id ?? r.read_account_id ?? ''} required={!!chosen?.record} options={data.accounts.map((a: D) => ({ value: a.id, label: `${a.code} · ${a.name}` }))} />
           <fieldset className="checks field-wide match-choices" aria-busy={m.looking}><legend>Attach to</legend>
             {m.list.length ? m.list.map((c: D, i: number) => <label key={c.id} className={target === `${c.kind}:${c.id}` ? 'chosen' : ''}>
@@ -95,7 +101,7 @@ function ReceiptCard({ r, data, onChange }: { r: D; data: D; onChange: () => Pro
 
 function Rules({ data, onChange }: { data: D; onChange: () => Promise<void> }) {
   return <Card title="Receipt rules">
-    <p>Without a rule, nothing is attached or recorded until a person accepts it. A rule lets receipts from one vendor that match exactly one bank or card line (same total, within three days) attach and record themselves.</p>
+    <p>Without a rule, nothing is attached or recorded until a person accepts it. A rule lets receipts from one vendor that match exactly one bank or card line (same USD total, within five days, matching vendor or card last four) attach and record themselves.</p>
     <Table heads={['Vendor', 'Records to', 'Up to', '']} figures={[2]} empty="No rules. Every receipt waits for a person.">
       {data.rules.map((x: D) => <tr key={x.id}><td>{x.vendor}</td><td>{x.code} · {x.account_name}</td><td className="fig">{usd(x.max_cents)}</td><td><Action tone="danger" run={async () => { await command('receipt-rule.remove', { id: x.id }); await onChange() }}>Remove</Action></td></tr>)}
     </Table>
