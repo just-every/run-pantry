@@ -30,12 +30,12 @@ function Reclassify({ onDone }: { onDone: () => Promise<void> }) {
   </Card>
 }
 
-function WriteOff({ onDone }: { onDone: () => Promise<void> }) {
+function WriteOff({ limit, onDone }: { limit: number; onDone: () => Promise<void> }) {
   const { state } = useShared(), [kind, setKind] = useState('invoice'), [ceiling, setCeiling] = useState('5.00')
   const v = useView<D>(/^\d+(\.\d{1,2})?$/.test(ceiling) ? `write-offs/candidates?kind=${kind}&ceiling=${ceiling}` : null), [done, setDone] = useState<D | null>(null)
   const items: D[] = v.data?.items ?? []
   return <Card title="Write off small balances">
-    <p className="hint">Each open {kind === 'invoice' ? 'invoice' : 'bill'} with a balance above zero and at most the amount below is settled by its own posted {kind === 'invoice' ? 'credit note' : 'vendor credit'} on the account you choose, all in one batch.</p>
+    <p className="hint">Each open {kind === 'invoice' ? 'invoice' : 'bill'} with a balance above zero and at most the amount below is settled by its own posted {kind === 'invoice' ? 'credit note' : 'vendor credit'} on the account you choose, all in one batch. Write-offs are bad debts, not returns: sales tax and the nexus watch keep the sale. The owner’s limit is {usd(limit)} per item.</p>
     <div className="grid-form">
       <Field label="Balances of" name="kind" value={kind} onChange={(e: any) => { setKind(e.target.value); setDone(null) }} options={[{ value: 'invoice', label: 'Customers (receivables)' }, { value: 'bill', label: 'Vendors (payables)' }]} />
       <Field label="Up to ($)" name="ceiling" value={ceiling} onChange={(e: any) => { setCeiling(e.target.value); setDone(null) }} inputMode="decimal" />
@@ -57,7 +57,15 @@ export function Review() {
   const r = v.data
   return <div className="split">
     <div>
-      {state.actor.can.post && <><Reclassify onDone={v.reload} /><WriteOff onDone={v.reload} /></>}
+      {state.actor.can.post && <><Reclassify onDone={v.reload} /><WriteOff limit={r.writeOffLimit} onDone={v.reload} /></>}
+      <Card title="Write-offs">
+        <Table heads={['When', 'By', 'Balances', 'Items', 'Account', 'Total']} figures={[3, 5]} empty="No write-offs yet.">
+          {r.writeOffs.map((w: D) => <tr key={w.id}><td>{when(w.at)}</td><td>{w.by}</td><td>{w.kind === 'invoice' ? 'Customers' : 'Vendors'}</td><td className="fig">{w.count}</td><td>{w.account}</td><td className="fig">{usd(w.total)}</td></tr>)}
+        </Table>
+        {state.actor.role === 'owner' && <Form label="Set limit" submit={b => command('write-off.limit', b)} onDone={v.reload} className="grid-form">
+          <Field label="Write-off limit per item ($)" name="limit" defaultValue={(r.writeOffLimit / 100).toFixed(2)} required inputMode="decimal" />
+        </Form>}
+      </Card>
       <Card title="Reclassifications">
         <Table heads={['When', 'By', 'Lines', 'To', 'Amount']} figures={[2, 4]} empty="No reclassifications yet.">
           {r.reclassifications.map((b: D) => <tr key={b.batch_id}><td>{when(b.created_at)}</td><td>{b.created_by}</td><td className="fig">{b.lines}</td><td>{b.to_code} · {b.to_name}</td><td className="fig">{usd(b.amount_cents)}</td></tr>)}

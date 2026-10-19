@@ -8,6 +8,7 @@ import { list, now, optionalText, requireThat, text, uid, type Data } from './co
 import { all, approval, assertOpen, audit, guard, one, periodOpen, q, run, type Sql } from './db'
 import { entryStatements, type Line } from './journal'
 import type { Command } from './context'
+import { writeOffBatches, writeOffLimit } from './write-offs'
 
 const MOVABLE = "subtype = 'other'"
 const MAX_LINES = 200
@@ -80,7 +81,7 @@ export async function reviewView(db: D1Database, reviewer: string) {
   const recent = await all(db, `SELECT n.*, e.number, e.memo FROM pt_review_notes n JOIN pt_journal_entries e ON e.id = n.entry_id ORDER BY n.created_at DESC LIMIT 100`)
   const batches = await all(db, `SELECT r.batch_id, MIN(r.created_at) AS created_at, r.created_by, COUNT(*) AS lines, SUM(r.amount_cents) AS amount_cents, t.code AS to_code, t.name AS to_name
     FROM pt_reclassifications r JOIN pt_accounts t ON t.id = r.to_account_id GROUP BY r.batch_id ORDER BY created_at DESC LIMIT 50`)
-  return { reviewer, reviewedAt: last?.reviewed_at ?? null, changes: changes.map((e): Data => ({ ...e, detail: JSON.parse(e.detail) })), notes: recent, reclassifications: batches }
+  return { reviewer, reviewedAt: last?.reviewed_at ?? null, changes: changes.map((e): Data => ({ ...e, detail: JSON.parse(e.detail) })), notes: recent, reclassifications: batches, writeOffs: await writeOffBatches(db), writeOffLimit: await writeOffLimit(db) }
 }
 
 export const reviewCommands: Record<string, Command> = { 'journal.reclassify': reclassify, 'journal.review-note': note, 'review.mark': mark }

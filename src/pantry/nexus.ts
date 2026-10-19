@@ -44,7 +44,8 @@ function reached(t: Threshold, sales: number, transactions: number) {
   return t.test === 'sales' ? s : t.test === 'or' ? Math.max(s, n) : Math.min(s, n)
 }
 
-/** Issued invoice and credit lines summed by destination state, issue day and kind. A line's
+/** Issued invoice and credit lines summed by destination state, issue day and kind; write-off credits
+ *  (ACCT-003) are bad debts, not returns, so they never reduce gross sales. A line's
  *  destination is its document's ship-to state, then (for a credit) its invoice's, then the state
  *  of the tax code chosen on the line. An invoice is one transaction in each state it ships to. */
 async function saleDays(db: D1Database, from: string) {
@@ -53,7 +54,7 @@ async function saleDays(db: D1Database, from: string) {
       FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
       LEFT JOIN pt_invoices o ON o.id = i.credit_for
       LEFT JOIN pt_tax_codes t ON t.id = COALESCE(l.chosen_tax_code, l.tax_code)
-      WHERE i.status = 'issued' AND i.journal_id IS NOT NULL AND i.issue_date >= ?)
+      WHERE i.status = 'issued' AND i.journal_id IS NOT NULL AND i.write_off = 0 AND i.issue_date >= ?)
     GROUP BY state, issue_date, kind`, from)
 }
 

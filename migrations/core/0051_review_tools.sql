@@ -30,3 +30,16 @@ CREATE TABLE pt_review_marks (
  reviewed_at TEXT NOT NULL
 );
 CREATE INDEX pt_review_marks_reviewer ON pt_review_marks(reviewer, reviewed_at);
+
+-- Write-off credits are marked: they settle a bad debt and are not sales
+-- returns, so sales-tax and nexus figures leave them out.
+ALTER TABLE pt_invoices ADD COLUMN write_off INTEGER NOT NULL DEFAULT 0 CHECK (write_off IN (0, 1));
+ALTER TABLE pt_vendor_credits ADD COLUMN write_off INTEGER NOT NULL DEFAULT 0 CHECK (write_off IN (0, 1));
+
+-- The owner's per-item write-off limit; Pantry uses $100 until the owner sets one.
+CREATE TABLE pt_write_off_policy (
+ id INTEGER PRIMARY KEY CHECK (id = 1),
+ limit_cents INTEGER NOT NULL CHECK (limit_cents > 0),
+ set_by TEXT NOT NULL,
+ set_at TEXT NOT NULL
+);

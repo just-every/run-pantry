@@ -53,6 +53,8 @@ test('ACCT-003 bulk reclassification, bulk write-off, review notes and changes s
   await writeOff.getByRole('button', { name: 'Write off 1 balance', exact: true }).click()
   await writeOff.getByText('Wrote off 1 balance to 6950 · Bad debts.', { exact: true }).waitFor()
   await writeOff.getByText('Nothing open at or under this amount.', { exact: true }).waitFor()
+  const batchesCard = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Write-offs', exact: true }) })
+  assert.match(await batchesCard.innerText(), /owner@example\.test\s+Customers\s+1\s+6950 Bad debts\s+\$0\.40/)
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
   assert.deepEqual(errors, []); await context.close()
   const tb = Object.fromEntries((await get('reports/trial-balance?to=2026-09-30')).rows.map(x => [x.code, x.net]))

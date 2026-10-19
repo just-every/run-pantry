@@ -2,10 +2,12 @@
 // ledger's sales tax liability accounts. On the accrual basis tax is owed when
 // an invoice is issued; on the cash basis when it is paid (the same settled
 // shares the cash-basis reports use). Tax collected is always what customers
-// actually paid in the period.
+// actually paid in the period. Write-off credits (ACCT-003) are bad debts, not
+// returns: they are left out until the accountant can record a state's bad-debt
+// deduction.
 import { type Data } from './core'
 import { all, one } from './db'
-import { cashLines, type Basis } from './basis'
+import { cashLines, type Basis, type CashLine } from './basis'
 import { balances, prevDay } from './reports'
 
 type Row = { taxable: number; charged: number; collected: number; owed: number }
@@ -17,16 +19,17 @@ export async function salesTax(db: D1Database, from: string, to: string, basis: 
   const byCode = new Map<string, Row>([['exempt', zero()], ...codes.map(c => [c.id, zero()] as [string, Row])])
   // Invoiced in the period (credits count against it): taxable sales and tax charged.
   const invoiced = await all(db, `SELECT i.kind, l.tax_code, l.amount_cents, l.tax_cents FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
-    WHERE i.status = 'issued' AND i.journal_id IS NOT NULL AND i.issue_date BETWEEN ? AND ?`, from, to)
+    WHERE i.status = 'issued' AND i.journal_id IS NOT NULL AND i.write_off = 0 AND i.issue_date BETWEEN ? AND ?`, from, to)
   const accrual = new Map<string, Row>()
   for (const l of invoiced) {
     const s = l.kind === 'credit' ? -1 : 1, key = l.tax_code ?? 'exempt'
     const row = accrual.get(key) ?? zero(); add(row, { taxable: s * l.amount_cents, charged: s * l.tax_cents }); accrual.set(key, row)
   }
   // Paid in the period: the settled shares of each line and of its tax.
+  const writeOffs = await writeOffCredits(db)
   const paid = new Map<string, Row>()
   for (const c of await cashLines(db, from, to)) {
-    if (c.docKind === 'bill' || (c.role !== 'sale' && c.role !== 'tax')) continue
+    if (c.docKind === 'bill' || (c.role !== 'sale' && c.role !== 'tax') || writtenOff(c, writeOffs)) continue
     const key = c.taxCode ?? 'exempt', row = paid.get(key) ?? zero()
     add(row, c.role === 'sale' ? { taxable: -c.net } : { collected: -c.net }); paid.set(key, row)
   }
@@ -45,12 +48,16 @@ export async function salesTax(db: D1Database, from: string, to: string, basis: 
   return { basis, from, to, states, exempt: byCode.get('exempt')!.taxable, totals, ledger: await ledgerTie(db, from, to, basis, codeRows) }
 }
 
+const writeOffCredits = async (db: D1Database) => new Set((await all(db, 'SELECT id FROM pt_invoices WHERE write_off = 1')).map(r => r.id))
+const writtenOff = (c: CashLine, ids: Set<string>) => ids.has(c.docId) || (c.settlement?.creditId ? ids.has(c.settlement.creditId) : false)
+
 /** Each liability account: opening, tax from invoices and credits, everything else (payments to the state), closing. */
 async function ledgerTie(db: D1Database, from: string, to: string, basis: Basis, codes: Data[]) {
   const accounts = await all(db, "SELECT id, code, name FROM pt_accounts WHERE subtype = 'tax' ORDER BY code")
   const opening = new Map((await balances(db, prevDay(from), undefined, basis)).map(b => [b.id, -b.net]))
   const closing = new Map((await balances(db, to, undefined, basis)).map(b => [b.id, -b.net]))
-  const cash = basis === 'cash' ? await cashLines(db, from, to) : []
+  const writeOffs = await writeOffCredits(db)
+  const cash = basis === 'cash' ? (await cashLines(db, from, to)).filter(c => !writtenOff(c, writeOffs)) : []
   const rows = []
   for (const a of accounts) {
     // Read from the ledger, not from the invoice lines the report adds up.

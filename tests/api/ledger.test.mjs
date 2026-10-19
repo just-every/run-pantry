@@ -213,7 +213,7 @@ test('ACCT-003 an accountant reclassifies 40 lines by linked correcting entries,
   const customer = await h.command('contact.save', { kind: 'customer', name: 'Cedar Studio', termsDays: 30 }), vendor = await h.command('contact.save', { kind: 'vendor', name: 'Harbor Print', termsDays: 30 })
   const invoices = []
   for (const [rate, paid] of [['100.00', '99.60'], ['200.00', '198.00'], ['300.00', '270.00']]) {
-    const d = await h.command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-09-10', lines: [{ description: 'Design', quantity: '1', rate, accountId: acct['4000'], taxCode: 'exempt' }] })
+    const d = await h.command('invoice.save-draft', { customerId: customer.id, destinationState: 'NJ', issueDate: '2026-09-10', lines: [{ description: 'Design', quantity: '1', rate, accountId: acct['4000'], taxCode: 'exempt' }] })
     const inv = await h.command('invoice.issue', { id: (await h.command('invoice.approve', { id: d.id, revision: d.revision })).id })
     await h.command('payment.record', { direction: 'received', contactId: customer.id, date: '2026-09-20', amount: paid, bankAccountId: bank.id, method: 'ach', reference: `ACH ${inv.number}`, allocations: [{ targetId: inv.id, amount: paid }] })
     invoices.push(inv)
@@ -222,13 +222,24 @@ test('ACCT-003 an accountant reclassifies 40 lines by linked correcting entries,
   await h.command('payment.record', { direction: 'paid', contactId: vendor.id, date: '2026-09-15', amount: '79.25', bankAccountId: bank.id, method: 'check', reference: 'CHK 1001', allocations: [{ targetId: bill.id, amount: '79.25' }] })
   assert.deepEqual((await h.view('write-offs/candidates?kind=invoice&ceiling=5.00', ann)).items.map(i => [i.reference, i.open]), [[invoices[0].number, 40], [invoices[1].number, 200]])
   await h.command('write-off.bulk', { kind: 'invoice', ceiling: '5.00', accountId: acct['3000'], date: '2026-09-30' }, ann, 400)
+  // The owner's per-item limit caps every batch; a write-off is a bad debt, not a return, so sales tax and nexus figures keep the sale.
+  await h.command('write-off.limit', { limit: '1.00' })
+  assert.match((await h.command('write-off.bulk', { kind: 'invoice', ceiling: '5.00', accountId: badDebts.id, date: '2026-09-30' }, ann, 403)).error, /write-off limit is \$1\.00.*INVOICE-008/)
+  await h.command('write-off.limit', { limit: '1000.00' }, ann, 403)
+  await h.command('write-off.limit', { limit: '100.00' })
+  const taxFigures = async () => { const a = await h.view('reports/sales-tax?from=2026-09-01&to=2026-09-30&basis=accrual'), c = await h.view('reports/sales-tax?from=2026-09-01&to=2026-09-30&basis=cash'); return [a.exempt, c.exempt, c.totals.collected, c.ledger.ties] }
+  const nexusNJ = async () => { const s = (await h.view('sales-tax/nexus')).states.find(x => x.state === 'NJ'); return [s.windows.at(-1).sales, s.windows.at(-1).transactions] }
+  const before = [await taxFigures(), await nexusNJ()]
+  assert.deepEqual(before[1], [60000, 3])
   const wo = await h.command('write-off.bulk', { kind: 'invoice', ceiling: '5.00', accountId: badDebts.id, date: '2026-09-30' }, ann)
+  assert.deepEqual([await taxFigures(), await nexusNJ()], before, 'write-off credits never reduce sales-tax or nexus sales')
   assert.deepEqual(wo.items.map(i => [i.reference, i.amount]), [[invoices[0].number, 40], [invoices[1].number, 200]])
   const sales = await h.view('sales')
   assert.deepEqual(invoices.map(i => at(sales.invoices, x => x.id === i.id).open_cents), [0, 0, 3000], 'the $30 balance stays open')
   const credits = sales.invoices.filter(x => x.kind === 'credit' && x.memo.startsWith('Write-off'))
   assert.deepEqual(credits.map(x => [x.credit_for, x.total_cents, x.status]).sort(), [[invoices[0].id, 40, 'issued'], [invoices[1].id, 200, 'issued']].sort())
   const vendorWo = await h.command('write-off.bulk', { kind: 'bill', ceiling: '1.00', accountId: acct['6300'], date: '2026-09-30' }, ann)
+  assert.deepEqual((await h.view('review')).writeOffs.map(w => [w.kind, w.by, w.count, w.total, w.account]), [['bill', 'ann@example.test', 1, 75, '6300 Office supplies'], ['invoice', 'ann@example.test', 2, 240, '6950 Bad debts']], 'the owner sees every batch with its count and total')
   assert.deepEqual(vendorWo.items.map(i => [i.reference, i.amount]), [['HP-77', 75]])
   assert.equal(at((await h.view('sales')).bills, x => x.id === bill.id).open_cents, 0)
   const after = Object.fromEntries((await h.view('reports/trial-balance?to=2026-09-30&basis=accrual')).rows.map(x => [x.code, x.net]))
