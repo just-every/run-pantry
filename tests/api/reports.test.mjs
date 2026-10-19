@@ -400,6 +400,8 @@ test('REPORT-001 financial statements with comparisons, fiscal periods, YTD and 
   const h = await harness(); t.after(() => h.close())
   const s = await october(h)
   await s.issue('Cedar Studio', '2025-10-05', [{ description: 'Prior-year design', quantity: '1', rate: '450.00', accountId: s.acct['4000'], taxCode: 'exempt' }])
+  const priorLoss = await h.command('journal.save-draft', { date: '2025-10-31', memo: 'Prior-year software costs', lines: [{ accountId: s.acct['6200'], debit: '500.00' }, { accountId: s.acct['1000'], credit: '500.00' }] })
+  await h.command('journal.post', { id: priorLoss.id, revision: priorLoss.revision })
   const job = await h.command('journal.save-draft', { date: '2026-10-12', memo: 'Cedar job materials', lines: [{ accountId: s.acct['6000'], contactId: s.c['Cedar Studio'].id, debit: '50.00' }, { accountId: s.acct['1000'], credit: '50.00' }] })
   await h.command('journal.post', { id: job.id, revision: job.revision })
   await h.command('entity.save', { revision: (await h.view('state')).settings.entity.revision, legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 4, taxMethod: 'cash', booksStart: '2026-01-01' })
@@ -462,7 +464,7 @@ test('REPORT-001 financial statements with comparisons, fiscal periods, YTD and 
     }
   }
   const octoberComparison = await h.view(`reports/profit-and-loss?${OCT}&columns=prior-year&basis=accrual`)
-  assert.deepEqual(octoberComparison.totals.find(l => l.id === 'net-income').values, [99800, 45000, 54800, 121.78])
+  assert.deepEqual(octoberComparison.totals.find(l => l.id === 'net-income').values, [99800, -5000, 104800, 2096])
   const declared = await h.view(`reports/profit-and-loss?${OCT}&columns=prior-year`)
   assert.equal(declared.basis, 'cash')
   const leap = await h.view('reports/profit-and-loss?from=2024-02-29&to=2024-02-29&columns=prior-year')
