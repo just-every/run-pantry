@@ -1,7 +1,7 @@
-// Monthly journal schedules share invoice recurrence arithmetic, not a second
+// Journal schedules share invoice month/week arithmetic, not a second
 // ledger. Each edit revokes automatic posting until that version is approved.
 import { authority, who } from './access'
-import { date, now, optionalText, requireThat, text, uid, type Data } from './core'
+import { addDays, date, now, optionalText, requireThat, text, uid, type Data } from './core'
 import { all, approval, audit, changed, one, q, run } from './db'
 import { parseLines, type Line } from './journal'
 import { occurrence } from './recurring'
@@ -9,7 +9,7 @@ import { businessDay, sendingSettings } from './delivery'
 import type { Command } from './context'
 import { generateJournalOccurrence } from './recurring-journal-runs'
 
-export const recurringJournalDate = (start: string, every: number, n: number) => occurrence(start, 'month', every, n)
+export const recurringJournalDate = (start: string, every: number, n: number, cadence: 'day' | 'week' | 'month') => cadence === 'day' ? addDays(start, every * n) : occurrence(start, cadence, every, n)
 export const journalInputLines = (lines: Line[]) => lines.map(l => ({ ...l, debit: (l.debit / 100).toFixed(2), credit: (l.credit / 100).toFixed(2) }))
 
 export async function recurringJournal(db: D1Database, id: string): Promise<Data & { lines: Line[] }> {
@@ -21,8 +21,13 @@ export async function recurringJournal(db: D1Database, id: string): Promise<Data
 const save: Command = { need: 'record', async run(c, b) {
   const start = date(b.startDate, 'First entry date'), end = b.endDate ? date(b.endDate, 'Last entry date') : null
   requireThat(!end || end >= start, 'The last entry date is on or after the first')
+  const cadence = b.cadence ?? 'month'
+  requireThat(['day', 'week', 'month'].includes(cadence), 'Repeat by days, weeks or months')
   const every = Number(b.every ?? 1)
-  requireThat(Number.isInteger(every) && every >= 1 && every <= 12, 'Repeat every 1 to 12 months')
+  requireThat(Number.isSafeInteger(every) && every >= 1, 'Repeat every positive whole number of days, weeks or months')
+  const [year, month] = start.split('-').map(Number)
+  const maxInterval = cadence === 'month' ? (9999 - year) * 12 + 12 - month : Math.floor((Date.UTC(9999, 11, 31) - Date.parse(start)) / (86400000 * (cadence === 'week' ? 7 : 1)))
+  requireThat(every <= maxInterval, 'The interval must produce a calendar date through year 9999')
   const mode = text(b.mode, 'Each occurrence')
   requireThat(mode === 'draft' || mode === 'post', 'Create drafts or post under an approved template')
   const name = text(b.name, 'Template name', 200), memo = text(b.memo, 'Entry description', 500)
@@ -30,15 +35,15 @@ const save: Command = { need: 'record', async run(c, b) {
   const before = b.id ? await recurringJournal(c.db, text(b.id, 'Recurring journal')) : null
   if (before) {
     requireThat(before.revision === b.revision, 'Recurring journal changed; reload', 409)
-    requireThat(!before.runs || (before.start_date === start && before.every === every), 'After the first occurrence, keep the schedule anchor and interval; create a new template for a new schedule', 409)
+    requireThat(!before.runs || (before.start_date === start && before.every === every && before.cadence === cadence), 'After the first occurrence, keep the schedule anchor and interval; create a new template for a new schedule', 409)
   }
-  const id = before?.id ?? uid(), next = recurringJournalDate(start, every, before?.runs ?? 0)
+  const id = before?.id ?? uid(), next = recurringJournalDate(start, every, before?.runs ?? 0, cadence)
   const nextDate = end && next > end ? null : next
   const status = !nextDate ? 'ended' : before?.status === 'paused' ? 'paused' : mode === 'post' ? 'awaiting-approval' : 'active'
-  const after = { revision, name, memo, lines, every, start_date: start, end_date: end, next_date: nextDate, mode, status, prepared_by: c.actor.email }
+  const after = { revision, name, memo, lines, every, cadence, start_date: start, end_date: end, next_date: nextDate, mode, status, prepared_by: c.actor.email }
   await run(c.db, [authority(c.actor, 'record'), ...(before ? [
-    q('UPDATE pt_recurring_journals SET name = ?, memo = ?, lines = ?, every = ?, start_date = ?, end_date = ?, next_date = ?, mode = ?, status = ?, prepared_by = ?, approved_by = NULL, approved_revision = NULL, approved_snapshot = NULL, revision = ?, updated_at = ? WHERE id = ? AND revision = ? AND runs = ? AND status = ?', name, memo, JSON.stringify(lines), every, start, end, nextDate, mode, status, c.actor.email, revision, at, id, b.revision, before.runs, before.status), changed(),
-  ] : [q('INSERT INTO pt_recurring_journals (id, name, memo, lines, every, start_date, end_date, next_date, mode, status, prepared_by, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, name, memo, JSON.stringify(lines), every, start, end, nextDate, mode, status, c.actor.email, revision, at, at)]),
+    q('UPDATE pt_recurring_journals SET name = ?, memo = ?, lines = ?, every = ?, cadence = ?, start_date = ?, end_date = ?, next_date = ?, mode = ?, status = ?, prepared_by = ?, approved_by = NULL, approved_revision = NULL, approved_snapshot = NULL, revision = ?, updated_at = ? WHERE id = ? AND revision = ? AND runs = ? AND status = ?', name, memo, JSON.stringify(lines), every, cadence, start, end, nextDate, mode, status, c.actor.email, revision, at, id, b.revision, before.runs, before.status), changed(),
+  ] : [q('INSERT INTO pt_recurring_journals (id, name, memo, lines, every, cadence, start_date, end_date, next_date, mode, status, prepared_by, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, name, memo, JSON.stringify(lines), every, cadence, start, end, nextDate, mode, status, c.actor.email, revision, at, at)]),
     audit(who(c.actor), before ? 'recurring-journal.edit' : 'recurring-journal.create', 'recurring-journal', id, { revision, before, after })])
   return recurringJournal(c.db, id)
 } }
@@ -105,7 +110,7 @@ export async function recurringJournalsView(db: D1Database, today?: string) {
     while (next && next <= today && (!t.end_date || next <= t.end_date)) {
       exceptions.push({ recurring_id: t.id, name: t.name, occurrence: next, template_revision: t.revision, status: 'missed',
         detail: t.status === 'awaiting-approval' ? 'Waiting for approval of this template revision' : t.status === 'paused' ? 'Schedule is paused' : 'Due occurrence has not run yet; the next scheduled check catches up' })
-      next = recurringJournalDate(t.start_date, t.every, ++n)
+      next = recurringJournalDate(t.start_date, t.every, ++n, t.cadence)
     }
   }
   exceptions.sort((a, b) => a.occurrence.localeCompare(b.occurrence) || a.name.localeCompare(b.name))

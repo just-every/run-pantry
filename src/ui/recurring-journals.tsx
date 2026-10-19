@@ -9,21 +9,23 @@ const blank = (): InputLine => ({ accountId: '', debit: '', credit: '', memo: ''
 
 function TemplateEditor({ template, onDone, cancel }: { template?: D; onDone: () => Promise<void>; cancel: () => void }) {
   const { state } = useShared()
+  const [cadence, setCadence] = useState(template?.cadence ?? 'month')
   const [lines, setLines] = useState<InputLine[]>(template ? template.lines.map((l: D) => ({ ...l, debit: l.debit ? amountText(l.debit) : '', credit: l.credit ? amountText(l.credit) : '' })) : [blank(), blank()])
   const update = (i: number, change: Partial<InputLine>) => setLines(ls => ls.map((l, j) => j === i ? { ...l, ...change } : l))
   return <Card title={template ? `Edit ${template.name}` : 'New recurring journal'}>
     <p className="hint">Automatic posting requires approval of the exact template revision. Every edit returns posting templates to approval. Draft schedules create entries for a person to review in Books.</p>
-    <Form label="Save journal template" submit={b => command('recurring-journal.save', { ...b, id: template?.id, revision: template?.revision, lines })} onDone={onDone}
+    <Form label="Save journal template" submit={b => command('recurring-journal.save', { ...b, cadence, id: template?.id, revision: template?.revision, lines })} onDone={onDone}
       secondary={<button type="button" className="btn btn-secondary" onClick={cancel}>Cancel</button>}>
       <div className="grid-form">
         <Field label="Template name" name="name" defaultValue={template?.name} required />
         <Field label="Entry description" name="memo" defaultValue={template?.memo} required />
-        <Field label="Every (months)" name="every" type="number" min={1} max={12} defaultValue={template?.every ?? 1} required readOnly={!!template?.runs} />
+        <Field label="Every" name="every" type="number" min={1} max={Number.MAX_SAFE_INTEGER} step={1} defaultValue={template?.every ?? 1} required readOnly={!!template?.runs} />
+        <Field label="Cadence" name="cadence" value={cadence} onChange={(e: any) => setCadence(e.target.value)} required disabled={!!template?.runs} options={[{ value: 'day', label: 'Days' }, { value: 'week', label: 'Weeks' }, { value: 'month', label: 'Months' }]} />
         <Field label="First entry date" name="startDate" type="date" defaultValue={template?.start_date ?? today()} required readOnly={!!template?.runs} />
         <Field label="Last entry date (optional)" name="endDate" type="date" defaultValue={template?.end_date} />
         <Field label="Each occurrence" name="mode" defaultValue={template?.mode ?? 'draft'} required options={[{ value: 'draft', label: 'Create a draft for review' }, { value: 'post', label: 'Post under template approval' }]} />
       </div>
-      <p className="hint">Dates stay anchored to the first day chosen: a 31st uses February's last day, then returns to the 31st. The last date is inclusive. Missed runs keep their original dates; locked dates remain exceptions.</p>
+      <p className="hint">{cadence === 'month' ? "Monthly dates stay anchored to the first day chosen: a 31st uses February's last day, then returns to the 31st. " : cadence === 'week' ? 'Weekly dates stay on the weekday of the first entry. ' : 'Daily dates advance by the number of days chosen. '}The last date is inclusive. Missed runs keep their original dates; locked dates remain exceptions.</p>
       {lines.map((l, i) => <div className="grid-form line" key={i}>
         <Field label={`Line ${i + 1} account`} name={`account${i}`} value={l.accountId} onChange={(e: any) => update(i, { accountId: e.target.value })} required options={accountOptions(state.accounts, a => !['receivable', 'payable'].includes(a.subtype))} />
         <Field label={`Line ${i + 1} memo`} name={`memo${i}`} value={l.memo} onChange={(e: any) => update(i, { memo: e.target.value })} />
@@ -57,7 +59,7 @@ export function RecurringJournals() {
     <Card title="Recurring journals" actions={state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={() => setEditing({})}>New recurring journal</button>}>
       {error && <p role="alert" className="error">{error}</p>}
       <Table heads={['Template', 'Repeats', 'Next entry', 'Status']} empty="No recurring journals yet.">
-        {data.templates.map((t: D) => <tr key={t.id}><td><button type="button" className="btn btn-link" onClick={() => setSelected(t.id)}>{t.name}</button></td><td>Every {t.every} month{t.every === 1 ? '' : 's'}</td><td>{day(t.next_date)}</td><td><Chip tone={t.status === 'awaiting-approval' ? 'warn' : 'neutral'}>{STATUS[t.status]}</Chip></td></tr>)}
+        {data.templates.map((t: D) => <tr key={t.id}><td><button type="button" className="btn btn-link" onClick={() => setSelected(t.id)}>{t.name}</button></td><td>Every {t.every} {t.cadence ?? 'month'}{t.every === 1 ? '' : 's'}</td><td>{day(t.next_date)}</td><td><Chip tone={t.status === 'awaiting-approval' ? 'warn' : 'neutral'}>{STATUS[t.status]}</Chip></td></tr>)}
       </Table>
     </Card>
     <Card title="Missed and failed journal runs">

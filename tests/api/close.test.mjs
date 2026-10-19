@@ -219,4 +219,36 @@ test('CLOSE-001 draft schedules preserve month anchors and failed preparation wa
   const february = new Date(Date.UTC(year, 2, 0)).toISOString().slice(0, 10)
   assert.deepEqual(anchored.runs_list.map(r => r.occurrence).sort(), [`${year}-01-31`, february, `${year}-03-31`])
   assert.ok(anchored.runs_list.every(r => r.status === 'drafted'))
+
+  const shift = n => new Date(Date.parse(day) + n * 86400000).toISOString().slice(0, 10)
+  for (const [cadence, every, expected, mode] of [
+    ['day', 1, [shift(-2), shift(-1), day], 'post'],
+    ['week', 2, [shift(-28), shift(-14), day], 'post'],
+    ['week', 13, [shift(-182), shift(-91), day], 'draft'],
+  ]) {
+    const input = { ...values, name: `${cadence} interval ${every}`, cadence, every, mode, startDate: expected[0], endDate: day }
+    let schedule = await h.command('recurring-journal.save', input, preparer)
+    if (mode === 'post') schedule = await h.command('recurring-journal.approve', { id: schedule.id, revision: schedule.revision }, reviewer)
+    await Promise.all([h.cron(), h.cron()])
+    schedule = await journalTemplate(h, schedule.id)
+    assert.deepEqual(schedule.runs_list.map(r => r.occurrence).sort(), expected)
+    assert.ok(schedule.runs_list.every(r => r.status === (mode === 'post' ? 'posted' : 'drafted')))
+    for (const r of schedule.runs_list) {
+      assert.equal((await h.view(`reports/record/entry/${r.journal_id}`)).total, 2500)
+      assert.equal(JSON.parse(r.template_snapshot).cadence, cadence)
+    }
+    await h.cron()
+    assert.equal((await journalTemplate(h, schedule.id)).runs_list.length, 3)
+    await h.command('recurring-journal.save', { ...input, id: schedule.id, revision: schedule.revision, cadence: cadence === 'day' ? 'week' : 'day' }, preparer, 409)
+  }
+  const backlog = await h.command('recurring-journal.save', { ...values, name: 'Daily catch-up', cadence: 'day', every: 1, startDate: shift(-13), endDate: day }, preparer)
+  await h.cron()
+  let caught = await journalTemplate(h, backlog.id)
+  assert.equal(caught.runs_list.length, 12)
+  assert.deepEqual((await h.view('recurring-journals')).exceptions.filter(r => r.recurring_id === backlog.id).map(r => r.occurrence), [shift(-1), day])
+  await h.cron()
+  caught = await journalTemplate(h, backlog.id)
+  assert.equal(caught.runs_list.length, 14)
+  assert.equal(new Set(caught.runs_list.map(r => r.occurrence)).size, 14)
+  assert.equal(caught.status, 'ended')
 })

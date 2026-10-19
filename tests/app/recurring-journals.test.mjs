@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import { worker, TOKEN } from './worker.mjs'
 
-test('CLOSE-001 create and approve recurring journals, inspect three posted months and edit back to approval at 1440 and 390', async t => {
+test('CLOSE-001 create and approve recurring journals, inspect dated daily, fortnightly and monthly postings and edit back to approval at 1440 and 390', async t => {
   const app = await worker(); t.after(() => app.close())
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
   const owner = await browser.newContext()
@@ -16,40 +16,60 @@ test('CLOSE-001 create and approve recurring journals, inspect three posted mont
   const state = await owner.storageState()
   for (const width of [1440, 390]) {
     const context = await browser.newContext({ storageState: state, viewport: { width, height: width === 390 ? 844 : 1000 } }), page = await context.newPage()
-    const name = `Owner-loan interest ${width}`
-    await page.goto(`${app.origin}/app/close?period=2026-09`)
-    await page.getByRole('button', { name: 'New recurring journal', exact: true }).click()
-    await page.getByLabel('Template name', { exact: true }).fill(name)
-    await page.getByLabel('Entry description', { exact: true }).fill('Accrue monthly owner-loan interest')
-    await page.getByLabel('First entry date', { exact: true }).fill('2026-07-01')
-    await page.getByLabel('Last entry date (optional)', { exact: true }).fill('2026-09-01')
-    await page.getByLabel('Each occurrence', { exact: true }).selectOption('post')
-    await page.getByLabel('Line 1 account', { exact: true }).selectOption(expense.id)
-    await page.getByLabel('Line 1 debit', { exact: true }).fill('500.00')
-    await page.getByLabel('Line 2 account', { exact: true }).selectOption(loan.id)
-    await page.getByLabel('Line 2 credit', { exact: true }).fill('500.00')
-    await page.getByRole('button', { name: 'Save journal template', exact: true }).click()
-    await page.getByRole('button', { name, exact: true }).first().click()
-    await page.getByRole('button', { name: 'Approve this template revision', exact: true }).waitFor()
-    await page.screenshot({ path: `/tmp/sx-pantry-r4-recurring-approval-${width}.png`, fullPage: true })
-    const approved = page.waitForResponse(r => r.url().endsWith('/command/recurring-journal.approve') && r.request().method() === 'POST')
-    await page.getByRole('button', { name: 'Approve this template revision', exact: true }).click()
-    assert.equal((await approved).status(), 200)
-    const cron = await owner.request.get(`${app.origin}/cdn-cgi/local/scheduled?cron=${encodeURIComponent('*/30 * * * *')}`)
-    assert.equal(cron.status(), 200, await cron.text())
-    await page.reload(); await page.getByRole('button', { name, exact: true }).first().click()
-    const templates = await (await owner.request.get(`${app.origin}/api/pantry/recurring-journals`)).json(), current = templates.templates.find(t => t.name === name)
-    assert.equal(current.runs_list.length, 3); assert.ok(current.runs_list.every(r => r.status === 'posted'))
-    await page.getByRole('heading', { name, exact: true }).waitFor()
-    await page.screenshot({ path: `/tmp/sx-pantry-r4-recurring-posted-${width}.png`, fullPage: true })
-    await page.getByRole('button', { name: 'Edit template', exact: true }).click()
-    await page.getByLabel('Last entry date (optional)', { exact: true }).fill('2026-10-01')
-    await page.getByLabel('Line 1 debit', { exact: true }).fill('600.00')
-    await page.getByLabel('Line 2 credit', { exact: true }).fill('600.00')
-    await page.getByRole('button', { name: 'Save journal template', exact: true }).click()
-    await page.getByRole('button', { name: 'Approve this template revision', exact: true }).waitFor()
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
-    await page.screenshot({ path: `/tmp/sx-pantry-r4-recurring-edited-${width}.png`, fullPage: true })
+    for (const schedule of [
+      { cadence: 'month', every: '1', dates: ['2026-07-01', '2026-08-01', '2026-09-01'] },
+      { cadence: 'day', every: '1', dates: ['2026-07-01', '2026-07-02', '2026-07-03'] },
+      { cadence: 'week', every: '2', dates: ['2026-07-01', '2026-07-15', '2026-07-29'] },
+    ]) {
+      const name = `Owner-loan interest ${schedule.cadence} ${width}`
+      const proof = schedule.cadence === 'month' ? `${width}` : `${schedule.cadence}-${width}`
+      await page.goto(`${app.origin}/app/close?period=2026-09`)
+      await page.getByRole('button', { name: 'New recurring journal', exact: true }).click()
+      await page.getByLabel('Template name', { exact: true }).fill(name)
+      await page.getByLabel('Entry description', { exact: true }).fill('Accrue owner-loan interest')
+      await page.getByLabel('Cadence', { exact: true }).selectOption(schedule.cadence)
+      await page.getByLabel('Every', { exact: true }).fill(schedule.every)
+      await page.getByLabel('First entry date', { exact: true }).fill(schedule.dates[0])
+      await page.getByLabel('Last entry date (optional)', { exact: true }).fill(schedule.dates.at(-1))
+      await page.getByLabel('Each occurrence', { exact: true }).selectOption('post')
+      await page.getByLabel('Line 1 account', { exact: true }).selectOption(expense.id)
+      await page.getByLabel('Line 1 debit', { exact: true }).fill('500.00')
+      await page.getByLabel('Line 2 account', { exact: true }).selectOption(loan.id)
+      await page.getByLabel('Line 2 credit', { exact: true }).fill('500.00')
+      await page.screenshot({ path: `/tmp/sx-pantry-r4-recurring-editor-${proof}.png`, fullPage: true })
+      await page.getByRole('button', { name: 'Save journal template', exact: true }).click()
+      await page.getByRole('button', { name, exact: true }).first().click()
+      await page.getByRole('button', { name: 'Approve this template revision', exact: true }).waitFor()
+      await page.screenshot({ path: `/tmp/sx-pantry-r4-recurring-approval-${proof}.png`, fullPage: true })
+      const approved = page.waitForResponse(r => r.url().endsWith('/command/recurring-journal.approve') && r.request().method() === 'POST')
+      await page.getByRole('button', { name: 'Approve this template revision', exact: true }).click()
+      assert.equal((await approved).status(), 200)
+      const cron = await owner.request.get(`${app.origin}/cdn-cgi/local/scheduled?cron=${encodeURIComponent('*/30 * * * *')}`)
+      assert.equal(cron.status(), 200, await cron.text())
+      await page.reload(); await page.getByRole('button', { name, exact: true }).first().click()
+      const templates = await (await owner.request.get(`${app.origin}/api/pantry/recurring-journals`)).json(), current = templates.templates.find(t => t.name === name)
+      assert.deepEqual(current.runs_list.map(r => r.occurrence).sort(), schedule.dates)
+      assert.ok(current.runs_list.every(r => r.status === 'posted' && r.journal_id))
+      assert.equal(current.cadence, schedule.cadence)
+      assert.equal(current.every, Number(schedule.every))
+      await page.getByRole('heading', { name, exact: true }).waitFor()
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+      await page.screenshot({ path: `/tmp/sx-pantry-r4-recurring-posted-${proof}.png`, fullPage: true })
+      await page.getByRole('button', { name: 'Edit template', exact: true }).click()
+      assert.equal(await page.getByLabel('Cadence', { exact: true }).isDisabled(), true)
+      assert.equal(await page.getByLabel('Every', { exact: true }).getAttribute('readonly'), '')
+      if (schedule.cadence !== 'month') {
+        await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+        continue
+      }
+      await page.getByLabel('Last entry date (optional)', { exact: true }).fill('2026-10-01')
+      await page.getByLabel('Line 1 debit', { exact: true }).fill('600.00')
+      await page.getByLabel('Line 2 credit', { exact: true }).fill('600.00')
+      await page.getByRole('button', { name: 'Save journal template', exact: true }).click()
+      await page.getByRole('button', { name: 'Approve this template revision', exact: true }).waitFor()
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+      await page.screenshot({ path: `/tmp/sx-pantry-r4-recurring-edited-${width}.png`, fullPage: true })
+    }
     await context.close()
   }
   const tasks = await command('close.tasks', { period: '2026-01' })

@@ -10,8 +10,8 @@ const approverCondition = `EXISTS (SELECT 1 FROM oa_operators o LEFT JOIN pt_mem
   WHERE lower(o.email) = lower(?) AND o.status = 'active' AND (o.role = 'owner' OR (m.active = 1 AND m.can_post = 1 AND m.role <> 'viewer')))`
 
 export async function generateJournalOccurrence(db: D1Database, t: Data, day: string, today: string, options: { retry?: boolean; authority?: Sql } = {}) {
-  const revision = t.revision, snapshot = JSON.stringify({ revision, name: t.name, memo: t.memo, lines: t.lines, mode: t.mode, approved_by: t.approved_by, approved_revision: t.approved_revision })
-  const next = recurringJournalDate(t.start_date, t.every, t.runs + 1), ended = !!t.end_date && next > t.end_date
+  const revision = t.revision, snapshot = JSON.stringify({ revision, name: t.name, memo: t.memo, lines: t.lines, mode: t.mode, cadence: t.cadence, every: t.every, start_date: t.start_date, end_date: t.end_date, approved_by: t.approved_by, approved_revision: t.approved_revision })
+  const next = recurringJournalDate(t.start_date, t.every, t.runs + 1, t.cadence), ended = !!t.end_date && next > t.end_date
   const fence = () => [
     ...(options.authority ? [options.authority] : []),
     guard('EXISTS (SELECT 1 FROM pt_recurring_journals WHERE id = ? AND revision = ? AND status = ? AND lines = ? AND runs = ?)', t.id, revision, t.status, JSON.stringify(t.lines), t.runs),
