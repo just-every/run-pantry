@@ -44,25 +44,26 @@ function reached(t: Threshold, sales: number, transactions: number) {
   return t.test === 'sales' ? s : t.test === 'or' ? Math.max(s, n) : Math.min(s, n)
 }
 
-/** Every issued invoice and credit line with its destination state: the document's ship-to state,
- *  then (for a credit) its invoice's, then the state of the tax code chosen on the line. */
-async function saleLines(db: D1Database, from: string) {
-  return all(db, `SELECT i.id, i.kind, i.issue_date, l.amount_cents,
-      COALESCE(NULLIF(i.destination_state, ''), NULLIF(o.destination_state, ''), t.state, '') AS state
-    FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
-    LEFT JOIN pt_invoices o ON o.id = i.credit_for
-    LEFT JOIN pt_tax_codes t ON t.id = COALESCE(l.chosen_tax_code, l.tax_code)
-    WHERE i.status = 'issued' AND i.journal_id IS NOT NULL AND i.issue_date >= ?`, from)
+/** Issued invoice and credit lines summed by destination state, issue day and kind. A line's
+ *  destination is its document's ship-to state, then (for a credit) its invoice's, then the state
+ *  of the tax code chosen on the line. An invoice is one transaction in each state it ships to. */
+async function saleDays(db: D1Database, from: string) {
+  return all(db, `SELECT state, issue_date, kind, SUM(amount_cents) AS amount, COUNT(DISTINCT id) AS documents FROM (
+      SELECT i.id, i.kind, i.issue_date, l.amount_cents, COALESCE(NULLIF(i.destination_state, ''), NULLIF(o.destination_state, ''), t.state, '') AS state
+      FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
+      LEFT JOIN pt_invoices o ON o.id = i.credit_for
+      LEFT JOIN pt_tax_codes t ON t.id = COALESCE(l.chosen_tax_code, l.tax_code)
+      WHERE i.status = 'issued' AND i.journal_id IS NOT NULL AND i.issue_date >= ?)
+    GROUP BY state, issue_date, kind`, from)
 }
 
 export async function nexusWatch(db: D1Database) {
   const today = businessDay((await sendingSettings(db)).time_zone)
-  const lines = await saleLines(db, `${Number(today.slice(0, 4)) - 2}-01-01`)
+  const days = await saleDays(db, `${Number(today.slice(0, 4)) - 2}-01-01`)
+  const sum = (rows: Data[]) => ({ sales: rows.reduce((s, d) => s + (d.kind === 'credit' ? -1 : 1) * d.amount, 0), documents: rows.reduce((s, d) => s + d.documents, 0) })
   const measure = (state: string, w: Window) => {
-    const inWindow = lines.filter(l => l.state === state && l.issue_date >= w.from && l.issue_date <= w.to)
-    const sales = inWindow.reduce((s, l) => s + (l.kind === 'credit' ? -1 : 1) * l.amount_cents, 0)
-    const transactions = new Set(inWindow.filter(l => l.kind === 'invoice').map(l => l.id)).size
-    return { sales, transactions }
+    const inWindow = days.filter(d => d.state === state && d.issue_date >= w.from && d.issue_date <= w.to)
+    return { sales: sum(inWindow).sales, transactions: sum(inWindow.filter(d => d.kind === 'invoice')).documents }
   }
   const alerts = await all(db, 'SELECT * FROM pt_nexus_alerts ORDER BY raised_at DESC, level DESC')
   const decisions = await all(db, 'SELECT * FROM pt_nexus_decisions ORDER BY decided_at DESC, id')
@@ -75,9 +76,9 @@ export async function nexusWatch(db: D1Database) {
       alerts: alerts.filter(a => a.state === t.state), decision: decisions.find(d => d.state === t.state) ?? null, decisions: decisions.filter(d => d.state === t.state) }
   }).sort((a, b) => b.reached - a.reached || a.state.localeCompare(b.state))
   // Lines with no ship-to state and no state on their tax code, since the start of last year: the owner fixes these.
-  const unassigned = lines.filter(l => !l.state && l.issue_date >= `${Number(today.slice(0, 4)) - 1}-01-01`)
+  const unassigned = sum(days.filter(d => !d.state && d.issue_date >= `${Number(today.slice(0, 4)) - 1}-01-01`))
   return { today, version: NEXUS_VERSION, note: NEXUS_NOTE, noStateTax: NO_STATE_TAX, states,
-    unassigned: { sales: unassigned.reduce((s, l) => s + (l.kind === 'credit' ? -1 : 1) * l.amount_cents, 0), documents: new Set(unassigned.map(l => l.id)).size } }
+    unassigned }
 }
 
 const escape = (s: string) => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!))
