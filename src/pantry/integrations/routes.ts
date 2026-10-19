@@ -10,6 +10,7 @@ import { invoice } from '../invoices'
 import { entry } from '../journal'
 import { bill } from '../payables'
 import { trialBalance } from '../reports'
+import { reportBasis } from '../basis'
 import { identify } from './credentials'
 import { idempotent, type Prepared } from './idempotency'
 import { payment } from './payments'
@@ -102,7 +103,7 @@ integrations.get('/payments', async c => {
 integrations.get('/reports/trial-balance', async c => {
   const ctx = context(c, 'reports:read'), to = date(c.req.query('to') ?? new Date().toISOString().slice(0, 10))
   await run(ctx.db, [authority(ctx.actor, 'read')])
-  return c.json(await trialBalance(ctx.db, to))
+  return c.json(await trialBalance(ctx.db, to, await reportBasis(ctx.db, c.req.query('basis'))))
 })
 
 const document = (db: D1Database, id: string) => one(db, 'SELECT id,name,media_type,size,sha256,linked_kind,linked_id,note,uploaded_by,uploaded_at FROM pt_documents WHERE id = ?', id).then(r => r!)

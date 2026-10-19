@@ -6,7 +6,7 @@ All amounts are sent as decimal strings (`"1250.00"`) and returned as integer ce
 
 A native session cookie; writes also need the installation's exact `Origin`. Sign in normally or use `rer dev --as bookkeeper` (personas still need a Pantry role from the owner).
 
-Reads (`GET`): `state` (you, your capabilities, chart, contacts, bank accounts, tax codes, overview, settings), `journal`, `sales`, `bank`, `reconciliation/:statementId`, `close/:YYYY-MM`, `reports/:kind?from=&to=` (`trial-balance`, `general-ledger[&account=]`, `profit-and-loss`, `balance-sheet`, `receivables`, `payables`), `proposals`, `move-in`, `activity`, `documents`, `documents/:id` (exact bytes), `package/:YYYY-MM` (accountant package JSON), `package/:YYYY-MM/general-ledger.csv`.
+Reads (`GET`): `state` (you, your capabilities, chart, contacts, bank accounts, tax codes, overview, settings), `journal`, `sales`, `bank`, `reconciliation/:statementId`, `close/:YYYY-MM`, `reports/:kind?from=&to=&basis=cash|accrual` (`trial-balance`, `general-ledger[&account=]`, `profit-and-loss`, `balance-sheet`, `sales-by-customer`, `expenses-by-vendor`, `sales-tax`, `cash-flow`, `receivables`, `payables`), `proposals`, `move-in`, `activity`, `documents`, `documents/:id` (exact bytes), `package/:YYYY-MM` (accountant package JSON), `package/:YYYY-MM/general-ledger.csv`.
 
 Writes: `POST /api/pantry/command/:action` with a JSON object.
 
@@ -57,3 +57,5 @@ Writes: `POST /api/pantry/command/:action` with a JSON object.
 ## Sibling integrations: `/api/pantry/integration/v1/`
 
 See [Sibling integrations](docs/integrations.md) for owner-created scoped credentials, idempotent writes, record reads, bill readiness and a complete `curl` example. Integration credentials use this separate API and cannot sign in as people or use the proposal-only agent API.
+
+Financial reports and `/api/pantry/reports/:kind/export?from=&to=&basis=&format=pdf|csv` use the declared tax method when basis is omitted, or the explicit cash/accrual choice. The scoped integrations trial balance uses the same choice/default under its existing `reports:read` scope. Open-item ageing remains accrual, 1099 reports use payment basis, and indirect cash flow starts from accrual net income.

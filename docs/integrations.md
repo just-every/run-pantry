@@ -56,7 +56,7 @@ All paths below follow `/api/pantry/integration/v1/`. List responses contain the
 | `documents?name=…` | `documents:write` | `{ "documents": […], "nextCursor": … }` |
 | `documents/:id` | `documents:write` | The original document bytes, as a download. |
 | `payments?billId=…`, `payments?invoiceId=…`, `payments?id=…` or `payments?reference=…` | `payments:read` or `payments:write` | `{ "payments": […], "nextCursor": … }`, including allocations and `reversal_id`. |
-| `reports/trial-balance?to=YYYY-MM-DD` | `reports:read` | The trial-balance rows through that date. |
+| `reports/trial-balance?to=YYYY-MM-DD&basis=cash` | `reports:read` | The trial-balance rows through that date, on the selected basis. Omitting basis uses the business’s declared tax method (accrual when undeclared); an explicit choice wins. |
 
 Bill and invoice readbacks include `open_cents`. Read payment allocations to see which payment was applied to which record. A reversed payment has a `reversal_id`; its allocations no longer reduce the open balance, so the bill or invoice reopens for that amount. Do not infer payment from a bill's readiness flag.
 

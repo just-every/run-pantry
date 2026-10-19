@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { books, harness } from './harness.mjs'
 
-test('a scoped sibling posts once, readies its bill, reads payment after owner expiry, and loses access on revocation', async t => {
+test('REPORT-002 / API-001 a scoped sibling posts once, readies its bill, reads payment after owner expiry, and loses access on revocation', async t => {
   const h = await harness(); t.after(h.close)
   const { acct } = await books(h)
   const bank = await h.command('bank-account.save', { name: 'Operating checking', institution: 'Community Bank', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-10-01', openingBalance: '0.00' })
@@ -44,6 +44,14 @@ test('a scoped sibling posts once, readies its bill, reads payment after owner e
   const invoice = await call('invoices', invoiceBody, 'invoice')
   assert.equal(invoice.status, 'issued')
   assert.equal((await call('invoices', invoiceBody, 'invoice')).id, invoice.id)
+  for (const basis of ['cash', 'accrual']) {
+    const scoped = await call(`reports/trial-balance?to=2026-10-17&basis=${basis}`)
+    const native = await h.view(`reports/trial-balance?to=2026-10-17&basis=${basis}`)
+    assert.deepEqual(scoped, native, 'scoped and native reports read the same basis and ledger')
+    assert.equal(scoped.rows.find(r => r.code === '4000')?.net ?? 0, basis === 'cash' ? 0 : -4000)
+  }
+  assert.equal((await call('reports/trial-balance?to=2026-10-17')).basis, 'cash', 'scoped report defaults to the declared tax method')
+  await call('reports/trial-balance?to=2026-10-17&basis=other', undefined, undefined, 400)
   const writer = await h.command('integration.create', { name: 'Pier Stripe receipts', scopes: ['payments:write', 'post'] })
   const readOnly = await h.command('integration.create', { name: 'Payment readback', scopes: ['payments:read', 'post'] })
   const noPost = await h.command('integration.create', { name: 'Payments without posting', scopes: ['payments:write'] })
