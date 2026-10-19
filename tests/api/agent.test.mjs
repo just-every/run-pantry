@@ -46,9 +46,9 @@ test('PAN-15 an agent prepares matches, entries and close work that a person app
   const close = await h.view('close/2026-09')
   assert.ok(close.tasks.some(x => x.title.startsWith('Harbor Office Rentals')))
   const note = await agent.call('proposals', { kind: 'variance-note', summary: 'Legal fees rose', payload: { period: '2026-09', body: 'Professional fees rose by the $900 Park & Lee accrual.', citations: [entry.id] } })
-  const tbBefore = await h.view('reports/trial-balance?to=2026-09-30')
+  const tbBefore = await h.view('reports/trial-balance?to=2026-09-30&basis=accrual')
   await h.command('proposal.decide', { id: note.id, revision: note.revision, decision: 'approve' }, ann)
-  assert.deepEqual(await h.view('reports/trial-balance?to=2026-09-30'), tbBefore)
+  assert.deepEqual(await h.view('reports/trial-balance?to=2026-09-30&basis=accrual'), tbBefore)
   assert.ok((await h.view('close/2026-09')).notes.some(n => n.kind === 'variance'))
   // Every decision is an approval record; a turned-off agent is shut out.
   const approvals = (await h.view('activity')).approvals.filter(a => a.subject_kind === 'proposal')

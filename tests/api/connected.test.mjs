@@ -85,10 +85,10 @@ test('PAYOUT-001 a Stripe payout is split into gross sales, Stripe fees and refu
   assert.ok(matched?.automatic); assert.deepEqual(matched.lines.map(l => [l.posted_date, l.amount_cents]), [['2026-10-09', 482848]])
 
   // Reading again (by a person and by due work) books nothing twice.
-  const tb = await h.view(`reports/trial-balance?to=${today()}`)
+  const tb = await h.view(`reports/trial-balance?to=${today()}&basis=accrual`)
   await h.command('stripe.payouts-sync', {}); await h.cron()
   assert.equal((await entriesFor(h, 'po_1TestAutomatic')).length, 1)
-  assert.deepEqual(await h.view(`reports/trial-balance?to=${today()}`), tb)
+  assert.deepEqual(await h.view(`reports/trial-balance?to=${today()}&basis=accrual`), tb)
   assert.ok(tb.balanced)
   assert.equal(net(tb, 'Stripe balance'), 0, 'the invoice payment left Stripe balance with the payout')
   assert.equal(net(tb, 'Service revenue'), -(240000 + 263798))
@@ -175,11 +175,11 @@ test('PAYROLL-001 a Gusto payroll posts as one balanced entry (wages, employer t
   assert.deepEqual(at((await h.view('connected')).gusto.payrolls, p => p.uuid === p2.uuid).match.lines.map(l => l.amount_cents), [-857650])
 
   // Reading again refreshes the two-hour token (each refresh token once) and posts nothing twice.
-  const tb = await h.view('reports/trial-balance?to=2026-10-31')
+  const tb = await h.view('reports/trial-balance?to=2026-10-31&basis=accrual')
   await h.command('gusto.sync', {}); await h.command('gusto.sync', {}); await h.cron()
   assert.deepEqual(refreshes.slice(0, 2), ['demo-refresh-token-1', 'demo-refresh-token-2'])
   assert.equal((await entriesFor(h, p1.uuid)).length, 1); assert.equal((await entriesFor(h, p2.uuid)).length, 1)
-  assert.deepEqual(await h.view('reports/trial-balance?to=2026-10-31'), tb)
+  assert.deepEqual(await h.view('reports/trial-balance?to=2026-10-31&basis=accrual'), tb)
   assert.ok(tb.balanced)
   assert.equal(net(tb, 'Wages and salaries'), 945000 + 820000)
   assert.equal(net(tb, 'Payroll taxes'), 77843 + 67650)

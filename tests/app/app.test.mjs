@@ -7,7 +7,7 @@ import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
 
-test('every report opens by clicking it, at 1440 and 390, and a payment made from its bank line pays its bill', async t => {
+test('REPORT-002 every report opens by clicking it, at 1440 and 390, and a payment made from its bank line pays its bill', async t => {
   const app = await worker(); t.after(() => app.close())
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
   const owner = await browser.newContext({ viewport: { width: 1440, height: 900 } })
@@ -16,9 +16,18 @@ test('every report opens by clicking it, at 1440 and 390, and a payment made fro
   const setup = await owner.request.post(`${app.origin}/setup`, { headers: { origin: app.origin }, form: { confirm: 'yes' }, maxRedirects: 0 })
   assert.equal(setup.status(), 303)
   await books(owner.request, app.origin)
+  const cmd = async (op, data) => { const r = await owner.request.post(`${app.origin}/api/pantry/command/${op}`, { headers: { origin: app.origin }, data }); assert.equal(r.status(), 200, await r.text()); return r.json() }
+  const state = await (await owner.request.get(`${app.origin}/api/pantry/state`)).json(), acct = Object.fromEntries(state.accounts.map(a => [a.code, a.id]))
+  const cedar = state.contacts.find(c => c.name === 'Cedar Studio'), acme = state.contacts.find(c => c.name === 'Acme Contractors'), bank = state.bankAccounts[0]
+  const tax = await cmd('tax-code.save', { name: 'New York City', rate: '8.875', accountId: acct['2200'], state: 'NY' })
+  let inv = await cmd('invoice.save-draft', { customerId: cedar.id, issueDate: '2026-09-12', lines: [{ description: 'Paid brand consultation', quantity: '1', rate: '250.00', accountId: acct['4000'], taxCode: tax.id }] })
+  await cmd('invoice.approve', { id: inv.id, revision: inv.revision }); inv = await cmd('invoice.issue', { id: inv.id })
+  await cmd('payment.record', { direction: 'received', contactId: cedar.id, date: '2026-09-15', amount: '272.19', bankAccountId: bank.id, allocations: [{ targetId: inv.id, amount: '272.19' }] })
+  const bill = await cmd('bill.save', { vendorId: acme.id, reference: 'SUPPORT-SEP', billDate: '2026-09-16', lines: [{ description: 'Software support', accountId: acct['6200'], amount: '100.00' }], post: true })
+  await cmd('payment.record', { direction: 'paid', contactId: acme.id, date: '2026-09-20', amount: '100.00', bankAccountId: bank.id, allocations: [{ targetId: bill.id, amount: '100.00' }] })
   const signedIn = await owner.storageState()
 
-  const reports = ['General ledger', 'Profit and loss', 'Balance sheet', 'Receivables aging', 'Payables aging', 'Sales tax by state', '1099 contractors', 'Trial balance']
+  const reports = ['General ledger', 'Profit and loss', 'Balance sheet', 'Receivables aging', 'Payables aging', 'Sales tax by state', 'Sales by customer', 'Expenses by vendor', 'Cash flow', '1099 contractors', 'Trial balance']
   for (const width of [1440, 390]) {
     const context = await browser.newContext({ storageState: signedIn, viewport: { width, height: width > 500 ? 900 : 844 } })
     const page = await context.newPage(), errors = []
@@ -30,6 +39,21 @@ test('every report opens by clicking it, at 1440 and 390, and a payment made fro
       else await page.getByLabel('Report', { exact: true }).selectOption(report)
       await page.getByRole('heading', { name: new RegExp(`^${report}`) }).waitFor()
       assert.equal(await page.getByText('Something went wrong').count(), 0, `${report} at ${width}`)
+      if (!['1099 contractors', 'Cash flow', 'Receivables aging', 'Payables aging'].includes(report)) {
+        for (const basis of ['Accrual', 'Cash']) {
+          await page.getByRole('radio', { name: basis, exact: true }).click()
+          await page.getByRole('heading', { name: new RegExp(`^${report} ${basis} basis`) }).waitFor()
+          const pdf = page.getByRole('link', { name: `Download PDF · ${basis.toLowerCase()}` })
+          const response = await context.request.get(new URL(await pdf.getAttribute('href'), app.origin).href)
+          assert.equal(response.status(), 200)
+          assert.match((await response.body()).toString('latin1'), new RegExp(`${basis} basis`))
+        }
+      }
+      if (report === 'Cash flow') await page.getByText('Ties to the balance sheet cash change', { exact: true }).waitFor()
+      else if (['Receivables aging', 'Payables aging'].includes(report)) await page.getByText(new RegExp(`^${report.startsWith('Receivables') ? 'Receivables' : 'Payables'} \\$.*agree to`)).waitFor()
+      await page.screenshot({ path: `/tmp/sx-pantry-r6-${report.replaceAll(' ', '-')}-${width}.png`, fullPage: true })
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${report} fits ${width}`)
+
     }
     assert.deepEqual(errors, [], `no page errors at ${width}`)
     await context.close()

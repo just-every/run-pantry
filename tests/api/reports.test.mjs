@@ -66,8 +66,55 @@ test('REPORT-002 cash or accrual: one switch reads the same books both ways, par
   assert.ok(rows.some(r => r.includes('INV-0001') && r.includes('500.00 of 1053.25 paid')))
   const pkg = await h.view('package/2026-10?basis=cash')
   assert.deepEqual([pkg.basis, pkg.profitAndLoss.period.netIncome, pkg.balanceSheet.balanced], ['Cash basis', -17728, true])
-  assert.equal((await h.view(`reports/profit-and-loss?${OCT}`)).netIncome, 104800, 'accrual stays the default')
+  assert.equal((await h.view(`reports/profit-and-loss?${OCT}`)).netIncome, -17728, 'the declared cash tax method picks the default')
   await h.view(`reports/profit-and-loss?${OCT}&basis=modified`, h.owner, 400)
+  const before = (await h.db.prepare("SELECT * FROM pt_journal_entries ORDER BY id").all()).results
+  for (const basis of ['cash', 'accrual']) {
+    const pl = await h.view(`reports/profit-and-loss?${OCT}&basis=${basis}`)
+    const sales = await h.view(`reports/sales-by-customer?${OCT}&basis=${basis}`), costs = await h.view(`reports/expenses-by-vendor?${OCT}&basis=${basis}`)
+    assert.equal(sales.total, pl.totalIncome); assert.equal(costs.total, pl.totalExpenses)
+    assert.equal(costs.rows.find(r => r.id === 'unassigned').amount, 1200, 'direct postings stay in totals')
+    assert.equal(sales.rows.find(r => r.id === s.c['Cedar Studio'].id).amount, basis === 'cash' ? 47472 : 100000)
+    assert.equal(costs.rows.find(r => r.id === s.c['Brightline Software'].id).amount, 64000)
+    for (const kind of ['trial-balance', 'general-ledger', 'profit-and-loss', 'balance-sheet', 'sales-tax', 'sales-by-customer', 'expenses-by-vendor']) {
+      const pdf = await h.send(`/api/pantry/reports/${kind}/export?${OCT}&basis=${basis}`, undefined, { cookie: h.owner })
+      assert.equal(pdf.status, 200, pdf.value); assert.equal(pdf.headers.get('content-type'), 'application/pdf')
+      const pages = pdf.value.match(/\/Type \/Page\b/g).length
+      assert.equal((pdf.value.match(new RegExp(basis === 'cash' ? 'Cash basis' : 'Accrual basis', 'g')) ?? []).length, pages, 'each PDF page declares its basis')
+      const csv = await h.send(`/api/pantry/reports/${kind}/export?${OCT}&basis=${basis}&format=csv`, undefined, { cookie: h.owner })
+      assert.equal(csv.status, 200); assert.match(csv.value, new RegExp(basis === 'cash' ? 'Cash basis' : 'Accrual basis'))
+    }
+    const pdf = await h.send(`/api/pantry/reports/profit-and-loss/export?${OCT}&basis=${basis}`, undefined, { cookie: h.owner })
+    assert.ok(pdf.value.includes(basis === 'cash' ? '-$177.28' : '$1,048.00'), 'PDF includes the calculated P&L total')
+  }
+  assert.deepEqual((await h.db.prepare("SELECT * FROM pt_journal_entries ORDER BY id").all()).results, before, 'switching and exporting never changes the ledger')
+  const archiveResponse = await fetch(`${h.origin}/api/pantry/package/2026-10/accountant-package.zip?basis=cash`, { headers: { cookie: h.owner } })
+  assert.equal(archiveResponse.status, 200)
+  const archive = Buffer.from(await archiveResponse.arrayBuffer())
+  let offset = 0, count = 0
+  while (archive.readUInt32LE(offset) === 0x04034b50) {
+    const size = archive.readUInt32LE(offset + 18), nameSize = archive.readUInt16LE(offset + 26), extraSize = archive.readUInt16LE(offset + 28)
+    const name = archive.subarray(offset + 30, offset + 30 + nameSize).toString(), dataAt = offset + 30 + nameSize + extraSize
+    if (name.endsWith('.csv')) {
+      const body = archive.subarray(dataAt, dataAt + size).toString()
+      const label = name.includes('aging') ? 'Open items · accrual basis' : name.endsWith('cash-flow.csv') ? 'Indirect method · starts from accrual net income' : 'Cash basis'
+      assert.equal(body.split('\r\n')[0], `Basis,${label}`, `export declares actual semantics: ${name}`); count++
+    }
+    offset = dataAt + size
+  }
+  assert.ok(count >= 8, 'every report inside the downloaded package was examined')
+  assert.equal((await h.view(`reports/sales-by-customer?${OCT}`)).basis, 'cash')
+  assert.equal((await h.view(`reports/receivables?${OCT}&basis=cash`)).basis, 'accrual', 'ageing honestly describes open items')
+  assert.equal((await h.view('reports/contractors?year=2025')).basis, 'payment')
+  assert.match((await h.send(`/api/pantry/reports/cash-flow.csv?${OCT}`, undefined, { cookie: h.owner })).value, /Indirect method · starts from accrual net income/)
+  const d = await s.issue('Willow Services', '2026-10-18', [
+    { description: 'Design', quantity: '1', rate: '600.00', accountId: s.acct['4000'], taxCode: 'exempt' },
+    { description: 'Workshop', quantity: '1', rate: '400.00', accountId: s.acct['4100'], taxCode: 'exempt' }])
+  await h.command('payment.record', { direction: 'received', contactId: s.c['Willow Services'].id, date: '2026-11-18', amount: '500.00', bankAccountId: s.bank.id, allocations: [{ targetId: d.id, amount: '500.00' }] })
+  assert.equal((await h.view(`reports/profit-and-loss?${OCT}&basis=cash`)).totalIncome, cash.totalIncome, 'unpaid October invoice excluded')
+  const november = await h.view('reports/profit-and-loss?from=2026-11-01&to=2026-11-30&basis=cash')
+  assert.deepEqual([lineOf(november, '4000') - lineOf(nov, '4000'), lineOf(november, '4100') - lineOf(nov, '4100')], [30000, 20000], 'half of the $1000 invoice is recognised proportionally in November')
+
 })
 
 test('REPORT-005 every P&L and balance sheet figure opens to its records, documents and bank lines, and ties to the figure', async t => {
@@ -93,13 +140,13 @@ test('REPORT-005 every P&L and balance sheet figure opens to its records, docume
     }
   }
   // Software expense on the accrual basis: the bill, its document, the payment and the cleared check.
-  const software = await h.view(`reports/detail?report=profit-and-loss&line=${s.acct['6200']}&${OCT}`)
+  const software = await h.view(`reports/detail?report=profit-and-loss&line=${s.acct['6200']}&${OCT}&basis=accrual`)
   const row = at(software.rows, x => x.record.kind === 'bill')
   assert.deepEqual([row.amount, row.record.id, row.record.label], [64000, s.bills.x.id, 'Bill BL-1042 · Brightline Software'])
   assert.deepEqual(row.documents.map(d => d.name), ['brightline-bl-1042.pdf'])
   assert.deepEqual(row.bank.map(b => [b.date, b.description, b.amount]), [['2026-10-16', 'CHECK 1001 BRIGHTLINE', -64000]])
   // The hand-filed fee opens to the statement line it was filed from.
-  const fees = await h.view(`reports/detail?report=profit-and-loss&line=${s.acct['6400']}&${OCT}`)
+  const fees = await h.view(`reports/detail?report=profit-and-loss&line=${s.acct['6400']}&${OCT}&basis=accrual`)
   assert.deepEqual(at(fees.rows, x => x.amount === 1500).bank.map(b => [b.date, b.description, b.amount, b.reconciled]), [['2026-10-29', 'WIRE FEE', -1500, false]])
   // Design revenue on the cash basis: the share of INV-0001 the October payment settled, and that payment.
   const design = await h.view(`reports/detail?report=profit-and-loss&line=${s.acct['4000']}&${OCT}&basis=cash`)
@@ -174,7 +221,7 @@ test('TAXFORM-002 1099 contractors: cash payments per calendar year by the IRS r
   assert.equal(csv.status, 200)
   const lines = csv.value.trim().split('\r\n')
   assert.equal(lines.length, 2)
-  assert.equal(lines[1], `2025,1099-NEC,Juniper Lane Design LLC,NY,${v['Ada Okafor'].id},Adaeze Okafor,SSN,123-45-6789,22 Elm St Apt 4,Brooklyn,NY,11201,650.00,0.00`)
+  assert.equal(lines[1], `2025,1099-NEC,Juniper Lane Design LLC,NY,${v['Ada Okafor'].id},Adaeze Okafor,SSN,123-45-6789,22 Elm St Apt 4,Brooklyn,NY,11201,650.00,0.00,Payment basis`)
   const activity = await h.view('activity')
   assert.ok(activity.audit.some(a => a.action === 'contractor.1099-csv'))
   assert.ok(!JSON.stringify(activity).includes('123456789') && !JSON.stringify(activity).includes('123-45-6789'), 'the audit trail never carries the full TIN')

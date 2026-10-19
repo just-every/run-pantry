@@ -136,7 +136,7 @@ test('Bank and card feeds: connect once, choose accounts, and transactions arriv
   await h.command('feed.disconnect', { itemId: connection.id })
   assert.equal(await count(), retained)
   assert.equal((await h.view('state')).overview.feedHealth.length, 0)
-  assert.ok((await h.view('reports/trial-balance?to=2026-10-31')).balanced)
+  assert.ok((await h.view('reports/trial-balance?to=2026-10-31&basis=accrual')).balanced)
 
 })
 

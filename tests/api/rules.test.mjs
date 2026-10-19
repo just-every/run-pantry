@@ -64,5 +64,5 @@ test('Bank rules: a suggested rule previews, files routine lines by rule with un
   // Only people who record may make rules, and the books still balance.
   const viewer = await h.member('vic@example.test', 'viewer')
   await h.command('bank-rule.save', { ...adobe, name: 'Adobe again' }, viewer, 403)
-  assert.ok((await h.view('reports/trial-balance?to=2026-11-30')).balanced)
+  assert.ok((await h.view('reports/trial-balance?to=2026-11-30&basis=accrual')).balanced)
 })

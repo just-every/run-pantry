@@ -10,7 +10,7 @@
 // every settlement is a balanced set of lines. Every other entry (payments,
 // bank items, journals, opening balances) reads the same on both bases.
 import { requireThat } from './core'
-import { all } from './db'
+import { all, one } from './db'
 
 export type Basis = 'accrual' | 'cash'
 export const BASIS_LABEL: Record<Basis, string> = { accrual: 'Accrual basis', cash: 'Cash basis' }
@@ -19,6 +19,12 @@ export function basisOf(value: unknown): Basis {
   if (value === undefined || value === null || value === '') return 'accrual'
   requireThat(value === 'cash' || value === 'accrual', 'Basis is cash or accrual')
   return value
+}
+
+/** Report defaults follow the business declaration; explicit callers keep their choice. */
+export async function reportBasis(db: D1Database, value: unknown): Promise<Basis> {
+  if (value !== undefined && value !== null && value !== '') return basisOf(value)
+  return (await one(db, 'SELECT tax_method FROM pt_entity WHERE id = 1'))?.tax_method === 'cash' ? 'cash' : 'accrual'
 }
 
 const DOCUMENT_KINDS = "('invoice', 'credit', 'bill')"

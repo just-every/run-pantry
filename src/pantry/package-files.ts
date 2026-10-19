@@ -63,5 +63,5 @@ export async function packageZip(db: D1Database, period: string, basis: Basis) {
     { name: 'documents.csv', data: csv([['Name', 'Type', 'Bytes', 'SHA-256', 'Attached to', 'Uploaded by', 'Uploaded at'], ...p.documents.map((d: Data) => [d.name, d.media_type, d.size, d.sha256, d.linked_kind ? `${d.linked_kind} ${d.linked_id}` : '', d.uploaded_by, d.uploaded_at])]) },
     { name: 'pantry-package.json', data: JSON.stringify(p, null, 2) },
   ]
-  return { bytes: zip(files.map(f => ({ name: `pantry-close-${period}/${f.name}`, data: f.data }))), basis }
+  return { bytes: zip(files.map(f => ({ name: `pantry-close-${period}/${f.name}`, data: f.name.endsWith('.csv') ? `Basis,${f.name.includes('aging') ? 'Open items · accrual basis' : f.name === 'cash-flow.csv' ? 'Indirect method · starts from accrual net income' : basisName}\r\n${f.data}` : f.data }))), basis }
 }

@@ -35,7 +35,7 @@ test('DEMO-001 the demo opens on the homepage\'s moments: a question with its an
   assert.ok(payout.charges > 1 && payout.fee_cents > 0 && payout.gross_cents - payout.fee_cents === payout.amount_cents, 'split into sales and fees')
   assert.ok(payout.match, 'matched to its deposit')
 
-  const pnl = await h.view(`reports/profit-and-loss?from=${month}-01&to=${new Date().toISOString().slice(0, 10)}`)
+  const pnl = await h.view(`reports/profit-and-loss?from=${month}-01&to=${new Date().toISOString().slice(0, 10)}&basis=accrual`)
   assert.ok(pnl.totalIncome > 0, 'this month has revenue')
 
   const feeds = await h.view('bank/feeds')

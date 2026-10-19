@@ -1,4 +1,4 @@
-**Reports** reads one set of books in several ways: the trial balance, general ledger, profit and loss, balance sheet, cash flow, receivables and payables aging, sales tax by state and 1099 contractors. Every report is calculated from posted lines when you open it; nothing is typed in as a total.
+**Reports** reads one set of books in several ways: the trial balance, general ledger, profit and loss, balance sheet, cash flow, receivables and payables aging, sales tax by state sales by customer, expenses by vendor and 1099 contractors. Every report is calculated from posted lines when you open it; nothing is typed in as a total.
 
 ## Every figure opens to its records
 
@@ -6,7 +6,7 @@ On the **Profit and loss** and the **Balance sheet**, choose any account line or
 
 ## Cash or accrual, one switch
 
-Pantry keeps accrual books. The **Cash** and **Accrual** switch on the trial balance, general ledger, profit and loss, balance sheet and sales tax report changes only how the books are read; the ledger never changes. Reports open on the tax method declared in the business settings.
+Pantry keeps accrual books. The **Cash** and **Accrual** switch on the trial balance, general ledger, profit and loss, balance sheet, sales by customer, expenses by vendor and sales tax report changes only how the books are read; the ledger never changes. Reports and API requests without an explicit basis open on the tax method declared in the business settings (accrual when undeclared). An explicit basis always wins.
 
 On the cash basis:
 
@@ -16,7 +16,7 @@ On the cash basis:
 - unpaid invoices and bills, and the sales tax on them, stay off the balance sheet. Money received or paid but not yet applied stays in receivables or payables;
 - payments, bank items, journal entries and opening balances read the same on both bases. Receivables and payables moved in open from another system stay at their opening value.
 
-The cash profit and loss ends with a bridge from accrual net income to cash net income. Every report, the general ledger CSV (a **Basis** column, and `-cash` in the file name) and the accountant package name their basis.
+The cash profit and loss ends with a bridge from accrual net income to cash net income. Download PDF or CSV on any financial report; every PDF page repeats its basis and range. Customer sales and vendor expenses include an Unassigned row for direct postings without a matching counterparty, so their totals agree with the P&L. Every financial report, the general ledger CSV (a **Basis** column, and `-cash` in the file name) and the accountant package name their basis.
 
 ### A worked example
 

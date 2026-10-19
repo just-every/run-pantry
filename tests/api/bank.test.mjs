@@ -64,7 +64,7 @@ test('PAN-08 statement lines match to the books through splits, fees, transfers 
   assert.equal(await count(h, `SELECT COUNT(*) AS n FROM pt_match_postings mp JOIN pt_match_bank_lines mb ON mb.match_id = mp.match_id WHERE mb.bank_line_id = '${square.id}' AND mp.active = 1`), 2, 'one deposit splits across two receipts')
   const sav = await h.view(`reconciliation/${st.savings.id}`)
   assert.equal(sav.lines.filter(l => !l.match_id).length, 0, 'the transfer clears on both accounts')
-  const tb = await h.view('reports/trial-balance?to=2026-09-30')
+  const tb = await h.view('reports/trial-balance?to=2026-09-30&basis=accrual')
   assert.ok(tb.balanced)
   assert.equal(at(tb.rows, x => x.code === '1010').net, 200125)
 })
@@ -261,7 +261,7 @@ test('BANK-007 undo a newest-first reconciliation chain retains proofs, releases
     assert.equal(at((await h.view(`close/${statement.end_date.slice(0, 7)}`)).checks, x => x.key === 'bank').ok, false)
   }
   assert.equal((await h.view('activity')).audit.filter(a => a.action === 'reconciliation.undo').length, 3)
-  const pack = await h.view('package/2026-09')
+  const pack = await h.view('package/2026-09?basis=accrual')
   assert.equal(pack.voidedReconciliations.length, 3)
   // Correct July's link to the same existing posting: no reversal or replacement posting is required.
   july = await h.view(`reconciliation/${statements[0].id}`)

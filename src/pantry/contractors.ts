@@ -44,7 +44,7 @@ export async function contractors(db: D1Database, year: number) {
       payments: own.map(p => ({ id: p.id, date: p.payment_date, amount: p.amount_cents, method: p.method, reference: p.reference, reversed: !!p.reversal_id, counts: !p.reversal_id && COUNTED.has(p.method) })) }
   })
   const marked = list.filter(v => v.is1099)
-  return { year, threshold: limit.cents, thresholdNote: limit.note, yearEnded: today > to, dueBy: `${year + 1}-01-31`,
+  return { basis: 'payment', year, threshold: limit.cents, thresholdNote: limit.note, yearEnded: today > to, dueBy: `${year + 1}-01-31`,
     contractors: marked, forms: marked.filter(v => v.overThreshold).map(v => ({ id: v.id, name: v.tax?.legalName ?? v.name, tin: v.tax?.tin ?? null, box1: v.box1, box4: 0, ready: !v.missing.length })),
     // Vendors not marked as contractors who were paid enough by check, ACH, wire or cash to be worth a look.
     unmarked: list.filter(v => !v.is1099 && v.box1 >= limit.cents).map(v => ({ id: v.id, name: v.name, box1: v.box1 })),
@@ -60,10 +60,10 @@ export async function necCsv(db: D1Database, actor: AuditActor, year: number) {
   const incomplete = report.forms.filter(f => !f.ready).map(f => f.name)
   requireThat(!incomplete.length, `Add the TIN and address for ${incomplete.join(', ')} first`, 409)
   const tax = new Map((await all(db, 'SELECT * FROM pt_contractor_tax')).map(t => [t.contact_id, t]))
-  const rows = [['Tax year', 'Form', 'Payer name', 'Payer state', 'Recipient account', 'Recipient name', 'Recipient TIN type', 'Recipient TIN', 'Address', 'City', 'State', 'ZIP', 'Box 1 nonemployee compensation', 'Box 4 federal income tax withheld']]
+  const rows = [['Tax year', 'Form', 'Payer name', 'Payer state', 'Recipient account', 'Recipient name', 'Recipient TIN type', 'Recipient TIN', 'Address', 'City', 'State', 'ZIP', 'Box 1 nonemployee compensation', 'Box 4 federal income tax withheld', 'Basis']]
   for (const f of report.forms) {
     const t = tax.get(f.id)!
-    rows.push([String(year), '1099-NEC', entity.legal_name, entity.state, f.id, t.legal_name, t.tin_kind.toUpperCase(), t.tin_kind === 'ein' ? `${t.tin.slice(0, 2)}-${t.tin.slice(2)}` : `${t.tin.slice(0, 3)}-${t.tin.slice(3, 5)}-${t.tin.slice(5)}`, t.address, t.city, t.state, t.zip, (f.box1 / 100).toFixed(2), '0.00'])
+    rows.push([String(year), '1099-NEC', entity.legal_name, entity.state, f.id, t.legal_name, t.tin_kind.toUpperCase(), t.tin_kind === 'ein' ? `${t.tin.slice(0, 2)}-${t.tin.slice(2)}` : `${t.tin.slice(0, 3)}-${t.tin.slice(3, 5)}-${t.tin.slice(5)}`, t.address, t.city, t.state, t.zip, (f.box1 / 100).toFixed(2), '0.00', 'Payment basis'])
   }
   await run(db, [audit(actor, 'contractor.1099-csv', 'tax-year', String(year), { forms: report.forms.length })])
   return rows.map(r => r.map(cell).join(',')).join('\r\n') + '\r\n'

@@ -233,7 +233,7 @@ test('PAY-004 invoice-named deposits clear automatically, amount-only wires awai
   await h.command('match.undo', { id: confirmed.id })
   assert.equal((await invoiceOf(h, north.id)).open_cents, 50000)
   assert.ok(at((await h.view('sales')).payments, p => p.contact_name === 'Cedar Studio').reversal_id)
-  assert.ok((await h.view('reports/trial-balance?to=2026-10-31')).balanced)
+  assert.ok((await h.view('reports/trial-balance?to=2026-10-31&basis=accrual')).balanced)
   assert.equal((await h.command('statement.import', input)).duplicate, true)
 
   // The CSV door uses the same payment-reference rule. Several same-customer
@@ -329,7 +329,7 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
   assert.deepEqual(sales.onlinePayments.map(p => [p.method, p.status, p.amount_cents, p.fee_cents]).sort(), [['card', 'succeeded', 240000, 6990], ['us_bank_account', 'succeeded', 90000, 500]].sort())
   const payments = sales.payments.filter(p => p.bank_name === 'Stripe balance')
   assert.deepEqual(payments.map(p => [p.contact_name, p.amount_cents, p.unallocated_cents]).sort(), [['Cedar Studio', 240000, 0], ['Willow Services', 90000, 0]])
-  const tb = await h.view(`reports/trial-balance?to=${today()}`)
+  const tb = await h.view(`reports/trial-balance?to=${today()}&basis=accrual`)
   assert.ok(tb.balanced)
   const balance = name => at(tb.rows, a => a.name === name).net
   assert.equal(balance('Stripe balance'), 240000 + 90000 - 6990 - 500)

@@ -22,9 +22,11 @@ import { proposalCommands, proposalsView, agentContext, fileProposal, proposal }
 import { moveInCommands, moveInView } from './cutover/commands'
 import { xeroRoutes } from './cutover/xero-attachments'
 import { ageing, balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports'
-import { basisOf, BASIS_LABEL } from './basis'
+import { basisOf, reportBasis, BASIS_LABEL } from './basis'
 import { figureDetail } from './drilldown'
 import { cashFlow, cashFlowCommands, cashFlowCsv, cashFlowDetail } from './cash-flow'
+import { contactTotals } from './contact-totals'
+import { reportExport } from './report-export'
 import { recordView } from './records'
 import { salesTax } from './sales-tax'
 import { contractorCommands, contractors, necCsv } from './contractors'
@@ -119,7 +121,7 @@ const year = (c: C) => { const y = Number(c.req.query('year') ?? new Date().getU
 view('reports/detail', async (ctx, c) => {
   const to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
-  return figureDetail(ctx.db, { report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: basisOf(c.req.query('basis')) }, Number(e?.fiscal_year_start ?? 1))
+  return figureDetail(ctx.db, { report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: await reportBasis(ctx.db, c.req.query('basis')) }, Number(e?.fiscal_year_start ?? 1))
 })
 view('reports/record/:kind/:id', async (ctx, c) => recordView(ctx.db, c.req.param('kind')!, c.req.param('id')!))
 view('reports/contractors', async (ctx, c) => contractors(ctx.db, year(c)))
@@ -128,9 +130,14 @@ api.get('/api/pantry/reports/cash-flow.csv', async c => {
   const ctx = await reader(c), from = day(c, 'from'), to = day(c, 'to')
   return new Response(cashFlowCsv(await cashFlow(ctx.db, from, to)), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-cash-flow-${from}-${to}.csv"`, 'cache-control': 'no-store' } })
 })
+api.get('/api/pantry/reports/:kind/export', async c => {
+  const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
+  return reportExport(ctx.db, c.req.param('kind')!, from, to, await reportBasis(ctx.db, c.req.query('basis')), c.req.query('format') ?? 'pdf')
+})
 view('reports/:kind', async (ctx, c) => {
-  const kind = c.req.param('kind'), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01'), basis = basisOf(c.req.query('basis'))
+  const kind = c.req.param('kind'), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01'), basis = await reportBasis(ctx.db, c.req.query('basis'))
   const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
+  if (kind === 'sales-by-customer' || kind === 'expenses-by-vendor') return contactTotals(ctx.db, kind === 'sales-by-customer' ? 'customer' : 'vendor', from, to, basis)
   if (kind === 'cash-flow') return cashFlow(ctx.db, from, to)
   if (kind === 'trial-balance') return trialBalance(ctx.db, to, basis)
   if (kind === 'general-ledger') return generalLedger(ctx.db, from, to, c.req.query('account') || undefined, basis)
@@ -167,20 +174,20 @@ gustoRoutes(api)
 const suffix = (basis: string) => basis === 'cash' ? '-cash' : ''
 
 api.get('/api/pantry/package/:period', async c => {
-  const ctx = await reader(c), period = c.req.param('period'), basis = basisOf(c.req.query('basis'))
+  const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis'))
   const body = JSON.stringify(await accountantPackage(ctx.db, period, basis), null, 2)
   return new Response(body, { headers: { 'content-type': 'application/json', 'content-disposition': `attachment; filename="pantry-close-${period}${suffix(basis)}.json"`, 'cache-control': 'no-store' } })
 })
 
 // The same package as an accountant opens it: a ZIP of CSV reports, the checklist, a README and the JSON.
 api.get('/api/pantry/package/:period/accountant-package.zip', async c => {
-  const ctx = await reader(c), period = c.req.param('period'), basis = basisOf(c.req.query('basis'))
+  const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis'))
   const { bytes } = await packageZip(ctx.db, period, basis)
   return new Response(bytes, { headers: { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="pantry-close-${period}${suffix(basis)}.zip"`, 'x-pantry-basis': BASIS_LABEL[basis], 'cache-control': 'no-store' } })
 })
 
 api.get('/api/pantry/package/:period/general-ledger.csv', async c => {
-  const ctx = await reader(c), period = c.req.param('period'), basis = basisOf(c.req.query('basis'))
+  const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis'))
   return new Response(await ledgerCsv(ctx.db, period, basis), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-general-ledger-${period}${suffix(basis)}.csv"`, 'x-pantry-basis': BASIS_LABEL[basis], 'cache-control': 'no-store' } })
 })
 

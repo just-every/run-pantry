@@ -130,7 +130,7 @@ test('CAPTURE-006 vendor matching and creation: a phone photo is kept byte for b
   assert.equal((await h.db.prepare('SELECT linked_id FROM pt_receipts WHERE id = ?').bind(added.id).first()).linked_id, cafeEntry)
 
   // The export carries every entry's receipt with its fingerprint.
-  const csv = await (await fetch(`${h.origin}/api/pantry/package/2026-09/general-ledger.csv`, { headers: { cookie: h.owner } })).text()
+  const csv = await (await fetch(`${h.origin}/api/pantry/package/2026-09/general-ledger.csv?basis=accrual`, { headers: { cookie: h.owner } })).text()
   assert.match(csv, new RegExp(`IMG_2041\\.jpg sha256:${sha(photo)} /api/pantry/documents/${r.document_id}`))
 
   // CAPTURE-006 shares this public capture journey: another printed name is
@@ -495,7 +495,7 @@ test('CAPTURE-007 captured bills and paid receipts become approved revision-spec
   const history = await h.view(`vendors/${vendor.id}/history`, ann)
   assert.equal(at(history.rows, x => x.id === draft.id).posted_expense, true)
   assert.equal(at(history.rows, x => x.id === draft.id).documents.length, 1)
-  const tb = await h.view('reports/trial-balance?to=2026-09-30'); assert.ok(tb.balanced)
+  const tb = await h.view('reports/trial-balance?to=2026-09-30&basis=accrual'); assert.ok(tb.balanced)
 })
 
 test('BILL-002 captured draft reminders send once per pending revision and stop after owner approval', async t => {

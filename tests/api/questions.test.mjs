@@ -87,7 +87,7 @@ test('BOOKS-AGENT the agent asks the owner what does not add up, by email first;
   assert.deepEqual(line.filed_to, ['Service revenue'])
   const rule = at((await h.view('bank/rules')).rules, r => r.id === q.rule_id)
   assert.equal(rule.payee, 'Stripe')
-  const tb = await h.view('reports/trial-balance?to=2026-10-31')
+  const tb = await h.view('reports/trial-balance?to=2026-10-31&basis=accrual')
   assert.equal(tb.balanced, true)
 
   // Learned: the next Stripe payout files itself by the rule; nobody is asked about it.

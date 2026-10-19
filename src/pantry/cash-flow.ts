@@ -98,7 +98,7 @@ export async function cashFlowDetail(db: D1Database, from: string, to: string, i
 const cell = (v: unknown) => `"${String(v).replaceAll('"', '""')}"`
 export function cashFlowCsv(r: Awaited<ReturnType<typeof cashFlow>>) {
   const money = (v: number) => (v / 100).toFixed(2)
-  const rows: unknown[][] = [['Statement of cash flows', 'Indirect method', r.from, r.to], ['Section', 'Code', 'Line', 'Amount (USD)']]
+  const rows: unknown[][] = [['Statement of cash flows', 'Indirect method · starts from accrual net income', r.from, r.to], ['Section', 'Code', 'Line', 'Amount (USD)']]
   for (const [name, lines, total] of [['Operating', r.operating, r.totalOperating], ['Investing', r.investing, r.totalInvesting], ['Financing', r.financing, r.totalFinancing]] as const) {
     for (const l of lines) rows.push([name, l.code, l.name, money(l.amount)])
     rows.push([name, '', `Net cash from ${name.toLowerCase()} activities`, money(total)])

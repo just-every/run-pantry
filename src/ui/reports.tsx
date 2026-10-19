@@ -14,7 +14,7 @@ type Basis = 'cash' | 'accrual'
 
 // [tab, slug, reads on a basis, takes a date range]
 const KINDS: [string, string, boolean, boolean][] = [['Trial balance', 'trial-balance', true, false], ['General ledger', 'general-ledger', true, true], ['Profit and loss', 'profit-and-loss', true, true], ['Balance sheet', 'balance-sheet', true, false],
-  ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false]]
+  ['Sales by customer', 'sales-by-customer', true, true], ['Expenses by vendor', 'expenses-by-vendor', true, true], ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false]]
 
 /** A figure that opens to its records. */
 function Figure({ line, children }: { line: string; children: React.ReactNode }) {
@@ -90,6 +90,9 @@ function Report({ slug, basis, from, to }: { slug: string; basis: Basis; from: s
   if (slug === 'balance-sheet') return <><p>{r.balanced ? <Chip tone="good">Assets equal liabilities plus equity</Chip> : <Chip tone="bad">Out of balance</Chip>}</p>
     {basis === 'cash' && <p className="hint">On the cash basis, unpaid invoices and bills stay off the balance sheet with the tax on them; money received or paid but not yet applied stays in receivables or payables.</p>}
     <Statement sections={[['Assets', r.assets, r.totalAssets, 'assets'], ['Liabilities', r.liabilities, r.totalLiabilities, 'liabilities'], ['Equity', r.equity, r.totalEquity, 'equity']]} total={['Liabilities and equity', r.totalLiabilities + r.totalEquity, 'liabilities-and-equity']} /></>
+  if (slug === 'sales-by-customer' || slug === 'expenses-by-vendor') return <Table heads={[slug === 'sales-by-customer' ? 'Customer' : 'Vendor', 'Amount']} figures={[1]} empty="No posted activity in this range.">
+    {[...r.rows.map((x: D) => <tr key={x.id}><td>{x.name}</td><td className="fig">{usd(x.amount)}</td></tr>), <tr key="total" className="total"><td>Total</td><td className="fig">{usd(r.total)}</td></tr>]}
+  </Table>
   if (slug === 'cash-flow') return <CashFlow from={from} to={to} />
   if (slug === 'sales-tax') return <SalesTax r={r} />
   return <Ageing r={r} />
@@ -113,9 +116,10 @@ export function Reports() {
       : search.record ? <RecordView record={search.record} reportLabel={label} />
       : detail && slug === 'cash-flow' ? <CashFlowDetail line={search.line!} from={from} to={to} />
       : detail ? <FigureDetail report={slug} line={search.line!} from={from} to={to} basis={basis} reportLabel={label} />
-      : <Card title={<>{label} <Chip tone="info">{slug === 'cash-flow' ? 'Indirect method' : based ? BASIS_NAME[basis] : 'Open items'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}
+      : <Card title={<>{label} <Chip tone="info">{slug === 'cash-flow' ? 'Indirect method · accrual starting income' : based ? BASIS_NAME[basis] : 'Open items · accrual basis'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}
           {ranged && <div className="field inline"><label htmlFor="r-from">From</label><input id="r-from" type="date" value={from} onChange={e => isDay(e.target.value) && set({ from: e.target.value })} /></div>}
           <div className="field inline"><label htmlFor="r-to">{ranged ? 'To' : 'As of'}</label><input id="r-to" type="date" value={to} onChange={e => isDay(e.target.value) && set({ to: e.target.value })} /></div></div>}>
+          {based && <p className="row-actions"><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?from=${from}&to=${to}&basis=${basis}&format=pdf`} download>Download PDF · {basis}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?from=${from}&to=${to}&basis=${basis}&format=csv`} download>Download CSV · {basis}</a></p>}
           <Report slug={slug} basis={basis} from={from} to={to} />
         </Card>}
   </>
