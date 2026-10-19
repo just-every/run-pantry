@@ -105,6 +105,7 @@ const setMethod: Command = { need: 'record', async run(c, b) {
   requireThat(payment, 'Payment not found', 404)
   const method = text(b.method, 'Payment method')
   requireThat((METHODS as readonly string[]).includes(method), 'Payment method is check, ACH, wire, cash, card or a payment network')
+  requireThat(method === 'check' || !await one(c.db, 'SELECT 1 FROM pt_checks WHERE payment_id = ?', payment.id), 'A numbered check keeps its check payment method', 409)
   requireThat(!payment.card_last4 || method === 'card', 'A payment from a card or line of credit keeps its card payment method')
   await run(c.db, [authority(c.actor, 'record'), q('UPDATE pt_payments SET method = ? WHERE id = ?', method, payment.id), changed(), audit(who(c.actor), 'payment.method', 'payment', payment.id, { from: payment.method, to: method })])
   return (await one(c.db, 'SELECT * FROM pt_payments WHERE id = ?', payment.id))!

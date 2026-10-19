@@ -1,11 +1,12 @@
 // Existing payments are offered before adding another expense or receipt.
 import type { Data } from './core'
 import { all } from './db'
+import { checkPaymentCandidates } from './checks/matching'
 
 const plain = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]+/g, '')
 
 export async function recordedPaymentCandidates(db: D1Database, lines: Data[]) {
-  const offers: Record<string, Data[]> = {}
+  const offers: Record<string, Data[]> = await checkPaymentCandidates(db, lines)
   const open = lines.filter(l => !l.match_id && !l.removed_at)
   const byId = new Map(open.map(l => [l.id, l]))
   for (let i = 0; i < open.length; i += 90) {
@@ -18,6 +19,7 @@ export async function recordedPaymentCandidates(db: D1Database, lines: Data[]) {
       JOIN pt_journal_lines l ON l.entry_id = p.journal_id AND l.account_id = b.account_id
       JOIN pt_journal_entries e ON e.id = l.entry_id
       WHERE x.id IN (${chunk.map(() => '?').join(',')}) AND x.removed_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM pt_checks ch WHERE ch.payment_id = p.id)
         AND p.reversal_id IS NULL AND e.status = 'posted' AND e.reversed_by_id IS NULL
         AND l.debit_cents - l.credit_cents = x.amount_cents
         AND p.payment_date BETWEEN date(x.posted_date, '-7 days') AND date(x.posted_date, '+7 days')

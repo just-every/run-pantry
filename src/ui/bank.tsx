@@ -2,6 +2,7 @@
 // and accounts, statement imports (CSV or OFX) and the statements waiting to reconcile.
 import { useRef, useState } from 'react'
 import { Card, Chip, command, Field, Form, Loading, PageHead, Table, Tabs, accountOptions, day, readFileText, usd, useShared, useView, type D } from './kit'
+import { Checks } from './checks'
 import { Reconcile } from './reconcile'
 import { ReconciliationReview } from './reconciliation-review'
 import { Suggestions, Transactions } from './bank-lines'
@@ -48,7 +49,7 @@ function NewBankAccount({ onDone }: { onDone: () => Promise<void> }) {
   </Form></Card>
 }
 
-const TABS = ['Transactions', 'Rules', 'Statements', 'Accountant review'] as const
+const TABS = ['Transactions', 'Rules', 'Statements', 'Checks', 'Accountant review'] as const
 
 function Statements({ data, refresh, open }: { data: D; refresh: () => Promise<void>; open: (id: string) => void }) {
   const shared = useShared()
@@ -90,6 +91,7 @@ export function Bank() {
     </div>}
     {tab === 'Accountant review' && ['owner', 'accountant'].includes(shared.state.actor.role) && <ReconciliationReview data={data} open={reconcile} />}
     {tab === 'Rules' && <Rules data={rules.data} draft={draft} setDraft={setDraft} onDone={refresh} />}
+    {tab === 'Checks' && <Checks />}
     {tab === 'Statements' && <Statements data={data} refresh={refresh} open={reconcile} />}
   </>
 }
