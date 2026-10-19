@@ -474,3 +474,65 @@ test('REPORT-001 financial statements with comparisons, fiscal periods, YTD and 
   await h.view('reports/profit-and-loss?from=2026-11-01&to=2026-10-01&columns=months', h.owner, 400)
   assert.deepEqual((await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results, before, 'columns, basis switches and exports never write to the ledger')
 })
+
+test('BUDGET-001 annual account/month plans copy posted actuals plus 5%, edit a month, import CSV and mapped Easel plans, and tie quarterly variances on both bases', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const { acct } = await books(h)
+  const journal = async (date, memo, income, expense) => {
+    const draft = await h.command('journal.save-draft', { date, memo, lines: [{ accountId: acct['1000'], debit: income }, { accountId: acct['4000'], credit: income }, { accountId: acct['6200'], debit: expense }, { accountId: acct['1000'], credit: expense }] })
+    return h.command('journal.post', { id: draft.id, revision: draft.revision })
+  }
+  await journal('2025-01-17', 'Last year studio activity', '1000.00', '300.00')
+  await journal('2026-01-17', 'This year studio activity', '1200.00', '450.00')
+  await h.command('journal.save-draft', { date: '2025-02-12', memo: 'Unposted estimate excluded', lines: [{ accountId: acct['1000'], debit: '9999.00' }, { accountId: acct['4000'], credit: '9999.00' }] })
+  const customer = await h.command('contact.save', { kind: 'customer', name: 'Cedar Studio', termsDays: 30 })
+  const invoice = await h.command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-02-10', dueDate: '2026-03-12', lines: [{ description: 'Unpaid design work', quantity: '1', rate: '500.00', accountId: acct['4000'], taxCode: 'exempt' }] })
+  await h.command('invoice.approve', { id: invoice.id, revision: invoice.revision })
+  await h.command('invoice.issue', { id: invoice.id, revision: invoice.revision })
+  const before = await h.view('reports/trial-balance?to=2026-12-31&basis=accrual')
+  let plan = await h.command('budget.save', { name: 'Studio 2026', startMonth: '2026-01', copyActuals: true, percentChange: '5' })
+  assert.equal(plan.basis, 'cash', 'declared basis applies to copying actuals')
+  assert.deepEqual(plan.cells.map(c => [c.account_id, c.month, c.amount_cents]).sort(), [[acct['4000'], '2026-01', 105000], [acct['6200'], '2026-01', 31500]].sort())
+  plan = await h.command('budget.save', { id: plan.id, revision: plan.revision, name: plan.name, startMonth: plan.start_month, basis: plan.basis, cells: plan.cells.map(c => ({ accountId: c.account_id, month: c.month, amount: c.account_id === acct['6200'] ? '400.00' : (c.amount_cents / 100).toFixed(2) })) })
+  const quarter = `budgets/${plan.id}/report?from=2026-01-01&to=2026-03-31`
+  const cash = await h.view(quarter)
+  assert.deepEqual(cash.netIncome, { budget: 65000, actual: 75000, variance: 10000, percent: 15.38 })
+  assert.equal(cash.basis, 'cash')
+  for (const basis of ['cash', 'accrual']) {
+    const report = await h.view(`${quarter}&basis=${basis}`), pl = await h.view(`reports/profit-and-loss?from=2026-01-01&to=2026-03-31&basis=${basis}`)
+    assert.equal(report.netIncome.actual, pl.netIncome)
+    for (const row of report.rows) {
+      assert.equal(row.actual, [...pl.income, ...pl.expenses].find(a => a.id === row.id)?.amount ?? 0)
+      assert.equal(row.variance, row.actual - row.budget)
+      assert.equal(row.percent, Math.round(row.variance / Math.abs(row.budget) * 10000) / 100)
+    }
+    const csv = await h.send(`/api/pantry/budgets/${plan.id}/report.csv?from=2026-01-01&to=2026-03-31&basis=${basis}`, undefined, { cookie: h.owner })
+    assert.equal(csv.status, 200)
+    assert.match(csv.value, new RegExp(`${basis === 'cash' ? 'Cash' : 'Accrual'} basis`))
+    assert.match(csv.value, new RegExp(`"${(pl.netIncome / 100).toFixed(2)}"`))
+  }
+  const partial = await h.view(`budgets/${plan.id}/report?from=2026-01-16&to=2026-01-31`)
+  assert.equal(at(partial.rows, r => r.id === acct['4000']).budget, Math.round(105000 * 16 / 31))
+  const entered = await h.command('budget.save', { name: 'Manual 2026', startMonth: '2026-01', cells: [{ accountId: acct['4000'], month: '2026-01', amount: '0.00' }, { accountId: acct['6200'], month: '2026-02', amount: '-12.55' }] })
+  assert.equal((await h.view(`budgets/${entered.id}/report?from=2026-01-01&to=2026-01-31`)).rows[0].percent, null)
+  const imported = await h.command('budget.save', { name: 'CSV plan', startMonth: '2026-01', csv: 'Account,Month,Amount\r\n4000,2026-01,2000.00\r\n6200,2026-02,-12.55\r\n' })
+  assert.deepEqual(imported.cells.map(c => [c.month, c.amount_cents]).sort(), [['2026-01', 200000], ['2026-02', -1255]])
+  // Easel's real scenario response: calculation cells are integer minor units,
+  // departments aggregate only through an explicit line-to-chart mapping.
+  const easel = { scenario: { id: 'board-budget', name: 'Board budget' }, workspace: { currency: 'USD', planStart: '2026-01', horizon: 12 }, lines: [{ id: 'design', name: 'Design services', type: 'revenue' }, { id: 'software', name: 'Software', type: 'operating-expense' }], calculation: { currency: 'USD', cells: [{ line: 'design', department: 'studio', month: '2026-01', amount: 200000, basis: 'plan' }, { line: 'design', department: 'projects', month: '2026-01', amount: 100000, basis: 'plan' }, { line: 'software', department: 'studio', month: '2026-02', amount: 50000, basis: 'plan' }] } }
+  const mapped = await h.command('budget.save', { name: 'Easel board plan', startMonth: '2026-01', easel, mapping: { design: acct['4000'], software: acct['6200'] } })
+  assert.deepEqual(mapped.cells.map(c => [c.account_id, c.month, c.amount_cents]).sort(), [[acct['4000'], '2026-01', 300000], [acct['6200'], '2026-02', 50000]].sort())
+  assert.equal((await h.view(`budgets/${mapped.id}/report?from=2026-01-01&to=2026-03-31`)).netIncome.budget, 250000)
+  assert.equal((await h.view('budgets')).budgets.length, 4)
+  await h.command('budget.save', { name: 'Unmapped', startMonth: '2026-01', easel, mapping: {} }, h.owner, 400)
+  await h.command('budget.save', { name: 'Foreign', startMonth: '2026-01', easel: { ...easel, calculation: { ...easel.calculation, currency: 'AUD' } }, mapping: {} }, h.owner, 400)
+  await h.command('budget.save', { name: 'Unknown CSV account', startMonth: '2026-01', csv: 'Account,Month,Amount\nmissing,2026-01,10.00' }, h.owner, 400)
+  await h.command('budget.save', { name: 'Duplicate cell', startMonth: '2026-01', csv: 'Account,Month,Amount\n4000,2026-01,10.00\n4000,2026-01,20.00' }, h.owner, 400)
+  await h.command('budget.save', { name: 'Outside year', startMonth: '2026-01', csv: 'Account,Month,Amount\n4000,2027-01,10.00' }, h.owner, 400)
+  await h.command('budget.save', { id: plan.id, revision: 'stale', name: plan.name, startMonth: '2026-01', cells: [] }, h.owner, 409)
+  const viewer = await h.member('budget-viewer@example.test', 'viewer')
+  await h.view(quarter, viewer)
+  await h.command('budget.save', { name: 'Unauthorized', startMonth: '2026-01', cells: [] }, viewer, 403)
+  await h.view(`budgets/${plan.id}/report?from=2025-12-31&to=2026-03-31`, h.owner, 400)
+  assert.deepEqual(await h.view('reports/trial-balance?to=2026-12-31&basis=accrual'), before, 'planning never changes the posted ledger')
+})

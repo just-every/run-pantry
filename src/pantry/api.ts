@@ -69,9 +69,11 @@ import { exemptionCommands, exemptionView } from './exemptions'
 import { nexusCommands, nexusWatch } from './nexus'
 import { reviewCommands, reviewView } from './review'
 import { smallBalances, writeOffCommands } from './write-offs'
+import { budgetCommands, budget, budgetsView } from './budgets/commands'
+import { budgetReport, budgetCsv } from './budgets/report'
 
 const commands: Record<string, Command> = {
-  ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -138,6 +140,13 @@ view('exemptions', async ctx => exemptionView(ctx.db))
 view('sales-tax/nexus', async ctx => nexusWatch(ctx.db))
 view('documents', async ctx => ({ documents: await documents(ctx.db) }))
 const year = (c: C) => { const y = Number(c.req.query('year') ?? new Date().getUTCFullYear()); requireThat(Number.isInteger(y) && y >= 2000 && y <= 2100, 'Choose a tax year'); return y }
+view('budgets', async ctx => budgetsView(ctx.db))
+view('budgets/:id', async (ctx, c) => budget(ctx.db, c.req.param('id')!))
+view('budgets/:id/report', async (ctx, c) => budgetReport(ctx.db, c.req.param('id')!, day(c, 'from'), day(c, 'to'), await reportBasis(ctx.db, c.req.query('basis'))))
+api.get('/api/pantry/budgets/:id/report.csv', async c => {
+  const ctx = await reader(c), r = await budgetReport(ctx.db, c.req.param('id')!, day(c, 'from'), day(c, 'to'), await reportBasis(ctx.db, c.req.query('basis')))
+  return new Response(budgetCsv(r), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="budget-actual.csv"', 'cache-control': 'no-store' } })
+})
 view('recognition', async (ctx, c) => recognitionView(ctx.db, day(c, 'to')))
 view('reports/detail', async (ctx, c) => {
   const to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')

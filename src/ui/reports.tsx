@@ -4,6 +4,7 @@
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { Card, Chip, Loading, PageHead, Table, Tabs, day, monthName, today, usd, useShared, useView, type D } from './kit'
 import { BASIS_NAME, FigureDetail, RecordView } from './report-detail'
+import { Budgets } from './budgets'
 import { SalesTax } from './sales-tax'
 import { Contractors } from './contractors'
 import { CashFlow, CashFlowDetail } from './cash-flow'
@@ -15,7 +16,7 @@ type Basis = 'cash' | 'accrual'
 
 // [tab, slug, reads on a basis, takes a date range]
 const KINDS: [string, string, boolean, boolean][] = [['Trial balance', 'trial-balance', true, false], ['General ledger', 'general-ledger', true, true], ['Profit and loss', 'profit-and-loss', true, true], ['Balance sheet', 'balance-sheet', true, false],
-  ['Sales by customer', 'sales-by-customer', true, true], ['Expenses by vendor', 'expenses-by-vendor', true, true], ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false]]
+  ['Sales by customer', 'sales-by-customer', true, true], ['Expenses by vendor', 'expenses-by-vendor', true, true], ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false], ['Budget versus actual', 'budget-actual', true, true]]
 
 /** A figure that opens to its records. */
 function Figure({ line, children }: { line: string; children: React.ReactNode }) {
@@ -82,7 +83,8 @@ const periodOf = (v: string) => { const m = DAY.exec(v); return `${String(Number
 
 function Report({ slug, basis, from, to, columns }: { slug: string; basis: Basis; from: string; to: string; columns: ColumnMode }) {
   const ranged = KINDS.find(k => k[1] === slug)![3]
-  const { data: r, error } = useView<D>(`reports/${slug}?to=${to}${ranged || columns !== 'single' ? `&from=${from}` : ''}&basis=${basis}${columns !== 'single' ? `&columns=${columns}` : ''}`)
+  const { data: r, error } = useView<D>(slug === 'budget-actual' ? null : `reports/${slug}?to=${to}${ranged || columns !== 'single' ? `&from=${from}` : ''}&basis=${basis}${columns !== 'single' ? `&columns=${columns}` : ''}`)
+  if (slug === 'budget-actual') return <Budgets from={from} to={to} basis={basis} />
   if (!r) return <Loading error={error} what="the report" />
   if (columns !== 'single') return <StatementColumns report={r as ColumnStatement} />
   if (slug === 'trial-balance') return <Trial r={r} from={from} to={to} basis={basis} />
@@ -123,7 +125,7 @@ export function Reports() {
           {statement && <ColumnPicker mode={columns} kind={slug} onChange={mode => set({ columns: mode, line: undefined, record: undefined })} />}
           {ranged && <div className="field inline"><label htmlFor="r-from">From</label><input id="r-from" type="date" value={from} onChange={e => isDay(e.target.value) && set({ from: e.target.value })} /></div>}
           <div className="field inline"><label htmlFor="r-to">{ranged ? 'To' : 'As of'}</label><input id="r-to" type="date" value={to} onChange={e => isDay(e.target.value) && set({ to: e.target.value })} /></div></div>}>
-          {based && <p className="row-actions"><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}&format=pdf`} download>Download PDF · {basis}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}&format=csv`} download>Download CSV · {basis}</a></p>}
+          {based && slug !== 'budget-actual' && <p className="row-actions"><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}&format=pdf`} download>Download PDF · {basis}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}&format=csv`} download>Download CSV · {basis}</a></p>}
           <Report slug={slug} basis={basis} from={from} to={to} columns={columns} />
         </Card>}
   </>

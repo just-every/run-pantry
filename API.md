@@ -59,3 +59,11 @@ Writes: `POST /api/pantry/command/:action` with a JSON object.
 See [Sibling integrations](docs/integrations.md) for owner-created scoped credentials, idempotent writes, record reads, bill readiness and a complete `curl` example. Integration credentials use this separate API and cannot sign in as people or use the proposal-only agent API.
 
 Financial reports and `/api/pantry/reports/:kind/export?from=&to=&basis=&format=pdf|csv` use the declared tax method when basis is omitted, or the explicit cash/accrual choice. The scoped integrations trial balance uses the same choice/default under its existing `reports:read` scope. Open-item ageing remains accrual, 1099 reports use payment basis, and indirect cash flow starts from accrual net income.
+
+## Annual budgets (BUDGET-001)
+
+Native signed-in readers use `GET /api/pantry/budgets`, `/budgets/:id`, `/budgets/:id/report?from=YYYY-MM-DD&to=YYYY-MM-DD&basis=cash|accrual`, and the same report path ending in `report.csv`. The declared tax method is the default.
+
+`POST /api/pantry/command/budget.save` needs the existing recording capability. Supply `name`, `startMonth` (YYYY-MM), optional `basis`, and one source: `cells: [{accountId, month, amount}]`; `copyActuals: true, percentChange: "5"`; `csv: "Account,Month,Amount\n4000,2026-01,1000.00"`; or `easel` with the JSON returned by Easel’s `/api/easel/scenario/:id` and `mapping: {"EASEL-LINE-ID": "PANTRY-ACCOUNT-ID"}`. Easel calculation currency must be USD. Calculation cells are integer cents; departments sum into explicitly mapped accounts. No credentials or automatic provider connection are involved.
+
+To edit, supply the current `id`/`revision` and the full replacement cell list; the annual start stays fixed. All amounts are signed USD, natural income/expense direction. Copy adjustments and partial-calendar-month prorating round half up in magnitude per account/month. Variance is actual minus budget, divided by the absolute budget for percent; zero budgets are not comparable. Budgets never write posted lines.
