@@ -50,6 +50,7 @@ test('PAY-004 payment-reference deposits clear, amount-only deposits confirm, an
     await page.screenshot({ path: `/tmp/sx-pantry-r5-pay004-undone-${width}.png`, fullPage: true })
     await page.goto(`${app.origin}/app/sales?tab=contacts`)
     await page.getByRole('row', { name: new RegExp(`Cedar Studio ${width}`) }).click()
+    await page.getByRole('button', { name: 'Edit contact details', exact: true }).click()
     await page.getByLabel('How their payments read on your bank statement (customers)', { exact: true }).waitFor()
     await page.screenshot({ path: `/tmp/sx-pantry-r5-pay004-reference-${width}.png`, fullPage: true })
     assert.deepEqual(errors, [])
