@@ -39,6 +39,8 @@ test('Bank and card feeds: connect once, choose accounts, and transactions arriv
     { id: byMask('1111').id, bankAccountId: '' },
   ] })
   assert.deepEqual([mapped.sync.added, mapped.sync.pending, mapped.sync.filed], [4, 1, 1])
+  const staplesQuestion = at((await h.view('bank/feeds')).history.duplicates, d => d.description === 'STAPLES 00123')
+  await h.command('feed.duplicate-decide', { id: staplesQuestion.id, revision: staplesQuestion.revision, decision: 'duplicate', bankLineId: staplesQuestion.candidates[0].id })
   let { lines, pending } = await h.view('bank/lines')
   const line = (d, date) => at(lines, l => l.description.startsWith(d) && l.posted_date === date)
   assert.deepEqual([line('ADOBE', '2026-10-02').rule_name, line('ADOBE', '2026-10-02').amount_cents], ['Adobe', -5499])
@@ -170,6 +172,8 @@ test('BANK-003 continuous sync of pending and posted lines', async t => {
     { id: at(connection.accounts, x => x.mask === '0000').id, bankAccountId: checking.id },
     { id: at(connection.accounts, x => x.mask === '3333').id, bankAccountId: 'new', new: { name: 'Business card', accountId: cardLedger.id, openingDate: '2026-09-30', openingBalance: '0.00' } },
   ] })
+  const staplesQuestion = at((await h.view('bank/feeds')).history.duplicates, d => d.description === 'STAPLES 00123')
+  await h.command('feed.duplicate-decide', { id: staplesQuestion.id, revision: staplesQuestion.revision, decision: 'duplicate', bankLineId: staplesQuestion.candidates[0].id })
   let received = await h.view('bank/lines')
   const byTransaction = (view, id) => at(view.lines, x => x.feed_txn_id === id)
   const adopted = byTransaction(received, staples.transaction_id)
@@ -228,6 +232,108 @@ test('BANK-003 continuous sync of pending and posted lines', async t => {
   assert.deepEqual((await h.view('bank/feeds')).exceptions, exceptions, 'replayed observations do not repeat named exceptions')
   await h.command('feed.disconnect', { itemId: connection.id })
   assert.deepEqual((await h.view('bank/feeds')).exceptions, exceptions, 'disconnecting retains unresolved bank discrepancies')
+})
+
+test('BANK-002 thirteen months of feed history preserve three imported OFX months, held references and the reconciliation proof', async t => {
+  const plaid = await fakePlaid()
+  const provider = plaid.recorded['accounts-get'].accounts.find(a => a.mask === '0000').account_id
+  let delivered = [], sequence = 0
+  const outbound = async request => {
+    if (new URL(request.url).pathname !== '/transactions/sync') return plaid.outbound(request)
+    return Response.json({ added: delivered, modified: [], removed: [], accounts: [], has_more: false, next_cursor: `history-${++sequence}` })
+  }
+  const h = await harness({ bindings: plaid.bindings, outbound }); t.after(() => h.close())
+  const { acct, state } = await books(h)
+  await h.command('entity.save', { revision: state.overview.entity.revision, legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2025-10-01', policies: '' })
+  const tasks = await h.command('close.tasks', { period: '2026-02' })
+  for (const task of tasks.tasks) await h.command('close.task', { id: task.id, revision: task.revision, done: true })
+  await h.command('period.lock', { period: '2026-02' })
+  const bank = await h.command('bank-account.save', { name: 'Historical checking', institution: 'First Platypus Bank', accountId: acct['1000'], numberLast4: '0000', openingDate: '2025-09-30', openingBalance: '0' })
+  const ofx = (start, end, id, description, closing) => `<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKACCTFROM><BANKID>123<ACCTID>1230000</BANKACCTFROM><BANKTRANLIST><DTSTART>${start.replaceAll('-', '')}<DTEND>${end.replaceAll('-', '')}<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>${start.replaceAll('-', '')}15<TRNAMT>-10.00<FITID>${id}<NAME>${description}</STMTTRN></BANKTRANLIST><LEDGERBAL><BALAMT>${closing}<DTASOF>${end.replaceAll('-', '')}</LEDGERBAL></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>`
+  const statements = []
+  for (const [index, month] of ['10', '11', '12'].entries()) {
+    const date = `2025-${month}-15`, end = `2025-${month}-${month === '11' ? '30' : '31'}`
+    const imported = await h.command('statement.import', { bankAccountId: bank.id, fileName: `2025-${month}.ofx`, content: ofx(date, end, `ofx-${month}`, `MONTH ${month} CHARGE`, -10 * (index + 1)), opening: String(-10 * index) })
+    statements.push(imported.statement)
+    const line = at((await h.view('bank/lines')).lines, l => l.statement_id === imported.statement.id)
+    await h.command('match.approve', { bankLineIds: [line.id], create: [{ type: 'fee', amount: '10', accountId: acct['6200'] }] })
+    await h.command('reconciliation.complete', { statementId: imported.statement.id })
+  }
+  const proof = (await h.view(`reconciliation/${statements[2].id}`)).completed
+  const journal = await h.view('journal')
+  const txn = (id, date, name, amount = 10) => ({ transaction_id: id, account_id: provider, date, name, amount, pending: false })
+  delivered = Array.from({ length: 13 }, (_, i) => {
+    const d = new Date(Date.UTC(2025, 8 + i, 15)).toISOString().slice(0, 10)
+    return txn(`history-${d}`, d, `MONTH ${d.slice(5, 7)} CHARGE`)
+  })
+  delivered.find(t => t.date === '2025-10-15').transaction_id = 'ofx-10'
+  delivered.find(t => t.date === '2025-10-15').name = 'BANK RENAMED OCTOBER CHARGE'
+  delivered.find(t => t.date === '2025-12-15').name = 'A DOUBTFUL DESCRIPTION'
+  await h.command('feed.link-token', {})
+  const request = at(plaid.state.calls, c => c.path === '/link/token/create').body
+  assert.ok(request.transactions.days_requested >= 13 * 30, 'the provider is asked for the historical reach needed by this connection')
+  const connection = await h.command('feed.connect', { publicToken: 'historical-public-token', institution: { name: 'First Platypus Bank' } })
+  const account = at(connection.accounts, a => a.mask === '0000')
+  await h.command('feed.map', { itemId: connection.id, accounts: [{ id: account.id, bankAccountId: bank.id, history: { mode: 'booksStart' } }] })
+  let feed = await h.view('bank/feeds')
+  assert.ok(!feed.history.references.some(r => r.reason === 'before-books'), 'books start bounds the initial history selection')
+  assert.equal(at(feed.history.references, r => r.posted_date === '2026-02-15').reason, 'locked-period')
+  let lines = (await h.view('bank/lines')).lines
+  assert.equal(lines.filter(l => l.posted_date.startsWith('2025-')).length, 3, 'OFX history has no duplicated bank lines')
+  assert.equal(at(lines, l => l.statement_id === statements[0].id).feed_txn_id, 'ofx-10', 'provider id wins even when description changes')
+  assert.equal(at(lines, l => l.statement_id === statements[1].id).feed_txn_id, 'history-2025-11-15', 'same date, amount and description adopt the existing line')
+  const doubtful = at(feed.history.duplicates, r => r.description === 'A DOUBTFUL DESCRIPTION')
+  assert.equal(doubtful.state, 'doubtful')
+  assert.ok(!lines.some(l => l.feed_txn_id === doubtful.feed_txn_id))
+  const viewer = await h.member('history-viewer@example.test', 'viewer')
+  const decide = { id: doubtful.id, revision: doubtful.revision, decision: 'duplicate', bankLineId: doubtful.candidates[0].id }
+  await h.command('feed.duplicate-decide', decide, viewer, 403)
+  await h.command('feed.duplicate-decide', decide, '', 401)
+  await h.command('feed.duplicate-decide', { ...decide, bankLineId: 'another-line' }, h.owner, 400)
+  await h.command('feed.duplicate-decide', { ...decide, decision: 'distinct' }, h.owner, 409)
+  await h.command('feed.duplicate-decide', decide)
+  await h.command('feed.duplicate-decide', decide, h.owner, 409)
+  let mapped = at(feed.connections[0].accounts, a => a.id === account.id)
+  await h.command('feed.history', { feedAccountId: account.id, revision: mapped.revision, history: { mode: 'explicit', startDate: '2025-09-01' } }, viewer, 403)
+  await h.command('feed.history', { feedAccountId: account.id, revision: mapped.revision, history: { mode: 'explicit', startDate: '2025-09-01' } })
+  feed = await h.view('bank/feeds')
+  const reference = at(feed.history.references, r => r.posted_date === '2025-09-15')
+  assert.equal(reference.reason, 'before-books')
+  await h.command('match.approve', { bankLineIds: [reference.id], create: [{ type: 'fee', amount: '10', accountId: acct['6200'] }] }, h.owner, 404)
+  mapped = at(feed.connections[0].accounts, a => a.id === account.id)
+  await h.command('feed.history', { feedAccountId: account.id, revision: mapped.revision, history: { mode: 'lastReconciled' } })
+  feed = await h.view('bank/feeds')
+  assert.equal(at(feed.connections[0].accounts, a => a.id === account.id).history_start, '2026-01-01')
+  assert.equal(at(feed.history.duplicates, r => r.id === doubtful.id).state, 'duplicate')
+  await h.command('feed.sync', { itemId: connection.id })
+  assert.deepEqual(await h.view('journal'), journal, 'backfill, decisions and replay never change posted entries')
+  const reconciled = await h.view(`reconciliation/${statements[2].id}`)
+  assert.deepEqual(reconciled.completed, proof)
+  assert.deepEqual(reconciled.blockers, [])
+  assert.equal(reconciled.difference, 0)
+  assert.ok((await h.view('activity')).audit.some(a => a.action === 'feed.duplicate-decide' && a.subject_id === doubtful.id))
+  // A separate open-period charge with a same-amount statement neighbour
+  // stays held until a person explicitly keeps it. Confirmation itself posts no ledger entry.
+  await h.command('statement.import', { bankAccountId: bank.id, fileName: 'september-2026.ofx', content: ofx('2026-09-16', '2026-09-30', 'september-file', 'ORIGINAL SEPTEMBER CHARGE', -10), opening: '0' })
+  delivered = [txn('separate-september-charge', '2026-09-16', 'A DIFFERENT SEPTEMBER CHARGE')]
+  await h.command('feed.sync', { itemId: connection.id })
+  feed = await h.view('bank/feeds')
+  const separate = at(feed.history.duplicates, d => d.feed_txn_id === 'separate-september-charge')
+  assert.equal(separate.state, 'doubtful')
+  await h.command('feed.duplicate-decide', { id: separate.id, revision: 'stale', decision: 'distinct' }, h.owner, 409)
+  const decision = { id: separate.id, revision: separate.revision, decision: 'distinct' }
+  await h.command('feed.duplicate-decide', decision)
+  await h.command('feed.duplicate-decide', decision, h.owner, 409)
+  await h.command('feed.sync', { itemId: connection.id })
+  assert.equal((await h.view('bank/lines')).lines.filter(l => l.feed_txn_id === separate.feed_txn_id).length, 1)
+  assert.deepEqual(await h.view('journal'), journal)
+  delivered = [{ ...delivered[0], date: '2025-09-15' }]
+  await h.command('feed.sync', { itemId: connection.id })
+  assert.equal(at((await h.view('bank/feeds')).history.references, r => r.feed_txn_id === separate.feed_txn_id).reason, 'before-books')
+  assert.ok(!(await h.view('bank/lines')).lines.some(l => l.feed_txn_id === separate.feed_txn_id))
+  delivered = [{ ...delivered[0], date: '2026-09-16' }]
+  await h.command('feed.sync', { itemId: connection.id })
+  assert.ok(!(await h.view('bank/lines')).lines.some(l => l.feed_txn_id === separate.feed_txn_id), 'a held reference cannot return to automatic posting through a provider replay')
 })
 
 // Opt-in provider proof. Only credentials explicitly injected by name are used.
@@ -438,9 +544,10 @@ test('RULE-004 connected transfers and card payments pair once; missing halves w
   const lockedOut = txn('locked-transfer-out', '0000', 30, 'TRANSFER TO SAVINGS 1111', '2026-01-12')
   const lockedIn = txn('locked-transfer-in', '1111', -30, 'TRANSFER FROM OPERATING CHECKING 0000', '2026-01-12')
   await deliver({ added: [lockedOut, lockedIn] })
-  const locked = await line(lockedOut.transaction_id)
-  assert.equal(locked.match_id, null); assert.match(locked.transfer.blocked, /locked/)
-  await h.command('transfer.expect', { bankLineId: locked.id, revision: locked.transfer.revision, otherBankAccountId: savings.id }, h.owner, 409)
+  const locked = at((await h.view('bank/feeds')).history.references, r => r.feed_txn_id === lockedOut.transaction_id)
+  assert.equal(locked.reason, 'locked-period')
+  assert.ok(!(await h.view('bank/lines')).lines.some(l => l.feed_txn_id === lockedOut.transaction_id))
+  await h.command('match.approve', { bankLineIds: [locked.id], create: [{ type: 'fee', amount: '30', accountId: acct['6200'] }] }, h.owner, 404)
   assert.equal((await journal()).length, beforeManualArrival)
 
   // Undo is one reasoned action for both sides; direct one-sided undo fails.

@@ -6,6 +6,7 @@ import { Action, Card, Chip, command, usd, useShared, type D } from './kit'
 import { Icon } from './icons'
 import { openLink } from './plaid-link'
 import { SetupSteps } from './provider-guides'
+import { HistoryChoice, HistoryObservations } from './feed-history'
 
 export function ago(iso?: string | null) {
   if (!iso) return 'never'
@@ -33,6 +34,7 @@ function Connection({ c, notice, onDone }: { c: D; notice?: D; onDone: () => Pro
     <ul className="feed-accounts">{c.accounts.map((a: D) => <li key={a.id}>
       <span>{a.name} <small className="sub">••{a.mask}</small></span>
       {a.bank_account_id ? <small>→ {a.bank_name} · {a.last_synced_at ? <>synced {ago(a.last_synced_at)}</> : 'not synced yet'}{a.pending ? ` · ${a.pending} pending` : ''}{a.balance_cents !== null ? ` · bank shows ${usd(a.balance_cents)}${a.kind.startsWith('credit') ? ' owed' : ''}` : ''}</small> : <small className="sub">Not brought in</small>}
+      {a.bank_account_id && can && <HistoryChoice account={a} onDone={onDone} />}
     </li>)}</ul>
     {c.status === 'active' && brought.length > 0 && <p className="hint">Next sync: {new Date(c.sync_due_at).getTime() <= Date.now() ? 'due now' : new Date(c.sync_due_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</p>}
     {c.status === 'relink' && <p className="hint">Next sync: after you re-link.</p>}
@@ -77,6 +79,7 @@ export function Feeds({ data, onDone, onImport }: { data: D | undefined; onDone:
       <p>{e.kind === 'removed' ? 'The bank removed this transaction.' : `The bank now reports ${e.providerChange.date} · ${e.providerChange.description} · ${usd(e.providerChange.amountCents)}.`} The saved line, matches and ledger postings are preserved. Review the discrepancy before making a correction.</p>
       {e.protection === 'reconciled' && <p>The completed reconciliation is preserved.</p>}
     </div></div>)}
+    <HistoryObservations history={data.history} canRecord={can.record} onDone={onDone} />
     {none && !a.available && (a.needsKeys ? <SetupSteps provider="plaid" reason={a.reason} summary="Set up live bank feeds" owner={can.owner} /> : <p className="hint">{a.reason}</p>)}
     {none && (a.available ? connect(true) : can.record && <button type="button" className="btn btn-primary" onClick={onImport}>Import a statement</button>)}
   </Card>

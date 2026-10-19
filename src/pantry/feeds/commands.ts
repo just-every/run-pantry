@@ -4,7 +4,7 @@
 import { runtimeBindings } from '../../auth.server'
 import { authority, who } from '../access'
 import { Fault, now, requireThat, text, uid, type Data } from '../core'
-import { all, audit, one, q, run } from '../db'
+import { all, audit, changed, one, q, run } from '../db'
 import { bankCommands } from '../bank'
 import type { Command, Context } from '../context'
 import { availability, plaid, PlaidError } from './plaid'
@@ -12,6 +12,7 @@ import { syncItem } from './sync'
 import { open, seal } from './vault'
 import { checkFeedHealth, feedHealth } from './health'
 import { transactionExceptions } from './transaction-exceptions'
+import { duplicateDecision, feedAccountIdle, historyChoice, historyOptions, historyView } from './history'
 
 const webhookUrl = (c: Context) => {
   const origin = runtimeBindings(c.env).AUTH_ORIGIN
@@ -67,7 +68,7 @@ const mapAccounts: Command = { need: 'record', async run(c, b) {
   requireThat(row.status !== 'disconnected', 'This connection was disconnected; connect the bank again', 409)
   requireThat(Array.isArray(b.accounts) && b.accounts.length, 'Choose where each account goes')
   const known = new Map((await all(c.db, 'SELECT * FROM pt_feed_accounts WHERE item_id = ?', row.id)).map(a => [a.id, a]))
-  const choices: { id: string; bankAccountId: string | null }[] = []
+  const choices: { id: string; bankAccountId: string | null; history: { mode: string; start: string } | null }[] = []
   for (const a of b.accounts as Data[]) {
     const current = known.get(String(a.id))
     requireThat(current, 'Account not found in this connection', 404)
@@ -80,17 +81,18 @@ const mapAccounts: Command = { need: 'record', async run(c, b) {
     if (bankAccountId) requireThat(ledger?.active && ledger.subtype === 'bank' && ledger.type === expectedType, debt ? 'Map a card or line of credit to an active liability bank account' : 'Map a deposit account to an active asset bank account')
     if (bankAccountId === 'new') bankAccountId = String((await bankCommands['bank-account.save'].run(c, { institution: row.institution_name, ...(a.new ?? {}), numberLast4: a.new?.numberLast4 || current.mask })).id)
     if (bankAccountId) requireThat(await one(c.db, 'SELECT 1 FROM pt_bank_accounts WHERE id = ?', bankAccountId), 'Bank account not found', 404)
-    choices.push({ id: current.id, bankAccountId })
+    choices.push({ id: current.id, bankAccountId, history: bankAccountId ? await historyChoice(c.db, bankAccountId, a.history, current) : null })
   }
   const ids = choices.map(x => x.bankAccountId).filter(Boolean)
   requireThat(new Set(ids).size === ids.length, 'Bring each account into a different Pantry bank account')
   await run(c.db, [authority(c.actor, 'record'),
-    ...choices.map(x => q('UPDATE pt_feed_accounts SET bank_account_id = ?, revision = ? WHERE id = ?', x.bankAccountId, uid(), x.id)),
+    ...choices.map(x => feedAccountIdle(x.id)),
+    ...choices.map(x => q('UPDATE pt_feed_accounts SET bank_account_id = ?, history_mode = ?, history_start = ?, revision = ? WHERE id = ?', x.bankAccountId, x.history?.mode ?? 'booksStart', x.history?.start ?? null, uid(), x.id)),
     // From the start again, so a newly brought-in account receives its history; lines already here are recognised by id.
     q("UPDATE pt_feed_items SET cursor = '', sync_due_at = ?, revision = ? WHERE id = ?", now(), uid(), row.id),
     audit(who(c.actor), 'feed.map', 'feed', row.id, { accounts: choices })])
   const sync = row.status === 'active' ? await syncItem(c.env, row.id, 'connect') : null
-  return { sync, connection: await connectionView(c.db, row.id) }
+  return { sync, connection: await connectionView(c.db, row.id), history: await historyView(c.db) }
 } }
 
 const relinked: Command = { need: 'record', async run(c, b) {
@@ -108,7 +110,7 @@ const syncNow: Command = { need: 'record', async run(c, b) {
   plaid(c.env)
   const sync = await syncItem(c.env, row.id, 'person')
   requireThat(sync.claimed, 'A sync for this connection is already running', 409)
-  return { sync, connection: await connectionView(c.db, row.id) }
+  return { sync, connection: await connectionView(c.db, row.id), history: await historyView(c.db) }
 } }
 
 const disconnect: Command = { need: 'record', async run(c, b) {
@@ -126,10 +128,26 @@ const disconnect: Command = { need: 'record', async run(c, b) {
   return { id: row.id }
 } }
 
+const setupHistory: Command = { need: 'record', async run(c, b) {
+  const account = await one(c.db, 'SELECT * FROM pt_feed_accounts WHERE id = ?', text(b.feedAccountId, 'Feed account'))
+  requireThat(account?.bank_account_id, 'Map this feed account before choosing its history', 409)
+  const connection = await item(c, account.item_id)
+  requireThat(connection.status !== 'disconnected', 'This connection was disconnected; connect the bank again', 409)
+  requireThat(account.revision === b.revision, 'This feed account changed; reload it', 409)
+  const choice = await historyChoice(c.db, account.bank_account_id, b.history)
+  await run(c.db, [authority(c.actor, 'record'), feedAccountIdle(account.id),
+    q('UPDATE pt_feed_accounts SET history_mode = ?, history_start = ?, revision = ? WHERE id = ? AND revision = ?', choice.mode, choice.start, uid(), account.id, b.revision), changed(),
+    q("UPDATE pt_feed_items SET cursor = '', sync_due_at = ?, revision = ? WHERE id = ?", now(), uid(), connection.id),
+    audit(who(c.actor), 'feed.history', 'feed', connection.id, { feedAccountId: account.id, history: choice })])
+  return { sync: connection.status === 'active' ? await syncItem(c.env, connection.id, 'person') : null, connection: await connectionView(c.db, connection.id) }
+} }
+
 export const feedCommands: Record<string, Command> = {
   'feed.link-token': linkToken,
   'feed.connect': connect,
   'feed.map': mapAccounts,
+  'feed.history': setupHistory,
+  'feed.duplicate-decide': duplicateDecision,
   'feed.relinked': relinked,
   'feed.sync': syncNow,
   'feed.disconnect': disconnect,
@@ -137,14 +155,14 @@ export const feedCommands: Record<string, Command> = {
 
 async function connectionView(db: D1Database, id: string) {
   const row = (await one(db, 'SELECT id, institution_name, status, error_code, error_message, last_sync_at, sync_due_at, last_sync_error, consent_expires_at, connected_by, connected_at, revision FROM pt_feed_items WHERE id = ?', id))!
-  const accounts = await all(db, `SELECT f.id, f.name, f.mask, f.kind, f.bank_account_id, f.balance_cents, f.last_synced_at, b.name AS bank_name,
+  const accounts = await all(db, `SELECT f.id, f.name, f.mask, f.kind, f.bank_account_id, f.balance_cents, f.last_synced_at, f.revision, f.history_mode, f.history_start, f.available_from, b.name AS bank_name,
       (SELECT COUNT(*) FROM pt_feed_pending p WHERE p.feed_account_id = f.id) AS pending
     FROM pt_feed_accounts f LEFT JOIN pt_bank_accounts b ON b.id = f.bank_account_id WHERE f.item_id = ? ORDER BY f.name`, id)
   const last = await one(db, 'SELECT * FROM pt_feed_syncs WHERE item_id = ? ORDER BY started_at DESC LIMIT 1', id)
-  return { ...row, accounts, lastSync: last }
+  return { ...row, accounts: await Promise.all(accounts.map(async a => ({ ...a, ...(a.bank_account_id ? await historyOptions(db, a.bank_account_id) : {}) }))), lastSync: last }
 }
 
 export async function feedsView(ctx: Context) {
   const items = await all<{ id: string }>(ctx.db, "SELECT id FROM pt_feed_items WHERE status <> 'disconnected' ORDER BY connected_at")
-  return { availability: availability(ctx.env), connections: await Promise.all(items.map(i => connectionView(ctx.db, i.id))), health: await feedHealth(ctx.db), exceptions: await transactionExceptions(ctx.db) }
+  return { availability: availability(ctx.env), connections: await Promise.all(items.map(i => connectionView(ctx.db, i.id))), health: await feedHealth(ctx.db), exceptions: await transactionExceptions(ctx.db), history: await historyView(ctx.db) }
 }

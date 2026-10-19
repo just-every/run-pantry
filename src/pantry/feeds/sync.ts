@@ -1,7 +1,7 @@
 // Feed sync. Each connection (Plaid Item) is synced by one claim at a time:
 // /transactions/sync pages from the stored cursor, applied idempotently on
 // Plaid's transaction ids. Posted transactions become bank lines (or adopt the
-// same day's same-amount line an imported file already brought); pending ones
+// uniquely identified statement line an imported file already brought); pending ones
 // are shown apart until the bank posts them; filed lines keep their original
 // values and raise an exception when the bank changes them. New lines then go
 // through the business's rules. Work becomes due by webhook, by schedule, or
@@ -16,6 +16,8 @@ import { matchConnected } from '../connected-match'
 import { matchTransfers, transferAvailableLines } from '../transfers'
 import { availability, plaid, PlaidError, relinkMessage, type PlaidTransaction, type SyncPage } from './plaid'
 import { open } from './vault'
+import { historyIndex, historyObservation, removeHistoryObservation } from './history'
+import { posted } from './line-write'
 import { checkFeedHealth } from './health'
 import { protectedLine, transactionDetails, transactionException } from './transaction-exceptions'
 
@@ -33,21 +35,6 @@ async function claim(db: D1Database, itemId: string) {
 const cents = (t: PlaidTransaction) => -Math.round(t.amount * 100)
 const describe = (t: PlaidTransaction) => (t.name || t.merchant_name || '(no description)').slice(0, 300)
 
-function posted(t: PlaidTransaction, bankAccountId: string, feedAccountId: string, stamp: string): Sql[] {
-  const details = transactionDetails(t), amount = details.amountCents, payee = details.payee
-  return [
-    ...(t.pending_transaction_id ? [q('DELETE FROM pt_feed_pending WHERE feed_txn_id = ?', t.pending_transaction_id)] : []),
-    q('DELETE FROM pt_feed_pending WHERE feed_txn_id = ?', t.transaction_id),
-    q(`UPDATE pt_bank_lines SET posted_date = ?, amount_cents = ?, description = ?, payee = ?, reference = ?, removed_at = NULL WHERE feed_txn_id = ? AND NOT ${protectedLine('pt_bank_lines')}`, t.date, amount, details.description, payee, details.reference, t.transaction_id),
-    // The same day's same-amount line from an imported file is this transaction: it adopts the id instead of a second line.
-    q(`UPDATE pt_bank_lines SET feed_txn_id = ?, payee = CASE WHEN payee = '' THEN ? ELSE payee END WHERE id = (SELECT id FROM pt_bank_lines WHERE bank_account_id = ? AND source = 'file' AND feed_txn_id IS NULL AND removed_at IS NULL AND posted_date = ? AND amount_cents = ? ORDER BY id LIMIT 1) AND NOT EXISTS (SELECT 1 FROM pt_bank_lines WHERE feed_txn_id = ?)`,
-      t.transaction_id, payee, bankAccountId, t.date, amount, t.transaction_id),
-    q(`INSERT INTO pt_bank_lines (id, statement_id, bank_account_id, posted_date, amount_cents, description, reference, fingerprint, source, payee, feed_txn_id, arrived_at)
-      SELECT ?, NULL, ?, ?, ?, ?, ?, ?, 'feed', ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM pt_bank_lines WHERE feed_txn_id = ?)`,
-      uid(), bankAccountId, t.date, amount, describe(t), (t.check_number ?? '').slice(0, 60), `plaid:${t.transaction_id}`, payee, t.transaction_id, stamp, t.transaction_id),
-    q('UPDATE pt_bank_lines SET feed_snapshot = ?, feed_account_id = COALESCE(feed_account_id, ?) WHERE feed_txn_id = ?', JSON.stringify(details), feedAccountId, t.transaction_id),
-  ]
-}
 
 const pending = (t: PlaidTransaction, feedAccountId: string, stamp: string): Sql =>
   q(`INSERT INTO pt_feed_pending (feed_txn_id, feed_account_id, txn_date, amount_cents, description, payee, seen_at) SELECT ?, ?, ?, ?, ?, ?, ?
@@ -58,6 +45,7 @@ const pending = (t: PlaidTransaction, feedAccountId: string, stamp: string): Sql
 const removed = (id: string, stamp: string): Sql[] => [
   transactionException(null, id, 'removed', '{"removed":true}', stamp),
   q('DELETE FROM pt_feed_pending WHERE feed_txn_id = ?', id),
+  removeHistoryObservation(id, stamp),
   // Retain the provider id and statement/match history; an unfiled removed line leaves the queue.
   q(`UPDATE pt_bank_lines SET removed_at = ? WHERE feed_txn_id = ? AND NOT ${protectedLine('pt_bank_lines')}`, stamp, id),
   q('UPDATE pt_bank_lines SET feed_snapshot = ? WHERE feed_txn_id = ?', '{"removed":true}', id),
@@ -92,18 +80,21 @@ export async function syncItem(env: Bindings, itemId: string, trigger: Trigger):
         throw e
       }
     }
-    const accounts = new Map((await all(db, 'SELECT f.*, b.opening_date FROM pt_feed_accounts f LEFT JOIN pt_bank_accounts b ON b.id = f.bank_account_id WHERE f.item_id = ?', itemId)).map(a => [a.provider_account_id, a]))
+    const accounts = new Map((await all(db, 'SELECT f.*, b.opening_date, (SELECT books_start FROM pt_entity WHERE id = 1) AS books_start FROM pt_feed_accounts f LEFT JOIN pt_bank_accounts b ON b.id = f.bank_account_id WHERE f.item_id = ?', itemId)).map(a => [a.provider_account_id, a]))
+    const index = await historyIndex(db, itemId)
     const statements: Sql[][] = [], counts = { updated: 0, removed: 0 }
     for (const page of pages) {
       for (const t of [...page.added, ...page.modified]) {
         const a = accounts.get(t.account_id)
-        // Only accounts brought into Pantry, only after their opening statement date, never a zero amount.
-        if (!a?.bank_account_id) continue
-        const changes = [transactionException(a.id, t.transaction_id, 'modified', JSON.stringify(transactionDetails(t)), stamp, page.modified.includes(t))]
-        if (t.date > a.opening_date && cents(t) !== 0) {
-          changes.push(...(t.pending ? [pending(t, a.id, stamp), q('UPDATE pt_bank_lines SET feed_snapshot = ? WHERE feed_txn_id = ?', JSON.stringify(transactionDetails(t)), t.transaction_id)] : posted(t, a.bank_account_id, a.id, stamp)))
-        }
-        statements.push(changes)
+        if (!a?.bank_account_id || cents(t) === 0) continue
+        if (!a.available_from || t.date < a.available_from) a.available_from = t.date
+        if (t.date < (a.history_start ?? a.books_start) && !index.providerIds.has(t.transaction_id) && !index.history.has(t.transaction_id)) continue
+        const observation = historyObservation(index, a, t, stamp)
+        const changes = observation.held ? observation.statements : [...observation.statements,
+          transactionException(a.id, t.transaction_id, 'modified', JSON.stringify(transactionDetails(t)), stamp, page.modified.includes(t)),
+          ...(t.pending ? [pending(t, a.id, stamp), q('UPDATE pt_bank_lines SET feed_snapshot = ? WHERE feed_txn_id = ?', JSON.stringify(transactionDetails(t)), t.transaction_id)] : posted(t, a.bank_account_id, a.id, stamp)),
+        ]
+        if (changes.length) statements.push(changes)
       }
       counts.updated += page.modified.length
       for (const r of page.removed) { statements.push(removed(r.transaction_id, stamp)); counts.removed++ }
@@ -116,7 +107,7 @@ export async function syncItem(env: Bindings, itemId: string, trigger: Trigger):
     for (let i = 0; i < statements.length; i += 20) await run(db, [mine, ...statements.slice(i, i + 20).flat()])
     const mapped = [...accounts.values()].filter(a => a.bank_account_id)
     await run(db, [mine,
-      ...mapped.map(a => q('UPDATE pt_feed_accounts SET last_synced_at = ? WHERE id = ?', now(), a.id)),
+      ...mapped.map(a => q('UPDATE pt_feed_accounts SET last_synced_at = ?, available_from = ? WHERE id = ?', now(), a.available_from ?? null, a.id)),
       q("UPDATE pt_feed_items SET cursor = ?, last_sync_at = ?, last_sync_error = '', error_code = CASE WHEN error_code IN ('PENDING_EXPIRATION', 'PENDING_DISCONNECT') THEN error_code ELSE '' END, error_message = CASE WHEN error_code IN ('PENDING_EXPIRATION', 'PENDING_DISCONNECT') THEN error_message ELSE '' END, sync_due_at = ?, claim_id = NULL, claim_until = NULL, revision = ? WHERE id = ? AND claim_id = ?", cursor, now(), later(EVERY_MS), uid(), itemId, claimId)])
     const arrived = await all<{ id: string }>(db, 'SELECT id FROM pt_bank_lines WHERE arrived_at = ? AND source = \'feed\'', stamp)
     // Booked Stripe payouts and Gusto payrolls meet their bank lines; deposits that name exactly one open

@@ -6,8 +6,9 @@ import { useEffect, useState } from 'react'
 import { Card, Chip, command, Field, Loading, PageHead, accountOptions, today, usd, useShared, useView, type D } from './kit'
 import { openLink, pendingLink } from './plaid-link'
 import { SetupSteps } from './provider-guides'
+import { HistoryFields } from './feed-history'
 
-type Choice = { target: string; name: string; ledger: string; openingDate: string; openingBalance: string }
+type Choice = { target: string; name: string; ledger: string; openingDate: string; openingBalance: string; historyMode: string; historyDate: string }
 const CREATE = 'create'
 
 /** The next free code in a hundred, for a ledger account made on this page. */
@@ -24,7 +25,7 @@ function Choose({ connection, onDone }: { connection: D; onDone: (r: D) => void 
   const [choices, setChoices] = useState<Record<string, Choice>>(() => Object.fromEntries(connection.accounts.map((a: D) => {
     const same = free.find((b: D) => compatible(a, b) && b.number_last4 === a.mask)
     const balance = a.balance_cents === null ? '' : ((debt(a) ? -a.balance_cents : a.balance_cents) / 100).toFixed(2)
-    return [a.id, { target: a.bank_account_id ?? same?.id ?? '', name: a.name, ledger: CREATE, openingDate: today(), openingBalance: balance }]
+    return [a.id, { target: a.bank_account_id ?? same?.id ?? '', name: a.name, ledger: CREATE, openingDate: today(), openingBalance: balance, historyMode: a.history_mode ?? 'booksStart', historyDate: a.history_start ?? '' }]
   })))
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const set = (id: string, patch: Partial<Choice>) => setChoices(c => ({ ...c, [id]: { ...c[id], ...patch } }))
@@ -36,29 +37,31 @@ function Choose({ connection, onDone }: { connection: D; onDone: (r: D) => void 
       const codes: string[] = [], accounts = []
       for (const a of connection.accounts as D[]) {
         const c = choices[a.id]
-        if (c.target !== 'new') { accounts.push({ id: a.id, bankAccountId: c.target }); continue }
+        const history = { mode: c.historyMode, ...(c.historyMode === 'explicit' ? { startDate: c.historyDate } : {}) }
+        if (c.target !== 'new') { accounts.push({ id: a.id, bankAccountId: c.target, ...(c.target ? { history } : {}) }); continue }
         let ledger = c.ledger
         if (ledger === CREATE) {
           const card = debt(a), code = nextCode(state.accounts, card ? 2110 : 1020, codes)
           codes.push(code)
           ledger = (await command('account.save', { code, name: c.name, type: card ? 'liability' : 'asset', subtype: 'bank' })).id
         }
-        accounts.push({ id: a.id, bankAccountId: 'new', new: { name: c.name, accountId: ledger, openingDate: c.openingDate, openingBalance: c.openingBalance } })
+        accounts.push({ id: a.id, bankAccountId: 'new', history, new: { name: c.name, accountId: ledger, openingDate: c.openingDate, openingBalance: c.openingBalance } })
       }
       const r = await command('feed.map', { itemId: connection.id, accounts })
       await reload(); onDone(r)
     } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
   return <Card title={`2 · Choose where each ${connection.institution_name} account goes`}>
-    <p className="hint">Each account feeds one Pantry bank or card account. Transactions after its opening date come in; leave out any you do not keep books for.</p>
+    <p className="hint">Each account feeds one Pantry bank or card account. Choose where its history starts; Pantry requests up to 24 months, as far as the bank provides. Leave out accounts you do not keep books for. History before your books start or in a locked period stays as reference.</p>
     <div className="connect-accounts">{connection.accounts.map((a: D) => { const c = choices[a.id]; return <fieldset key={a.id} className="connect-account">
       <legend>{a.name} <small className="sub">••{a.mask} · {a.kind}{a.balance_cents !== null ? ` · ${usd(a.balance_cents)}` : ''}</small></legend>
       <Field label="Brings transactions into" name={`target-${a.id}`} value={c.target} onChange={(e: any) => set(a.id, { target: e.target.value })}
         empty="Leave it out" options={[...free.filter((b: D) => compatible(a, b)).map((b: D) => ({ value: b.id, label: `${b.name} (…${b.number_last4})` })), { value: 'new', label: 'A new bank or card account' }]} />
+      {c.target && <HistoryFields prefix={a.id} mode={c.historyMode} startDate={c.historyDate} onChange={patch => set(a.id, patch)} />}
       {c.target === 'new' && <div className="grid-form">
         <Field label="Name in Pantry" name={`name-${a.id}`} value={c.name} onChange={(e: any) => set(a.id, { name: e.target.value })} />
         <Field label="Ledger account" name={`ledger-${a.id}`} value={c.ledger} onChange={(e: any) => set(a.id, { ledger: e.target.value })} options={[{ value: CREATE, label: `Create “${c.name}” in the chart` }, ...ledgers(a)]} />
-        <Field label="Opening date" name={`date-${a.id}`} type="date" value={c.openingDate} onChange={(e: any) => set(a.id, { openingDate: e.target.value })} hint="Transactions after this day come in" />
+        <Field label="Opening date" name={`date-${a.id}`} type="date" value={c.openingDate} onChange={(e: any) => set(a.id, { openingDate: e.target.value })} hint="Balance date from your statement; choose feed history above" />
         <Field label="Balance on that day" name={`balance-${a.id}`} inputMode="decimal" value={c.openingBalance} onChange={(e: any) => set(a.id, { openingBalance: e.target.value })} hint={debt(a) ? 'What you owed, as a negative amount' : 'From that day’s statement'} />
       </div>}
     </fieldset> })}</div>
@@ -105,6 +108,7 @@ export function Connect() {
       {connection && !result && <Choose connection={connection} onDone={setResult} />}
       {result && <Card title="3 · Transactions are coming in">
         {result.sync?.error ? <p className="error">{result.sync.message}</p> : <p><strong>{result.sync?.added ?? 0} transaction{result.sync?.added === 1 ? '' : 's'} came in</strong>{result.sync?.filed ? `, ${result.sync.filed} filed by your rules` : ''}{result.sync?.pending ? `, ${result.sync.pending} pending at the bank` : ''}. New ones arrive on their own; Pantry checks every few hours and as soon as the bank says there is news.</p>}
+        {result.history && <p>{result.history.references.filter((r: D) => r.item_id === connection?.id).length} historical observations kept as reference; {result.history.duplicates.filter((r: D) => r.item_id === connection?.id && r.state === 'doubtful').length} possible duplicates waiting for your decision in Bank.</p>}
         <div className="form-end"><Link to="/app/bank" className="btn btn-primary">See transactions</Link></div>
       </Card>}
     </div>}
