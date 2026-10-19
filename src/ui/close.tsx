@@ -5,6 +5,7 @@ import { Action, Card, Chip, command, Field, Form, Loading, PageHead, Table, day
 import { Icon } from './icons'
 import { CaptureButtons } from './receipt-capture'
 import { YearEnd } from './year-end'
+import { RecognitionSchedules } from './recognition-schedules'
 import { RecurringJournals } from './recurring-journals'
 import { MonthQuestions } from './questions'
 
@@ -42,10 +43,11 @@ export function Close() {
       <div className="stack">
         <Card title="Close checklist" actions={s.checks.every((c: D) => c.ok) ? <Chip tone="good">All checks passed</Chip> : <Chip tone="warn">{s.checks.filter((c: D) => !c.ok).length} to resolve</Chip>}>
           <Table heads={['Check', 'Status', 'Details']}>
-            {s.checks.map((c: D) => <tr key={c.key}><td><strong>{c.title}</strong></td><td>{c.ok ? <Chip tone="good">Passed</Chip> : <Chip tone="bad">Not yet</Chip>}</td><td>{c.detail} {!c.ok && <Link to={LINK[c.key]}>Open</Link>}</td></tr>)}
+            {s.checks.map((c: D) => <tr key={c.key}><td><strong>{c.title}</strong></td><td>{c.ok ? <Chip tone="good">Passed</Chip> : <Chip tone="bad">Not yet</Chip>}</td><td>{c.detail} {!c.ok && (c.key === 'recognition' ? <a href="#recognition">Open</a> : <Link to={LINK[c.key]}>Open</Link>)}</td></tr>)}
           </Table>
         </Card>
         <RecurringJournals />
+        <div id="recognition"><RecognitionSchedules to={s.end} onChange={refresh} /></div>
         <MonthQuestions questions={s.questions} month={monthName(period)} onDone={refresh} />
         <Card title="Review tasks" actions={s.status !== 'locked' && can.record && (!s.tasks.length || s.checks.some((c: D) => c.key === 'year-end-reviews' && !c.ok)) && <Action tone="primary" run={async () => { await command('close.tasks', { period }); await reload() }}>Add the standard review tasks</Action>}>
           <Table heads={['Task', 'Status', 'Completed by', '']} empty="No review tasks yet. Add the standard ones, or your own.">

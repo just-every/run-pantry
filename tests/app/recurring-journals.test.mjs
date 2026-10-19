@@ -98,3 +98,93 @@ test('CLOSE-001 create and approve recurring journals, inspect dated daily, fort
     await context.close()
   }
 })
+
+test('CLOSE-002 people create and approve recognition schedules, inspect posted months and milestones, and resolve a close tie at 1440 and 390', async t => {
+  const { recognitionScenario } = await import('../api/recognition-scenario.mjs')
+  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
+  for (const width of [1440, 390]) {
+    const app = await worker()
+    try {
+      const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 1000 } })
+      assert.equal((await context.request.post(`${app.origin}/auth/bootstrap`, { headers: { origin:app.origin }, data:{token:TOKEN,displayName:'Rosa Rivera'},maxRedirects:0 })).status(),303)
+      await context.request.post(`${app.origin}/setup`,{headers:{origin:app.origin},form:{confirm:'yes'},maxRedirects:0})
+      const command = async (op,data) => {const r=await context.request.post(`${app.origin}/api/pantry/command/${op}`,{headers:{origin:app.origin},data});assert.equal(r.status(),200,`${op}: ${await r.text()}`);return r.json()}
+      const view=async path=>{const r=await context.request.get(`${app.origin}/api/pantry/${path}`);assert.equal(r.status(),200,await r.text());return r.json()}
+      await command('entity.save',{legalName:'Rivera Design Studio LLC',entityType:'single-member-llc',state:'NY',fiscalYearStart:1,taxMethod:'accrual',booksStart:'2025-01-01'})
+      await command('chart.start',{})
+      const s=await recognitionScenario({command,view}),page=await context.newPage(), errors=[];page.on('pageerror',e=>errors.push(String(e)))
+      await page.goto(`${app.origin}/app/close?period=2026-09`)
+      const card = name => page.locator('section.card').filter({has:page.getByRole('heading',{name,exact:true})})
+      const create = async (plan, milestones) => {
+        await page.getByRole('button',{name:'New recognition schedule',exact:true}).click()
+        await page.getByLabel('Schedule type',{exact:true}).selectOption(plan.kind)
+        await page.getByLabel('Schedule name',{exact:true}).fill(plan.name)
+        await page.getByLabel('Balance-sheet account',{exact:true}).selectOption(plan.balanceAccountId)
+        await page.getByLabel('Recognition account',{exact:true}).selectOption(plan.recognitionAccountId)
+        if(plan.kind!=='accrual') {
+          const funding=(await view('recognition?to=2026-09-30')).fundingSources.find(x=>x.journal_id===plan.sourceJournalId && x.account_id===plan.balanceAccountId)
+          await page.getByLabel('Original posted journal',{exact:true}).selectOption(funding.line_id)
+        }
+        await page.getByLabel(plan.kind==='accrual'?'Amount per month':'Total amount',{exact:true}).fill(plan.amount)
+        await page.getByLabel(plan.kind==='accrual'?'First accrual month':'First recognition date',{exact:true}).fill(plan.startDate)
+        if(milestones) {
+          await page.getByLabel('Recognize by',{exact:true}).selectOption('milestones')
+          for(const [i,m] of milestones.entries()) {
+            if(i)await page.getByRole('button',{name:'Add milestone',exact:true}).click()
+            await page.getByLabel(`Milestone ${i+1} name`,{exact:true}).fill(m.label)
+            await page.getByLabel(`Milestone ${i+1} date`,{exact:true}).fill(m.date)
+            await page.getByLabel(`Milestone ${i+1} amount`,{exact:true}).fill(m.amount)
+          }
+        } else await page.getByLabel('Number of months',{exact:true}).fill(String(plan.months))
+        await card('New recognition schedule').screenshot({path:`/tmp/sx-pantry-r9-recognition-${width}-new-${milestones?'milestones':plan.kind}.png`})
+        await page.getByRole('button',{name:'Save recognition schedule',exact:true}).click()
+        await card(plan.name).waitFor()
+        await card(plan.name).getByRole('button',{name:'Approve this schedule revision',exact:true}).click()
+        await card(plan.name).getByRole('button',{name:'Renew schedule approval',exact:true}).waitFor()
+      }
+      for(const plan of Object.values(s.plans))await create(plan)
+      const cron=await context.request.get(`${app.origin}/cdn-cgi/local/scheduled?cron=${encodeURIComponent('*/30 * * * *')}`)
+      assert.equal(cron.status(),200,await cron.text())
+      await page.reload()
+      let r=await view('recognition?to=2026-09-30');assert.ok(r.ties.every(x=>x.ties),JSON.stringify(r.ties))
+      for(const plan of Object.values(s.plans)) {
+        await card('Recognition schedules').getByRole('button',{name:plan.name,exact:true}).click()
+        const detail=card(plan.name);await detail.waitFor()
+        assert.ok(await detail.getByRole('link',{name:/Journal \d+/}).count()>0)
+        assert.match(await detail.innerText(),new RegExp(plan.kind==='accrual'?'Automatic reversal':plan.kind==='prepaid'?'Month 12':'Month 3'))
+        await detail.screenshot({path:`/tmp/sx-pantry-r9-recognition-${width}-posted-${plan.kind}.png`})
+      }
+      const funding=await s.journal('2026-06-01','Milestone retainer',[{accountId:s.acct['1000'],debit:'100.01'},{accountId:s.acct['2400'],credit:'100.01'}])
+      await page.reload()
+      const milestonePlan={...s.plans.deferred,name:'Milestone retainer',amount:'100.01',startDate:'2026-06-01',sourceJournalId:funding.id}
+      const milestones=[{label:'Design approved',date:'2026-06-30',amount:'50.00'},{label:'Launch accepted',date:'2026-07-31',amount:'50.01'}]
+      await create(milestonePlan,milestones)
+      const detail=card('Milestone retainer')
+      for(const [i,date] of ['2026-07-03','2026-08-02'].entries()) {
+        const form=detail.locator('form').filter({has:page.getByLabel(`Achieved date · ${milestones[i].label}`,{exact:true})})
+        await form.getByLabel(`Achieved date · ${milestones[i].label}`,{exact:true}).fill(date)
+        await form.getByRole('button',{name:'Mark milestone achieved',exact:true}).click()
+        await form.waitFor({state:'detached'})
+      }
+      await detail.screenshot({path:`/tmp/sx-pantry-r9-recognition-${width}-posted-milestones.png`})
+      const achieved=(await view('recognition?to=2026-09-30')).schedules.find(x=>x.name==='Milestone retainer')
+      assert.equal(achieved.remaining_cents,0)
+      for(const [i,o] of achieved.occurrences.entries()) assert.equal(await detail.locator('tbody tr').nth(i).locator('td').first().locator('time').first().getAttribute('datetime'),o.entry_date,'entry date is the actual achievement posting date')
+      const bad=await s.journal('2026-09-30','Unallocated prepaid adjustment',[{accountId:s.acct['1400'],debit:'1.00'},{accountId:s.acct['3000'],credit:'1.00'}])
+      await page.reload()
+      const check=card('Close checklist').getByRole('row').filter({hasText:'Recognition schedules tie to the balance sheet'})
+      await check.getByText('Not yet',{exact:true}).waitFor()
+      await check.getByRole('link',{name:'Open',exact:true}).click()
+      assert.equal(new URL(page.url()).hash,'#recognition')
+      await card('Recognition balance-sheet ties').getByText('Does not tie',{exact:true}).waitFor()
+      await card('Recognition balance-sheet ties').screenshot({path:`/tmp/sx-pantry-r9-recognition-${width}-broken-tie.png`})
+      await command('journal.reverse',{id:bad.id,date:'2026-09-30',reason:'Correct the unrelated adjustment'})
+      await page.reload();await card('Recognition balance-sheet ties').waitFor()
+      assert.ok((await view('recognition?to=2026-09-30')).ties.every(x=>x.ties))
+      await card('Recognition balance-sheet ties').screenshot({path:`/tmp/sx-pantry-r9-recognition-${width}-tied.png`})
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+      assert.deepEqual(errors,[])
+      await context.close()
+    } finally {await app.close()}
+  }
+})

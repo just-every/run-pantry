@@ -60,6 +60,7 @@ import { parse as parseQuestion, withThreads as questionThreads } from './questi
 import { questionCommands, questionsView } from './questions/commands'
 import { integrationCommands, integrationSettings } from './integrations/credentials'
 import { integrations } from './integrations/routes'
+import { recognitionCommands, recognitionView } from './recognition'
 import { recurringJournalCommands, recurringJournalsView } from './recurring-journals'
 import { transferCommands } from './transfers'
 import { vendorHistory } from './vendor-history'
@@ -70,7 +71,7 @@ import { reviewCommands, reviewView } from './review'
 import { smallBalances, writeOffCommands } from './write-offs'
 
 const commands: Record<string, Command> = {
-  ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -137,6 +138,7 @@ view('exemptions', async ctx => exemptionView(ctx.db))
 view('sales-tax/nexus', async ctx => nexusWatch(ctx.db))
 view('documents', async ctx => ({ documents: await documents(ctx.db) }))
 const year = (c: C) => { const y = Number(c.req.query('year') ?? new Date().getUTCFullYear()); requireThat(Number.isInteger(y) && y >= 2000 && y <= 2100, 'Choose a tax year'); return y }
+view('recognition', async (ctx, c) => recognitionView(ctx.db, day(c, 'to')))
 view('reports/detail', async (ctx, c) => {
   const to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')

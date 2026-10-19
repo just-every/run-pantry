@@ -1,4 +1,5 @@
 import { YEAR_END_TASKS, yearEndChecks } from './year-end-checks'
+import { recognitionCloseGuards, recognitionTies } from './recognition'
 import { feedCloseExceptions } from './feeds/health'
 // Period close: calculated checks plus reviewed tasks, then a lock that both
 // people and agents' approved work must respect. Reopening is a separate
@@ -69,6 +70,10 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
   const tb = await trialBalance(db, end)
   checks.push({ key: 'trial-balance', title: 'Trial balance balances', ok: tb.balanced, detail: `Debits ${usd(tb.debit)}, credits ${usd(tb.credit)}` })
 
+  const ties = await recognitionTies(db, end)
+  checks.push({ key: 'recognition', title: 'Recognition schedules tie to the balance sheet', ok: ties.every(t => t.ties), items: ties,
+    detail: ties.length ? ties.map(t => `${t.account_name}: expected ${usd(t.expected_cents)}, posted ${usd(t.actual_cents)}, difference ${usd(t.difference_cents)}${t.exceptions.length ? `; ${t.exceptions.length} missing or failed occurrences` : ''}`).join('; ') : 'No prepaid, accrual or deferred-revenue schedules' })
+
   const proposals = await all(db, "SELECT id, summary FROM pt_proposals WHERE status = 'proposed'")
   checks.push({ key: 'proposals', title: 'No agent proposals waiting', ok: proposals.length === 0, items: proposals.map(x => ({ kind: 'proposal', id: x.id, label: x.summary })), detail: proposals.length ? `${proposals.length} waiting for a person` : 'None waiting' })
 
@@ -123,6 +128,7 @@ export async function lockPlan(db: D1Database, actor: Actor, id: string, note: s
   requireThat(state.tasks.length && state.tasks.every((t: Data) => t.status === 'done'), 'Complete every review task before locking', 409)
   const revision = uid()
   return [
+    ...await recognitionCloseGuards(db, state.end),
     // The checked state must still hold: no task reopened, no draft or posting added in the period meanwhile.
     guard("(SELECT COUNT(*) FROM pt_close_tasks WHERE period = ? AND status <> 'done') = 0", id),
     guard("NOT EXISTS (SELECT 1 FROM pt_journal_entries WHERE status = 'draft' AND entry_date BETWEEN ? AND ?)", state.start, state.end),
