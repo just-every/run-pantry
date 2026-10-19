@@ -304,7 +304,7 @@ These nineteen clauses are the tested ledger core. Every later clause writes int
 
 ### Close and schedules
 
-- **CLOSE-001 — Recurring journals.** A journal template runs on a schedule, either creating a draft for approval or posting under the template's approval when its amounts equal the approved template. Missed and failed runs are listed. **Acceptance evidence:** Approve a monthly $500 owner-loan interest template and see it post for three months. Change the amount and see the run wait for approval. Lock a month and see that month's run wait in the exception queue.
+- **CLOSE-001 — Recurring journals.** A journal template runs on a schedule, either creating a draft for approval or posting under the template's approval when its amounts equal the approved template. Every 1–12 months is anchored to the original day; a short month clamps that occurrence without shifting later months. First and last entry dates are inclusive and due dates use the installation’s configured sending time zone. Each trigger catches up at most twelve original dates per template; remaining due dates are listed as missed. Editing a posting template revokes its approval before another occurrence can post. Missed, failed and locked runs retain their exact template snapshot and reason; a failed or locked occurrence requires an explicit retry, and an earlier revision requires a corrective journal. **Acceptance evidence:** Approve a monthly $500 owner-loan interest template and see it post for three months. Change the amount and see the run wait for approval. Lock a month and see that month's run wait in the exception queue.
 
 - **CLOSE-002 — Prepaid, accrual and deferred-revenue schedules.** A person or AGENT-006 sets a schedule. An annual insurance premium is spread monthly. An accrued expense posts at month end and reverses on the first day of the next month. A retainer or deposit is recognised as revenue by month or milestone. Each schedule shows its remaining balance and is tied to its balance-sheet account. The close checklist (PAN-13) checks that tie. **Acceptance evidence:** Spread a $12,000 annual insurance bill over 12 months, accrue a $3,200 utility bill at month end, and recognise a $6,000 retainer over 3 months. See each month's postings, the auto-reversal, and the close checklist flag a deliberately broken tie.
 
@@ -648,8 +648,8 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 17 | 58 | 45 | 120 |
-| All | 36 | 58 | 45 | 139 |
+| Target and push further | 18 | 58 | 44 | 120 |
+| All | 37 | 58 | 44 | 139 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -742,7 +742,7 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | `BUDGET-001` | Budgets and budget versus actual | target | missing |  | No implementation. |
 | `CASH-001` | Cash planner | target | missing |  | No implementation. |
 | `CURRENCY-001` | Foreign-currency customers and vendors | target | missing |  | No implementation; USD only. |
-| `CLOSE-001` | Recurring journals | target | missing |  | No implementation. |
+| `CLOSE-001` | Recurring journals | target | done | `src/pantry/recurring-journals.ts`, `src/pantry/recurring-journal-runs.ts`, `src/ui/recurring-journals.tsx`, `tests/api/close.test.mjs`, `tests/app/recurring-journals.test.mjs` › CLOSE-001 | Exact-version monthly template approval, atomic once-only original-date runs, draft mode, catch-up and visible missed/failed/locked exceptions with retained snapshots and explicit retry. Public Cron/API and 1440/390 browser journeys prove three $500 months, changed-amount reapproval, locks, account failure and draft approval. |
 | `CLOSE-002` | Prepaid, accrual and deferred-revenue schedules | target | missing |  | No implementation; an agent can propose a single accrual journal (PAN-15). |
 | `CLOSE-003` | Close workflow with owners and questions | target | partial | `src/pantry/close.ts`, `src/pantry/questions/close.ts`, `src/ui/close.tsx`, `tests/api/close.test.mjs`, `tests/api/questions.test.mjs` | Calculated checks, review tasks by named people and the month's questions as one thread that must be answered before the lock ship. Questions on bank lines, entries and report figures/source records can be addressed to an invited accountant and answered in Pantry or by email reply, kept with the record; custom items with owners and due dates and a multi-month board do not. |
 | `CLOSE-004` | Continuous checks | target | partial | `src/pantry/close.ts`, `src/pantry/reconcile.ts` | Checks are calculated on request at close; daily runs and the unusual-amount, duplicate, wrong-side, suspense and clearing checks do not exist. |

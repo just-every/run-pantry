@@ -59,7 +59,7 @@ async function names(db: D1Database) {
   const out: Record<string, string> = {}
   for (const r of rows) if (r.name?.trim()) out[r.email] = r.name.trim()
   // Pantry acting by itself, named for the job it did.
-  Object.assign(out, { 'pantry:reminders': 'Pantry (reminders)', 'pantry:recurring': 'Pantry (recurring invoices)', 'pantry:auto-match': 'Pantry (matched automatically)', 'pantry:stripe': 'Pantry (Stripe)', 'pantry:customer': 'The customer', 'agent:pantry': 'Pantry' })
+  Object.assign(out, { 'pantry:recurring-journals': 'Pantry (recurring journals)', 'pantry:reminders': 'Pantry (reminders)', 'pantry:recurring': 'Pantry (recurring invoices)', 'pantry:auto-match': 'Pantry (matched automatically)', 'pantry:stripe': 'Pantry (Stripe)', 'pantry:customer': 'The customer', 'agent:pantry': 'Pantry' })
   return out
 }
 

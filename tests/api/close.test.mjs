@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { at, harness } from './harness.mjs'
+import { at, books, harness } from './harness.mjs'
 import { closeReady, importStatements, matchSeptember, september } from './scenario.mjs'
 
 async function reconciledSeptember(h) {
@@ -96,4 +96,127 @@ test('PAN-14 the accountant package holds the period\'s reports, reconciliations
   assert.match(csv.split('\r\n')[0], /^Account code,Account,Date,Entry/)
   assert.ok(csv.includes('Belonged to October'))
   assert.equal((await fetch(`${h.origin}/api/pantry/package/2026-09`)).status, 401)
+})
+
+const recurringToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+const recurringMonth = (day, n) => { const [y, m] = day.split('-').map(Number); return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 10) }
+const journalTemplate = async (h, id) => at((await h.view('recurring-journals')).templates, x => x.id === id)
+const recurringLines = (expense, loan, amount = '500.00') => [{ accountId: expense, debit: amount, memo: 'Owner-loan interest' }, { accountId: loan, credit: amount, memo: 'Accrued interest payable' }]
+
+test('CLOSE-001 recurring journals post three approved months once, edits wait for approval, and locked dates remain actionable exceptions', async t => {
+  const h = await harness(); t.after(() => h.close())
+  await books(h)
+  const expense = await h.command('account.save', { code: '6910', name: 'Owner-loan interest', type: 'expense' })
+  const loan = await h.command('account.save', { code: '2510', name: 'Owner loan and accrued interest', type: 'liability' })
+  const preparer = await h.member('journal-preparer@example.test', 'accountant', { canPost: true })
+  const approver = await h.member('journal-reviewer@example.test', 'accountant', { canPost: true })
+  const viewer = await h.member('journal-viewer@example.test', 'viewer')
+  const day = recurringToday(), start = recurringMonth(day, -3), third = recurringMonth(day, -1), fourth = recurringMonth(day, 0)
+  const values = { name: 'Monthly owner-loan interest', memo: 'Accrue owner-loan interest', startDate: start, endDate: third, every: 1, mode: 'post', lines: recurringLines(expense.id, loan.id) }
+  assert.equal((await h.send('/api/pantry/command/recurring-journal.save', values)).status, 401)
+  await h.view('recurring-journals', '', 401)
+  await h.command('recurring-journal.save', values, viewer, 403)
+  let saved = await h.command('recurring-journal.save', values, preparer)
+  await h.cron()
+  assert.equal((await journalTemplate(h, saved.id)).runs_list.length, 0)
+  let view = await h.view('recurring-journals')
+  assert.deepEqual(view.exceptions.filter(r => r.recurring_id === saved.id).map(r => r.occurrence), [start, recurringMonth(start, 1), third])
+  assert.ok(view.exceptions.every(r => /approval/i.test(r.detail)))
+  await h.command('recurring-journal.approve', { id: saved.id, revision: saved.revision }, preparer, 403)
+  saved = await h.command('recurring-journal.approve', { id: saved.id, revision: saved.revision }, approver)
+  await Promise.all([h.cron(), h.cron()])
+  let current = await journalTemplate(h, saved.id)
+  assert.deepEqual(current.runs_list.map(r => [r.occurrence, r.status]).sort(), [[start, 'posted'], [recurringMonth(start, 1), 'posted'], [third, 'posted']])
+  for (const r of current.runs_list) {
+    const record = await h.view(`reports/record/entry/${r.journal_id}`)
+    assert.equal(record.status, 'posted'); assert.equal(record.total, 50000)
+    const history = await h.view(`activity?record=${r.journal_id}`)
+    const posted = at(history.audit, e => e.action === 'journal.post')
+    assert.equal(posted.origin_kind, 'schedule')
+    assert.equal(posted.authority_id, saved.id); assert.equal(posted.authority_revision, saved.revision)
+    assert.equal(posted.approval.actor_email, 'journal-reviewer@example.test')
+    const snapshot = JSON.parse(r.template_snapshot)
+    assert.equal(snapshot.approved_revision, saved.revision)
+    assert.deepEqual(snapshot.lines.map(l => [l.debit, l.credit]), [[50000, 0], [0, 50000]])
+  }
+  const pl = await h.view(`reports/profit-and-loss?from=${start}&to=${day}`)
+  assert.equal(at(pl.expenses, a => a.id === expense.id).amount, 150000)
+  await h.cron()
+  assert.equal((await journalTemplate(h, saved.id)).runs_list.length, 3)
+
+  // Extending the inclusive end date admits a fourth occurrence. Changing its
+  // amount invalidates the earlier approval without touching the three posts.
+  const edited = await h.command('recurring-journal.save', { ...values, id: saved.id, revision: current.revision, endDate: day, lines: recurringLines(expense.id, loan.id, '600.00') }, preparer)
+  await h.cron()
+  current = await journalTemplate(h, saved.id)
+  assert.equal(current.status, 'awaiting-approval'); assert.equal(current.runs_list.length, 3)
+  assert.equal(at((await h.view('recurring-journals')).exceptions, r => r.recurring_id === saved.id).occurrence, fourth)
+  await h.command('recurring-journal.approve', { id: saved.id, revision: saved.revision }, approver, 409)
+  await h.command('recurring-journal.approve', { id: saved.id, revision: edited.revision }, approver)
+  await h.cron()
+  current = await journalTemplate(h, saved.id)
+  assert.equal(current.runs_list.length, 4)
+  const changed = at(current.runs_list, r => r.occurrence === fourth)
+  assert.equal((await h.view(`reports/record/entry/${changed.journal_id}`)).total, 60000)
+  assert.ok(current.runs_list.filter(r => r.occurrence !== fourth).every(r => JSON.parse(r.template_snapshot).lines[0].debit === 50000))
+  await h.command('recurring-journal.save', { ...values, id: saved.id, revision: current.revision, startDate: recurringMonth(start, 1) }, preparer, 409)
+
+  const period = start.slice(0, 7)
+  let close = await h.command('close.tasks', { period })
+  for (const task of close.tasks) await h.command('close.task', { id: task.id, revision: task.revision })
+  await h.command('period.lock', { period })
+  let locked = await h.command('recurring-journal.save', { ...values, name: 'Locked-month accrual', endDate: start }, preparer)
+  locked = await h.command('recurring-journal.approve', { id: locked.id, revision: locked.revision }, approver)
+  await h.cron()
+  let failed = at((await journalTemplate(h, locked.id)).runs_list, r => r.occurrence === start)
+  assert.equal(failed.status, 'blocked'); assert.equal(failed.journal_id, null); assert.match(failed.detail, /locked/i)
+  assert.ok((await h.view('recurring-journals')).exceptions.some(r => r.recurring_id === locked.id && /locked/i.test(r.detail)))
+  await h.cron()
+  assert.equal((await journalTemplate(h, locked.id)).runs_list.length, 1, 'a failed occurrence remains one durable record')
+  const reopened = await h.command('period.request-reopen', { period, reason: 'Review retained recurring-journal exception' })
+  await h.command('period.decide-reopen', { id: reopened.requests[0].id, decision: 'approve' })
+  await h.command('recurring-journal.retry', { id: locked.id, revision: locked.revision, occurrence: start }, preparer)
+  failed = at((await journalTemplate(h, locked.id)).runs_list, r => r.occurrence === start)
+  assert.equal(failed.status, 'posted'); assert.equal((await h.view(`reports/record/entry/${failed.journal_id}`)).total, 50000)
+  await h.command('recurring-journal.retry', { id: locked.id, revision: locked.revision, occurrence: start }, preparer, 409)
+})
+
+test('CLOSE-001 draft schedules preserve month anchors and failed preparation waits for an explicit retry without granting posting authority', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const { acct } = await books(h), day = recurringToday()
+  const preparer = await h.member('draft-preparer@example.test', 'accountant', { canPost: true })
+  const reviewer = await h.member('draft-reviewer@example.test', 'accountant', { canPost: true })
+  let expense = await h.command('account.save', { code: '6920', name: 'Scheduled adjustment', type: 'expense' })
+  const values = { name: 'Review each adjustment', memo: 'Scheduled adjustment for review', startDate: day, endDate: day, every: 1, mode: 'draft', lines: recurringLines(expense.id, acct['3000'], '25.00') }
+  let saved = await h.command('recurring-journal.save', values, preparer)
+  saved = await h.command('recurring-journal.status', { id: saved.id, revision: saved.revision, status: 'paused' }, preparer)
+  await h.cron()
+  assert.equal((await journalTemplate(h, saved.id)).runs_list.length, 0)
+  assert.match(at((await h.view('recurring-journals')).exceptions, r => r.recurring_id === saved.id).detail, /paused/i)
+  expense = await h.command('account.save', { ...expense, active: false })
+  await h.command('recurring-journal.status', { id: saved.id, revision: saved.revision, status: 'active' }, preparer)
+  await h.cron()
+  let current = await journalTemplate(h, saved.id), failed = current.runs_list[0]
+  assert.equal(failed.status, 'failed'); assert.equal(failed.journal_id, null); assert.match(failed.detail, /inactive/i)
+  expense = await h.command('account.save', { ...expense, active: true })
+  await h.cron()
+  assert.equal((await journalTemplate(h, saved.id)).runs_list[0].journal_id, null, 'repairing an account does not silently retry a failed date')
+  await h.command('recurring-journal.retry', { id: saved.id, revision: saved.revision, occurrence: day }, preparer)
+  current = await journalTemplate(h, saved.id)
+  const draft = at((await h.view('journal')).entries, e => e.id === current.runs_list[0].journal_id)
+  assert.equal(draft.status, 'draft'); assert.equal(draft.lines[0].debit_cents, 2500)
+  await h.command('journal.post', { id: draft.id, revision: draft.revision }, preparer, 403)
+  await h.command('journal.post', { id: draft.id, revision: draft.revision }, reviewer)
+  await Promise.all([h.cron(), h.cron()])
+  assert.equal((await journalTemplate(h, saved.id)).runs_list.length, 1)
+  assert.equal((await h.view(`reports/record/entry/${draft.id}`)).total, 2500)
+
+  // Public schedule evidence shows the same monthly clipping used by invoices.
+  const year = Number(day.slice(0, 4)) - 1
+  let anchored = await h.command('recurring-journal.save', { ...values, name: 'Month-end adjustment', startDate: `${year}-01-31`, endDate: `${year}-03-31` }, preparer)
+  await h.cron()
+  anchored = await journalTemplate(h, anchored.id)
+  const february = new Date(Date.UTC(year, 2, 0)).toISOString().slice(0, 10)
+  assert.deepEqual(anchored.runs_list.map(r => r.occurrence).sort(), [`${year}-01-31`, february, `${year}-03-31`])
+  assert.ok(anchored.runs_list.every(r => r.status === 'drafted'))
 })

@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router'
 import { Action, Card, Chip, command, Field, Form, Loading, PageHead, Table, day, monthName, thisMonth, usd, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
 import { CaptureButtons } from './receipt-capture'
+import { RecurringJournals } from './recurring-journals'
 import { MonthQuestions } from './questions'
 
 /** Every entry keeps its receipt: spending and bills without one, each with "add receipt" right here. */
@@ -43,6 +44,7 @@ export function Close() {
             {s.checks.map((c: D) => <tr key={c.key}><td><strong>{c.title}</strong></td><td>{c.ok ? <Chip tone="good">Passed</Chip> : <Chip tone="bad">Not yet</Chip>}</td><td>{c.detail} {!c.ok && <Link to={LINK[c.key]}>Open</Link>}</td></tr>)}
           </Table>
         </Card>
+        <RecurringJournals />
         <MonthQuestions questions={s.questions} month={monthName(period)} onDone={refresh} />
         <Card title="Review tasks" actions={s.status !== 'locked' && can.record && !s.tasks.length && <Action tone="primary" run={async () => { await command('close.tasks', { period }); await reload() }}>Add the standard review tasks</Action>}>
           <Table heads={['Task', 'Status', 'Completed by', '']} empty="No review tasks yet. Add the standard ones, or your own.">
