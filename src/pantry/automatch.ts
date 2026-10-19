@@ -1,6 +1,5 @@
-// Deposit suggestions are recalculated from current open invoices. Confirmation
-// records the receipt and clears the bank line atomically. Recorded payments
-// still clear automatically without another posting.
+// Invoice-named deposits clear automatically; other deposits await confirmation.
+// Both paths record, allocate and match atomically, with an undoable receipt.
 import { pantry } from './access'
 import { Fault, usd, type Data } from './core'
 import { all, one, run } from './db'
@@ -20,13 +19,13 @@ async function openInvoices(db: D1Database): Promise<Candidate[]> {
 }
 
 /** What Pantry makes of one deposit line: the single invoice it pays, or why a person should decide. */
-export function judge(line: Data, invoices: Candidate[]): { invoice?: Candidate; reason?: string; possible: Candidate[] } {
+export function judge(line: Data, invoices: Candidate[]): { invoice?: Candidate; namedInvoice?: boolean; reason?: string; possible: Candidate[] } {
   if (line.amount_cents <= 0) return { possible: [] }
   const words = plain(`${line.description} ${line.reference}`)
   const same = invoices.filter(i => i.open_cents === line.amount_cents)
   if (!same.length) return { possible: [] }
   const byNumber = same.filter(i => words.includes(plain(i.number)))
-  if (byNumber.length === 1) return { invoice: byNumber[0], possible: same }
+  if (byNumber.length === 1) return { invoice: byNumber[0], namedInvoice: true, possible: same }
   const byCustomer = same.filter(i => plain(i.bank_reference).length >= 3 && words.includes(plain(i.bank_reference)))
   if (!byNumber.length && byCustomer.length === 1) return { invoice: byCustomer[0], possible: same }
   if (!byNumber.length && !byCustomer.length && same.length === 1) return { invoice: same[0], possible: same }
@@ -35,12 +34,28 @@ export function judge(line: Data, invoices: Candidate[]): { invoice?: Candidate;
   return { possible: same, reason: `Same amount as ${same.map(i => `${i.number} (${i.customer_name})`).join(', ')}, but the deposit names neither the invoice nor the customer's bank reference; confirm it` }
 }
 
-/** Suggest incoming deposits; importing a bank line never records a new receipt. */
+/** Clear deposits naming one open invoice. Amount/customer-only suggestions wait. */
 export async function matchDeposits(db: D1Database, lineIds: string[]) {
-  if (!lineIds.length) return { matched: [], needsPerson: [], proposed: [] }
+  const matched: Data[] = []
+  if (!lineIds.length) return { matched, needsPerson: [], proposed: [] }
   const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE amount_cents > 0 AND removed_at IS NULL AND id IN (${lineIds.map(() => '?').join(',')}) ORDER BY posted_date, id`, ...lineIds)
-  const proposals = await depositProposals(db, lines), invoices = await openInvoices(db)
-  return { matched: [], proposed: Object.values(proposals), needsPerson: lines.filter(l => !proposals[l.id]).flatMap(l => { const reason = judge(l, invoices).reason; return reason ? [{ lineId: l.id, reason }] : [] }) }
+  for (const line of lines) {
+    if (await one(db, 'SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = ? AND active = 1', line.id)) continue
+    const decision = judge(line, await openInvoices(db)), inv = decision.invoice
+    if (!inv || !decision.namedInvoice) continue
+    const amount = (line.amount_cents / 100).toFixed(2)
+    try {
+      const plan = await matchPlan(db, pantry('auto-match'), { bankLineIds: [line.id], journalLineIds: [],
+        create: [{ type: 'receipt', contactId: inv.customer_id, amount, date: line.posted_date,
+          reference: line.reference || inv.number, memo: `Automatic deposit for ${inv.number}`, allocations: [{ targetId: inv.id, amount }] }],
+        note: `Matched automatically: deposit names ${inv.number} (${inv.customer_name})` }, { automatic: true })
+      await run(db, plan.statements)
+      matched.push({ lineId: line.id, matchId: plan.id, invoiceId: inv.id, invoice: inv.number, customer: inv.customer_name, amount: line.amount_cents })
+    } catch (error) { if (!(error instanceof Fault)) throw error }
+  }
+  const remaining = lines.filter(l => !matched.some(m => m.lineId === l.id))
+  const proposals = await depositProposals(db, remaining), invoices = await openInvoices(db)
+  return { matched, proposed: Object.values(proposals), needsPerson: remaining.filter(l => !proposals[l.id]).flatMap(l => { const reason = judge(l, invoices).reason; return reason ? [{ lineId: l.id, description: l.description, reason }] : [] }) }
 }
 
 /** Current suggestions, shared by the transaction queue and reconciliation. */

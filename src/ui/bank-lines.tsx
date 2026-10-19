@@ -17,7 +17,8 @@ function Status({ l, onUndo, picked, onFile }: { l: D; onUndo: () => Promise<voi
   if (l.removed_at) return <Chip tone="bad">Removed by the bank</Chip>
   if (l.rule_id) return <span className="filed"><Chip tone="good">Filed by rule · {l.rule_name}</Chip><small className="sub">{l.filed_to.join(', ')}</small>
     {can && !l.reconciliation_id && <Action run={async () => { await command('bank-rule.undo', { matchId: l.match_id }); await onUndo() }}>Undo</Action>}</span>
-  if (l.match_id) return <span className="filed"><Chip tone="good">Filed</Chip><small className="sub">{l.filed_to.join(', ')}</small></span>
+  if (l.match_id) return <span className="filed"><Chip tone="good">{l.automatic ? 'Matched automatically' : 'Filed'}</Chip><small className="sub">{l.filed_to.join(', ')}</small>
+    {can && l.payment_id && !l.reconciliation_id && <Action run={async () => { await command('match.undo', { id: l.match_id }); await onUndo() }}>Undo</Action>}</span>
   return <span className="filed"><Chip tone="warn">To file</Chip>{can && <button type="button" className="btn btn-link" aria-pressed={picked} onClick={e => { e.stopPropagation(); onFile() }}>{picked ? 'Chosen' : 'File it'}</button>}</span>
 }
 
