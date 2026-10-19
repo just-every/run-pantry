@@ -41,7 +41,7 @@ export async function invoiceDocument(db: D1Database, inv: Data) {
     facts: [['Billed to', inv.customer_name], ['Issued', longDay(inv.issue_date)], ['Due', longDay(inv.due_date)]] as [string, string][],
     lines: inv.lines.map((l: Data) => ({ description: l.description, quantity: String(l.quantity_milli / 1000), amount: usd(l.amount_cents) })),
     totals: [['Subtotal', usd(inv.subtotal_cents)], ['Sales tax', usd(inv.tax_cents)], ['Total', usd(inv.total_cents)], ...(paid ? [['Paid', usd(paid)] as [string, string]] : []), ['Amount due', usd(inv.open_cents)]] as [string, string][],
-    notes: inv.memo ? [inv.memo] : [],
+    notes: [...(inv.memo ? [inv.memo] : []), ...(inv.exemption ? [`Sales tax exempt in ${inv.destination_state}: certificate ${inv.exemption.certificateNumber}, valid through ${inv.exemption.expiresOn}.`] : [])],
   }
 }
 

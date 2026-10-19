@@ -8,10 +8,12 @@ import { controlAccount } from './accounts'
 import { contact } from './contacts'
 import { entryStatements, type Line } from './journal'
 import type { Command } from './context'
+import { applicableExemption, assertInvoiceExemption, destinationState, exemptionDay, exemptionFence } from './exemptions'
 
 export async function invoice(db: D1Database, id: string) {
   const row = await one(db, 'SELECT i.*, c.name AS customer_name, c.email AS customer_email FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id WHERE i.id = ?', id)
   requireThat(row, 'Invoice not found', 404)
+  row.exemption = row.exemption_evidence ? JSON.parse(row.exemption_evidence) : null
   row.lines = await all(db, 'SELECT * FROM pt_invoice_lines WHERE invoice_id = ? ORDER BY line_no', id)
   row.open_cents = await openBalance(db, 'invoice', id, row.total_cents)
   return row
@@ -31,6 +33,8 @@ export async function parseInvoice(db: D1Database, b: Data) {
   const issueDate = date(b.issueDate, 'Issue date')
   const dueDate = b.dueDate ? date(b.dueDate, 'Due date') : addDays(issueDate, customer.terms_days)
   requireThat(dueDate >= issueDate, 'Due date is on or after the issue date')
+  const destination = destinationState(b.destinationState)
+  const exemption = b.kind === 'credit' ? null : await applicableExemption(db, customer.id, destination, issueDate)
   const taxCodes = new Map((await all(db, 'SELECT * FROM pt_tax_codes WHERE active = 1')).map(t => [t.id, t]))
   const accounts = new Map((await all(db, "SELECT id, type, active FROM pt_accounts")).map(a => [a.id, a]))
   const lines = list<Data>(b.lines, 'Invoice lines', 100).map((l, i) => {
@@ -40,18 +44,19 @@ export async function parseInvoice(db: D1Database, b: Data) {
     requireThat(amount > 0, `${label} amount must be positive`)
     const account = accounts.get(text(l.accountId, `${label} income account`))
     requireThat(account && account.active && account.type === 'income', `${label}: choose an active income account`)
-    const code = typeof l.taxCode === 'string' && l.taxCode ? l.taxCode : null
-    requireThat(code === null || code === 'exempt' || taxCodes.has(code), `${label}: unknown sales tax code`)
+    const chosenCode = typeof l.taxCode === 'string' && l.taxCode ? l.taxCode : null
+    requireThat(chosenCode === null || chosenCode === 'exempt' || taxCodes.has(chosenCode), `${label}: unknown sales tax code`)
+    const code = exemption ? 'exempt' : chosenCode
     const tax = code && code !== 'exempt' ? scale(amount, taxCodes.get(code)!.rate_milli_percent, 100000) : 0
-    return { description: text(l.description, `${label} description`, 500), qty, unit, amount, accountId: account.id, taxCode: code, tax }
+    return { description: text(l.description, `${label} description`, 500), qty, unit, amount, accountId: account.id, taxCode: code, chosenTaxCode: chosenCode, tax }
   })
   const subtotal = lines.reduce((s, l) => s + l.amount, 0), tax = lines.reduce((s, l) => s + l.tax, 0)
-  return { customer, issueDate, dueDate, lines, subtotal, tax, total: subtotal + tax, memo: optionalText(b.memo, 'Memo', 1000) }
+  return { customer, issueDate, dueDate, destination, exemption, lines, subtotal, tax, total: subtotal + tax, memo: optionalText(b.memo, 'Memo', 1000) }
 }
 
 export const lineStatements = (invoiceId: string, lines: Awaited<ReturnType<typeof parseInvoice>>['lines']) => lines.map((l, i) =>
-  q('INSERT INTO pt_invoice_lines (id, invoice_id, line_no, description, quantity_milli, unit_cents, amount_cents, account_id, tax_code, tax_cents) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    uid(), invoiceId, i + 1, l.description, l.qty, l.unit, l.amount, l.accountId, l.taxCode, l.tax))
+  q('INSERT INTO pt_invoice_lines (id, invoice_id, line_no, description, quantity_milli, unit_cents, amount_cents, account_id, tax_code, tax_cents, chosen_tax_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    uid(), invoiceId, i + 1, l.description, l.qty, l.unit, l.amount, l.accountId, l.taxCode, l.tax, l.chosenTaxCode))
 
 export async function nextNumber(db: D1Database, kind: 'invoice' | 'credit') {
   const prefix = kind === 'invoice' ? 'INV-' : 'CR-'
@@ -63,6 +68,7 @@ export async function nextNumber(db: D1Database, kind: 'invoice' | 'credit') {
 const saveDraft: Command = { need: 'record', async run(c, b) {
   const kind = b.kind === 'credit' ? 'credit' : 'invoice'
   const p = await parseInvoice(c.db, b)
+  const certificateGuards = exemptionFence(p.exemption, p.customer.id, p.destination, p.issueDate, await exemptionDay(c.db))
   // A locked month refuses drafts dated in it, as journals do (PAN-13).
   await assertOpen(c.db, p.issueDate)
   let creditFor: string | null = null
@@ -78,17 +84,17 @@ const saveDraft: Command = { need: 'record', async run(c, b) {
     await assertOpen(c.db, current.issue_date)
     // Editing an approved invoice returns it to draft: approval covered the earlier revision.
     // The editor becomes the preparer, so whoever last changed it cannot approve it.
-    await run(c.db, [authority(c.actor, 'record'), periodOpen(current.issue_date), periodOpen(p.issueDate),
-      q("UPDATE pt_invoices SET customer_id = ?, issue_date = ?, due_date = ?, status = 'draft', memo = ?, credit_for = ?, subtotal_cents = ?, tax_cents = ?, total_cents = ?, approved_by = NULL, approved_revision = NULL, prepared_by = ?, revision = ? WHERE id = ? AND revision = ? AND status <> 'issued'",
-        p.customer.id, p.issueDate, p.dueDate, p.memo, creditFor, p.subtotal, p.tax, p.total, c.actor.email, uid(), current.id, b.revision), changed(),
+    await run(c.db, [authority(c.actor, 'record'), ...certificateGuards, periodOpen(current.issue_date), periodOpen(p.issueDate),
+      q("UPDATE pt_invoices SET customer_id = ?, destination_state = ?, exemption_evidence = ?, issue_date = ?, due_date = ?, status = 'draft', memo = ?, credit_for = ?, subtotal_cents = ?, tax_cents = ?, total_cents = ?, approved_by = NULL, approved_revision = NULL, prepared_by = ?, revision = ? WHERE id = ? AND revision = ? AND status <> 'issued'",
+        p.customer.id, p.destination, p.exemption ? JSON.stringify(p.exemption) : null, p.issueDate, p.dueDate, p.memo, creditFor, p.subtotal, p.tax, p.total, c.actor.email, uid(), current.id, b.revision), changed(),
       q('DELETE FROM pt_invoice_lines WHERE invoice_id = ?', current.id), ...lineStatements(current.id, p.lines),
       audit(who(c.actor), `${kind}.edit`, kind, current.id, { total: p.total })])
     return invoice(c.db, current.id)
   }
   const id = uid(), number = b.number ? text(b.number, 'Number', 40) : await nextNumber(c.db, kind)
-  await run(c.db, [authority(c.actor, 'record'), periodOpen(p.issueDate),
-    q("INSERT INTO pt_invoices (id, kind, number, customer_id, issue_date, due_date, status, memo, credit_for, subtotal_cents, tax_cents, total_cents, opening, prepared_by, revision, created_at) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, 0, ?, ?, ?)",
-      id, kind, number, p.customer.id, p.issueDate, p.dueDate, p.memo, creditFor, p.subtotal, p.tax, p.total, c.actor.email, uid(), now()),
+  await run(c.db, [authority(c.actor, 'record'), ...certificateGuards, periodOpen(p.issueDate),
+    q("INSERT INTO pt_invoices (id, kind, number, customer_id, destination_state, exemption_evidence, issue_date, due_date, status, memo, credit_for, subtotal_cents, tax_cents, total_cents, opening, prepared_by, revision, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, 0, ?, ?, ?)",
+      id, kind, number, p.customer.id, p.destination, p.exemption ? JSON.stringify(p.exemption) : null, p.issueDate, p.dueDate, p.memo, creditFor, p.subtotal, p.tax, p.total, c.actor.email, uid(), now()),
     ...lineStatements(id, p.lines), audit(who(c.actor), `${kind}.draft`, kind, id, { number, total: p.total })])
   return invoice(c.db, id)
 } }
@@ -98,22 +104,24 @@ const approve: Command = { need: 'post', async run(c, b) {
   requireThat(current.status === 'draft', 'Only a draft is approved', 409)
   requireThat(current.revision === b.revision, 'Invoice changed since you reviewed it; review it again', 409)
   requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || current.prepared_by !== c.actor.email), 'Someone other than the preparer approves this invoice', 403)
+  const certificateGuards = await assertInvoiceExemption(c.db, current)
   const untaxed = current.lines.filter((l: Data) => !l.tax_code)
   requireThat(!untaxed.length, `Tax treatment needed before approval: line ${untaxed.map((l: Data) => l.line_no).join(', ')}`, 409)
   await assertOpen(c.db, current.issue_date)
   const revision = uid()
-  await run(c.db, [authority(c.actor, 'post'), periodOpen(current.issue_date), approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
+  await run(c.db, [authority(c.actor, 'post'), ...certificateGuards, periodOpen(current.issue_date), approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
     q("UPDATE pt_invoices SET status = 'approved', approved_by = ?, approved_revision = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'draft'", c.actor.email, revision, revision, current.id, b.revision), changed(),
     audit(who(c.actor), `${current.kind}.approve`, current.kind, current.id)])
   return invoice(c.db, current.id)
 } }
 
 /** The invoice fields issuing reads; an invoice being created in the same batch passes them directly. */
-export type Issuable = { id: string; kind: string; number: string; customer_id: string; customer_name: string; issue_date: string; total_cents: number; credit_for?: string | null; revision: string
+export type Issuable = { id: string; kind: string; number: string; customer_id: string; customer_name: string; issue_date: string; total_cents: number; credit_for?: string | null; revision: string; destination_state?: string; exemption_evidence?: string | null
   lines: { account_id: string; amount_cents: number; description: string; tax_code: string | null; tax_cents: number }[] }
 
 /** Issue posts the approved revision: receivable against income and sales tax (reversed for a credit). */
 export async function issueStatements(db: D1Database, current: Issuable, actor: AuditActor, preparedBy = actor.email): Promise<{ journalId: string; statements: Sql[] }> {
+  const certificateGuards = await assertInvoiceExemption(db, current)
   const receivable = await controlAccount(db, 'receivable')
   const taxAccounts = new Map((await all(db, 'SELECT id, account_id FROM pt_tax_codes')).map(t => [t.id, t.account_id]))
   const credit = current.kind === 'credit'
@@ -124,6 +132,7 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
   for (const l of current.lines) if (l.tax_cents) tax.set(taxAccounts.get(l.tax_code!)!, (tax.get(taxAccounts.get(l.tax_code!)!) ?? 0) + l.tax_cents)
   for (const [accountId, amount] of tax) lines.push({ accountId, ...side(amount, credit), memo: `Sales tax ${current.number}` })
   const journalId = uid(), statements: Sql[] = [
+    ...certificateGuards,
     ...entryStatements({ id: journalId, date: current.issue_date, memo: `${credit ? 'Credit' : 'Invoice'} ${current.number} — ${current.customer_name}`, sourceKind: current.kind, sourceId: current.id, preparedBy, preparedKind: 'person', lines }, actor.email),
     q("UPDATE pt_invoices SET status = 'issued', journal_id = ?, issued_by = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'approved'", journalId, actor.email, uid(), current.id, current.revision), changed()]
   if (credit) {
@@ -154,6 +163,7 @@ export async function invoicesView(db: D1Database) {
   const rows = await all(db, 'SELECT i.*, c.name AS customer_name, c.email AS customer_email FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id ORDER BY i.issue_date DESC, i.number DESC, i.id LIMIT 500')
   const lines = await all(db, 'SELECT * FROM pt_invoice_lines ORDER BY invoice_id, line_no')
   for (const r of rows) {
+    r.exemption = r.exemption_evidence ? JSON.parse(r.exemption_evidence) : null
     r.lines = lines.filter(l => l.invoice_id === r.id)
     r.open_cents = r.kind === 'invoice' && r.status === 'issued' ? await openBalance(db, 'invoice', r.id, r.total_cents) : r.kind === 'credit' && r.status === 'issued' ? r.total_cents - Number((await one(db, "SELECT COALESCE(SUM(amount_cents),0) AS n FROM pt_allocations WHERE source_kind = 'credit' AND source_id = ?", r.id))?.n ?? 0) : r.total_cents
   }

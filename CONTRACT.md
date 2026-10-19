@@ -648,8 +648,8 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 14 | 61 | 45 | 120 |
-| All | 33 | 61 | 45 | 139 |
+| Target and push further | 15 | 60 | 45 | 120 |
+| All | 34 | 60 | 45 | 139 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -725,7 +725,7 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | `PAYROLL-002` | Payroll liabilities reconciled | target | missing |  | No implementation. |
 | `SALESTAX-001` | Sales tax rates by address | target | partial | `src/pantry/invoices.ts`, `src/pantry/accounts.ts`, `src/pantry/sales-tax.ts`, `tests/api/subledgers.test.mjs` | Business-entered tax codes, each belonging to a state, with rates per line and approval stopped on an undecided line; address-based rates, local jurisdictions, state-published rate sources and tax services do not exist. |
 | `SALESTAX-002` | Liability by state and filing | target | partial | `src/pantry/sales-tax.ts`, `src/ui/sales-tax.tsx`, `tests/api/reports.test.mjs` | Taxable sales, tax charged, collected and owed by state and code for any period, on either basis, tied to each sales tax liability account; local jurisdictions, the filing calendar, recorded returns with PDF and payment, partner filing, approved adjustments and the filed-period lock do not exist. |
-| `SALESTAX-003` | Exemption certificates | target | partial | `src/pantry/invoices.ts`, `tests/api/subledgers.test.mjs` | A line can be marked exempt; certificates, covered states and expiry do not exist. |
+| `SALESTAX-003` | Exemption certificates | target | done | `src/pantry/exemptions.ts`, `exemption-reminders.ts`, `src/ui/exemption-certificates.tsx`, `tests/api/subledgers.test.mjs` › SALESTAX-003 | Retained certificate bytes, covered states and expiry drive destination-specific invoice exemption and citations in staff/customer views and PDFs. Owner reminders are claimed once before expiry with visible delivery outcome. Expired or retired evidence blocks stale approval/issue; edits restore original tax choices and renewal never rewrites issued evidence. |
 | `SALESTAX-004` | Economic nexus watch | target | missing |  | No implementation. |
 | `TAXFORM-001` | W-9 collection | target | partial | `src/pantry/contractors.ts`, `src/ui/contractors.tsx`, `migrations/core/0017_pantry_reports.sql`, `tests/api/reports.test.mjs` | A person records a contractor's legal name, TIN and address, masked to its last four everywhere except the audited filing CSV; the secure W-9 request link with online certification or signed upload, encryption at rest, step-up reveal, the list of vendors paid without a W-9 and the backup-withholding flag do not exist. |
 | `TAXFORM-002` | 1099 tracking and e-filing | target | partial | `src/pantry/contractors.ts`, `src/ui/contractors.tsx`, `tests/api/reports.test.mjs` | Calendar-year 1099-NEC box 1 totals by payment method with card and payment-network payments left out, the per-year threshold table and, after year end, the forms and a filing CSV ship; 1099-MISC boxes, IRIS filing (CONNECT-003), Combined Federal/State Filing and state filings, recipient e-delivery and corrections do not. |

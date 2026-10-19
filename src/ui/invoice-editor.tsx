@@ -2,7 +2,7 @@
 // line without a tax code is shown as needing a decision; approval is refused
 // until every line has one.
 import { useState } from 'react'
-import { accountOptions, Card, command, contactOptions, Field, today, usd, useShared, type D } from './kit'
+import { accountOptions, Card, command, contactOptions, Field, today, usd, useShared, useView, type D } from './kit'
 
 export type Line = { description: string; quantity: string; rate: string; accountId: string; taxCode: string }
 export const blank = (accountId = ''): Line => ({ description: '', quantity: '1', rate: '', accountId, taxCode: '' })
@@ -26,12 +26,16 @@ export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCan
   const { state } = useShared()
   const income = accountOptions(state.accounts, a => a.type === 'income')
   const source = invoice ?? creditFor
-  const [lines, setLines] = useState<Line[]>(source?.lines?.length ? source.lines.map((l: D) => ({ description: l.description, quantity: String(l.quantity_milli / 1000), rate: (l.unit_cents / 100).toFixed(2), accountId: l.account_id, taxCode: creditFor ? l.tax_code ?? '' : l.tax_code ?? '' })) : [blank(income[0]?.value)])
+  const [lines, setLines] = useState<Line[]>(source?.lines?.length ? source.lines.map((l: D) => ({ description: l.description, quantity: String(l.quantity_milli / 1000), rate: (l.unit_cents / 100).toFixed(2), accountId: l.account_id, taxCode: creditFor ? l.tax_code ?? '' : ('chosen_tax_code' in l ? l.chosen_tax_code : l.tax_code) ?? '' })) : [blank(income[0]?.value)])
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
-  const { tax, subtotal, missing } = lineTotals(lines, state.taxCodes)
   const kind = creditFor || invoice?.kind === 'credit' ? 'credit' : 'invoice'
   // The due date follows the customer's terms from the issue date until the person types one.
   const [customer, setCustomer] = useState<string>(source?.customer_id ?? ''), [issue, setIssue] = useState<string>(invoice?.issue_date ?? today())
+  const [destination, setDestination] = useState<string>(source?.destination_state ?? '')
+  const { data: exemptions } = useView<D>('exemptions')
+  const certificate = kind === 'invoice' && destination ? exemptions?.certificates.filter((e: D) => e.active && e.customer_id === customer && e.states.includes(destination.toUpperCase()) && e.valid_from <= issue && e.valid_from <= exemptions.today && e.expires_on >= issue && e.expires_on >= exemptions.today).sort((a: D, b: D) => b.expires_on.localeCompare(a.expires_on))[0] : null
+  const effectiveLines = certificate ? lines.map(l => ({ ...l, taxCode: 'exempt' })) : lines
+  const { tax, subtotal, missing } = lineTotals(effectiveLines, state.taxCodes)
   const [due, setDue] = useState<string | null>(invoice?.due_date ?? null)
   const terms = state.contacts.find((c: D) => c.id === customer)?.terms_days
   const dueShown = due ?? (customer && terms !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(issue) ? addDays(issue, Number(terms)) : '')
@@ -46,10 +50,13 @@ export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCan
           <div className="grid-form">
             <Field label="Customer" name="customerId" value={customer} onChange={(e: any) => setCustomer(e.target.value)} required options={contactOptions(state.contacts, 'customer')} />
             <Field label={kind === 'credit' ? 'Credit number' : 'Invoice number'} name="number" defaultValue={invoice?.number ?? nextNumber(invoices, kind)} required hint={invoice ? undefined : 'The next number in sequence; change it if you need to'} />
+            <Field label="Ship-to / destination state" name="destinationState" value={destination} onChange={(e: any) => setDestination(e.target.value.toUpperCase())} maxLength={2} hint="Two-letter US state code. Required to apply a customer exemption certificate." />
             <Field label="Issue date" name="issueDate" type="date" value={issue} onChange={(e: any) => setIssue(e.target.value)} required />
             <Field label="Due date" name="dueDate" type="date" value={dueShown} onChange={(e: any) => setDue(e.target.value)} hint={due === null && customer && terms !== undefined ? `${terms} days after the issue date: the customer's terms` : undefined} />
           </div>
         </Card>
+        {certificate && <div className="callout" role="status"><strong>Certificate {certificate.certificate_number} applies in {destination}</strong><span>Exempt through {certificate.expires_on}. <a href={`/api/pantry/documents/${certificate.document_id}`}>View certificate</a>. Your line tax choices below are kept for when the certificate no longer applies.</span></div>}
+        {invoice?.exemption && !certificate && <div className="callout callout-warn" role="status"><strong>Review tax treatment</strong><span>The earlier certificate no longer applies to these details. Saving uses your original line tax choices.</span></div>}
         <ServiceLines lines={lines} setLines={setLines} />
         <Card title="Memo"><Field label="Memo on the invoice" name="memo" type="textarea" defaultValue={invoice?.memo} wide /></Card>
       </div>

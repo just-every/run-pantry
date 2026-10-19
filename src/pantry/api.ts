@@ -54,9 +54,10 @@ import { parse as parseQuestion, withThreads as questionThreads } from './questi
 import { questionCommands, questionsView } from './questions/commands'
 import { integrationCommands, integrationSettings } from './integrations/credentials'
 import { integrations } from './integrations/routes'
+import { exemptionCommands, exemptionView } from './exemptions'
 
 const commands: Record<string, Command> = {
-  ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...exemptionCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -104,6 +105,7 @@ view('questions/record', async (ctx, c) => ({ questions: await questionThreads(c
 view('questions', async (ctx, c) => questionsView(ctx, c.req.query('q') || undefined))
 view('move-in', async ctx => moveInView(ctx))
 view('activity', async ctx => activity(ctx.db))
+view('exemptions', async ctx => exemptionView(ctx.db))
 view('documents', async ctx => ({ documents: await documents(ctx.db) }))
 const year = (c: C) => { const y = Number(c.req.query('year') ?? new Date().getUTCFullYear()); requireThat(Number.isInteger(y) && y >= 2000 && y <= 2100, 'Choose a tax year'); return y }
 view('reports/detail', async (ctx, c) => {

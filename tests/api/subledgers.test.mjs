@@ -12,6 +12,63 @@ async function setup(h) {
 }
 const journalOf = async (h, id) => at((await h.view('journal')).entries, e => e.id === id)
 
+test('SALESTAX-003 certificates exempt only covered destinations, remind before expiry, stop stale approval and issue, and retain issued evidence', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const { acct, tax, customer } = await setup(h)
+  const { today } = await h.view('exemptions')
+  const day = n => new Date(Date.parse(today + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10)
+  const certificateBody = { customerId: customer.id, certificateNumber: 'NY-resale-17', states: ['NY'], validFrom: day(-30), expiresOn: day(10),
+    name: 'resale-certificate.txt', mediaType: 'text/plain', base64: Buffer.from('Signed New York resale certificate for Willow Services').toString('base64') }
+  await h.command('exemption.save', { ...certificateBody, base64: '' }, h.owner, 400)
+  const cert = await h.command('exemption.save', certificateBody)
+  const file = await h.send('/api/pantry/documents/' + cert.document_id, undefined, { cookie: h.owner })
+  assert.equal(file.status, 200); assert.equal(file.value, Buffer.from(certificateBody.base64, 'base64').toString())
+  const body = state => ({ customerId: customer.id, destinationState: state, issueDate: today, lines: [
+    { description: 'Printed guides', quantity: '1', rate: '100.00', accountId: acct['4000'], taxCode: tax.id }] })
+  let original = await h.command('invoice.save-draft', body('NY'))
+  assert.deepEqual([original.tax_cents, original.lines[0].tax_code, original.lines[0].chosen_tax_code], [0, 'exempt', tax.id])
+  assert.equal(original.exemption.documentId, cert.document_id)
+  assert.deepEqual(original.exemption.states, ['NY'])
+  const outside = await h.command('invoice.save-draft', body('NJ'))
+  assert.equal(outside.tax_cents, 888); assert.equal(outside.exemption, null)
+  original = await h.command('invoice.approve', { id: original.id, revision: original.revision })
+  original = await h.command('invoice.issue', { id: original.id })
+  const frozen = original.exemption
+  await h.command('contact.save', { ...customer, id: customer.id, revision: customer.revision, kind: 'customer', email: 'ap@willow.example', termsDays: 30 })
+  const sent = await h.command('invoice.send', { id: original.id })
+  const customerPath = '/i/' + sent.invoice.link_token
+  const customerPage = await h.send(customerPath)
+  assert.equal(customerPage.status, 200); assert.ok(customerPage.value.includes(cert.certificate_number))
+  const pdf = await h.send(customerPath + '/invoice.pdf')
+  assert.equal(pdf.status, 200); assert.ok(pdf.value.includes(cert.certificate_number), 'the customer PDF cites the certificate')
+  const awaitingApproval = await h.command('invoice.save-draft', body('NY'))
+  let awaitingIssue = await h.command('invoice.save-draft', body('NY'))
+  awaitingIssue = await h.command('invoice.approve', { id: awaitingIssue.id, revision: awaitingIssue.revision })
+  await h.cron()
+  const reminders = () => h.mail.filter(m => m.subject.includes('Exemption certificate'))
+  assert.equal(reminders().length, 1)
+  assert.deepEqual(reminders()[0].to, ['owner@example.test'])
+  assert.ok(reminders()[0].text.includes(cert.expires_on) && reminders()[0].text.includes(customer.name))
+  await h.cron(); assert.equal(reminders().length, 1, 'overlapping due runs send one expiry reminder')
+  // Move the stored expiry into the past to represent time passing, without a
+  // clock override or alternate application path; actions still use real HTTP.
+  await h.db.prepare('UPDATE pt_exemption_certificates SET expires_on = ? WHERE id = ?').bind(day(-1), cert.id).run()
+  const refused = await h.command('invoice.approve', { id: awaitingApproval.id, revision: awaitingApproval.revision }, h.owner, 409)
+  assert.match(refused.error, /certificate expired or was replaced/)
+  await h.command('invoice.issue', { id: awaitingIssue.id }, h.owner, 409)
+  const expired = await h.command('invoice.save-draft', body('NY'))
+  assert.equal(expired.tax_cents, 888); assert.equal(expired.exemption, null)
+  const corrected = await h.command('invoice.save-draft', { ...body('NY'), id: awaitingIssue.id, revision: awaitingIssue.revision })
+  assert.equal(corrected.status, 'draft'); assert.equal(corrected.tax_cents, 888)
+  assert.equal(corrected.lines[0].chosen_tax_code, tax.id)
+  const renewal = await h.command('exemption.save', { ...certificateBody, replacesId: cert.id, expiresOn: day(365), base64: Buffer.from('Renewed certificate evidence').toString('base64') })
+  const renewed = await h.command('invoice.save-draft', body('NY'))
+  assert.equal(renewed.tax_cents, 0); assert.equal(renewed.exemption.documentId, renewal.document_id)
+  const unchanged = at((await h.view('sales')).invoices, i => i.id === original.id)
+  assert.equal(unchanged.status, 'issued'); assert.equal(unchanged.tax_cents, 0)
+  assert.deepEqual(unchanged.exemption, frozen, 'issued invoice keeps the cited document, coverage and expiry after renewal')
+})
+
 test('PAN-04 invoices are drafted, approved and issued; unknown tax stops approval; credits reduce what is owed', async t => {
   const h = await harness(); t.after(() => h.close())
   const { acct, tax, customer } = await setup(h)

@@ -6,6 +6,7 @@ import { Action, Card, Chip, command, contactOptions, Details, Field, Form, Load
 import { InvoiceEditor } from './invoice-editor'
 import { Deliveries, SendPanel } from './invoice-delivery'
 import { Recurring } from './recurring'
+import { ExemptionCertificates, ExemptionCitation } from './exemption-certificates'
 
 function invoiceStatus(i: D): [string, 'good' | 'warn' | 'info' | 'neutral'] {
   if (i.status === 'draft') return ['Draft', 'neutral']
@@ -22,6 +23,7 @@ function InvoicePanel({ i, data, onChange, onEdit, onCredit }: { i: D; data: D; 
   const untaxed = i.lines.filter((l: D) => !l.tax_code).length
   return <Card title={<>{i.customer_name} — {i.number}</>} actions={<Chip tone={tone}>{label}</Chip>}>
     <p>{i.kind === 'credit' ? 'Credit' : 'Invoice'} for {usd(i.total_cents)}{i.kind === 'invoice' && i.status === 'issued' ? `, ${usd(i.open_cents)} open, due ` : ', due '}{day(i.due_date)}.</p>
+    <ExemptionCitation invoice={i} />
     {untaxed > 0 && <div className="callout callout-warn"><strong>Tax treatment needed before approval</strong><span>{untaxed} line{untaxed === 1 ? '' : 's'} without a sales tax code.</span></div>}
     {i.lines.length > 0 && <Table heads={['Description', 'Quantity', 'Amount', 'Tax']} figures={[1, 2, 3]}>{i.lines.map((l: D) => <tr key={l.id}><td>{l.description}</td><td className="fig">{l.quantity_milli / 1000}</td><td className="fig">{usd(l.amount_cents)}</td><td className="fig">{l.tax_code === 'exempt' ? 'Exempt' : l.tax_code ? usd(l.tax_cents) : 'Needed'}</td></tr>)}</Table>}
     <div className="row-actions">
@@ -231,7 +233,7 @@ export function Sales() {
   return <>
     <PageHead title="Sales & bills" lead="Invoices you send and follow up, recurring invoices, bills and their evidence, and payments." />
     <Tabs tabs={['Invoices', 'Recurring', 'Bills', 'Payments', 'Deliveries', 'Customers & vendors']} current={tab} onChange={setTab} pick="Show" />
-    {tab === 'Customers & vendors' ? <Contacts /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
+    {tab === 'Customers & vendors' ? <><Contacts /><ExemptionCertificates /></> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
       : tab === 'Bills' ? <Bills data={data} reload={refresh} /> : tab === 'Deliveries' ? <Card title="Deliveries"><p className="hint">Every invoice and reminder Pantry has sent, with the mail provider's answer. Accepted means the provider took the message, not that the customer read it; "Viewed" on an invoice means the customer opened its link.</p><Deliveries data={data} /></Card> : <Payments data={data} reload={refresh} />}
   </>
 }
