@@ -277,6 +277,7 @@ test('CLOSE-005 fiscal year closes by calculation with two exact-revision accoun
   assert.equal((await h.view('journal')).entries.filter(e => e.status === 'posted').length, 2, 'earnings rollover writes no closing entry')
   await h.command('year-end.lock', { year: 2025, revision: year.revision }, bea, 403)
   await h.command('year-end.lock', { year: 2025, revision: year.revision }, h.owner, 409)
+  assert.equal((await h.view('year-end/2025')).months.filter(m => m.status === 'locked').length, 0, 'refused year close locks no month')
   await h.command('close.tasks', { period: year.finalPeriod, title: 'Existing review task' })
   assert.equal((await h.view(`close/${year.finalPeriod}`)).checks.find(c => c.key === 'year-end-reviews').ok, false)
   for (const period of year.periods) {

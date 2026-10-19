@@ -191,6 +191,12 @@ test('CLOSE-005 / PAYROLL-001 a Gusto payroll posts as one balanced entry (wages
   assert.equal(yearEnd.payrollTotals.gross, payrolls.filter(p => p.processed && !p.external).reduce((sum, p) => sum + Math.round(Number(p.totals.gross_pay) * 100), 0))
   assert.equal(yearEnd.checks.find(c => c.key === 'year-end-payroll').ok, false)
   assert.ok(yearEnd.checks.find(c => c.key === 'year-end-payroll').items.some(p => p.id === p3.uuid))
+  const payrollMatch = (await h.view('connected')).gusto.payrolls.find(p => p.uuid === p2.uuid).match
+  await h.command('match.undo', { id: payrollMatch.id, reason: 'Review payroll correction' })
+  await h.command('journal.reverse', { id: p2.entry_id, date: '2026-10-31', memo: 'Correct imported payroll' })
+  const reversedPayroll = await h.view('year-end/2026')
+  assert.equal(reversedPayroll.payroll.find(p => p.uuid === p2.uuid).ties, false)
+  assert.ok(reversedPayroll.checks.find(c => c.key === 'year-end-payroll').items.some(p => p.id === p2.uuid))
 
   // RER Managed cannot reach Gusto yet: one plain line, and connecting is refused.
   const m = await harness({ bindings: { ...GUSTO, ...MANAGED } }); t.after(() => m.close())

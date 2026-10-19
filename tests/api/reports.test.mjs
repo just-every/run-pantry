@@ -232,9 +232,12 @@ test('CLOSE-005 / TAXFORM-002 1099 contractors: cash payments per calendar year 
   let y26 = await h.view('reports/contractors?year=2026', bea)
   assert.deepEqual([y26.threshold, y26.yearEnded], [200000, false])
   assert.deepEqual(y26.contractors.map(x => [x.name, x.box1, x.unrecorded, x.overThreshold, x.mayReach]), [['Ada Okafor', 150000, 60000, false, true], ['Ben Ruiz Design', 0, 0, false, false]])
+  const unknownMethods = (await h.view('year-end/2026')).checks.find(c => c.key === 'year-end-1099')
+  assert.equal(unknownMethods.ok, false); assert.ok(unknownMethods.items.some(i => i.id === v['Ada Okafor'].id))
   await h.command('payment.set-method', { id: later.id, method: 'check' }, bea)
   y26 = await h.view('reports/contractors?year=2026', bea)
   assert.deepEqual(y26.contractors.map(x => [x.name, x.box1, x.overThreshold]), [['Ada Okafor', 210000, true], ['Ben Ruiz Design', 0, false]])
+  assert.equal((await h.view('year-end/2026')).checks.find(c => c.key === 'year-end-1099').ok, true, 'recording the method resolves readiness')
   assert.equal((await h.send('/api/pantry/reports/contractors/2026/1099-nec.csv', undefined, { cookie: h.owner })).status, 409)
 })
 
