@@ -431,3 +431,66 @@ test('CAPTURE-005: duplicate bytes need no reader key, and typed facts cannot by
   const documentSkipAudit = at((await h.view('activity')).audit, a => a.action === 'document.duplicate-skip' && a.subject_id === skipDocument.id)
   assert.equal(JSON.parse(documentSkipAudit.detail).reason, 'Already archived')
 })
+
+test('CAPTURE-007 captured bills and paid receipts become approved revision-specific drafts with source evidence through posting and close', async t => {
+  let reading = { receipt: true, vendor: 'Valley Electric LLC', invoiceNumber: 'VE-2041', vendorDetails: null, date: '2026-09-15', total: '1850.00', tax: '100.00', currency: 'USD', category: '6000', note: '', draft: { kind: 'bill', dueDate: null, termsDays: null, lines: [{ description: 'Electrical repairs', amount: '1400.00', accountCode: '6000' }, { description: 'Parts', amount: '350.00', accountCode: '6300' }] } }
+  const { model } = fakeModel(() => reading)
+  const h = await harness({ outbound: model }); t.after(() => h.close())
+  const { acct } = await books(h)
+  const bea = await h.member('drafts@example.test', 'bookkeeper'), ann = await h.member('approval@example.test', 'accountant', { canPost: true })
+  await h.command('reader.save', { provider: 'anthropic', key: 'sk-ant-test-key-2041' })
+  const vendor = await h.command('contact.save', { kind: 'vendor', name: 'Valley Electric LLC', termsDays: 30, defaultAccountId: acct['6000'], defaultClass: 'Studio', is1099: true })
+  const inbox = await h.command('receipt-address.create', { mailbox: 'receipts@books.example.test' })
+  const raw = email({ to: inbox.address, from: 'billing@valley.example', subject: 'Electrical repair VE-2041', attachment: Buffer.from('%PDF-1.4 Electrical repair bill VE-2041 $1850.00') })
+  const delivered = await deliver(h, inbox.address, raw); assert.ok(delivered.ok)
+  let r = at((await h.view('receipts')).review, x => x.subject === 'Electrical repair VE-2041')
+  await h.command('receipt.vendor-confirm', { id: r.id, revision: r.revision, vendorId: vendor.id, vendorRevision: vendor.revision, confirm: true }, bea)
+  r = at((await h.view('receipts')).review, x => x.id === r.id)
+  assert.equal(r.draftProposal.dueDate, '2026-10-15', 'due date comes from the confirmed vendor terms')
+  assert.deepEqual(r.draftProposal.lines.map(l => l.amount), [140000, 35000])
+  const fields = { id: r.id, revision: r.revision, kind: 'bill', date: r.read_date, total: '1850.00', tax: '100.00', invoiceNumber: 'VE-2041', termsDays: 30, lines: r.draftProposal.lines.map(l => ({ ...l, amount: (l.amount / 100).toFixed(2) })) }
+  let prepared = await h.command('receipt.draft-save', fields, bea)
+  let draft = prepared.saved
+  const billId = draft.bill_id
+  let b = at((await h.view('sales')).bills, x => x.id === billId)
+  assert.equal(b.status, 'draft'); assert.equal(b.due_date, '2026-10-15'); assert.equal(b.documents.length, 2, 'original email and PDF remain attached')
+  assert.deepEqual(b.lines.map(l => l.amount_cents), [140000, 35000, 10000])
+  await h.command('bill.record', { id: billId, revision: b.revision }, bea, 409)
+  await h.command('capture-draft.post', { id: draft.id, revision: draft.revision }, ann, 409)
+  await h.command('capture-draft.approve', { id: draft.id, revision: draft.revision }, bea, 403)
+  await h.command('capture-draft.approve', { id: draft.id, revision: draft.revision }, ann)
+  // A correction invalidates the earlier approval, which stays in immutable history.
+  prepared = await h.command('receipt.draft-save', { ...fields, draftRevision: draft.revision, lines: [{ ...fields.lines[0], description: 'Electrical repairs, reviewed' }, fields.lines[1]] }, bea)
+  assert.notEqual(prepared.saved.revision, draft.revision); draft = prepared.saved
+  await h.command('capture-draft.post', { id: draft.id, revision: draft.revision }, ann, 409)
+  await h.command('capture-approval-rule.save', { minimum: '1000.00', vendorId: vendor.id })
+  await h.command('capture-draft.approve', { id: draft.id, revision: draft.revision }, ann, 403)
+  await h.command('capture-draft.approve', { id: draft.id, revision: draft.revision })
+  await h.command('capture-draft.post', { id: draft.id, revision: draft.revision })
+  await h.command('capture-draft.post', { id: draft.id, revision: draft.revision }, h.owner, 409)
+  b = at((await h.view('sales')).bills, x => x.id === billId)
+  assert.equal(b.status, 'posted'); assert.equal(b.open_cents, 185000)
+  assert.equal(at((await h.view('close/2026-09')).checks, x => x.key === 'evidence').items.some(x => x.id === billId), false)
+  assert.equal(at((await h.view('receipts')).attached, x => x.id === r.id).linked_id, billId)
+  const doc = await h.send(`/api/pantry/documents/${r.file_document_id}`, undefined, { cookie: ann }); assert.equal(doc.status, 200)
+
+  // A paid receipt saves a draft against its feed/file charge, with no posting until approval.
+  reading = { ...reading, invoiceNumber: 'VE-2042', total: '84.37', tax: '6.12', draft: { kind: 'expense', dueDate: null, termsDays: null, lines: [{ description: 'Repair parts', amount: '78.25', accountCode: '6300' }] } }
+  const bank = await h.command('bank-account.save', { name: 'Business checking', institution: 'Chase', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-08-31', openingBalance: '0' })
+  const statement = await h.command('statement.import', { bankAccountId: bank.id, fileName: 'electric-charge.csv', content: 'Posting Date,Description,Amount\n09/15/2026,VALLEY ELECTRIC,-84.37\n', opening: '0', closing: '-84.37', start: '2026-09-01', end: '2026-09-30', confirmLast4: '4821' })
+  const charge = (await h.view(`reconciliation/${statement.statement.id}`)).lines[0]
+  const captured = await capture(h, Buffer.from('Valley repair parts paid receipt VE-2042'))
+  r = at((await h.view('receipts')).review, x => x.id === captured.id)
+  await h.command('receipt.vendor-confirm', { id: r.id, revision: r.revision, vendorId: vendor.id, vendorRevision: vendor.revision, confirm: true }, bea)
+  r = at((await h.view('receipts')).review, x => x.id === captured.id)
+  prepared = await h.command('receipt.draft-save', { id: r.id, revision: r.revision, kind: 'expense', date: '2026-09-15', total: '84.37', tax: '6.12', bankLineId: charge.id, lines: [{ description: 'Repair parts', amount: '78.25', accountId: acct['6300'] }] }, bea)
+  draft = prepared.saved
+  assert.equal((await h.view(`reconciliation/${statement.statement.id}`)).lines[0].match_id, null)
+  await h.command('receipt.attach', { id: r.id, revision: r.revision, targetKind: 'bankline', targetId: charge.id, date: '2026-09-15', total: '84.37' }, bea, 409)
+  await h.command('capture-draft.approve', { id: draft.id, revision: draft.revision }, ann)
+  await h.command('capture-draft.post', { id: draft.id, revision: draft.revision }, ann)
+  const reconciled = await h.view(`reconciliation/${statement.statement.id}`)
+  assert.ok(reconciled.lines[0].match_id)
+  assert.deepEqual((await h.view('close/2026-09')).receipts.missing, [], 'all split expense entries carry the original source')
+  const tb = await h.view('reports/trial-balance?to=2026-09-30'); assert.ok(tb.balanced)
+})

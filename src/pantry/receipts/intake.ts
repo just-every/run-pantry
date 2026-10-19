@@ -45,7 +45,7 @@ export async function readWith(db: D1Database, env: Bindings, input: ReceiptInpu
 /** The receipt columns a reading fills. */
 export async function readingColumns(db: D1Database, r: ReadOutcome) {
   const account = r.reading?.category ? await one<{ id: string }>(db, 'SELECT id FROM pt_accounts WHERE code = ?', r.reading.category) : null
-  return { ...await vendorReadingColumns(r.reading?.vendorDetails), read_status: r.status, read_note: r.note, read_model: r.model, read_at: now(), read_vendor: r.reading?.vendor ?? null, read_invoice_number: r.reading?.invoiceNumber ?? null, read_date: r.reading?.date ?? null, read_total_cents: r.reading?.total ?? null, read_tax_cents: r.reading?.tax ?? null, read_currency: r.reading?.currency ?? null, read_account_id: account?.id ?? null }
+  return { ...await vendorReadingColumns(r.reading?.vendorDetails), read_draft_fields: r.reading?.draft ? JSON.stringify(r.reading.draft) : null, read_status: r.status, read_note: r.note, read_model: r.model, read_at: now(), read_vendor: r.reading?.vendor ?? null, read_invoice_number: r.reading?.invoiceNumber ?? null, read_date: r.reading?.date ?? null, read_total_cents: r.reading?.total ?? null, read_tax_cents: r.reading?.tax ?? null, read_currency: r.reading?.currency ?? null, read_account_id: account?.id ?? null }
 }
 
 export type Arrival = {
@@ -60,10 +60,10 @@ export async function receive(db: D1Database, env: Bindings, a: Arrival, read?: 
   const file = a.file ? await documentStatements(a.by.email, a.file) : null
   const id = uid(), cols = await readingColumns(db, outcome)
   await run(db, [...(a.guards ?? []), ...original.statements, ...(file?.statements ?? []),
-    q(`INSERT INTO pt_receipts (id, document_id, file_document_id, source, sender, subject, read_status, read_note, read_model, read_at, read_vendor, read_date, read_total_cents, read_tax_cents, read_currency, read_account_id, status, received_by, received_at, revision, vendor_key, read_invoice_number, read_vendor_details)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'review', ?, ?, ?, ?, ?, ?)`,
+    q(`INSERT INTO pt_receipts (id, document_id, file_document_id, source, sender, subject, read_status, read_note, read_model, read_at, read_vendor, read_date, read_total_cents, read_tax_cents, read_currency, read_account_id, status, received_by, received_at, revision, vendor_key, read_invoice_number, read_vendor_details, read_draft_fields)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'review', ?, ?, ?, ?, ?, ?, ?)`,
       id, original.id, file?.id ?? null, a.source, (a.sender ?? '').slice(0, 254), (a.subject ?? '').slice(0, 300), cols.read_status, cols.read_note, cols.read_model, cols.read_at,
-      cols.read_vendor, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, a.by.email, now(), uid(), vendorKey(cols.read_vendor), cols.read_invoice_number, cols.read_vendor_details),
+      cols.read_vendor, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, a.by.email, now(), uid(), vendorKey(cols.read_vendor), cols.read_invoice_number, cols.read_vendor_details, cols.read_draft_fields),
     audit(a.by, 'receipt.receive', 'receipt', id, { source: a.source, file: a.original.name, sha256: original.sha256, read: outcome.status })])
   await flagDuplicate(db, (await receipt(db, id))!)
   return { id, outcome }

@@ -18,6 +18,7 @@ type Target = { kind: Candidate['kind']; id: string }
 
 /** The record the document will belong to, and the statements that make it so. */
 async function attachPlan(db: D1Database, actor: Actor, r: Data, target: Target, f: Fields, duplicateReason = '', duplicate?: Duplicate | null): Promise<{ statements: Sql[]; linked: { kind: string; id: string } }> {
+  requireThat(!await one(db, 'SELECT 1 FROM pt_capture_drafts WHERE receipt_id = ?', r.id), 'Approve and post the document draft instead of attaching it directly', 409)
   const statements: Sql[] = [
     noDuplicate(r.id, f, duplicateReason ? duplicate : null),
     guard("? <> '' OR NOT EXISTS (SELECT 1 FROM pt_receipts WHERE status = 'attached' AND target_kind = ? AND target_id = ?)", duplicateReason, target.kind, target.id),
@@ -117,8 +118,8 @@ const readAgain: Command = { need: 'record', async run(c, b) {
   const input = file.mediaType === 'message/rfc822' ? emailReadable(file.bytes, file.name) : readable({ name: file.name, mediaType: file.mediaType, bytes: file.bytes })
   const cols = await readingColumns(c.db, await readWith(c.db, c.env, input))
   await run(c.db, [authority(c.actor, 'record'),
-    q("UPDATE pt_receipts SET read_status = ?, read_note = ?, read_model = ?, read_at = ?, read_vendor = ?, read_invoice_number = ?, read_date = ?, read_total_cents = ?, read_tax_cents = ?, read_currency = ?, read_account_id = ?, read_vendor_details = ?, vendor_id = NULL, vendor = NULL, account_id = NULL, vendor_terms_days = NULL, vendor_is_1099 = NULL, vendor_class = NULL, vendor_confirmed_by = NULL, vendor_confirmed_at = NULL, revision = ?, vendor_key = ? WHERE id = ? AND status = 'review'",
-      cols.read_status, cols.read_note, cols.read_model, cols.read_at, cols.read_vendor, cols.read_invoice_number, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, cols.read_vendor_details, uid(), vendorKey(cols.read_vendor), r.id), changed(),
+    q("UPDATE pt_receipts SET read_status = ?, read_note = ?, read_model = ?, read_at = ?, read_vendor = ?, read_invoice_number = ?, read_date = ?, read_total_cents = ?, read_tax_cents = ?, read_currency = ?, read_account_id = ?, read_vendor_details = ?, read_draft_fields = ?, vendor_id = NULL, vendor = NULL, account_id = NULL, vendor_terms_days = NULL, vendor_is_1099 = NULL, vendor_class = NULL, vendor_confirmed_by = NULL, vendor_confirmed_at = NULL, revision = ?, vendor_key = ? WHERE id = ? AND status = 'review'",
+      cols.read_status, cols.read_note, cols.read_model, cols.read_at, cols.read_vendor, cols.read_invoice_number, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, cols.read_vendor_details, cols.read_draft_fields, uid(), vendorKey(cols.read_vendor), r.id), changed(),
     audit(who(c.actor), 'receipt.read', 'receipt', r.id, { read: cols.read_status })])
   await flagDuplicate(c.db, (await receipt(c.db, r.id))!)
   return (await receipt(c.db, r.id))!

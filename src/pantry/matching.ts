@@ -27,6 +27,7 @@ export function matchInput(b: Data): MatchInput {
 export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchInput, { automatic = false, recordedReceipt = false } = {}) {
   const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE id IN (${input.bankLineIds.map(() => '?').join(',')})`, ...input.bankLineIds)
   requireThat(lines.length === input.bankLineIds.length, 'A statement line was not found', 404)
+  requireThat(lines.every(l => !l.removed_at), 'A bank line was removed; reload before matching', 409)
   const bankId = lines[0].bank_account_id
   requireThat(lines.every(l => l.bank_account_id === bankId), 'Match lines from one bank account at a time')
   const bank = (await one(db, 'SELECT * FROM pt_bank_accounts WHERE id = ?', bankId))!
@@ -64,7 +65,7 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
         requireThat(other.active && !['bank', 'receivable', 'payable'].includes(other.subtype), `${label}: choose an income, expense or other account`)
       }
       const entryId = uid(), into = direction === 'in'
-      statements.push(...entryStatements({ id: entryId, date: item.date ?? day, memo: memo || `${type === 'transfer' ? 'Transfer' : other.name} — ${lines[0].description}`, sourceKind: 'bank', preparedBy: actor.email, preparedKind: 'person', lines: [
+      statements.push(...entryStatements({ id: entryId, date: item.date ?? day, memo: memo || `${type === 'transfer' ? 'Transfer' : other.name} — ${lines[0].description}`, sourceKind: 'bank', documentId: item.documentId ?? null, preparedBy: actor.email, preparedKind: 'person', lines: [
         { accountId: into ? bank.account_id : other.id, debit: amount, credit: 0, memo },
         { accountId: into ? other.id : bank.account_id, debit: 0, credit: amount, memo },
       ] }, actor.email))

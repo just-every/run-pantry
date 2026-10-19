@@ -14,10 +14,13 @@ import { duplicateDetails, duplicateOf, readFingerprint } from './duplicates'
 import { emailReadable, inboxView, mailCommands, MAX_EMAIL_BYTES, tryLocally } from './mail'
 import { applyRules, attachChosen, reviewCommands } from './review'
 import { readerCommands, readerView } from './settings'
+import { captureDraftCommands } from './drafts'
+import { requiresOwner } from './draft-approval'
+import { documentDraftProposal } from './draft-proposal'
 import { receiptVendorCommands } from './vendor-confirm'
 import { receiptVendorProposal } from './vendor-match'
 
-export const receiptCommands: Record<string, Command> = { ...readerCommands, ...mailCommands, ...reviewCommands, ...receiptVendorCommands }
+export const receiptCommands: Record<string, Command> = { ...readerCommands, ...mailCommands, ...reviewCommands, ...receiptVendorCommands, ...captureDraftCommands }
 
 const MEDIA = /^(application\/pdf|image\/(png|jpeg|webp|gif|heic|heif)|text\/plain|message\/rfc822)$/
 const TARGETS = ['bankline', 'bill', 'payment', 'journal']
@@ -61,6 +64,8 @@ export async function receiptsView(c: Context): Promise<Data> {
     }
     r.vendorProposal = await receiptVendorProposal(c.db, r)
     r.account_id ??= r.vendorProposal.defaults?.accountId
+    r.draftProposal = await documentDraftProposal(c.db, r)
+    if (r.draftProposal.saved) r.draftProposal.saved.ownerRequired = await requiresOwner(c.db, r.draftProposal.saved.payload)
     r.candidates = (await candidates(c.db, r.total_cents ?? r.read_total_cents, r.receipt_date ?? r.read_date, r.vendor ?? r.read_vendor, r.currency ?? r.read_currency)).slice(0, 6)
     offerOriginal(r.candidates, r.duplicate, readFingerprint(r))
   }
@@ -77,7 +82,7 @@ export async function receiptsView(c: Context): Promise<Data> {
     WHERE r.status = 'dismissed' ORDER BY r.decided_at DESC LIMIT 100`)
   const rules = await all(c.db, 'SELECT r.*, a.code, a.name AS account_name FROM pt_receipt_rules r JOIN pt_accounts a ON a.id = r.account_id WHERE r.active = 1 ORDER BY r.created_at')
   const reader = await readerView(c)
-  return { review, attached, skipped, duplicateDocuments: await documentDuplicates(c.db), rules, accounts: await categories(c.db), reader: { unavailable: reader.unavailable, missing: reader.missing, model: reader.saved?.model ?? null }, inbox: await inboxView(c) }
+  return { approvalRules: await all(c.db, 'SELECT * FROM pt_capture_approval_rules ORDER BY minimum_cents'), review, attached, skipped, duplicateDocuments: await documentDuplicates(c.db), rules, accounts: await categories(c.db), reader: { unavailable: reader.unavailable, missing: reader.missing, model: reader.saved?.model ?? null }, inbox: await inboxView(c) }
 }
 
 export function receiptRoutes(api: Hono<{ Bindings: Bindings }>) {

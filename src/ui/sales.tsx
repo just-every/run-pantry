@@ -94,7 +94,8 @@ function Bills({ data, reload }: { data: D; reload: () => Promise<void> }) {
       {current && <Card title={`${current.vendor_name} ${current.reference}`}>
         <p>{usd(current.total_cents)} due {day(current.due_date)}; {usd(current.open_cents)} open.</p>
         {!!current.received && <p><Chip tone="good">Received</Chip> {current.ready_to_pay ? <Chip tone="good">Ready to pay</Chip> : <Chip>Not ready to pay</Chip>}</p>}
-        {current.status === 'draft' && state.actor.can.record && <Action tone="primary" run={async () => { await command('bill.record', { id: current.id, revision: current.revision }); await reload() }}>Record bill</Action>}
+        {current.status === 'draft' && current.capture_receipt_id && <a href={`/app/receipts#receipt-${current.capture_receipt_id}`}>Review and approve document draft</a>}
+        {current.status === 'draft' && !current.capture_receipt_id && state.actor.can.record && <Action tone="primary" run={async () => { await command('bill.record', { id: current.id, revision: current.revision }); await reload() }}>Record bill</Action>}
         {current.documents.map((d: D) => <p key={d.id}><a href={`/api/pantry/documents/${d.id}`}>{d.name}</a></p>)}
         {state.actor.can.record && <Form label="Attach source document" submit={async () => command('document.upload', { ...(await readFileBase64(file.current)), linkedKind: 'bill', linkedId: current.id })} onDone={reload}><div className="field"><label htmlFor="bill-file">Document</label><input id="bill-file" ref={file} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv" required /></div></Form>}
         {!current.documents.length && !current.evidence_waived && state.actor.can.post && <Form label="Record why there is no document" submit={b => command('bill.waive-evidence', { id: current.id, revision: current.revision, ...b })} onDone={reload}><Field label="Reason" name="reason" required /></Form>}

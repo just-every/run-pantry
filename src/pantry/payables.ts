@@ -56,7 +56,7 @@ const saveBill: Command = { need: 'record', async run(c, b) {
   return bill(c.db, prepared.id)
 } }
 
-function postBill(actor: Actor, b: { id: string; journalId: string; payable: string; vendor: Data; reference: string; date: string; lines: Data[]; total: number }): Sql[] {
+export function postBill(actor: Actor, b: { id: string; journalId: string; payable: string; vendor: Data; reference: string; date: string; lines: Data[]; total: number }): Sql[] {
   const lines: Line[] = [...b.lines.map(l => ({ accountId: l.account_id, debit: l.amount_cents, credit: 0, memo: l.description })), { accountId: b.payable, debit: 0, credit: b.total, memo: `${b.vendor.name} ${b.reference}`, contactId: b.vendor.id }]
   return [...entryStatements({ id: b.journalId, date: b.date, memo: `Bill ${b.reference} — ${b.vendor.name}`, sourceKind: 'bill', sourceId: b.id, preparedBy: actor.email, preparedKind: 'person', lines }, actor.email),
     q("UPDATE pt_bills SET status = 'posted', journal_id = ?, revision = ? WHERE id = ? AND status = 'draft'", b.journalId, uid(), b.id), changed()]
@@ -65,6 +65,7 @@ function postBill(actor: Actor, b: { id: string; journalId: string; payable: str
 const recordBill: Command = { need: 'record', async run(c, b) {
   const current = await bill(c.db, text(b.id, 'Bill'))
   requireThat(current.status === 'draft' && current.revision === b.revision, 'Bill changed or is already recorded; reload', 409)
+  requireThat(!await one(c.db, 'SELECT 1 FROM pt_capture_drafts WHERE bill_id = ?', current.id), 'Review and approve this captured draft in Receipts before posting it', 409)
   await assertOpen(c.db, current.bill_date)
   const payable = await controlAccount(c.db, 'payable'), vendor = await contact(c.db, current.vendor_id)
   await run(c.db, [authority(c.actor, 'record'), ...postBill(c.actor, { id: current.id, journalId: uid(), payable: payable.id, vendor, reference: current.reference, date: current.bill_date, lines: current.lines, total: current.total_cents }), audit(who(c.actor), 'bill.record', 'bill', current.id)])
@@ -164,9 +165,11 @@ export async function billsView(db: D1Database) {
   const rows = await all(db, 'SELECT b.*, c.name AS vendor_name FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id ORDER BY b.bill_date DESC, b.reference, b.id LIMIT 500')
   const lines = await all(db, 'SELECT * FROM pt_bill_lines ORDER BY bill_id, line_no')
   const docs = await all(db, "SELECT id, name, linked_id FROM pt_documents WHERE linked_kind = 'bill'")
+  const captured = await all(db, 'SELECT receipt_id, bill_id FROM pt_capture_drafts WHERE bill_id IS NOT NULL')
   for (const r of rows) {
     r.lines = lines.filter(l => l.bill_id === r.id)
     r.documents = docs.filter(d => d.linked_id === r.id)
+    r.capture_receipt_id = captured.find(d => d.bill_id === r.id)?.receipt_id ?? null
     r.open_cents = r.status === 'void' ? 0 : await openBalance(db, 'bill', r.id, r.total_cents)
   }
   return rows

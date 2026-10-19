@@ -1,3 +1,5 @@
+import { CaptureApprovalRules } from './capture-approval-rules'
+import { ReceiptDraft } from './receipt-draft'
 import { ReceiptVendor } from './receipt-vendor'
 // Receipts: take a photo or forward the email; Pantry reads the vendor, date
 // and total, proposes the transaction, and attaches it when a person accepts.
@@ -67,7 +69,8 @@ function ReceiptCard({ r, data, onChange }: { r: D; data: D; onChange: () => Pro
         <ReadLine r={r} reader={{ ...data.reader, canSet: state.actor.can.owner }} />
         {r.read_status !== 'read' && state.actor.can.record && <p className="hint">Type the vendor, date and total from the receipt: the transactions with that total are listed under <strong>Attach to</strong>.</p>}
         {state.actor.can.record && <ReceiptVendor r={r} accounts={data.accounts} vendors={state.contacts.filter((v: D) => v.kind === 'vendor')} onChange={onChange} />}
-        {state.actor.can.record ? <Form label={m.duplicate ? "Keep both" : "Accept and attach"} submit={async b => accept(b)} onDone={onChange} className="grid-form"
+        {state.actor.can.record && <ReceiptDraft r={r} accounts={data.accounts} onChange={onChange} />}
+        {!r.draftProposal?.saved && (state.actor.can.record ? <Form label={m.duplicate ? "Keep both" : "Accept and attach"} submit={async b => accept(b)} onDone={onChange} className="grid-form"
           secondary={<>{canRead && <Action run={async () => { await command('receipt.read', { id: r.id }); await onChange() }}>Read again</Action>}<Action run={async () => { await command('receipt.dismiss', { id: r.id, revision: r.revision, ...m.fields, reason: m.duplicate ? 'Duplicate skipped' : '' }); await onChange() }}>{m.duplicate ? 'Skip' : 'Not a receipt'}</Action></>}>
           {m.duplicate && <Field label="Reason to keep both" name="duplicateReason" required maxLength={300} wide />}
           <Field label="Vendor" name="vendor" defaultValue={r.vendor ?? r.read_vendor ?? ''} onChange={m.type('vendor')} />
@@ -84,7 +87,7 @@ function ReceiptCard({ r, data, onChange }: { r: D; data: D; onChange: () => Pro
             </label>) : <p className="hint">{m.looking ? 'Finding transactions with this total…' : m.total ? 'No transaction with this total yet. It is offered here when the bank or card line, bill or payment arrives.' : 'Enter the total to find its transaction.'}</p>}
             {m.error && <p role="alert" className="error">{m.error}</p>}
           </fieldset>
-        </Form> : <p className="hint">A bookkeeper, accountant or the owner accepts receipts.</p>}
+        </Form> : <p className="hint">A bookkeeper, accountant or the owner accepts receipts.</p>)}
       </div>
     </div>
   </Card>
@@ -122,6 +125,7 @@ export function Receipts() {
         {data.reader.unavailable ? <p className="hint">{data.reader.unavailable}</p> : data.reader.missing ? <p className="hint">{data.reader.missing} {state.actor.can.owner && <Link to="/app/settings" hash="ai-reading">Add a key</Link>}</p> : <p className="hint">Read with this install’s own AI model ({data.reader.model}). The original is kept exactly as received.</p>}
         <Forwarding inbox={data.inbox} owner={state.actor.can.owner} />
       </Card>
+      <CaptureApprovalRules rules={data.approvalRules} accounts={data.accounts} onChange={refresh} />
       {data.review.length ? data.review.map((r: D) => <div id={`receipt-${r.id}`} key={r.id + r.revision}><ReceiptCard r={r} data={data} onChange={refresh} /></div>)
         : <Card title="To review" className="empty-card"><span className="empty-lines" aria-hidden="true" /><p>Nothing waiting. New receipts appear here with what was read and the transaction they belong to.</p></Card>}
       {data.duplicateDocuments?.map((d: D) => <div key={d.id} id={`document-${d.id}`}><Card title="Duplicate document" actions={<Chip tone="warn">Duplicate</Chip>}>
