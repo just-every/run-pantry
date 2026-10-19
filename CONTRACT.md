@@ -648,8 +648,8 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 12 | 61 | 47 | 120 |
-| All | 31 | 61 | 47 | 139 |
+| Target and push further | 13 | 61 | 46 | 120 |
+| All | 32 | 61 | 46 | 139 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -688,7 +688,7 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | `CAPTURE-003` | Reading receipts and bills | target | partial | `src/pantry/receipts/reader.ts`, `src/pantry/receipts/intake.ts`, `tests/api/receipts.test.mjs` | The installation's own Anthropic or OpenAI-compatible model reads vendor, date, total, tax, currency and an expense account through a fixed schema, as a proposal only, never following text in the document; tip, invoice number, due date, terms, line items and card last four, per-field confidence and source regions, Base's ai module, the Textract adapter and the 20-document ground-truth run do not exist. |
 | `CAPTURE-004` | Receipts matched to transactions | target | partial | `src/pantry/receipts/attachments.ts`, `src/pantry/receipts/review.ts`, `src/ui/receipts.tsx`, `tests/api/receipts.test.mjs` | A read receipt proposes the bank or card line, bill, payment or entry with the same total near its date and vendor, and attaches when a person accepts, or by the owner's rule when exactly one line fits; a line not yet in the books is recorded to the chosen account. Automatic coding from the receipt without a rule, tip and currency tolerances, card last four, a receipt waiting for its line to arrive and the cash-receipt expense are not shown by a test. |
 | `CAPTURE-005` | Duplicate documents caught | target | done | `src/pantry/receipts/duplicates.ts`, `fingerprints.ts`, `document-intake.ts`, `review.ts`, `src/ui/receipts.tsx`, `tests/api/receipts.test.mjs` › CAPTURE-005 | Email/photo captures and ordinary/integration document uploads compare file hashes, normalized vendor/invoice number or vendor/date/total against captured and bill-linked originals. Duplicates link to the first and cannot file again without an audited Keep reason; Skip retains evidence. Atomic guards recheck the original at filing. |
-| `CAPTURE-006` | Vendor matching and creation | target | missing |  | No implementation. |
+| `CAPTURE-006` | Vendor matching and creation | target | done | `src/pantry/receipts/vendor-match.ts`, `vendor-confirm.ts`, `src/ui/receipt-vendor.tsx`, `tests/api/receipts.test.mjs` › CAPTURE-006 | Name variants, confirmed aliases, sender/email domains, address, phone and W-9 EIN propose existing identities; conflicting signals wait for a person. Accepting a new vendor or an alias requires confirmation. Account, terms, 1099 and class defaults fill the draft; existing contact and payment details never change from a reading. |
 | `CAPTURE-007` | Bills and expenses drafted from documents | target | partial | `src/pantry/payables.ts`, `tests/api/subledgers.test.mjs` | A person can record a bill and attach its document; drafting from a read document does not exist. |
 | `CAPTURE-008` | Missing receipts chased | target | partial | `src/pantry/close.ts`, `src/pantry/questions/checks.ts`, `src/ui/close.tsx`, `tests/api/receipts.test.mjs`, `tests/api/questions.test.mjs` | Spending without a receipt is listed at close with "Add receipt" and "No receipt needed", and a cost over the receipt amount (default $75) with no receipt past the set age becomes a question emailed to the owner, whose reply can attach the receipt; requests to the person who made the charge, push and SMS, repeated reminders and a waivable close exception per line do not exist. |
 | `ITEM-001` | Products and services list | target | missing |  | No implementation; invoice lines carry an income account and tax code directly (`src/pantry/invoices.ts`). |

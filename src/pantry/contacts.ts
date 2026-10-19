@@ -4,6 +4,7 @@ import { authority, who } from './access'
 import { now, optionalText, requireThat, sha256, text, uid } from './core'
 import { audit, changed, one, q, run, type Sql } from './db'
 import type { Command, Context } from './context'
+import { vendorProfile } from './receipts/vendor-profile'
 import { documentCaptureStatements, decideDocumentDuplicate } from './receipts/document-intake'
 
 export async function contact(db: D1Database, id: string, kind?: 'customer' | 'vendor') {
@@ -23,13 +24,15 @@ const saveContact: Command = { need: 'record', async run(c, b) {
   // How the customer's deposits read on the bank statement, for automatic matching.
   const bankReference = optionalText(b.bankReference, 'Bank statement reference', 120)
   const id = b.id ? text(b.id, 'Contact') : uid(), statements: Sql[] = [authority(c.actor, 'record')]
+  const current = b.id ? await contact(c.db, id) : null
+  const profile = kind === 'vendor' ? await vendorProfile(c.db, b, current) : null
   if (b.id) {
-    const current = await contact(c.db, id)
-    requireThat(current.revision === b.revision, 'Record changed; reload', 409)
-    requireThat(current.kind === kind, 'A customer stays a customer; add a vendor separately')
+    requireThat(current!.revision === b.revision, 'Record changed; reload', 409)
+    requireThat(current!.kind === kind, 'A customer stays a customer; add a vendor separately')
     const active = b.active === false || b.active === 'false' ? 0 : 1
     statements.push(q('UPDATE pt_contacts SET name = ?, email = ?, terms_days = ?, bank_reference = ?, active = ?, revision = ? WHERE id = ? AND revision = ?', name, email, terms, bankReference, active, uid(), id, b.revision), changed())
   } else statements.push(q('INSERT INTO pt_contacts (id, kind, name, email, terms_days, external_ref, bank_reference, active, revision) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)', id, kind, name, email, terms, '', bankReference, uid()))
+  if (profile) statements.push(q('UPDATE pt_contacts SET address = ?, phone = ?, default_account_id = ?, default_class = ?, is_1099 = ?, vendor_ein_hash = ? WHERE id = ?', profile.address, profile.phone, profile.accountId, profile.className, profile.is1099, profile.einHash, id), changed())
   statements.push(audit(who(c.actor), b.id ? 'contact.update' : 'contact.create', kind, id, { name }))
   await run(c.db, statements)
   return contact(c.db, id)

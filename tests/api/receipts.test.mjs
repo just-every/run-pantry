@@ -38,10 +38,11 @@ async function cardWithCharges(h, acct) {
   return { card, st, depot: at(lines, l => l.description.includes('HOME DEPOT')), cafe: at(lines, l => l.description.includes('CORNER CAFE')) }
 }
 
-test('Receipts: a phone photo is kept byte for byte, read by the install\'s own model, and attached to its card charge only when a person accepts', async t => {
+test('CAPTURE-006 vendor matching and creation: a phone photo is kept byte for byte, read by the install\'s own model, and attached to its card charge only when a person accepts', async t => {
+  let readVendor = 'THE HOME DEPOT #4417', vendorDetails = null
   const { model, seen } = fakeModel(file => {
     assert.equal(file.type, 'image')
-    return { receipt: true, vendor: 'The Home Depot', date: '2026-09-14', total: '84.37', tax: '6.12', currency: 'USD', category: '6300', note: '' }
+    return { receipt: true, vendor: readVendor, vendorDetails, date: '2026-09-14', total: '84.37', tax: '6.12', currency: 'USD', category: '6300', note: '' }
   })
   const h = await harness({ outbound: model }); t.after(() => h.close())
   const { acct } = await books(h)
@@ -70,6 +71,8 @@ test('Receipts: a phone photo is kept byte for byte, read by the install\'s own 
   const stored = await h.db.prepare('SELECT key_sealed FROM pt_reader').first()
   assert.ok(!stored.key_sealed.includes('sk-ant-test-key'), 'the key is sealed at rest')
 
+  const vendor = await h.command('contact.save', { kind: 'vendor', name: 'Home Depot', email: 'billing@homedepot.example', address: '100 Main Street Atlanta GA 30301', phone: '(404) 555-0123', termsDays: 15, defaultAccountId: acct['6300'], defaultClass: 'Repairs', is1099: false })
+
   // A bookkeeper photographs the receipt; the model reads it with the install's key.
   const { id } = await capture(h, photo, { cookie: bea })
   assert.equal(seen.length, 1)
@@ -77,8 +80,23 @@ test('Receipts: a phone photo is kept byte for byte, read by the install\'s own 
   assert.equal(Buffer.from(seen[0].body.messages[0].content[0].source.data, 'base64').equals(photo), true, 'the model reads the photo as taken')
   view = await h.view('receipts', bea)
   r = at(view.review, x => x.id === id)
-  assert.deepEqual([r.read_status, r.read_vendor, r.read_date, r.read_total_cents, r.read_tax_cents, r.read_currency], ['read', 'The Home Depot', '2026-09-14', 8437, 612, 'USD'])
+  assert.deepEqual([r.read_status, r.read_vendor, r.read_date, r.read_total_cents, r.read_tax_cents, r.read_currency], ['read', 'THE HOME DEPOT #4417', '2026-09-14', 8437, 612, 'USD'])
   assert.equal(r.read_account_id, acct['6300'])
+  assert.equal(r.vendorProposal.state, 'matched')
+  assert.equal(r.vendorProposal.matched.id, vendor.id)
+  assert.deepEqual(r.vendorProposal.defaults, { accountId: acct['6300'], termsDays: 15, is1099: false, className: 'Repairs' })
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM pt_vendor_aliases').first()).n, 0, 'a model reading does not teach an alias')
+  const viewer = await h.member('vendor-viewer@example.test', 'viewer')
+  const confirmVendor = { id: r.id, revision: r.revision, vendorId: vendor.id, vendorRevision: vendor.revision, confirm: true }
+  await h.command('receipt.vendor-confirm', confirmVendor, viewer, 403)
+  await h.command('receipt.vendor-confirm', { ...confirmVendor, confirm: false }, bea, 400)
+  await h.command('receipt.vendor-confirm', { ...confirmVendor, vendorRevision: 'stale' }, bea, 409)
+  await h.command('receipt.vendor-confirm', confirmVendor, bea)
+  view = await h.view('receipts', bea)
+  r = at(view.review, x => x.id === id)
+  assert.equal(r.vendor_id, vendor.id)
+  assert.deepEqual([r.account_id, r.vendor_terms_days, r.vendor_is_1099, r.vendor_class], [acct['6300'], 15, 0, 'Repairs'])
+  assert.equal((await h.db.prepare('SELECT alias FROM pt_vendor_aliases WHERE vendor_id = ?').bind(vendor.id).first()).alias, 'THE HOME DEPOT #4417')
   // It proposes the matching charge by amount, date window and vendor; the café charge is not offered.
   assert.equal(r.candidates[0].kind, 'bankline'); assert.equal(r.candidates[0].id, depot.id); assert.equal(r.candidates[0].record, true)
   assert.ok(!r.candidates.some(c => c.id === cafe.id))
@@ -88,13 +106,13 @@ test('Receipts: a phone photo is kept byte for byte, read by the install\'s own 
   assert.equal((await h.db.prepare('SELECT linked_kind FROM pt_documents WHERE id = ?').bind(r.document_id).first()).linked_kind, null)
 
   // The person corrects the tax and accepts: the charge is recorded to Office supplies, matched, and keeps its receipt.
-  const attached = await h.command('receipt.attach', { id: r.id, revision: r.revision, targetKind: 'bankline', targetId: depot.id, vendor: 'The Home Depot', date: '2026-09-14', total: '84.37', tax: '6.21', currency: 'USD', accountId: acct['6300'] }, bea)
+  const attached = await h.command('receipt.attach', { id: r.id, revision: r.revision, targetKind: 'bankline', targetId: depot.id, vendor: 'Home Depot', date: '2026-09-14', total: '84.37', tax: '6.21', currency: 'USD', accountId: acct['6300'] }, bea)
   assert.equal(attached.status, 'attached'); assert.equal(attached.linked_kind, 'journal'); assert.equal(attached.tax_cents, 621); assert.equal(attached.read_tax_cents, 612)
   assert.equal(await posted(), before + 1)
   const entry = await h.db.prepare('SELECT e.memo, l.debit_cents FROM pt_journal_entries e JOIN pt_journal_lines l ON l.entry_id = e.id WHERE e.id = ? AND l.account_id = ?').bind(attached.linked_id, acct['6300']).first()
-  assert.deepEqual([entry.memo, entry.debit_cents], ['The Home Depot', 8437])
+  assert.deepEqual([entry.memo, entry.debit_cents], ['Home Depot', 8437])
   const audit = await h.db.prepare("SELECT detail FROM pt_audit WHERE action = 'receipt.attach' AND subject_id = ?").bind(r.id).first()
-  assert.deepEqual(JSON.parse(audit.detail).corrected, ['tax'])
+  assert.deepEqual(JSON.parse(audit.detail).corrected, ['vendor', 'tax'])
   // The original comes back byte for byte, with its fingerprint.
   const doc = await fetch(`${h.origin}/api/pantry/documents/${r.document_id}`, { headers: { cookie: bea } })
   const bytes = Buffer.from(await doc.arrayBuffer())
@@ -114,6 +132,79 @@ test('Receipts: a phone photo is kept byte for byte, read by the install\'s own 
   // The export carries every entry's receipt with its fingerprint.
   const csv = await (await fetch(`${h.origin}/api/pantry/package/2026-09/general-ledger.csv`, { headers: { cookie: h.owner } })).text()
   assert.match(csv, new RegExp(`IMG_2041\\.jpg sha256:${sha(photo)} /api/pantry/documents/${r.document_id}`))
+
+  // CAPTURE-006 shares this public capture journey: another printed name is
+  // proposed, then retained only after a person confirms the existing vendor.
+  readVendor = 'Home Depot Pro'
+  const pro = await capture(h, Buffer.from('Home Depot Pro receipt'))
+  view = await h.view('receipts')
+  let proposal = at(view.review, x => x.id === pro.id)
+  assert.equal(proposal.vendorProposal.matched.id, vendor.id)
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM pt_vendor_aliases').first()).n, 1)
+  await h.command('receipt.vendor-confirm', { id: pro.id, revision: proposal.revision, vendorId: vendor.id, vendorRevision: vendor.revision, confirm: true })
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM pt_vendor_aliases WHERE vendor_id = ?').bind(vendor.id).first()).n, 2)
+  const remembered = await capture(h, Buffer.from('another Home Depot Pro receipt'))
+  const rememberedProposal = at((await h.view('receipts')).review, x => x.id === remembered.id).vendorProposal
+  assert.equal(rememberedProposal.matched.id, vendor.id)
+  assert.ok(rememberedProposal.matched.reasons.includes('confirmed alias'))
+
+  // Each non-name identity signal works through the same real capture door.
+  // The document's contradictory details never update the existing contact.
+  await h.command('contractor.save', { contactId: vendor.id, is1099: false, legalName: 'Home Depot', tinKind: 'ein', tin: '12-3456789', address: '100 Main Street', city: 'Atlanta', state: 'GA', zip: '30301' })
+  const currentVendor = at((await h.view('state')).contacts, x => x.id === vendor.id)
+  for (const [reason, details] of [
+    ['email domain', { email: 'orders@homedepot.example' }],
+    ['address', { address: '100 MAIN ST, ATLANTA GA 30301' }],
+    ['phone', { phone: '+1 404 555 0123' }],
+    ['EIN on W-9', { ein: '12-3456789', address: '999 A different address' }],
+  ]) {
+    readVendor = `Unfamiliar trade name ${reason}`
+    vendorDetails = details
+    const next = await capture(h, Buffer.from(`identity evidence ${reason}`))
+    proposal = at((await h.view('receipts')).review, x => x.id === next.id)
+    assert.equal(proposal.vendorProposal.matched.id, vendor.id, reason)
+    assert.ok(proposal.vendorProposal.matched.reasons.includes(reason))
+    assert.ok(!JSON.stringify(proposal).includes('123456789') && !JSON.stringify(proposal).includes('12-3456789'), 'receipt views expose no full EIN')
+  }
+  const unchanged = at((await h.view('state')).contacts, x => x.id === vendor.id)
+  assert.deepEqual([unchanged.address, unchanged.phone, unchanged.email, unchanged.revision], [currentVendor.address, currentVendor.phone, currentVendor.email, currentVendor.revision])
+
+  // The sender domain is identity evidence even without an email printed on the attachment.
+  const inbox = await h.command('receipt-address.create', { mailbox: 'receipts@books.example.test' })
+  readVendor = 'The hardware shop'; vendorDetails = null
+  const senderRaw = Buffer.from(`From: Orders <orders@homedepot.example>\r\nTo: ${inbox.address}\r\nSubject: Hardware receipt\r\nMessage-ID: <hardware-4417@homedepot.example>\r\nDate: Mon, 14 Sep 2026 10:00:00 +0000\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="hardware"\r\n\r\n--hardware\r\nContent-Type: text/plain\r\n\r\nReceipt attached.\r\n--hardware\r\nContent-Type: image/jpeg; name="hardware.jpg"\r\nContent-Disposition: attachment; filename="hardware.jpg"\r\nContent-Transfer-Encoding: base64\r\n\r\n${Buffer.alloc(12000, 1).toString('base64').replace(/.{76}/g, '$&\r\n')}\r\n--hardware--\r\n`)
+  const delivered = await deliver(h, inbox.address, senderRaw)
+  assert.ok(delivered.ok, `email delivery ${delivered.status}: ${await delivered.text()}`)
+  const mailed = await h.view('receipts')
+  assert.ok(mailed.review.some(x => x.subject === 'Hardware receipt'), JSON.stringify(mailed.review.map(x => ({ subject: x.subject, read: x.read_status, note: x.read_note, vendor: x.read_vendor }))))
+  proposal = at(mailed.review, x => x.subject === 'Hardware receipt')
+  assert.equal(proposal.vendorProposal.matched.id, vendor.id)
+  assert.ok(proposal.vendorProposal.matched.reasons.includes('email domain'))
+
+  // A new business remains a proposal until acceptance, then supplies defaults
+  // to this draft and future captures, including its confirmed trade name.
+  readVendor = 'Harbor Plumbing'; vendorDetails = { email: 'office@harbor.example', address: '25 Bay Road Tampa FL 33602', phone: '813-555-0109', ein: '98-7654321' }
+  const contactCount = (await h.view('state')).contacts.length
+  const fresh = await capture(h, Buffer.from('Harbor Plumbing new vendor receipt'))
+  proposal = at((await h.view('receipts')).review, x => x.id === fresh.id)
+  assert.equal(proposal.vendorProposal.state, 'new')
+  assert.equal((await h.view('state')).contacts.length, contactCount)
+  assert.deepEqual(proposal.vendorProposal.proposed, { name: 'Harbor Plumbing', email: 'office@harbor.example', address: '25 Bay Road Tampa FL 33602', phone: '813-555-0109', einLast4: '4321' })
+  const accepted = await h.command('receipt.vendor-confirm', { id: fresh.id, revision: proposal.revision, create: true, confirm: true, termsDays: 45, defaultAccountId: acct['6200'], defaultClass: 'Maintenance', is1099: true })
+  assert.equal((await h.view('state')).contacts.length, contactCount + 1)
+  proposal = at((await h.view('receipts')).review, x => x.id === fresh.id)
+  assert.equal(proposal.vendor_id, accepted.vendorId)
+  assert.deepEqual([proposal.account_id, proposal.vendor_terms_days, proposal.vendor_is_1099, proposal.vendor_class], [acct['6200'], 45, 1, 'Maintenance'])
+  const created = at((await h.view('state')).contacts, x => x.id === accepted.vendorId)
+  assert.deepEqual([created.email, created.address, created.phone], ['office@harbor.example', '25 Bay Road Tampa FL 33602', '813-555-0109'])
+  // Conflicting signals require a choice; neither company is silently merged.
+  readVendor = 'Home Depot'; vendorDetails = { phone: created.phone }
+  const conflict = await capture(h, Buffer.from('conflicting identity signals'))
+  proposal = at((await h.view('receipts')).review, x => x.id === conflict.id)
+  assert.equal(proposal.vendorProposal.state, 'ambiguous')
+  assert.equal(proposal.vendorProposal.matched, null)
+  assert.equal(proposal.vendorProposal.candidates.length, 2)
+  await h.command('receipt.vendor-confirm', { id: conflict.id, revision: proposal.revision, create: true, confirm: true, name: 'Another hardware shop' }, h.owner, 409)
 })
 
 const pdf = Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\n% Brightline Software invoice BL-3391, 2026-09-08, total $640.00\n%%EOF\n')

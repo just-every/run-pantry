@@ -80,7 +80,7 @@ const attach: Command = { need: 'record', async run(c, b) {
   const kind = text(b.targetKind, 'Transaction') as Target['kind']
   requireThat(['bankline', 'bill', 'payment', 'journal'].includes(kind), 'Choose a bank or card line, bill, payment or entry')
   const entered = fieldsFrom(b)
-  const f: Fields = { vendor: entered.vendor ?? r.vendor ?? r.read_vendor, invoiceNumber: entered.invoiceNumber ?? r.invoice_number ?? r.read_invoice_number, date: entered.date ?? r.read_date, total: entered.total ?? r.read_total_cents, tax: entered.tax ?? r.read_tax_cents, currency: entered.currency ?? r.read_currency, accountId: entered.accountId ?? r.read_account_id }
+  const f: Fields = { vendor: entered.vendor ?? r.vendor ?? r.read_vendor, invoiceNumber: entered.invoiceNumber ?? r.invoice_number ?? r.read_invoice_number, date: entered.date ?? r.read_date, total: entered.total ?? r.read_total_cents, tax: entered.tax ?? r.read_tax_cents, currency: entered.currency ?? r.read_currency, accountId: entered.accountId ?? r.account_id ?? r.read_account_id }
   const duplicate = await flagDuplicate(c.db, r, f)
   const duplicateReason = optionalText(b.duplicateReason, 'Reason to keep both', 300)
   if (duplicate && !duplicateReason) {
@@ -117,8 +117,8 @@ const readAgain: Command = { need: 'record', async run(c, b) {
   const input = file.mediaType === 'message/rfc822' ? emailReadable(file.bytes, file.name) : readable({ name: file.name, mediaType: file.mediaType, bytes: file.bytes })
   const cols = await readingColumns(c.db, await readWith(c.db, c.env, input))
   await run(c.db, [authority(c.actor, 'record'),
-    q("UPDATE pt_receipts SET read_status = ?, read_note = ?, read_model = ?, read_at = ?, read_vendor = ?, read_invoice_number = ?, read_date = ?, read_total_cents = ?, read_tax_cents = ?, read_currency = ?, read_account_id = ?, revision = ?, vendor_key = ? WHERE id = ? AND status = 'review'",
-      cols.read_status, cols.read_note, cols.read_model, cols.read_at, cols.read_vendor, cols.read_invoice_number, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, uid(), vendorKey(cols.read_vendor), r.id), changed(),
+    q("UPDATE pt_receipts SET read_status = ?, read_note = ?, read_model = ?, read_at = ?, read_vendor = ?, read_invoice_number = ?, read_date = ?, read_total_cents = ?, read_tax_cents = ?, read_currency = ?, read_account_id = ?, read_vendor_details = ?, vendor_id = NULL, vendor = NULL, account_id = NULL, vendor_terms_days = NULL, vendor_is_1099 = NULL, vendor_class = NULL, vendor_confirmed_by = NULL, vendor_confirmed_at = NULL, revision = ?, vendor_key = ? WHERE id = ? AND status = 'review'",
+      cols.read_status, cols.read_note, cols.read_model, cols.read_at, cols.read_vendor, cols.read_invoice_number, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, cols.read_vendor_details, uid(), vendorKey(cols.read_vendor), r.id), changed(),
     audit(who(c.actor), 'receipt.read', 'receipt', r.id, { read: cols.read_status })])
   await flagDuplicate(c.db, (await receipt(c.db, r.id))!)
   return (await receipt(c.db, r.id))!

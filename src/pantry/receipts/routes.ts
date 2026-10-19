@@ -14,8 +14,10 @@ import { duplicateDetails, duplicateOf, readFingerprint } from './duplicates'
 import { emailReadable, inboxView, mailCommands, MAX_EMAIL_BYTES, tryLocally } from './mail'
 import { applyRules, attachChosen, reviewCommands } from './review'
 import { readerCommands, readerView } from './settings'
+import { receiptVendorCommands } from './vendor-confirm'
+import { receiptVendorProposal } from './vendor-match'
 
-export const receiptCommands: Record<string, Command> = { ...readerCommands, ...mailCommands, ...reviewCommands }
+export const receiptCommands: Record<string, Command> = { ...readerCommands, ...mailCommands, ...reviewCommands, ...receiptVendorCommands }
 
 const MEDIA = /^(application\/pdf|image\/(png|jpeg|webp|gif|heic|heif)|text\/plain|message\/rfc822)$/
 const TARGETS = ['bankline', 'bill', 'payment', 'journal']
@@ -57,6 +59,8 @@ export async function receiptsView(c: Context): Promise<Data> {
       r.currency ??= r.read_currency ?? r.duplicate.currency
       r.account_id ??= r.read_account_id ?? r.duplicate.account_id
     }
+    r.vendorProposal = await receiptVendorProposal(c.db, r)
+    r.account_id ??= r.vendorProposal.defaults?.accountId
     r.candidates = (await candidates(c.db, r.total_cents ?? r.read_total_cents, r.receipt_date ?? r.read_date, r.vendor ?? r.read_vendor, r.currency ?? r.read_currency)).slice(0, 6)
     offerOriginal(r.candidates, r.duplicate, readFingerprint(r))
   }

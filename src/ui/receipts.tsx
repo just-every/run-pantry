@@ -1,3 +1,4 @@
+import { ReceiptVendor } from './receipt-vendor'
 // Receipts: take a photo or forward the email; Pantry reads the vendor, date
 // and total, proposes the transaction, and attaches it when a person accepts.
 import { useEffect, useState } from 'react'
@@ -65,6 +66,7 @@ function ReceiptCard({ r, data, onChange }: { r: D; data: D; onChange: () => Pro
         {m.duplicate && <p className="hint" role="status">Duplicate receipt · {m.basis === 'file' ? 'same file' : m.basis === 'vendor-invoice' ? 'same vendor and invoice number' : 'same vendor, date and total'}. Original: <FileLink id={m.duplicate.document_id} name={m.duplicate.file_name} mediaType={m.duplicate.media_type} />{m.duplicate.status === 'attached' ? <> · already attached {day(m.duplicate.decided_at)}</> : ' · waiting for review'}. Choose Keep both with a reason, or Skip.</p>}
         <ReadLine r={r} reader={{ ...data.reader, canSet: state.actor.can.owner }} />
         {r.read_status !== 'read' && state.actor.can.record && <p className="hint">Type the vendor, date and total from the receipt: the transactions with that total are listed under <strong>Attach to</strong>.</p>}
+        {state.actor.can.record && <ReceiptVendor r={r} accounts={data.accounts} vendors={state.contacts.filter((v: D) => v.kind === 'vendor')} onChange={onChange} />}
         {state.actor.can.record ? <Form label={m.duplicate ? "Keep both" : "Accept and attach"} submit={async b => accept(b)} onDone={onChange} className="grid-form"
           secondary={<>{canRead && <Action run={async () => { await command('receipt.read', { id: r.id }); await onChange() }}>Read again</Action>}<Action run={async () => { await command('receipt.dismiss', { id: r.id, revision: r.revision, ...m.fields, reason: m.duplicate ? 'Duplicate skipped' : '' }); await onChange() }}>{m.duplicate ? 'Skip' : 'Not a receipt'}</Action></>}>
           {m.duplicate && <Field label="Reason to keep both" name="duplicateReason" required maxLength={300} wide />}
