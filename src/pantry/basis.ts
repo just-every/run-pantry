@@ -43,12 +43,12 @@ export type CashLine = {
   accountId: string; date: string; net: number
   docKind: 'invoice' | 'credit' | 'bill'; docId: string; docRef: string; docJournalId: string; docTotal: number
   contactId: string; contactName: string
-  role: 'control' | 'sale' | 'tax' | 'expense'; description: string; taxCode: string | null
+  role: 'control' | 'sale' | 'tax' | 'expense'; description: string; taxCode: string | null; itemId?: string | null
   settledBefore: number; settledAfter: number
   settlement: Settlement
 }
 
-type Component = { accountId: string; sign: 1 | -1; magnitude: number; role: CashLine['role']; description: string; taxCode: string | null }
+type Component = { accountId: string; sign: 1 | -1; magnitude: number; role: CashLine['role']; description: string; taxCode: string | null; itemId?: string | null }
 type Doc = { kind: CashLine['docKind']; id: string; ref: string; journalId: string; total: number; contactId: string; contactName: string; control: Component; parts: Component[] }
 type Event = { docId: string; date: string; order: string; delta: number; settlement: Settlement }
 
@@ -70,14 +70,14 @@ async function documents(db: D1Database): Promise<Map<string, Doc>> {
   // Only documents something has settled matter on the cash basis.
   const invoices = await all(db, `SELECT i.id, i.kind, i.number, i.total_cents, i.journal_id, i.customer_id, c.name AS contact_name FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id
     WHERE i.journal_id IS NOT NULL AND (i.id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice') OR i.id IN (SELECT source_id FROM pt_allocations WHERE source_kind = 'credit'))`)
-  const invoiceLines = await all(db, `SELECT l.invoice_id, l.description, l.amount_cents, l.tax_cents, l.tax_code, l.account_id, t.account_id AS tax_account FROM pt_invoice_lines l LEFT JOIN pt_tax_codes t ON t.id = l.tax_code
+  const invoiceLines = await all(db, `SELECT l.invoice_id, l.description, l.amount_cents, l.tax_cents, l.tax_code, l.account_id, l.item_id, t.account_id AS tax_account FROM pt_invoice_lines l LEFT JOIN pt_tax_codes t ON t.id = l.tax_code
     WHERE l.invoice_id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice' UNION SELECT source_id FROM pt_allocations WHERE source_kind = 'credit') ORDER BY l.invoice_id, l.line_no`)
   for (const i of invoices) {
     // An invoice debits receivables and credits income and tax; a credit note the reverse.
     const s: 1 | -1 = i.kind === 'invoice' ? 1 : -1
     const parts: Component[] = []
     for (const l of invoiceLines.filter(x => x.invoice_id === i.id)) {
-      parts.push({ accountId: l.account_id, sign: (-s) as 1 | -1, magnitude: l.amount_cents, role: 'sale', description: l.description, taxCode: l.tax_code })
+      parts.push({ accountId: l.account_id, sign: (-s) as 1 | -1, magnitude: l.amount_cents, role: 'sale', description: l.description, taxCode: l.tax_code, itemId: l.item_id })
       if (l.tax_cents) parts.push({ accountId: l.tax_account, sign: (-s) as 1 | -1, magnitude: l.tax_cents, role: 'tax', description: `Sales tax · ${l.description}`, taxCode: l.tax_code })
     }
     docs.set(i.id, { kind: i.kind, id: i.id, ref: i.number, journalId: i.journal_id, total: i.total_cents, contactId: i.customer_id, contactName: i.contact_name,
@@ -131,7 +131,7 @@ export async function cashLines(db: D1Database, from: string, to: string): Promi
     const was = spread(d.parts, d.total, before), now = spread(d.parts, d.total, after)
     const common = { date: e.date, docKind: d.kind, docId: d.id, docRef: d.ref, docJournalId: d.journalId, docTotal: d.total, contactId: d.contactId, contactName: d.contactName, settledBefore: before, settledAfter: after, settlement: e.settlement }
     out.push({ ...common, accountId: d.control.accountId, net: d.control.sign * e.delta, role: 'control', description: d.control.description, taxCode: null })
-    d.parts.forEach((p, i) => { const share = now[i] - was[i]; if (share) out.push({ ...common, accountId: p.accountId, net: p.sign * share, role: p.role, description: p.description, taxCode: p.taxCode }) })
+    d.parts.forEach((p, i) => { const share = now[i] - was[i]; if (share) out.push({ ...common, accountId: p.accountId, net: p.sign * share, role: p.role, description: p.description, taxCode: p.taxCode, itemId: p.itemId ?? null }) })
   }
   return out
 }

@@ -4,7 +4,7 @@
 import { useState } from 'react'
 import { accountOptions, Card, command, contactOptions, Field, today, usd, useShared, useView, type D } from './kit'
 
-export type Line = { description: string; quantity: string; rate: string; accountId: string; taxCode: string }
+export type Line = { description: string; quantity: string; rate: string; accountId: string; taxCode: string; itemId?: string }
 export const blank = (accountId = ''): Line => ({ description: '', quantity: '1', rate: '', accountId, taxCode: '' })
 export const cents = (v: string) => /^\d+(\.\d{1,2})?$/.test(v.replace(/,/g, '').trim()) ? Math.round(Number(v.replace(/,/g, '')) * 100) : 0
 export const qty = (v: string) => /^\d+(\.\d{1,3})?$/.test(v.trim()) ? Number(v) : 0
@@ -26,7 +26,7 @@ export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCan
   const { state } = useShared()
   const income = accountOptions(state.accounts, a => a.type === 'income')
   const source = invoice ?? creditFor
-  const [lines, setLines] = useState<Line[]>(source?.lines?.length ? source.lines.map((l: D) => ({ description: l.description, quantity: String(l.quantity_milli / 1000), rate: (l.unit_cents / 100).toFixed(2), accountId: l.account_id, taxCode: creditFor ? l.tax_code ?? '' : ('chosen_tax_code' in l ? l.chosen_tax_code : l.tax_code) ?? '' })) : [blank(income[0]?.value)])
+  const [lines, setLines] = useState<Line[]>(source?.lines?.length ? source.lines.map((l: D) => ({ ...(l.item_id ? { itemId: l.item_id } : {}), description: l.description, quantity: String(l.quantity_milli / 1000), rate: (l.unit_cents / 100).toFixed(2), accountId: l.account_id, taxCode: creditFor ? l.tax_code ?? '' : ('chosen_tax_code' in l ? l.chosen_tax_code : l.tax_code) ?? '' })) : [blank(income[0]?.value)])
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const kind = creditFor || invoice?.kind === 'credit' ? 'credit' : 'invoice'
   // The due date follows the customer's terms from the issue date until the person types one.
@@ -83,16 +83,22 @@ export function ServiceLines({ lines, setLines }: { lines: Line[]; setLines: (f:
   const income = accountOptions(state.accounts, a => a.type === 'income')
   const { amounts } = lineTotals(lines, state.taxCodes)
   const set = (i: number, patch: Partial<Line>) => setLines(ls => ls.map((l, j) => j === i ? { ...l, ...patch } : l))
+  const items: D[] = state.items ?? []
+  // Choosing a product or service fills the line from it (ITEM-001); its income account then stays the item's.
+  const pick = (i: number, id: string) => {
+    const it = items.find(x => x.id === id)
+    set(i, it ? { itemId: it.id, description: it.description || it.name, rate: (it.rate_cents / 100).toFixed(2), accountId: it.income_account_id, taxCode: it.tax_category === 'non-taxable' ? 'exempt' : it.tax_code ?? '' } : { itemId: undefined })
+  }
   return <Card title="Service lines" actions={<button type="button" className="btn btn-secondary" onClick={() => setLines(ls => [...ls, blank(income[0]?.value)])}>Add line</button>}>
-    <div className="table-wrap"><table className="ledger lines-editor"><thead><tr><th>#</th><th>Description</th><th className="fig">Quantity</th><th className="fig">Rate</th><th className="fig">Amount</th><th>Income account</th><th>Sales tax code</th><th /></tr></thead>
+    <div className="table-wrap"><table className="ledger lines-editor"><thead><tr><th>#</th><th>Item and description</th><th className="fig">Quantity</th><th className="fig">Rate</th><th className="fig">Amount</th><th>Income account</th><th>Sales tax code</th><th /></tr></thead>
       <tbody>{lines.map((l, i) => <tr key={i}>
         <td data-label="#">{i + 1}</td>
-        <td data-label="Description"><input aria-label={`Line ${i + 1} description`} value={l.description} onChange={e => set(i, { description: e.target.value })} required /></td>
+        <td data-label="Item and description"><div className="stack" style={{ gap: 6 }}><select aria-label={`Line ${i + 1} product or service`} value={l.itemId ?? ''} onChange={e => pick(i, e.target.value)}><option value="">No item</option>{items.filter(it => it.active || it.id === l.itemId).map(it => <option key={it.id} value={it.id}>{it.name}{it.sku ? ` · ${it.sku}` : ''}{it.active ? '' : ' (inactive)'}</option>)}</select><input aria-label={`Line ${i + 1} description`} value={l.description} onChange={e => set(i, { description: e.target.value })} required /></div></td>
         <td data-label="Quantity"><input aria-label={`Line ${i + 1} quantity`} className="fig narrow" inputMode="decimal" value={l.quantity} onChange={e => set(i, { quantity: e.target.value })} required /></td>
         <td data-label="Rate"><input aria-label={`Line ${i + 1} rate`} className="fig narrow" inputMode="decimal" value={l.rate} onChange={e => set(i, { rate: e.target.value })} required /></td>
         <td data-label="Amount" className="fig">{usd(amounts[i])}</td>
-        <td data-label="Income account"><select aria-label={`Line ${i + 1} income account`} value={l.accountId} onChange={e => set(i, { accountId: e.target.value })} required><option value="">Choose…</option>{income.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></td>
-        <td data-label="Sales tax code"><select aria-label={`Line ${i + 1} sales tax code`} className={l.taxCode ? '' : 'needs-decision'} aria-invalid={!l.taxCode || undefined} value={l.taxCode} onChange={e => set(i, { taxCode: e.target.value })}><option value="">Tax treatment needed</option><option value="exempt">Exempt / not taxable</option>{state.taxCodes.map((t: D) => <option key={t.id} value={t.id}>{t.name} ({(t.rate_milli_percent / 1000).toFixed(3)}%)</option>)}</select></td>
+        <td data-label="Income account"><select aria-label={`Line ${i + 1} income account`} disabled={!!l.itemId} value={l.accountId} onChange={e => set(i, { accountId: e.target.value })} required><option value="">Choose…</option>{income.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></td>
+        <td data-label="Sales tax code"><select aria-label={`Line ${i + 1} sales tax code`} disabled={items.find(it => it.id === l.itemId)?.tax_category === 'non-taxable'} className={l.taxCode ? '' : 'needs-decision'} aria-invalid={!l.taxCode || undefined} value={l.taxCode} onChange={e => set(i, { taxCode: e.target.value })}><option value="">Tax treatment needed</option><option value="exempt">Exempt / not taxable</option>{state.taxCodes.map((t: D) => <option key={t.id} value={t.id}>{t.name} ({(t.rate_milli_percent / 1000).toFixed(3)}%)</option>)}</select></td>
         <td>{lines.length > 1 && <button type="button" className="btn btn-link" onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}>Remove</button>}</td>
       </tr>)}</tbody></table></div>
   </Card>

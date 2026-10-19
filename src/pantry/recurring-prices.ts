@@ -31,7 +31,7 @@ const schedule: Command = { need: 'record', async run(c, b) {
   requireThat(!await one(c.db, 'SELECT 1 FROM pt_recurring_runs WHERE recurring_id = ? AND occurrence >= ?', t.id, effective), 'Invoices have already been generated on or after that date; choose a later price date', 409)
   const p = await parseInvoice(c.db, { customerId: t.customer_id, issueDate: effective, lines: b.lines, memo: t.memo })
   requireThat(p.lines.every(l => l.taxCode), 'Choose a sales tax code or exemption for every line')
-  const lines = p.lines.map(l => ({ description: l.description, quantity: String(l.qty / 1000), rate: (l.unit / 100).toFixed(2), accountId: l.accountId, taxCode: l.taxCode }))
+  const lines = p.lines.map(l => ({ description: l.description, quantity: String(l.qty / 1000), rate: (l.unit / 100).toFixed(2), accountId: l.accountId, taxCode: l.taxCode, ...(l.itemId ? { itemId: l.itemId } : {}) }))
   const id = uid(), revision = uid()
   await run(c.db, [authority(c.actor, 'record'),
     guard("EXISTS (SELECT 1 FROM pt_recurring WHERE id = ? AND revision = ? AND status <> 'ended')", t.id, t.revision),

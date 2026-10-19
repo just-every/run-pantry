@@ -8,6 +8,7 @@ import { InvoiceEditor } from './invoice-editor'
 import { Deliveries, SendPanel } from './invoice-delivery'
 import { Recurring } from './recurring'
 import { ExemptionCertificates, ExemptionCitation } from './exemption-certificates'
+import { Items } from './items'
 
 function invoiceStatus(i: D): [string, 'good' | 'warn' | 'info' | 'neutral'] {
   if (i.status === 'draft') return ['Draft', 'neutral']
@@ -184,8 +185,8 @@ export function Sales({ billId }: { billId?: string } = {}) {
   const refresh = async () => { await reload(); await shared.reload() }
   return <>
     <PageHead title="Sales & bills" lead="Invoices you send and follow up, recurring invoices, bills and their evidence, and payments." />
-    <Tabs tabs={['Invoices', 'Recurring', 'Bills', 'Payments', 'Deliveries', 'Customers & vendors']} current={tab} onChange={setTab} pick="Show" />
-    {tab === 'Customers & vendors' ? <><Contacts /><ExemptionCertificates /></> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
+    <Tabs tabs={['Invoices', 'Recurring', 'Bills', 'Payments', 'Deliveries', 'Customers & vendors', 'Products & services']} current={tab} onChange={setTab} pick="Show" />
+    {tab === 'Customers & vendors' ? <><Contacts /><ExemptionCertificates /></> : tab === 'Products & services' ? <Items /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
       : tab === 'Bills' ? <Bills initialBillId={billId} data={data} reload={refresh} /> : tab === 'Deliveries' ? <Card title="Deliveries"><p className="hint">Every invoice and reminder Pantry has sent, with the mail provider's answer. Accepted means the provider took the message, not that the customer read it; "Viewed" on an invoice means the customer opened its link.</p><Deliveries data={data} /></Card> : <Payments data={data} reload={refresh} />}
   </>
 }

@@ -73,9 +73,11 @@ import { budgetCommands, budget, budgetsView } from './budgets/commands'
 import { budgetReport, budgetCsv } from './budgets/report'
 import { checkCommands, checksView } from './checks/commands'
 import { checksRoutes } from './checks/routes'
+import { itemCommands } from './items/commands'
+import { salesByItem } from './items/report'
 
 const commands: Record<string, Command> = {
-  ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -173,6 +175,7 @@ view('reports/:kind', async (ctx, c) => {
   const kind = c.req.param('kind'), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01'), basis = await reportBasis(ctx.db, c.req.query('basis'))
   const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
   if (kind === 'sales-by-customer' || kind === 'expenses-by-vendor') return contactTotals(ctx.db, kind === 'sales-by-customer' ? 'customer' : 'vendor', from, to, basis)
+  if (kind === 'sales-by-item') return salesByItem(ctx.db, from, to, basis)
   if (kind === 'cash-flow') return cashFlow(ctx.db, from, to)
   if (kind === 'trial-balance') return trialBalance(ctx.db, to, basis)
   if (kind === 'general-ledger') return generalLedger(ctx.db, from, to, c.req.query('account') || undefined, basis)

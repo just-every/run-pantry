@@ -233,3 +233,68 @@ test('BILL-002 manual and integration bills obey amount/vendor/account/class rul
   const noRule = await h.command('bill.save', { ...small, className: 'Office', post: true }, bea)
   assert.equal(noRule.status, 'posted')
 })
+
+test('ITEM-001 products and services carry income accounts and tax categories onto invoices and recurring templates, report sales by item on both bases, and an inactive item is refused on new invoices but kept on old ones', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const { acct, tax: city, customer, bank } = await setup(h)
+  const bea = await h.member('bea@example.test', 'bookkeeper'), ann = await h.member('ann@example.test', 'accountant', { canPost: true })
+  const state = await h.command('tax-code.save', { name: 'New York State', rate: '4', accountId: acct['2200'] })
+  const training = await h.command('account.save', { code: '4100', name: 'Training revenue', type: 'income' })
+  const products = await h.command('account.save', { code: '4200', name: 'Product sales', type: 'income' })
+  // Three items with different income accounts and tax categories.
+  const design = await h.command('item.save', { name: 'Brand design hour', kind: 'service', rate: '150.00', accountId: acct['4000'], taxCategory: 'non-taxable' }, bea)
+  const workshop = await h.command('item.save', { name: 'Team workshop', kind: 'service', description: 'Half-day brand workshop', rate: '900.00', accountId: training.id, taxCategory: 'taxable', taxCode: state.id }, bea)
+  let guides = await h.command('item.save', { name: 'Printed style guide', kind: 'non-inventory', sku: 'PSG-1', rate: '40.00', accountId: products.id, taxCategory: 'taxable', taxCode: city.id }, bea)
+  await h.command('item.save', { name: 'printed STYLE guide', rate: '1.00', accountId: acct['4000'], taxCategory: 'taxable' }, bea, 409)
+  await h.command('item.save', { name: 'Inventory chair', kind: 'inventory', rate: '1.00', accountId: acct['4000'], taxCategory: 'taxable' }, bea, 400)
+  assert.deepEqual((await h.view('state')).items.map(i => i.name), ['Brand design hour', 'Printed style guide', 'Team workshop'])
+  // An item's own account and taxability apply; a line cannot move it to another income account or tax a non-taxable item.
+  const draft = lines => h.send('/api/pantry/command/invoice.save-draft', { customerId: customer.id, issueDate: '2026-09-02', lines }, { cookie: bea })
+  assert.match((await draft([{ itemId: design.id, quantity: '1', taxCode: city.id }])).value.error, /Brand design hour is not taxable/)
+  assert.match((await draft([{ itemId: workshop.id, quantity: '1', accountId: acct['4000'] }])).value.error, /Team workshop posts to its own income account/)
+  assert.equal((await draft([{ itemId: 'nope', quantity: '1' }])).status, 400)
+  let inv = await h.command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-09-02', lines: [
+    { itemId: design.id, quantity: '10' }, { itemId: workshop.id, quantity: '1' }, { itemId: guides.id, quantity: '5' },
+    { description: 'Rush fee', quantity: '1', rate: '100.00', accountId: acct['4000'], taxCode: 'exempt' }] }, bea)
+  assert.deepEqual(inv.lines.map(l => [l.item_id, l.description, l.account_id, l.tax_code, l.amount_cents, l.tax_cents]), [
+    [design.id, 'Brand design hour', acct['4000'], 'exempt', 150000, 0], [workshop.id, 'Half-day brand workshop', training.id, state.id, 90000, 3600],
+    [guides.id, 'Printed style guide', products.id, city.id, 20000, 1775], [null, 'Rush fee', acct['4000'], 'exempt', 10000, 0]])
+  assert.deepEqual([inv.subtotal_cents, inv.tax_cents, inv.total_cents], [270000, 5375, 275375])
+  inv = await h.command('invoice.approve', { id: inv.id, revision: inv.revision }, ann)
+  inv = await h.command('invoice.issue', { id: inv.id }, bea)
+  assert.deepEqual((await journalOf(h, inv.journal_id)).lines.map(l => [l.account_code, l.debit_cents, l.credit_cents]),
+    [['1200', 275375, 0], ['4000', 0, 150000], ['4100', 0, 90000], ['4200', 0, 20000], ['4000', 0, 10000], ['2200', 0, 5375]])
+  await h.command('payment.record', { direction: 'received', contactId: customer.id, date: '2026-09-15', amount: '2753.75', bankAccountId: bank.id, allocations: [{ targetId: inv.id, amount: '2753.75' }] }, bea)
+  // A typed rate overrides the item's default rate.
+  let second = await h.command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-09-20', lines: [{ itemId: guides.id, quantity: '10', rate: '35.00' }] }, bea)
+  assert.equal(second.lines[0].amount_cents, 35000)
+  second = await h.command('invoice.approve', { id: second.id, revision: second.revision }, ann)
+  await h.command('invoice.issue', { id: second.id }, bea)
+  // A recurring template picks an item and keeps it on each invoice it creates.
+  await h.command('recurring.save', { customerId: customer.id, startDate: '2026-09-01', endDate: '2026-10-31', every: 1, unit: 'month', mode: 'draft', lines: [{ itemId: design.id, quantity: '4' }] }, bea)
+  await h.cron()
+  const sales = await h.view('sales')
+  assert.deepEqual(sales.recurring[0].lines.map(l => [l.itemId, l.accountId, l.taxCode, l.rate]), [[design.id, acct['4000'], 'exempt', '150.00']])
+  const generated = sales.invoices.filter(i => i.recurring_id)
+  assert.equal(generated.length, 2)
+  for (const g of generated) assert.deepEqual(g.lines.map(l => [l.item_id, l.account_id, l.amount_cents]), [[design.id, acct['4000'], 60000]])
+  // Deactivated: refused on a new invoice, kept on the issued ones, and still creditable.
+  guides = await h.command('item.save', { id: guides.id, revision: guides.revision, name: guides.name, kind: guides.kind, sku: guides.sku, rate: '40.00', accountId: products.id, taxCategory: 'taxable', taxCode: city.id, active: false }, bea)
+  assert.equal(guides.active, 0)
+  assert.match((await draft([{ itemId: guides.id, quantity: '1' }])).value.error, /Printed style guide is inactive/)
+  assert.equal(at((await h.view('sales')).invoices, i => i.id === inv.id).lines[2].item_id, guides.id)
+  const credit = await h.command('invoice.save-draft', { kind: 'credit', creditFor: second.id, customerId: customer.id, issueDate: '2026-09-25', lines: [{ itemId: guides.id, quantity: '1', rate: '35.00' }] }, bea)
+  await h.command('invoice.issue', { id: (await h.command('invoice.approve', { id: credit.id, revision: credit.revision }, ann)).id }, bea)
+  // Sales by item ties to profit and loss income on both bases; the declared cash method is the default.
+  const SEP = 'from=2026-09-01&to=2026-09-30'
+  const byItem = r => Object.fromEntries(r.rows.map(x => [x.name, x.amount]))
+  const accrual = await h.view(`reports/sales-by-item?${SEP}&basis=accrual`)
+  assert.deepEqual(byItem(accrual), { 'Brand design hour': 150000, 'Printed style guide': 20000 + 35000 - 3500, 'Team workshop': 90000, 'No item (other income)': 10000 })
+  assert.equal(accrual.total, (await h.view(`reports/profit-and-loss?${SEP}&basis=accrual`)).totalIncome)
+  const cash = await h.view(`reports/sales-by-item?${SEP}`)
+  assert.equal(cash.basis, 'cash')
+  assert.deepEqual(byItem(cash), { 'Brand design hour': 150000, 'Printed style guide': 20000, 'Team workshop': 90000, 'No item (other income)': 10000 })
+  assert.equal(cash.total, (await h.view(`reports/profit-and-loss?${SEP}&basis=cash`)).totalIncome)
+  const csv = await h.send(`/api/pantry/reports/sales-by-item/export?${SEP}&basis=accrual&format=csv`, undefined, { cookie: h.owner })
+  assert.match(csv.value, /"Printed style guide · PSG-1","","515.00","Accrual basis"/)
+})

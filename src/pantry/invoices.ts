@@ -37,26 +37,36 @@ export async function parseInvoice(db: D1Database, b: Data) {
   const exemption = b.kind === 'credit' ? null : await applicableExemption(db, customer.id, destination, issueDate)
   const taxCodes = new Map((await all(db, 'SELECT * FROM pt_tax_codes WHERE active = 1')).map(t => [t.id, t]))
   const accounts = new Map((await all(db, "SELECT id, type, active FROM pt_accounts")).map(a => [a.id, a]))
+  const items = new Map((await all(db, 'SELECT * FROM pt_items')).map(it => [it.id, it]))
   const lines = list<Data>(b.lines, 'Invoice lines', 100).map((l, i) => {
     const label = `Line ${i + 1}`
-    const qty = quantity(l.quantity ?? '1', `${label} quantity`), unit = cents(l.rate, `${label} rate`, { zero: true })
+    // A line sold as an item (ITEM-001) takes its description, rate, income account and tax category.
+    const item = l.itemId ? items.get(String(l.itemId)) : null
+    requireThat(!l.itemId || item, `${label}: unknown product or service`)
+    requireThat(!item || item.active || b.kind === 'credit', `${label}: ${item?.name} is inactive; choose an active product or service`)
+    const given = (v: unknown) => v !== undefined && v !== null && v !== ''
+    const qty = quantity(l.quantity ?? '1', `${label} quantity`), unit = cents(item && !given(l.rate) ? String(item.rate_cents / 100) : l.rate, `${label} rate`, { zero: true })
     const amount = scale(qty, unit, 1000)
     requireThat(amount > 0, `${label} amount must be positive`)
-    const account = accounts.get(text(l.accountId, `${label} income account`))
+    requireThat(!item || !given(l.accountId) || l.accountId === item.income_account_id, `${label}: ${item?.name} posts to its own income account`)
+    const account = accounts.get(item ? item.income_account_id : text(l.accountId, `${label} income account`))
     requireThat(account && account.active && account.type === 'income', `${label}: choose an active income account`)
-    const chosenCode = typeof l.taxCode === 'string' && l.taxCode ? l.taxCode : null
+    let chosenCode = typeof l.taxCode === 'string' && l.taxCode ? l.taxCode : null
     requireThat(chosenCode === null || chosenCode === 'exempt' || taxCodes.has(chosenCode), `${label}: unknown sales tax code`)
+    if (item?.tax_category === 'non-taxable') { requireThat(chosenCode === null || chosenCode === 'exempt', `${label}: ${item.name} is not taxable`); chosenCode = 'exempt' }
+    else if (item && chosenCode === null && item.tax_code && taxCodes.has(item.tax_code)) chosenCode = item.tax_code
     const code = exemption ? 'exempt' : chosenCode
     const tax = code && code !== 'exempt' ? scale(amount, taxCodes.get(code)!.rate_milli_percent, 100000) : 0
-    return { description: text(l.description, `${label} description`, 500), qty, unit, amount, accountId: account.id, taxCode: code, chosenTaxCode: chosenCode, tax }
+    const description = item && !given(l.description) ? item.description || item.name : text(l.description, `${label} description`, 500)
+    return { description, qty, unit, amount, accountId: account.id, taxCode: code, chosenTaxCode: chosenCode, tax, itemId: item ? item.id as string : null }
   })
   const subtotal = lines.reduce((s, l) => s + l.amount, 0), tax = lines.reduce((s, l) => s + l.tax, 0)
   return { customer, issueDate, dueDate, destination, exemption, lines, subtotal, tax, total: subtotal + tax, memo: optionalText(b.memo, 'Memo', 1000) }
 }
 
 export const lineStatements = (invoiceId: string, lines: Awaited<ReturnType<typeof parseInvoice>>['lines']) => lines.map((l, i) =>
-  q('INSERT INTO pt_invoice_lines (id, invoice_id, line_no, description, quantity_milli, unit_cents, amount_cents, account_id, tax_code, tax_cents, chosen_tax_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    uid(), invoiceId, i + 1, l.description, l.qty, l.unit, l.amount, l.accountId, l.taxCode, l.tax, l.chosenTaxCode))
+  q('INSERT INTO pt_invoice_lines (id, invoice_id, line_no, description, quantity_milli, unit_cents, amount_cents, account_id, tax_code, tax_cents, chosen_tax_code, item_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    uid(), invoiceId, i + 1, l.description, l.qty, l.unit, l.amount, l.accountId, l.taxCode, l.tax, l.chosenTaxCode, l.itemId))
 
 export async function nextNumber(db: D1Database, kind: 'invoice' | 'credit') {
   const prefix = kind === 'invoice' ? 'INV-' : 'CR-'

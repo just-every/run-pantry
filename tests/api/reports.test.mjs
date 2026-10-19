@@ -76,7 +76,7 @@ test('REPORT-002 cash or accrual: one switch reads the same books both ways, par
     assert.equal(costs.rows.find(r => r.id === 'unassigned').amount, 1200, 'direct postings stay in totals')
     assert.equal(sales.rows.find(r => r.id === s.c['Cedar Studio'].id).amount, basis === 'cash' ? 47472 : 100000)
     assert.equal(costs.rows.find(r => r.id === s.c['Brightline Software'].id).amount, 64000)
-    for (const kind of ['trial-balance', 'general-ledger', 'profit-and-loss', 'balance-sheet', 'sales-tax', 'sales-by-customer', 'expenses-by-vendor']) {
+    for (const kind of ['trial-balance', 'general-ledger', 'profit-and-loss', 'balance-sheet', 'sales-tax', 'sales-by-customer', 'sales-by-item', 'expenses-by-vendor']) {
       const pdf = await h.send(`/api/pantry/reports/${kind}/export?${OCT}&basis=${basis}`, undefined, { cookie: h.owner })
       assert.equal(pdf.status, 200, pdf.value); assert.equal(pdf.headers.get('content-type'), 'application/pdf')
       const pages = pdf.value.match(/\/Type \/Page\b/g).length

@@ -16,7 +16,7 @@ type Basis = 'cash' | 'accrual'
 
 // [tab, slug, reads on a basis, takes a date range]
 const KINDS: [string, string, boolean, boolean][] = [['Trial balance', 'trial-balance', true, false], ['General ledger', 'general-ledger', true, true], ['Profit and loss', 'profit-and-loss', true, true], ['Balance sheet', 'balance-sheet', true, false],
-  ['Sales by customer', 'sales-by-customer', true, true], ['Expenses by vendor', 'expenses-by-vendor', true, true], ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false], ['Budget versus actual', 'budget-actual', true, true]]
+  ['Sales by customer', 'sales-by-customer', true, true], ['Sales by item', 'sales-by-item', true, true], ['Expenses by vendor', 'expenses-by-vendor', true, true], ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false], ['Budget versus actual', 'budget-actual', true, true]]
 
 /** A figure that opens to its records. */
 function Figure({ line, children }: { line: string; children: React.ReactNode }) {
@@ -97,6 +97,9 @@ function Report({ slug, basis, from, to, columns }: { slug: string; basis: Basis
   if (slug === 'sales-by-customer' || slug === 'expenses-by-vendor') return <Table heads={[slug === 'sales-by-customer' ? 'Customer' : 'Vendor', 'Amount']} figures={[1]} empty="No posted activity in this range.">
     {[...r.rows.map((x: D) => <tr key={x.id}><td>{x.name}</td><td className="fig">{usd(x.amount)}</td></tr>), <tr key="total" className="total"><td>Total</td><td className="fig">{usd(r.total)}</td></tr>]}
   </Table>
+  if (slug === 'sales-by-item') return <><p className="hint">Income by the product or service each invoice and credit line was sold as. Income without an item stays in its own row, so the total ties to the profit and loss.</p><Table heads={['Product or service', 'SKU', 'Amount']} figures={[2]} empty="No posted income in this range.">
+    {[...r.rows.map((x: D) => <tr key={x.id}><td>{x.name}</td><td>{x.sku ?? ''}</td><td className="fig">{usd(x.amount)}</td></tr>), <tr key="total" className="total"><td>Total</td><td /><td className="fig">{usd(r.total)}</td></tr>]}
+  </Table></>
   if (slug === 'cash-flow') return <CashFlow from={from} to={to} />
   if (slug === 'sales-tax') return <SalesTax r={r} />
   return <Ageing r={r} />

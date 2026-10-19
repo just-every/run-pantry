@@ -5,6 +5,7 @@ import { BASIS_LABEL, type Basis } from './basis'
 import { balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports'
 import { salesTax } from './sales-tax'
 import { contactTotals } from './contact-totals'
+import { salesByItem } from './items/report'
 import { statementColumns } from './statement-columns'
 import { statementExport } from './statement-export'
 import { reportPdf } from './report-pdf'
@@ -42,6 +43,10 @@ export async function reportExport(db: D1Database, kind: string, from: string, t
     title = kind === 'sales-by-customer' ? 'Sales by customer' : 'Expenses by vendor'
     const r = await contactTotals(db, kind === 'sales-by-customer' ? 'customer' : 'vendor', from, to, basis)
     rows = r.rows.map(l => row(l.name, l.amount)); totals = [row('Total', r.total)]
+  } else if (kind === 'sales-by-item') {
+    title = 'Sales by item'
+    const r = await salesByItem(db, from, to, basis)
+    rows = r.rows.map(l => row(l.sku ? `${l.name} · ${l.sku}` : l.name, l.amount)); totals = [row('Total', r.total)]
   } else if (kind === 'sales-tax') {
     title = 'Sales tax by state'
     const r = await salesTax(db, from, to, basis)

@@ -48,7 +48,8 @@ async function parseTemplate(db: D1Database, b: Data) {
   const mode = text(b.mode, 'Each invoice')
   requireThat(mode === 'draft' || mode === 'send', 'Each invoice is created as a draft or sent automatically')
   requireThat(mode === 'draft' || p.customer.email, `${p.customer.name} has no email address; add one to send invoices automatically`)
-  const lines = (b.lines as Data[]).map(l => ({ description: String(l.description).trim(), quantity: String(l.quantity ?? '1'), rate: String(l.rate), accountId: l.accountId, taxCode: l.taxCode }))
+  // The template keeps the lines as parsed, so an item's defaults are fixed at the approved revision.
+  const lines = p.lines.map(l => ({ description: l.description, quantity: String(l.qty / 1000), rate: (l.unit / 100).toFixed(2), accountId: l.accountId, taxCode: l.chosenTaxCode, ...(l.itemId ? { itemId: l.itemId } : {}) }))
   return { p, start, end, unit, every, terms, mode, lines, memo: p.memo }
 }
 

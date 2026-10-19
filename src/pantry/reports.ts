@@ -36,7 +36,7 @@ export async function generalLedger(db: D1Database, from: string, to: string, ac
   if (basis === 'cash') {
     // Settled shares of invoices, credits and bills, dated when they were settled.
     for (const [i, l] of (await cashLines(db, from, to)).entries()) if (!accountId || l.accountId === accountId)
-      lines.push({ id: `cash-${i}`, entry_id: l.docJournalId, account_id: l.accountId, entry_date: l.date, number: null, entry_memo: settlementMemo(l), memo: l.description, contact_name: l.contactName, contact_id: l.contactId, debit_cents: Math.max(l.net, 0), credit_cents: Math.max(-l.net, 0), source_kind: l.docKind })
+      lines.push({ id: `cash-${i}`, entry_id: l.docJournalId, account_id: l.accountId, entry_date: l.date, number: null, entry_memo: settlementMemo(l), memo: l.description, contact_name: l.contactName, contact_id: l.contactId, debit_cents: Math.max(l.net, 0), credit_cents: Math.max(-l.net, 0), source_kind: l.docKind, item_id: l.itemId ?? null })
     lines.sort((x, y) => x.entry_date < y.entry_date ? -1 : x.entry_date > y.entry_date ? 1 : (x.number ?? Infinity) - (y.number ?? Infinity))
   }
   const accounts = await all(db, `SELECT id, code, name, type FROM pt_accounts ${accountId ? 'WHERE id = ?' : ''} ORDER BY code`, ...(accountId ? [accountId] : []))

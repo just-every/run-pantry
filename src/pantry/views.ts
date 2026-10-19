@@ -11,6 +11,7 @@ export async function lookups(db: D1Database) {
     contacts: await all(db, 'SELECT * FROM pt_contacts ORDER BY kind, name'),
     bankAccounts: await all(db, 'SELECT * FROM pt_bank_accounts ORDER BY name'),
     taxCodes: await all(db, 'SELECT * FROM pt_tax_codes WHERE active = 1 ORDER BY name'),
+    items: await all(db, 'SELECT * FROM pt_items ORDER BY active DESC, lower(name)'),
     names: await names(db),
   }
 }
