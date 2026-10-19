@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { Card, Chip, command, Field, Form, Loading, PageHead, Table, Tabs, accountOptions, day, readFileText, usd, useShared, useView, type D } from './kit'
 import { Reconcile } from './reconcile'
+import { ReconciliationReview } from './reconciliation-review'
 import { Suggestions, Transactions } from './bank-lines'
 import { Rules, fromSuggestion, type Draft } from './bank-rules'
 import { Feeds, RelinkNotices } from './bank-feeds'
@@ -47,7 +48,7 @@ function NewBankAccount({ onDone }: { onDone: () => Promise<void> }) {
   </Form></Card>
 }
 
-const TABS = ['Transactions', 'Rules', 'Statements'] as const
+const TABS = ['Transactions', 'Rules', 'Statements', 'Accountant review'] as const
 
 function Statements({ data, refresh, open }: { data: D; refresh: () => Promise<void>; open: (id: string) => void }) {
   const shared = useShared()
@@ -82,11 +83,12 @@ export function Bank() {
   return <>
     <PageHead title="Bank" lead="Transactions arrive from your bank and card feeds or statement files. Rules file the routine ones; you file the rest and reconcile to the statement." />
     <RelinkNotices data={feeds.data} onDone={refresh} />
-    <Tabs tabs={[...TABS]} current={tab} onChange={go} />
+    <Tabs tabs={TABS.filter(t => t !== 'Accountant review' || ['owner', 'accountant'].includes(shared.state.actor.role))} current={tab} onChange={go} />
     {tab === 'Transactions' && <div className="split split-wide-left split-bank">
       <div className="stack"><Suggestions items={rules.data?.suggestions ?? []} onPick={s => { setDraft(fromSuggestion(s)); go('Rules') }} /><Transactions data={lines.data} onDone={refresh} feeds={!!feeds.data?.availability.available} /></div>
       <div className="stack"><Feeds data={feeds.data} onDone={refresh} onImport={importStatement} /></div>
     </div>}
+    {tab === 'Accountant review' && ['owner', 'accountant'].includes(shared.state.actor.role) && <ReconciliationReview data={data} open={reconcile} />}
     {tab === 'Rules' && <Rules data={rules.data} draft={draft} setDraft={setDraft} onDone={refresh} />}
     {tab === 'Statements' && <Statements data={data} refresh={refresh} open={reconcile} />}
   </>

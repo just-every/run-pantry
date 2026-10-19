@@ -8,6 +8,7 @@ import { requireEntity } from './settings'
 import { BASIS_LABEL, type Basis } from './basis'
 import { cashFlow } from './cash-flow'
 import { entryDocuments } from './receipts/attachments'
+import { reconciliationHistory } from './reconciliation-undo'
 
 export async function accountantPackage(db: D1Database, period: string, basis: Basis = 'accrual'): Promise<Data> {
   const entity = await requireEntity(db)
@@ -28,6 +29,7 @@ export async function accountantPackage(db: D1Database, period: string, basis: B
     payables: await ageing(db, 'payable', end),
     generalLedger: await generalLedger(db, start, end, undefined, basis),
     reconciliations: (await all(db, 'SELECT r.*, b.name AS bank FROM pt_reconciliations r JOIN pt_bank_accounts b ON b.id = r.bank_account_id WHERE r.end_date <= ? ORDER BY r.end_date', end)).map(r => ({ ...r, proof: JSON.parse(r.proof) })),
+    voidedReconciliations: await reconciliationHistory(db, undefined, end),
     reversals: await all(db, "SELECT e.id, e.number, e.entry_date, e.memo, e.reverses_id, o.number AS reverses_number FROM pt_journal_entries e JOIN pt_journal_entries o ON o.id = e.reverses_id WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ?", start, end),
     // Approvals carry the time they were given, not a book date: the package holds all of them.
     approvals: await all(db, 'SELECT * FROM pt_approvals ORDER BY at'),

@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Action, Card, Chip, command, Details, Field, Loading, Metrics, accountOptions, contactOptions, day, monthName, usd, useShared, useView, useWho, type D } from './kit'
 import { RecordedPaymentProposal } from './recorded-payment-proposal'
 import { DepositProposal } from './deposit-proposal'
+import { ReconciliationUndo } from './reconciliation-undo'
 import { Icon } from './icons'
 
 type NewItem = { type: string; amount: string; accountId?: string; contactId?: string; otherBankAccountId?: string; direction?: string; memo?: string; allocations?: Record<string, string> }
@@ -124,6 +125,7 @@ export function Reconcile({ statementId, back }: { statementId: string; back: ()
             <p>{r.ready ? 'Every line is matched and the balances agree.' : 'You can finish when every difference is explained.'}</p></>}
       </div>
     </div>
+    <ReconciliationUndo info={r.undo} history={r.history} statementId={statementId} onDone={refresh} />
     {!finished && r.blockers.length > 0 && <div className="callout callout-warn" role="status"><Icon name="alert" /><div><strong>Before you can finish</strong><ul>{r.blockers.map((b: D) => <li key={b.kind}>{b.message}</li>)}</ul></div></div>}
     <div className="split even">
       <Card title="Statement lines" actions={lineIds.length > 0 && <Chip tone="info">{lineIds.length} selected</Chip>}>
@@ -131,7 +133,7 @@ export function Reconcile({ statementId, back }: { statementId: string; back: ()
           <tbody>{r.lines.map((l: D) => { const picked = lineIds.includes(l.id); return <tr key={l.id} className={picked ? 'selected' : proposedLines.has(l.id) && !l.match_id ? 'proposed' : ''}>
             <td data-label="Select"><input type="checkbox" aria-label={`Select ${l.description} ${usd(l.amount_cents)}`} checked={picked} disabled={!!l.match_id || finished} onChange={() => toggle(lineIds, setLineIds, l.id)} /></td>
             <td data-label="Date">{day(l.posted_date)}</td><td data-label="Description">{l.description}{l.automatic ? <small className="sub block">{l.match_note}</small> : !l.match_id && r.depositNotes[l.id] ? <small className="sub block">{r.depositNotes[l.id]}</small> : null}</td><td data-label="Amount" className="fig">{usd(l.amount_cents)}</td>
-            <td data-label="Status">{l.automatic ? <><Chip tone="good">Matched automatically</Chip>{!finished && shared.state.actor.can.record && <Action run={async () => { await command('match.undo', { id: l.match_id, reason: 'Automatic match undone by a person' }); await refresh() }}>Undo</Action>}</> : l.match_id ? <><Chip tone="good">Matched</Chip>{l.payment_id && !finished && shared.state.actor.can.record && <Action run={async () => { await command('match.undo', { id: l.match_id }); await refresh() }}>Undo</Action>}</> : proposedLines.has(l.id) ? <Chip tone="agent">Proposed by agent</Chip> : <><Chip tone="warn">Unmatched</Chip><RecordedPaymentProposal offers={r.recordedPayments?.[l.id]} canRecord={!finished && shared.state.actor.can.record} onDone={refresh} /><DepositProposal proposal={r.depositProposals[l.id]} canRecord={!finished && shared.state.actor.can.record} onDone={refresh} /></>}</td></tr> })}</tbody></table></div>
+            <td data-label="Status">{l.automatic ? <><Chip tone="good">Matched automatically</Chip>{!finished && shared.state.actor.can.record && <Action run={async () => { await command('match.undo', { id: l.match_id, reason: 'Automatic match undone by a person' }); await refresh() }}>Undo</Action>}</> : l.match_id ? <><Chip tone="good">Matched</Chip>{!finished && shared.state.actor.can.record && <Action run={async () => { await command('match.undo', { id: l.match_id }); await refresh() }}>Undo</Action>}</> : proposedLines.has(l.id) ? <Chip tone="agent">Proposed by agent</Chip> : <><Chip tone="warn">Unmatched</Chip><RecordedPaymentProposal offers={r.recordedPayments?.[l.id]} canRecord={!finished && shared.state.actor.can.record} onDone={refresh} /><DepositProposal proposal={r.depositProposals[l.id]} canRecord={!finished && shared.state.actor.can.record} onDone={refresh} /></>}</td></tr> })}</tbody></table></div>
       </Card>
       <Card title="Ledger postings">
         <div className="table-wrap"><table className="ledger selectable"><thead><tr><th><span className="sr-only">Select</span></th><th>Date</th><th>Entry</th><th className="fig">Amount</th><th>Status</th></tr></thead>

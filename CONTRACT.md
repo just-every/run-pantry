@@ -648,8 +648,8 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 11 | 61 | 48 | 120 |
-| All | 30 | 61 | 48 | 139 |
+| Target and push further | 12 | 61 | 47 | 120 |
+| All | 31 | 61 | 47 | 139 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -678,7 +678,7 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | `BANK-004` | Connection health and re-linking | target | done | `src/pantry/feeds/`, `src/pantry/close.ts`, `src/ui/bank-feeds.tsx`, `src/ui/overview.tsx`, `tests/api/feeds.test.mjs` | Every mapped connection shows last/next sync and plain errors, broken/stale/expiring feed notices appear on Bank and Overview and email the owner once per incident with visible mail outcomes. Close lists accounts whose successful feed pull has not covered month end until recovered. Update-mode re-link resumes the saved cursor without duplicates; disconnect retains lines. Actual Plaid sandbox ITEM_LOGIN_REQUIRED and signed US PENDING_DISCONNECT callback were exercised; mail acceptance is tested at its network edge. |
 | `BANK-005` | Reconciliation from feeds and statements | target | partial | `src/pantry/reconcile.ts`, `tests/api/bank.test.mjs` | Statement-balance proof ships for imported statements; feed-based reconciliation and fetched statement PDFs do not. |
 | `BANK-006` | Direct business-bank and spend-platform connections | target | missing |  | No implementation. |
-| `BANK-007` | Undo a reconciliation | target | missing |  | No implementation; completed reconciliations freeze their matches and cannot be undone (`src/pantry/reconcile.ts`). |
+| `BANK-007` | Undo a reconciliation | target | done | `src/pantry/reconciliation-undo.ts`, `src/ui/reconciliation-undo.tsx`, `src/ui/reconciliation-review.tsx`, `tests/api/bank.test.mjs` › BANK-007 | Reopen-grant holders confirm the exact newest-first cascade with a reason. Immutable proof/statement snapshots remain linked to the undo; matches unfreeze without changing postings. Locked months route to reopening; close flags each undone month until new proofs are completed. Offered in the client accountant review workspace; cross-client navigation remains ACCT-001. |
 | `RULE-001` | One review queue for every new line | target | partial | `src/pantry/matching.ts`, `src/ui/bank-lines.tsx`, `src/pantry/rules.ts`, `tests/api/bank.test.mjs`, `tests/api/rules.test.mjs` | Feed and statement lines are listed across accounts with To file, Filed by rule and Pending views, and are matched, posted as a fee, income or transfer, or filed by a rule with undo; per-line split coding, exclude with a reason, bulk accept, keyboard shortcuts and dimensions do not exist. |
 | `RULE-002` | Bank rules that file routine lines | target | partial | `src/pantry/rules.ts`, `src/ui/bank-rules.tsx`, `tests/api/rules.test.mjs` | Rules on payee, description, amount range, direction and account file lines from feeds and files as a category or percentage split with contact, tax code and memo, after a preview, marked by rule with an undo that reverses the entry, never in a locked month or reconciled statement; suggest-only rules, rule ordering by the person, split by amount, class, location and project, and the rule revision on each filed line do not exist. |
 | `RULE-003` | Suggestions learned from this business's own history | target | partial | `src/pantry/rules.ts`, `tests/api/rules.test.mjs` | A payee filed the same way three times is suggested as a rule; per-line account, payee and dimension suggestions with a reason and confidence, vendor and document sources, and acceptance rates do not exist. |
