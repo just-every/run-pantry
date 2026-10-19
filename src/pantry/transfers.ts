@@ -41,6 +41,18 @@ function namedAccount(line: Data, banks: Data[]) {
   // A common name or account mask is not a unique identity.
   return other.length === 1 ? other[0] : null
 }
+// Feeds supply a payee; CSVs often put it before the operation instead.
+// A named third party's transfer is a deposit/payment, not evidence of money
+// moving between our accounts. Generic bank prefixes carry no payee identity.
+function externalPayee(line: Data, banks: Data[]) {
+  let payee = String(line.payee ?? '').trim()
+  if (!payee) {
+    const prefix = normalize(line.description).split(/\b(?:TRANSFER|XFER|TRNSFR|PAYMENT)\b/, 1)[0].trim()
+    const generic = /^(?:(?:ONLINE|INTERNET|MOBILE|WEB|BANK|ACH|WIRE|ELECTRONIC|AUTOMATIC|AUTO|INTERNAL|CREDIT|DEBIT|\d+)\s*)*$/
+    if (prefix && !generic.test(prefix)) payee = prefix
+  }
+  return !!payee && !banks.some(b => [b.institution, b.name].some(name => normalize(name) === normalize(payee)))
+}
 const freeLine = (l: Data) => guard(`EXISTS (SELECT 1 FROM pt_bank_lines WHERE id = ? AND posted_date = ? AND amount_cents = ? AND description = ? AND removed_at IS NULL)
   AND NOT EXISTS (SELECT 1 FROM pt_reconciliations r JOIN pt_statements s ON s.id = r.statement_id WHERE r.bank_account_id = ? AND ? BETWEEN s.start_date AND s.end_date)`, l.id, l.posted_date, l.amount_cents, l.description, l.bank_account_id, l.posted_date)
 
@@ -113,7 +125,7 @@ export async function matchTransfers(db: D1Database) {
   for (const l of lines) {
     const named = namedAccount(l, banks), explicit = l.basis === 'person' ? l.expected_bank_account_id : named?.id
     if (!isTransfer(l) && !(named && /\bPAYMENT\b/.test(normalize(l.description))) && l.basis !== 'person') continue
-    if (!explicit && l.payee && !banks.some(b => normalize(b.institution) === normalize(l.payee)) && !/\bINTERNAL\b/.test(normalize(l.description))) continue
+    if (!explicit && externalPayee(l, banks) && !/\bINTERNAL\b/.test(normalize(l.description))) continue
     const otherId = explicit ?? null
     identified.push({ ...l, expected_bank_account_id: otherId })
     if (!l.match_id) {
