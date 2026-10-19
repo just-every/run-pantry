@@ -1,11 +1,11 @@
 // Accountant review: move posted lines between accounts in bulk by linked
-// correcting entries, see every change since your last review with who made
+// correcting entries, write off small open balances in bulk, see every change since your last review with who made
 // it, and read the review notes left on entries.
 import { useState } from 'react'
-import { Action, Card, command, day, Field, Form, Loading, Table, accountOptions, usd, useShared, useView, type D } from './kit'
+import { Action, Card, command, day, Field, Form, Loading, Table, accountOptions, today, usd, useShared, useView, type D } from './kit'
 
 const when = (iso: string) => <>{day(iso.slice(0, 10))} {iso.slice(11, 16)} UTC</>
-const ACTION: Record<string, string> = { 'journal.draft': 'Drafted entry', 'journal.edit': 'Edited draft', 'journal.post': 'Posted entry', 'journal.reverse': 'Reversed entry', 'journal.discard': 'Discarded draft', 'journal.reclassify': 'Reclassified lines', 'journal.review-note': 'Left a review note' }
+const ACTION: Record<string, string> = { 'journal.draft': 'Drafted entry', 'journal.edit': 'Edited draft', 'journal.post': 'Posted entry', 'journal.reverse': 'Reversed entry', 'journal.discard': 'Discarded draft', 'journal.reclassify': 'Reclassified lines', 'journal.review-note': 'Left a review note', 'write-off.bulk': 'Wrote off small balances', 'credit.issue': 'Issued credit' }
 
 function Reclassify({ onDone }: { onDone: () => Promise<void> }) {
   const { state } = useShared(), journal = useView<D>('journal')
@@ -30,13 +30,34 @@ function Reclassify({ onDone }: { onDone: () => Promise<void> }) {
   </Card>
 }
 
+function WriteOff({ onDone }: { onDone: () => Promise<void> }) {
+  const { state } = useShared(), [kind, setKind] = useState('invoice'), [ceiling, setCeiling] = useState('5.00')
+  const v = useView<D>(/^\d+(\.\d{1,2})?$/.test(ceiling) ? `write-offs/candidates?kind=${kind}&ceiling=${ceiling}` : null), [done, setDone] = useState<D | null>(null)
+  const items: D[] = v.data?.items ?? []
+  return <Card title="Write off small balances">
+    <p className="hint">Each open {kind === 'invoice' ? 'invoice' : 'bill'} with a balance above zero and at most the amount below is settled by its own posted {kind === 'invoice' ? 'credit note' : 'vendor credit'} on the account you choose, all in one batch.</p>
+    <div className="grid-form">
+      <Field label="Balances of" name="kind" value={kind} onChange={(e: any) => { setKind(e.target.value); setDone(null) }} options={[{ value: 'invoice', label: 'Customers (receivables)' }, { value: 'bill', label: 'Vendors (payables)' }]} />
+      <Field label="Up to ($)" name="ceiling" value={ceiling} onChange={(e: any) => { setCeiling(e.target.value); setDone(null) }} inputMode="decimal" />
+    </div>
+    {done && <p className="tone-good">Wrote off {done.items.length} balance{done.items.length === 1 ? '' : 's'} to {done.account.code} · {done.account.name}.</p>}
+    <Table heads={[kind === 'invoice' ? 'Invoice' : 'Bill', kind === 'invoice' ? 'Customer' : 'Vendor', 'Date', 'Open balance']} figures={[3]} empty="Nothing open at or under this amount." caption="Balances to write off">
+      {items.map((i: D) => <tr key={i.id}><td>{i.reference}</td><td>{i.name}</td><td>{day(i.day)}</td><td className="fig">{usd(i.open)}</td></tr>)}
+    </Table>
+    {items.length > 0 && <Form label={`Write off ${items.length} balance${items.length === 1 ? '' : 's'}`} submit={b => command('write-off.bulk', { ...b, kind, ceiling })} onDone={async r => { setDone(r); await v.reload(); await onDone() }} className="grid-form">
+      <Field label="Write-off account" name="accountId" required options={accountOptions(state.accounts, a => a.subtype === 'other' && ['income', 'expense'].includes(a.type))} />
+      <Field label="Write-off date" name="date" type="date" defaultValue={today()} required />
+    </Form>}
+  </Card>
+}
+
 export function Review() {
   const { state } = useShared(), v = useView<D>('review')
   if (!v.data) return <Loading error={v.error} what="your review" />
   const r = v.data
   return <div className="split">
     <div>
-      {state.actor.can.post && <Reclassify onDone={v.reload} />}
+      {state.actor.can.post && <><Reclassify onDone={v.reload} /><WriteOff onDone={v.reload} /></>}
       <Card title="Reclassifications">
         <Table heads={['When', 'By', 'Lines', 'To', 'Amount']} figures={[2, 4]} empty="No reclassifications yet.">
           {r.reclassifications.map((b: D) => <tr key={b.batch_id}><td>{when(b.created_at)}</td><td>{b.created_by}</td><td className="fig">{b.lines}</td><td>{b.to_code} · {b.to_name}</td><td className="fig">{usd(b.amount_cents)}</td></tr>)}

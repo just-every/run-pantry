@@ -167,7 +167,7 @@ test('PAN-11 a posted entry is corrected by a linked reversal and its history su
   assert.equal(gl.accounts[0].rows.length, 2, 'both entries stay in the ledger')
 })
 
-test('ACCT-003 an accountant reclassifies 40 lines by linked correcting entries, leaves review notes and sees what changed since their review and who changed it', async t => {
+test('ACCT-003 an accountant reclassifies 40 lines by linked correcting entries, writes off small balances in bulk, leaves review notes and sees what changed since their review and who changed it', async t => {
   const h = await harness(); t.after(() => h.close())
   const { acct } = await books(h)
   const ann = await h.member('ann@example.test', 'accountant', { canPost: true })
@@ -207,4 +207,35 @@ test('ACCT-003 an accountant reclassifies 40 lines by linked correcting entries,
   assert.deepEqual(review.changes.map(c => [c.action, c.actor_email, c.subject_id, c.entry_memo]), [['journal.edit', 'owner@example.test', draft.id, 'Accrued design contractor'], ['journal.draft', 'owner@example.test', draft.id, 'Accrued design contractor']])
   assert.deepEqual([review.reclassifications[0].lines, review.reclassifications[0].created_by, review.reclassifications[0].to_code], [40, 'ann@example.test', '6200'])
   assert.deepEqual((await h.view('review')).changes.length > 2, true, 'the owner has not reviewed, so everything is listed for them')
+  // Small balances are written off in bulk by credits applied to each item; larger ones stay open.
+  const bank = await h.command('bank-account.save', { name: 'Operating checking', institution: 'Chase', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-08-31', openingBalance: '0.00' })
+  const badDebts = await h.command('account.save', { code: '6950', name: 'Bad debts', type: 'expense' })
+  const customer = await h.command('contact.save', { kind: 'customer', name: 'Cedar Studio', termsDays: 30 }), vendor = await h.command('contact.save', { kind: 'vendor', name: 'Harbor Print', termsDays: 30 })
+  const invoices = []
+  for (const [rate, paid] of [['100.00', '99.60'], ['200.00', '198.00'], ['300.00', '270.00']]) {
+    const d = await h.command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-09-10', lines: [{ description: 'Design', quantity: '1', rate, accountId: acct['4000'], taxCode: 'exempt' }] })
+    const inv = await h.command('invoice.issue', { id: (await h.command('invoice.approve', { id: d.id, revision: d.revision })).id })
+    await h.command('payment.record', { direction: 'received', contactId: customer.id, date: '2026-09-20', amount: paid, bankAccountId: bank.id, method: 'ach', reference: `ACH ${inv.number}`, allocations: [{ targetId: inv.id, amount: paid }] })
+    invoices.push(inv)
+  }
+  const bill = await h.command('bill.save', { vendorId: vendor.id, reference: 'HP-77', billDate: '2026-09-05', lines: [{ description: 'Printing', accountId: acct['6300'], amount: '80.00' }], post: true })
+  await h.command('payment.record', { direction: 'paid', contactId: vendor.id, date: '2026-09-15', amount: '79.25', bankAccountId: bank.id, method: 'check', reference: 'CHK 1001', allocations: [{ targetId: bill.id, amount: '79.25' }] })
+  assert.deepEqual((await h.view('write-offs/candidates?kind=invoice&ceiling=5.00', ann)).items.map(i => [i.reference, i.open]), [[invoices[0].number, 40], [invoices[1].number, 200]])
+  await h.command('write-off.bulk', { kind: 'invoice', ceiling: '5.00', accountId: acct['3000'], date: '2026-09-30' }, ann, 400)
+  const wo = await h.command('write-off.bulk', { kind: 'invoice', ceiling: '5.00', accountId: badDebts.id, date: '2026-09-30' }, ann)
+  assert.deepEqual(wo.items.map(i => [i.reference, i.amount]), [[invoices[0].number, 40], [invoices[1].number, 200]])
+  const sales = await h.view('sales')
+  assert.deepEqual(invoices.map(i => at(sales.invoices, x => x.id === i.id).open_cents), [0, 0, 3000], 'the $30 balance stays open')
+  const credits = sales.invoices.filter(x => x.kind === 'credit' && x.memo.startsWith('Write-off'))
+  assert.deepEqual(credits.map(x => [x.credit_for, x.total_cents, x.status]).sort(), [[invoices[0].id, 40, 'issued'], [invoices[1].id, 200, 'issued']].sort())
+  const vendorWo = await h.command('write-off.bulk', { kind: 'bill', ceiling: '1.00', accountId: acct['6300'], date: '2026-09-30' }, ann)
+  assert.deepEqual(vendorWo.items.map(i => [i.reference, i.amount]), [['HP-77', 75]])
+  assert.equal(at((await h.view('sales')).bills, x => x.id === bill.id).open_cents, 0)
+  const after = Object.fromEntries((await h.view('reports/trial-balance?to=2026-09-30&basis=accrual')).rows.map(x => [x.code, x.net]))
+  assert.deepEqual([after['6950'], after['1200'], after['2000'] ?? 0], [240, 3000, 0], 'bad debts carry the written-off receivables; receivables and payables hold only what stays open')
+  const cash = Object.fromEntries((await h.view('reports/trial-balance?to=2026-09-30&basis=cash')).rows.map(x => [x.code, x.net]))
+  assert.deepEqual([cash['6950'], cash['4000'] + cash['6950']], [240, -(9960 + 19800 + 27000)], 'on the cash basis the written-off share and its write-off net to nothing, like any credit')
+  await h.command('write-off.bulk', { kind: 'invoice', ceiling: '5.00', accountId: badDebts.id, date: '2026-09-30' }, ann, 409)
+  await h.command('write-off.bulk', { kind: 'invoice', ceiling: '50.00', accountId: badDebts.id, date: '2026-08-31' }, ann, 409)
+  await h.command('write-off.bulk', { kind: 'invoice', ceiling: '50.00', accountId: badDebts.id, date: '2026-09-30' }, await h.member('cy@example.test', 'bookkeeper'), 403)
 })
