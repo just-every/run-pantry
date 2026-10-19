@@ -7,7 +7,7 @@ type Line = { accountId: string; debit: string; credit: string; memo: string }
 const blank = (): Line => ({ accountId: '', debit: '', credit: '', memo: '' })
 const toCents = (v: string) => /^\d+(\.\d{1,2})?$/.test(v.replace(/,/g, '').trim()) ? Math.round(Number(v.replace(/,/g, '')) * 100) : 0
 
-export function JournalEditor({ entry, onDone }: { entry?: D; onDone: (saved: D) => void }) {
+export function JournalEditor({ entry, onDone }: { entry?: D; onDone: (saved: D) => void | Promise<void> }) {
   const { state } = useShared()
   const [lines, setLines] = useState<Line[]>(entry ? entry.lines.map((l: D) => ({ accountId: l.account_id, debit: l.debit_cents ? (l.debit_cents / 100).toFixed(2) : '', credit: l.credit_cents ? (l.credit_cents / 100).toFixed(2) : '', memo: l.memo })) : [blank(), blank()])
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
@@ -17,7 +17,7 @@ export function JournalEditor({ entry, onDone }: { entry?: D; onDone: (saved: D)
   return <form className="form" onSubmit={async e => {
     e.preventDefault(); const f = new FormData(e.currentTarget)
     setBusy(true); setError('')
-    try { onDone(await command('journal.save-draft', { id: entry?.id, revision: entry?.revision, date: f.get('date'), memo: f.get('memo'), adjusting: f.get('adjusting') === 'on', lines })) } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+    try { await onDone(await command('journal.save-draft', { id: entry?.id, revision: entry?.revision, date: f.get('date'), memo: f.get('memo'), adjusting: f.get('adjusting') === 'on', lines })) } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
   }}>
     <div className="grid-form">
       <Field label="Entry date" name="date" type="date" defaultValue={entry?.entry_date ?? today()} required />

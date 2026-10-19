@@ -59,7 +59,7 @@ function EntryPanel({ e, onChange }: { e: D; onChange: () => Promise<void> }) {
   const { state } = useShared(), who = useWho(), [editing, setEditing] = useState(false), [reversing, setReversing] = useState(false)
   const debit = e.lines.reduce((s: number, l: D) => s + l.debit_cents, 0), credit = e.lines.reduce((s: number, l: D) => s + l.credit_cents, 0)
   const mayPost = state.actor.can.post && (state.actor.role === 'owner' || e.prepared_by !== state.actor.email)
-  if (editing) return <Card title="Edit draft"><JournalEditor entry={e} onDone={async () => { setEditing(false); await onChange() }} /></Card>
+  if (editing) return <Card title="Edit draft"><JournalEditor entry={e} onDone={async () => { await onChange(); setEditing(false) }} /></Card>
   return <Card title={<>{e.number ? `Entry ${e.number}` : 'Draft entry'} — {e.memo}</>} actions={e.status === 'posted' ? <Chip tone="good">Posted</Chip> : <Chip tone="warn">Draft</Chip>}>
     {e.status === 'posted' && <div className="callout callout-good"><Icon name="ok" /><div><strong>{e.reversed_by_id ? 'Posted and reversed' : 'Posted — reverse to correct'}</strong><span>{e.reverses_id ? 'This entry reverses an earlier one. ' : ''}Posted entries never change; a reversal keeps both in the history.</span></div></div>}
     <dl className="facts"><div><dt>Date</dt><dd>{day(e.entry_date)}</dd></div><div><dt>Source</dt><dd>{SOURCE[e.source_kind]}{e.adjusting && <> · <Chip tone="info">Adjusting</Chip></>}</dd></div><div><dt>Prepared by</dt><dd>{e.prepared_kind === 'agent' && <Icon name="agent" />}{who(e.prepared_by)}</dd></div><div><dt>{e.status === 'posted' ? 'Posted by' : 'Approver'}</dt><dd>{e.posted_by ? who(e.posted_by) : 'The owner, or someone else with the posting grant'}</dd></div></dl>
