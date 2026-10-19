@@ -65,9 +65,10 @@ import { vendorHistory } from './vendor-history'
 import { billApprovalCommands } from './bill-approval'
 import { exemptionCommands, exemptionView } from './exemptions'
 import { nexusCommands, nexusWatch } from './nexus'
+import { reviewCommands, reviewView } from './review'
 
 const commands: Record<string, Command> = {
-  ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -104,6 +105,7 @@ view('dashboard', async (ctx, c) => dashboard(ctx.db, day(c, 'to'), c.req.query(
 view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await lookups(ctx.db)), overview: await overview(ctx.db), settings: await settingsView(ctx) }))
 view('recurring-journals', async ctx => recurringJournalsView(ctx.db))
 view('journal', async ctx => ({ entries: await journalView(ctx.db) }))
+view('review', async ctx => reviewView(ctx.db, ctx.actor.email))
 view('sales', async ctx => ({ approvalRules: await all(ctx.db, 'SELECT * FROM pt_capture_approval_rules ORDER BY minimum_cents'), vendorCredits: await vendorCreditsView(ctx.db), invoices: await invoicesView(ctx.db), bills: await billsView(ctx.db), payments: await paymentsView(ctx.db), deliveries: await deliveriesView(ctx.db), reminders: await reminderPlans(ctx.db), recurring: await recurringView(ctx.db), onlinePayments: await all(ctx.db, 'SELECT id, invoice_id, method, amount_cents, status, fee_cents, created_at, updated_at FROM pt_stripe_payments ORDER BY created_at DESC LIMIT 500') }))
 view('invoicing', async ctx => ({ sending: await sendingView(ctx.env, ctx.db), stripe: await stripeView(ctx.env, ctx.db) }))
 view('connected', async ctx => ({ payouts: await payoutsView(ctx.env, ctx.db), gusto: await gustoView(ctx) }))

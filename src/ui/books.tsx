@@ -1,5 +1,6 @@
 // Books: the chart of accounts with current balances, the journal, entry
-// review (post by a second person) and reversal of posted entries.
+// review (post by a second person), reversal of posted entries, and the
+// accountant's review: bulk reclassification, notes and changes since review.
 import { useState } from 'react'
 import { Action, Card, Chip, command, Details, Field, Form, PageHead, Table, Tabs, Loading, accountOptions, day, today, usd, useShared, useView, useWho, type D } from './kit'
 import { JournalEditor } from './journal-editor'
@@ -7,6 +8,7 @@ import { Icon } from './icons'
 import { CaptureButtons } from './receipt-capture'
 import { AskAccountant } from './ask-accountant'
 import { NexusWatch } from './nexus'
+import { EntryNotes, Review } from './review'
 
 const TYPE: Record<string, string> = { asset: 'Asset', liability: 'Liability', equity: 'Equity', income: 'Income', expense: 'Expense' }
 const ROLE: Record<string, string> = { bank: 'Bank or card', receivable: 'Receivables control', payable: 'Payables control', tax: 'Sales tax', retained: 'Retained earnings', other: '' }
@@ -62,9 +64,10 @@ function EntryPanel({ e, onChange }: { e: D; onChange: () => Promise<void> }) {
     {e.status === 'posted' && <div className="callout callout-good"><Icon name="ok" /><div><strong>{e.reversed_by_id ? 'Posted and reversed' : 'Posted — reverse to correct'}</strong><span>{e.reverses_id ? 'This entry reverses an earlier one. ' : ''}Posted entries never change; a reversal keeps both in the history.</span></div></div>}
     <dl className="facts"><div><dt>Date</dt><dd>{day(e.entry_date)}</dd></div><div><dt>Source</dt><dd>{SOURCE[e.source_kind]}{e.adjusting && <> · <Chip tone="info">Adjusting</Chip></>}</dd></div><div><dt>Prepared by</dt><dd>{e.prepared_kind === 'agent' && <Icon name="agent" />}{who(e.prepared_by)}</dd></div><div><dt>{e.status === 'posted' ? 'Posted by' : 'Approver'}</dt><dd>{e.posted_by ? who(e.posted_by) : 'The owner, or someone else with the posting grant'}</dd></div></dl>
     <Table heads={['#', 'Account', 'Description', 'Debit', 'Credit']} figures={[3, 4]}>
-      {e.lines.map((l: D) => <tr key={l.id}><td>{l.line_no}</td><td>{l.account_code} · {l.account_name}</td><td>{l.memo}</td><td className="fig">{l.debit_cents ? usd(l.debit_cents) : '—'}</td><td className="fig">{l.credit_cents ? usd(l.credit_cents) : '—'}</td></tr>)}
+      {e.lines.map((l: D) => <tr key={l.id}><td>{l.line_no}</td><td>{l.account_code} · {l.account_name}{l.reclassified_by && <small className="sub"> · reclassified</small>}</td><td>{l.memo}</td><td className="fig">{l.debit_cents ? usd(l.debit_cents) : '—'}</td><td className="fig">{l.credit_cents ? usd(l.credit_cents) : '—'}</td></tr>)}
     </Table>
     <p className={`balance-line ${debit === credit ? 'tone-good' : 'tone-bad'}`}>Debits {usd(debit)} {debit === credit ? '=' : '≠'} Credits {usd(credit)}</p>
+    <EntryNotes e={e} onChange={onChange} />
     <AskAccountant subjectKind="journal" subjectId={e.id} label={`${e.number ? `Entry ${e.number}` : 'Draft entry'} · ${e.entry_date} · ${e.memo}`} />
     <div className="entry-receipts"><strong><Icon name="receipt" /> Receipt</strong> {e.documents.length ? e.documents.map((d: D) => <a key={d.id} className="doc-link" href={`/api/pantry/documents/${d.id}${/^image\//.test(d.media_type) ? '?view=1' : ''}`} target="_blank" rel="noreferrer">{d.name}</a>)
       : e.status === 'posted' && state.actor.can.record ? <><span className="hint">None yet.</span> <CaptureButtons compact target={{ kind: 'journal', id: e.id }} onDone={onChange} /></> : <span className="hint">None</span>}</div>
@@ -104,9 +107,10 @@ export function Books() {
   const balances = new Map<string, number>((tb.data?.rows ?? []).map((r: D) => [r.id, r.net]))
   return <>
     <PageHead title="Books" lead="Your chart of accounts and journal. Posted entries never change: corrections are reversals." />
-    <Tabs tabs={['Chart of accounts', 'Journal entries', 'Sales tax']} current={tab} onChange={setTab} />
+    <Tabs tabs={['Chart of accounts', 'Journal entries', 'Sales tax', 'Review']} current={tab} onChange={setTab} />
     {tab === 'Chart of accounts' && <div className="split"><Chart balances={balances} />{state.actor.can.record && <NewAccount />}</div>}
     {tab === 'Journal entries' && <Journal />}
     {tab === 'Sales tax' && <><TaxCodes /><NexusWatch /></>}
+    {tab === 'Review' && <Review />}
   </>
 }

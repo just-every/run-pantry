@@ -171,8 +171,12 @@ export const journalCommands: Record<string, Command> = {
 export async function journalView(db: D1Database) {
   const entries = await all(db, 'SELECT * FROM pt_journal_entries ORDER BY CASE status WHEN \'draft\' THEN 0 ELSE 1 END, entry_date DESC, number DESC, created_at DESC, id LIMIT 300')
   const ids = entries.map(e => e.id)
-  const lines = ids.length ? await all(db, `SELECT l.*, a.code AS account_code, a.name AS account_name FROM pt_journal_lines l JOIN pt_accounts a ON a.id = l.account_id WHERE l.entry_id IN (${ids.map(() => '?').join(',')}) ORDER BY l.line_no`, ...ids) : []
+  const marks = ids.map(() => '?').join(',')
+  const lines = ids.length ? await all(db, `SELECT l.*, a.code AS account_code, a.name AS account_name, a.subtype AS account_subtype,
+      (SELECT r.correcting_entry_id FROM pt_reclassifications r WHERE r.original_line_id = l.id) AS reclassified_by
+    FROM pt_journal_lines l JOIN pt_accounts a ON a.id = l.account_id WHERE l.entry_id IN (${marks}) ORDER BY l.line_no`, ...ids) : []
+  const notes = ids.length ? await all(db, `SELECT * FROM pt_review_notes WHERE entry_id IN (${marks}) ORDER BY created_at, id`, ...ids) : []
   const docs = await entryDocuments(db)
-  for (const e of entries) { e.adjusting = Boolean(e.adjusting); e.lines = lines.filter(l => l.entry_id === e.id); e.documents = docs[e.id] ?? [] }
+  for (const e of entries) { e.adjusting = Boolean(e.adjusting); e.lines = lines.filter(l => l.entry_id === e.id); e.documents = docs[e.id] ?? []; e.notes = notes.filter(n => n.entry_id === e.id) }
   return entries
 }
