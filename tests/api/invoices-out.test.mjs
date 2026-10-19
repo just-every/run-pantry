@@ -166,28 +166,36 @@ test('INVOICE-005 a recurring invoice creates drafts for approval, or once a sec
 test('PAY-004 invoice-named deposits clear automatically, amount-only wires await confirmation, and both undo without duplicates', async t => {
   const plaid = await fakePlaid()
   const h = await harness({ bindings: plaid.bindings, outbound: plaid.outbound }); t.after(() => h.close())
-  const { bank, issue } = await setup(h)
+  const { bank, c, issue } = await setup(h)
   const cedar = await issue('Cedar Studio', '2026-10-01', '2026-10-31', '1200.00')
   const willow = await issue('Willow Services', '2026-10-01', '2026-10-31', '1200.00')
   await issue('Northstar Consulting', '2026-10-01', '2026-10-31', '1200.00')
   const north = await issue('Northstar Consulting', '2026-10-01', '2026-10-31', '500.00')
+  const referenced = await issue('Cedar Studio', '2026-10-01', '2026-10-31', '375.00')
+  await issue('Willow Services', '2026-10-01', '2026-10-31', '375.00')
   const csv = ['Posting Date,Description,Amount',
     `10/05/2026,ZELLE ${cedar.number},1200.00`,
     '10/06/2026,WIRE,500.00',
-    '10/07/2026,MOBILE DEPOSIT,1200.00'].join('\n') + '\n'
-  const input = { bankAccountId: bank.id, fileName: 'checking-2026-10.csv', content: csv, opening: '0.00', closing: '2900.00', start: '2026-10-01', end: '2026-10-31', confirmLast4: '4821' }
+    '10/07/2026,MOBILE DEPOSIT,1200.00',
+    '10/08/2026,ZELLE CEDAR STUDIO,375.00'].join('\n') + '\n'
+  const input = { bankAccountId: bank.id, fileName: 'checking-2026-10.csv', content: csv, opening: '0.00', closing: '3275.00', start: '2026-10-01', end: '2026-10-31', confirmLast4: '4821' }
   const first = plaid.recorded['transactions-sync-1'], next = plaid.recorded['transactions-sync-2']
   const account = at(plaid.recorded['accounts-get'].accounts, a => a.mask === '0000')
   const template = first.added[0]
   first.added = [
     { ...template, account_id: account.account_id, transaction_id: 'outside-zelle', date: '2026-10-05', name: `ZELLE ${cedar.number}`, merchant_name: null, amount: -1200, pending: false, pending_transaction_id: null },
     { ...template, account_id: account.account_id, transaction_id: 'outside-wire', date: '2026-10-06', name: 'WIRE', merchant_name: null, amount: -500, pending: false, pending_transaction_id: null },
-    { ...template, account_id: account.account_id, transaction_id: 'outside-mobile', date: '2026-10-07', name: 'MOBILE DEPOSIT', merchant_name: null, amount: -1200, pending: false, pending_transaction_id: null }]
+    { ...template, account_id: account.account_id, transaction_id: 'outside-mobile', date: '2026-10-07', name: 'MOBILE DEPOSIT', merchant_name: null, amount: -1200, pending: false, pending_transaction_id: null },
+    { ...template, account_id: account.account_id, transaction_id: 'outside-reference', date: '2026-10-08', name: 'ZELLE CEDAR STUDIO', merchant_name: null, amount: -375, pending: false, pending_transaction_id: null }]
   next.added = []; next.modified = []; next.removed = []
   const connection = await h.command('feed.connect', { publicToken: 'synthetic-public-sandbox-b0e2c4ee-a763-4df5-bfe9-46a46bce993d', institution: { name: 'First Platypus Bank' } })
   await h.command('feed.map', { itemId: connection.id, accounts: [{ id: at(connection.accounts, a => a.mask === '0000').id, bankAccountId: bank.id }] })
   const queue = await h.view('bank/lines')
-  const zelle = at(queue.lines, l => l.description.startsWith('ZELLE')), wire = at(queue.lines, l => l.description === 'WIRE'), mobile = at(queue.lines, l => l.description === 'MOBILE DEPOSIT')
+  const zelle = at(queue.lines, l => l.description === `ZELLE ${cedar.number}`), wire = at(queue.lines, l => l.description === 'WIRE'), mobile = at(queue.lines, l => l.description === 'MOBILE DEPOSIT')
+  const refLine = at(queue.lines, l => l.description === 'ZELLE CEDAR STUDIO')
+  assert.ok(refLine.match_id, 'PAY-004 the customer payment reference identifies one invoice of the exact amount on the feed')
+  assert.equal(refLine.automatic, 1)
+  assert.equal((await invoiceOf(h, referenced.id)).open_cents, 0)
   // A downloaded statement adopts the feed lines and retains their proposal identities.
   const imported = await h.command('statement.import', input)
   assert.equal(imported.added, 0)
@@ -210,20 +218,51 @@ test('PAY-004 invoice-named deposits clear automatically, amount-only wires awai
   assert.equal((await invoiceOf(h, cedar.id)).open_cents, 0)
   assert.equal((await invoiceOf(h, north.id)).open_cents, 0)
   const payments = (await h.view('sales')).payments
-  assert.equal(payments.length, 2, 'repeat confirmation posts nothing twice')
+  assert.equal(payments.length, 3, 'repeat confirmation posts nothing twice')
   r = await h.view(`reconciliation/${imported.statement.id}`)
   assert.ok(at(r.lines, l => l.id === wire.id).match_id)
   const audit = await h.view('activity')
   assert.ok(audit.audit.some(e => e.action === 'match.automatic' && e.subject_id === automatic.match_id), 'automatic payment has an audit entry')
   await h.command('feed.sync', { itemId: connection.id })
-  assert.equal((await h.view('sales')).payments.length, 2, 'feed replay cannot duplicate a receipt')
+  assert.equal((await h.view('sales')).payments.length, 3, 'feed replay cannot duplicate a receipt')
   await h.command('match.undo', { id: automatic.match_id })
   assert.equal((await invoiceOf(h, cedar.id)).open_cents, 120000)
+  assert.ok(audit.audit.some(e => e.action === 'match.automatic' && e.subject_id === refLine.match_id))
+  await h.command('match.undo', { id: refLine.match_id })
+  assert.equal((await invoiceOf(h, referenced.id)).open_cents, 37500)
   await h.command('match.undo', { id: confirmed.id })
   assert.equal((await invoiceOf(h, north.id)).open_cents, 50000)
   assert.ok(at((await h.view('sales')).payments, p => p.contact_name === 'Cedar Studio').reversal_id)
   assert.ok((await h.view('reports/trial-balance?to=2026-10-31')).balanced)
   assert.equal((await h.command('statement.import', input)).duplicate, true)
+
+  // The CSV door uses the same payment-reference rule. Several same-customer
+  // invoices of the amount remain ambiguous, even when their reference is named.
+  const csvInvoice = await issue('Cedar Studio', '2026-10-01', '2026-10-31', '425.00')
+  await issue('Willow Services', '2026-10-01', '2026-10-31', '425.00')
+  await issue('Cedar Studio', '2026-10-01', '2026-10-31', '275.00')
+  await issue('Cedar Studio', '2026-10-01', '2026-10-31', '275.00')
+  const recorded = await issue('Willow Services', '2026-10-01', '2026-10-31', '180.00')
+  await h.command('payment.record', { direction: 'received', contactId: c['Willow Services'].id, date: '2026-10-09', amount: '180.00', bankAccountId: bank.id, reference: 'WILLOW PAYMENT 7842', allocations: [{ targetId: recorded.id, amount: '180.00' }] })
+  const before = (await h.view('sales')).payments.length
+  c['Ab Design'] = await h.command('contact.save', { kind: 'customer', name: 'Ab Design', bankReference: 'AB', termsDays: 30 })
+  c['Abc Design'] = await h.command('contact.save', { kind: 'customer', name: 'Abc Design', bankReference: 'ABC', termsDays: 30 })
+  const short = await issue('Ab Design', '2026-10-01', '2026-10-31', '90.00'), longer = await issue('Abc Design', '2026-10-01', '2026-10-31', '90.00')
+  const csvInput = { ...input, fileName: 'checking-reference.csv', content: 'Posting Date,Description,Amount\n10/09/2026,WIRE cédar-stúdio,425.00\n10/09/2026,ZELLE CEDAR STUDIO,275.00\n10/09/2026,WILLOW PAYMENT 7842,180.00\n10/09/2026,ZELLE ABC,90.00\n10/09/2026,ZELLE AB,90.00\n10/09/2026,OTHER INVOICE PREFIX,1200.00\n'.replace('OTHER INVOICE PREFIX', `OTHER ${cedar.number}0`), opening: '3275.00', closing: '5535.00', start: '2026-10-09', end: '2026-10-09' }
+  const importedReference = await h.command('statement.import', csvInput)
+  assert.equal((await invoiceOf(h, csvInvoice.id)).open_cents, 0)
+  assert.equal((await invoiceOf(h, short.id)).open_cents, 0, 'a short stored reference is still a payment reference')
+  assert.equal((await invoiceOf(h, longer.id)).open_cents, 0, 'a reference must name the whole value, not a prefix')
+  const csvLines = (await h.view(`reconciliation/${importedReference.statement.id}`)).lines
+  assert.ok(at(csvLines, l => l.description === 'WIRE cédar-stúdio').match_id, 'case, accents and separators do not change a reference')
+  assert.equal(at(csvLines, l => l.description === `OTHER ${cedar.number}0`).match_id, null, 'a different, longer invoice number cannot settle its prefix')
+  assert.equal(at((await h.view('sales')).payments, p => p.id === at(csvLines, l => l.description === 'ZELLE ABC').payment_id).contact_id, c['Abc Design'].id)
+  assert.equal(at(csvLines, l => l.description === 'ZELLE CEDAR STUDIO').match_id, null, 'ambiguous customer reference waits for a person')
+  assert.ok(at(csvLines, l => l.description === 'WILLOW PAYMENT 7842').match_id, 'PAN-06 recorded receipt clears automatically')
+  assert.equal((await h.view('sales')).payments.length, before + 3, 'the recorded receipt is never posted a second time')
+  assert.equal((await h.command('statement.import', csvInput)).duplicate, true)
+  assert.equal((await h.view('sales')).payments.length, before + 3)
+
 })
 
 test('PAY-001 customers pay by card or ACH from the invoice link through the business\'s own Stripe; the payment is recorded and allocated and the fee booked; without online payment the customer is told how to pay, and RER Managed refuses to connect', async t => {

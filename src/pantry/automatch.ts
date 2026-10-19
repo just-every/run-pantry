@@ -1,4 +1,4 @@
-// Invoice-named deposits clear automatically; other deposits await confirmation.
+// Deposits naming an invoice number or its customer payment reference clear automatically.
 // Both paths record, allocate and match atomically, with an undoable receipt.
 import { pantry } from './access'
 import { Fault, usd, type Data } from './core'
@@ -6,7 +6,14 @@ import { all, one, run } from './db'
 import { matchPlan } from './matching'
 import { recordedPaymentCandidates } from './recorded-payments'
 
-const plain = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]+/g, '')
+const canonical = (s: string) => s.normalize('NFKD').toUpperCase().replace(/\p{M}/gu, '')
+/** Name the complete value, ignoring case and separators, without accepting a prefix. */
+function names(deposit: string, value: string) {
+  const letters = canonical(value).replace(/[^\p{L}\p{N}]+/gu, '')
+  if (!letters) return false
+  const gap = '[^\\p{L}\\p{N}]'
+  return new RegExp(`(?:^|${gap})${[...letters].join(gap + '*')}(?:$|${gap})`, 'u').test(canonical(deposit))
+}
 
 type Candidate = { id: string; number: string; customer_id: string; customer_name: string; bank_reference: string; open_cents: number }
 
@@ -21,20 +28,20 @@ async function openInvoices(db: D1Database): Promise<Candidate[]> {
 /** What Pantry makes of one deposit line: the single invoice it pays, or why a person should decide. */
 export function judge(line: Data, invoices: Candidate[]): { invoice?: Candidate; namedInvoice?: boolean; reason?: string; possible: Candidate[] } {
   if (line.amount_cents <= 0) return { possible: [] }
-  const words = plain(`${line.description} ${line.reference}`)
+  const words = `${line.description} ${line.reference}`
   const same = invoices.filter(i => i.open_cents === line.amount_cents)
   if (!same.length) return { possible: [] }
-  const byNumber = same.filter(i => words.includes(plain(i.number)))
+  const byNumber = same.filter(i => names(words, i.number))
   if (byNumber.length === 1) return { invoice: byNumber[0], namedInvoice: true, possible: same }
-  const byCustomer = same.filter(i => plain(i.bank_reference).length >= 3 && words.includes(plain(i.bank_reference)))
-  if (!byNumber.length && byCustomer.length === 1) return { invoice: byCustomer[0], possible: same }
+  const byCustomer = same.filter(i => names(words, i.bank_reference))
+  if (!byNumber.length && byCustomer.length === 1) return { invoice: byCustomer[0], namedInvoice: true, possible: same }
   if (!byNumber.length && !byCustomer.length && same.length === 1) return { invoice: same[0], possible: same }
   const named = byNumber.length ? byNumber : byCustomer
   if (named.length > 1) return { possible: named, reason: `${named.length} open invoices of ${usd(line.amount_cents)} fit this deposit (${named.map(i => i.number).join(', ')}); choose the one it pays` }
   return { possible: same, reason: `Same amount as ${same.map(i => `${i.number} (${i.customer_name})`).join(', ')}, but the deposit names neither the invoice nor the customer's bank reference; confirm it` }
 }
 
-/** Clear deposits naming one open invoice. Amount/customer-only suggestions wait. */
+/** Clear a deposit naming one open invoice by number or customer payment reference. Amount-only suggestions wait. */
 export async function matchDeposits(db: D1Database, lineIds: string[]) {
   const matched: Data[] = []
   if (!lineIds.length) return { matched, needsPerson: [], proposed: [] }

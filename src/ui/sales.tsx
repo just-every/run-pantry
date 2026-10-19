@@ -171,7 +171,7 @@ function Contacts() {
         <Field label="Name" name="name" defaultValue={editing?.name} required />
         <Field label="Email" name="email" type="email" defaultValue={editing?.email} />
         <Field label="Payment terms (days)" name="termsDays" type="number" defaultValue={editing?.terms_days ?? 30} min={0} max={365} />
-        {(editing ? editing.kind === 'customer' : true) && <Field label="How their payments read on your bank statement (customers)" name="bankReference" defaultValue={editing?.bank_reference} hint="For example CEDAR STUDIO LLC. A deposit naming this, or the invoice number, for exactly an open invoice's amount proposes that invoice for confirmation." />}
+        {(editing ? editing.kind === 'customer' : true) && <Field label="How their payments read on your bank statement (customers)" name="bankReference" defaultValue={editing?.bank_reference} hint="For example CEDAR STUDIO LLC. A deposit naming this, or the invoice number, clears automatically when exactly one open invoice of that amount fits. Amount-only deposits wait for confirmation." />}
         {editing && <Field label="Status" name="active" defaultValue={editing.active ? 'yes' : 'no'} options={[{ value: 'yes', label: 'Active' }, { value: 'no', label: 'Inactive' }]} />}
       </Form>
     </Card>}
