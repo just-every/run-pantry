@@ -28,6 +28,79 @@ async function setup(h) {
 const invoiceOf = async (h, id) => at((await h.view('sales')).invoices, i => i.id === id)
 const linkIn = message => new URL(message.text.match(/http:\/\/[^\s]+\/i\/[A-Za-z0-9_-]{32}/)[0]).pathname
 
+test('INVOICE-009 the private customer record preserves preferences and follows invoices, credits, payments, mail and certificates down to their records', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const { acct, bank, c, issue } = await setup(h), day = today(), original = c['Cedar Studio']
+  const privateNote = 'Internal collection arrangement: call Olivia before escalating.'
+  let customer = await h.command('contact.save', { id: original.id, revision: original.revision, kind: 'customer',
+    termsDays: 45, billingAddress: '12 Cedar Street, New York NY 10001', serviceAddress: '90 Studio Road, Albany NY 12207',
+    phone: '212 555 0192', internalNotes: privateNote, payMethods: ['card', 'offline'], contacts: [
+      { name: 'Casey', email: 'casey@cedar.example', phone: '212 555 0111', roles: ['primary'] },
+      { name: 'Accounts', email: 'accounts@cedar.example', roles: ['billing'] },
+      { name: 'Owner', email: 'owner@cedar.example', roles: ['cc'] },
+    ] })
+  customer = await h.command('contact.save', { id: customer.id, revision: customer.revision, kind: 'customer', name: 'Cedar Studio' })
+  const profile = (await h.view(`customers/${customer.id}`)).customer
+  assert.deepEqual([profile.terms_days, profile.billing_address, profile.service_address, profile.phone, profile.internal_notes, profile.pay_methods],
+    [45, '12 Cedar Street, New York NY 10001', '90 Studio Road, Albany NY 12207', '212 555 0192', privateNote, ['card', 'offline']])
+  assert.equal(profile.contacts.length, 3)
+  assert.deepEqual(profile.default_recipients, ['accounts@cedar.example', 'owner@cedar.example'])
+  await h.command('contact.save', { id: customer.id, revision: customer.revision, kind: 'customer', payMethods: ['cash'] }, h.owner, 400)
+  await h.command('contact.save', { id: customer.id, revision: customer.revision, kind: 'customer', contacts: [{ name: 'No email', roles: ['billing'] }] }, h.owner, 400)
+  const inv = await issue('Cedar Studio', day, addDays(day, 30), '1200.00')
+  const other = await issue('Willow Services', day, addDays(day, 30), '900.00')
+  const payment = await h.command('payment.record', { direction: 'received', contactId: customer.id, date: day, amount: '300.00', bankAccountId: bank.id,
+    reference: 'Cedar deposit', allocations: [{ targetId: inv.id, amount: '200.00' }] })
+  const draftCredit = await h.command('invoice.save-draft', { kind: 'credit', customerId: customer.id, creditFor: inv.id, issueDate: day, dueDate: day,
+    lines: [line('Service allowance', '100.00', acct['4000'])] })
+  const approvedCredit = await h.command('invoice.approve', { id: draftCredit.id, revision: draftCredit.revision })
+  const credit = await h.command('invoice.issue', { id: approvedCredit.id })
+  const certificate = await h.command('exemption.save', { customerId: customer.id, states: ['NY'], validFrom: day, expiresOn: addDays(day, 365),
+    certificateNumber: 'CEDAR-EXEMPT', name: 'cedar-certificate.txt', mediaType: 'text/plain', base64: Buffer.from('Cedar resale certificate evidence').toString('base64') })
+  const attachment = await h.command('document.upload', { name: 'invoice-evidence.txt', mediaType: 'text/plain', base64: Buffer.from('Invoice supporting evidence').toString('base64'), linkedKind: 'invoice', linkedId: inv.id })
+  const sent = await h.command('invoice.send', { id: inv.id })
+  const message = h.mail.at(-1), publicPath = linkIn(message)
+  assert.doesNotMatch(message.text + message.html, /Internal collection arrangement/)
+  const page = await h.send(publicPath)
+  assert.equal(page.status, 200); assert.doesNotMatch(page.value, /Internal collection arrangement/)
+  const pdf = await h.send(publicPath + '/invoice.pdf')
+  assert.equal(pdf.status, 200); assert.doesNotMatch(pdf.value, /Internal collection arrangement/)
+
+  const history = await h.view(`customers/${customer.id}?to=${day}`), report = await h.view(`reports/receivables?to=${day}`)
+  assert.deepEqual(history.summary.ageing_items, report.items.filter(i => i.contact_id === customer.id))
+  assert.deepEqual([history.summary.open_invoice_cents, history.summary.unallocated_payment_cents, history.summary.unallocated_credit_cents, history.summary.open_balance_cents], [90000, 10000, 0, 80000])
+  const willow = await h.view(`customers/${c['Willow Services'].id}?to=${day}`)
+  assert.equal(history.summary.open_balance_cents + willow.summary.open_balance_cents, report.subledger)
+  assert.equal(report.agrees, true)
+  assert.deepEqual(history.rows.map(r => r.kind).sort(), ['credit', 'invoice', 'payment'])
+  assert.ok(!history.rows.some(r => r.id === other.id))
+  assert.equal(at(history.rows, r => r.id === payment.id).balance_cents, 10000)
+  assert.equal(at(history.rows, r => r.id === credit.id).balance_cents, 0)
+  for (const row of history.rows) {
+    const record = await h.view(`reports/record/${row.kind === 'payment' ? 'payment' : 'invoice'}/${row.id}`)
+    assert.equal(record.id, row.id)
+    assert.ok(row.href.includes(encodeURIComponent(row.id)))
+    assert.ok(row.allocations.length)
+  }
+  const invoiceRow = at(history.rows, r => r.id === inv.id)
+  const evidence = at(invoiceRow.documents, d => d.id === attachment.id)
+  assert.equal((await h.send(evidence.href, undefined, { cookie: h.owner })).value, 'Invoice supporting evidence')
+  assert.deepEqual(history.deliveries.map(d => [d.id, d.status, d.recipient]).sort(), sent.deliveries.map(d => [d.id, d.status, d.recipient]).sort())
+  assert.ok(history.deliveries.every(d => d.invoice_id === inv.id && d.href === invoiceRow.href))
+  const cert = at(history.certificates, e => e.id === certificate.id)
+  assert.equal(cert.status, 'Valid')
+  assert.equal((await h.send(cert.href, undefined, { cookie: h.owner })).value, 'Cedar resale certificate evidence')
+  assert.deepEqual(history.sections, { estimates: { available: false, rows: [] }, statements: { available: false, rows: [] } })
+  await h.view(`customers/${customer.id}`, '', 401)
+  await h.view(`customers/missing`, h.owner, 404)
+  const viewer = await h.member('customer-reader@example.test', 'viewer')
+  assert.equal((await h.view(`customers/${customer.id}/history`, viewer)).customer.id, customer.id)
+  await h.command('contact.save', { id: customer.id, revision: customer.revision, kind: 'customer', internalNotes: 'Cannot save' }, viewer, 403)
+  customer = await h.command('contact.save', { id: customer.id, revision: customer.revision, kind: 'customer', contacts: [], payMethods: null, internalNotes: '' })
+  const cleared = (await h.view(`customers/${customer.id}`)).customer
+  assert.deepEqual([cleared.contacts, cleared.pay_methods, cleared.internal_notes, cleared.default_recipients], [[], null, '', ['ap@cedar.example']])
+})
+
 test('INVOICE-002/003/004 an issued invoice is emailed with its PDF and customer link; the first customer view is recorded; reminders follow the schedule once and stop when paid', async t => {
   const h = await harness(); t.after(() => h.close())
   const { bank, c, issue } = await setup(h), day = today()

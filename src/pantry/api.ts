@@ -64,6 +64,7 @@ import { recognitionCommands, recognitionView } from './recognition'
 import { recurringJournalCommands, recurringJournalsView } from './recurring-journals'
 import { transferCommands } from './transfers'
 import { vendorHistory } from './vendor-history'
+import { customerHistory } from './customer-history'
 import { billApprovalCommands } from './bill-approval'
 import { exemptionCommands, exemptionView } from './exemptions'
 import { nexusCommands, nexusWatch } from './nexus'
@@ -110,6 +111,8 @@ view('integrations', async (ctx, c) => { must(ctx.actor, 'owner'); return integr
 const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10)) => date(c.req.query(name) ?? fallback, name)
 
 view('vendors/:id/history', async (ctx, c) => vendorHistory(ctx.db, c.req.param('id')!))
+view('customers/:id', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to')))
+view('customers/:id/history', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to')))
 view('dashboard', async (ctx, c) => dashboard(ctx.db, day(c, 'to'), c.req.query('basis') ? basisOf(c.req.query('basis')) : undefined))
 view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await lookups(ctx.db)), overview: await overview(ctx.db), settings: await settingsView(ctx) }))
 view('recurring-journals', async ctx => recurringJournalsView(ctx.db))

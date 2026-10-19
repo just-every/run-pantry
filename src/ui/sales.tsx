@@ -7,8 +7,9 @@ import { Bills } from './bills'
 import { InvoiceEditor } from './invoice-editor'
 import { Deliveries, SendPanel } from './invoice-delivery'
 import { Recurring } from './recurring'
-import { ExemptionCertificates, ExemptionCitation } from './exemption-certificates'
+import { ExemptionCitation } from './exemption-certificates'
 import { Items } from './items'
+import { Contacts } from './contacts'
 
 function invoiceStatus(i: D): [string, 'good' | 'warn' | 'info' | 'neutral'] {
   if (i.status === 'draft') return ['Draft', 'neutral']
@@ -158,26 +159,6 @@ function VendorCredits({ data, reload }: { data: D; reload: () => Promise<void> 
   </Card>
 }
 
-function Contacts() {
-  const { state, reload } = useShared(), [editing, setEditing] = useState<D | null>(null), [added, setAdded] = useState(0)
-  return <div className="split split-wide-left">
-    <Card title="Customers and vendors">
-      <Table heads={['Name', 'Kind', 'Email', 'Terms', 'Status']} empty="No customers or vendors yet.">
-        {state.contacts.map((c: D) => <tr key={c.id} tabIndex={0} onClick={() => setEditing(c)} onKeyDown={k => { if (k.key === 'Enter') setEditing(c) }}><td>{c.name}</td><td>{c.kind === 'customer' ? 'Customer' : 'Vendor'}</td><td>{c.email || '—'}</td><td>{c.terms_days} days</td><td>{c.active ? <Chip tone="good">Active</Chip> : <Chip>Inactive</Chip>}</td></tr>)}
-      </Table>
-    </Card>
-    {state.actor.can.record && <Card title={editing ? `Edit ${editing.name}` : 'Add a customer or vendor'}>
-      <Form key={editing?.id ?? `new-${added}`} label={editing ? 'Save' : 'Add'} submit={b => command('contact.save', { ...b, id: editing?.id, revision: editing?.revision, kind: editing?.kind ?? b.kind, active: b.active !== 'no' })} onDone={async () => { setEditing(null); setAdded(n => n + 1); await reload() }} secondary={editing && <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>Cancel</button>}>
-        {!editing && <Field label="Kind" name="kind" required options={[{ value: 'customer', label: 'Customer' }, { value: 'vendor', label: 'Vendor' }]} />}
-        <Field label="Name" name="name" defaultValue={editing?.name} required />
-        <Field label="Email" name="email" type="email" defaultValue={editing?.email} />
-        <Field label="Payment terms (days)" name="termsDays" type="number" defaultValue={editing?.terms_days ?? 30} min={0} max={365} />
-        {(editing ? editing.kind === 'customer' : true) && <Field label="How their payments read on your bank statement (customers)" name="bankReference" defaultValue={editing?.bank_reference} hint="For example CEDAR STUDIO LLC. A deposit naming this, or the invoice number, clears automatically when exactly one open invoice of that amount fits. Amount-only deposits wait for confirmation." />}
-        {editing && <Field label="Status" name="active" defaultValue={editing.active ? 'yes' : 'no'} options={[{ value: 'yes', label: 'Active' }, { value: 'no', label: 'Inactive' }]} />}
-      </Form>
-    </Card>}
-  </div>
-}
 
 export function Sales({ billId }: { billId?: string } = {}) {
   // Overview's Customers and vendors step opens this page at ?tab=contacts.
@@ -186,7 +167,7 @@ export function Sales({ billId }: { billId?: string } = {}) {
   return <>
     <PageHead title="Sales & bills" lead="Invoices you send and follow up, recurring invoices, bills and their evidence, and payments." />
     <Tabs tabs={['Invoices', 'Recurring', 'Bills', 'Payments', 'Deliveries', 'Customers & vendors', 'Products & services']} current={tab} onChange={setTab} pick="Show" />
-    {tab === 'Customers & vendors' ? <><Contacts /><ExemptionCertificates /></> : tab === 'Products & services' ? <Items /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
+    {tab === 'Customers & vendors' ? <Contacts /> : tab === 'Products & services' ? <Items /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
       : tab === 'Bills' ? <Bills initialBillId={billId} data={data} reload={refresh} /> : tab === 'Deliveries' ? <Card title="Deliveries"><p className="hint">Every invoice and reminder Pantry has sent, with the mail provider's answer. Accepted means the provider took the message, not that the customer read it; "Viewed" on an invoice means the customer opened its link.</p><Deliveries data={data} /></Card> : <Payments data={data} reload={refresh} />}
   </>
 }

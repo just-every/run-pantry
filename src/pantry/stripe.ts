@@ -13,6 +13,7 @@ import { accountInsert } from './accounts'
 import { entryStatements } from './journal'
 import { paymentStatements } from './payables'
 import { invoice } from './invoices'
+import { customerPaymentMethods } from './customer-profile'
 import { businessDay, customerLink, sendingSettings } from './delivery'
 import { managedInstall, seal, STRIPE_VERSION, stripeCall, unseal } from './stripe-api'
 import type { Command } from './context'
@@ -106,10 +107,13 @@ export async function stripeView(env: Bindings, db: D1Database) {
 }
 
 /** The methods a customer may use now on this invoice. */
-export async function offeredMethods(env: Bindings, db: D1Database): Promise<Method[]> {
-  if (await paymentBlock(env, db)) return []
-  const s = (await stripeSettings(db))!
-  return [...(s.card ? ['card' as const] : []), ...(s.ach && s.country === 'US' ? ['us_bank_account' as const] : [])]
+export async function offeredMethods(env: Bindings, db: D1Database, customerId: string): Promise<(Method | 'offline')[]> {
+  const customer = await one(db, "SELECT * FROM pt_contacts WHERE id = ? AND kind = 'customer'", customerId)
+  requireThat(customer, 'Customer not found', 404)
+  const allowed = customerPaymentMethods(customer)
+  const s = await paymentBlock(env, db) ? null : await stripeSettings(db)
+  const available: (Method | 'offline')[] = [...(s?.card ? ['card' as const] : []), ...(s?.ach && s.country === 'US' ? ['us_bank_account' as const] : []), 'offline']
+  return available.filter(method => allowed.includes(method))
 }
 
 /** Start Stripe Checkout for the invoice's open balance; returns the address to send the customer to. */
@@ -117,8 +121,8 @@ export async function startCheckout(env: Bindings, db: D1Database, token: string
   const inv = await invoiceByLink(db, token)
   requireThat(inv, 'Invoice not found', 404)
   requireThat(inv.open_cents > 0, 'This invoice is already paid', 409)
-  const offered = await offeredMethods(env, db)
-  requireThat((offered as string[]).includes(method), 'That payment method is not offered for this invoice', 409)
+  const offered = await offeredMethods(env, db, inv.customer_id)
+  requireThat((method === 'card' || method === 'us_bank_account') && (offered as string[]).includes(method), 'That payment method is not offered for this invoice', 409)
   const s = (await stripeSettings(db))!, link = customerLink(env, token)
   const e = await one(db, 'SELECT legal_name FROM pt_entity WHERE id = 1')
   const session = await stripeCall(await unseal(env, s.key_sealed), 'POST', '/checkout/sessions', {

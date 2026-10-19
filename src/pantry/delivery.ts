@@ -9,6 +9,7 @@ import { authority, ownerEmail, pantry, who } from './access'
 import { addDays, daysBetween, longDay, now, optionalText, requireThat, sha256, text, uid, usd, type Data } from './core'
 import { all, audit, changed, one, q, run, type AuditActor } from './db'
 import { invoice } from './invoices'
+import { customerRecipients } from './customer-profile'
 import { ensureLink, invoiceLinkCommands } from './invoice-links'
 export { ensureLink } from './invoice-links'
 import { invoicePdf } from './invoice-pdf'
@@ -58,6 +59,7 @@ const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<
  * returns null without sending.
  */
 export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, invoiceId: string, recipient: string, kind: 'invoice' | 'reminder', step: number | null = null): Promise<Data | null> {
+  recipient = recipient.trim().toLowerCase()
   const mailer = operatorMail(runtimeBindings(env)) as unknown as InvoiceMailer | undefined
   requireThat(mailer, 'No mail provider is set up for this installation, so Pantry cannot send email. Set MAIL_PROVIDER and MAIL_API_KEY when you deploy.', 409)
   const inv = await invoice(db, invoiceId)
@@ -102,20 +104,21 @@ export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, 
   return (await one(db, 'SELECT * FROM pt_deliveries WHERE id = ?', id))!
 }
 
-function recipients(raw: unknown, fallback: string) {
+function recipients(raw: unknown, defaults: string[]) {
   const list = (typeof raw === 'string' ? raw.split(/[,;\s]+/) : Array.isArray(raw) ? raw : []).map(x => String(x).trim().toLowerCase()).filter(Boolean)
-  const out = list.length ? list : fallback ? [fallback] : []
+  const out = [...new Set(list.length ? list : defaults.map(r => r.trim().toLowerCase()).filter(Boolean))]
   requireThat(out.length, "Add the customer's email address, or name who should receive the invoice")
-  requireThat(out.length <= 5, 'Send to at most five addresses at a time')
+  requireThat(!list.length || out.length <= 5, 'Send to at most five addresses at a time')
   for (const r of out) requireThat(/^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/.test(r), `${r} is not an email address`)
-  return [...new Set(out)]
+  return out
 }
 
 const sendInvoice: Command = { need: 'record', async run(c, b) {
   const inv = await invoice(c.db, text(b.id, 'Invoice'))
   requireThat(inv.kind === 'invoice' && inv.status === 'issued', 'Issue the invoice before sending it', 409)
   requireThat(inv.open_cents > 0, 'This invoice is paid; there is nothing to send', 409)
-  const to = recipients(b.to, inv.customer_email)
+  const customer = (await one(c.db, 'SELECT * FROM pt_contacts WHERE id = ?', inv.customer_id))!
+  const to = recipients(b.to, customerRecipients(customer))
   await run(c.db, [authority(c.actor, 'record')])
   const deliveries = []
   for (const r of to) deliveries.push(await deliver(c.env, c.db, who(c.actor), inv.id, r, 'invoice'))
@@ -177,11 +180,15 @@ export function dueStep(dueDate: string, today: string, steps: number[], sent: n
 export async function reminderPlans(db: D1Database) {
   const settings = await sendingSettings(db), today = businessDay(settings.time_zone), plans: Record<string, string | null> = {}
   if (!settings.reminders_on) return { today, on: false, days: settings.reminder_days, plans }
-  const sent = await all<{ invoice_id: string; step: number }>(db, "SELECT invoice_id, step FROM pt_deliveries WHERE kind = 'reminder'")
-  for (const inv of await all(db, "SELECT id, due_date FROM pt_invoices WHERE kind = 'invoice' AND status = 'issued' AND sent_at IS NOT NULL AND reminders_paused = 0")) {
-    const steps = sent.filter(r => r.invoice_id === inv.id).map(r => r.step)
-    if (dueStep(inv.due_date, today, settings.reminder_days, steps) !== null) { plans[inv.id] = today; continue }
-    plans[inv.id] = settings.reminder_days.filter(d => !steps.some(x => x >= d)).map(d => addDays(inv.due_date, d)).filter(d => d > today).sort()[0] ?? null
+  const sent = await all<{ invoice_id: string; step: number; recipient: string }>(db, "SELECT invoice_id, step, recipient FROM pt_deliveries WHERE kind = 'reminder'")
+  for (const inv of await all(db, "SELECT id, customer_id, due_date FROM pt_invoices WHERE kind = 'invoice' AND status = 'issued' AND sent_at IS NOT NULL AND reminders_paused = 0")) {
+    const customer = (await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', inv.customer_id))!
+    const dates = customerRecipients(customer).flatMap(recipient => {
+      const steps = sent.filter(r => r.invoice_id === inv.id && r.recipient.toLowerCase() === recipient.toLowerCase()).map(r => r.step)
+      if (dueStep(inv.due_date, today, settings.reminder_days, steps) !== null) return [today]
+      return settings.reminder_days.filter(d => !steps.some(x => x >= d)).map(d => addDays(inv.due_date, d)).filter(d => d > today)
+    })
+    plans[inv.id] = dates.sort()[0] ?? null
   }
   return { today, on: true, days: settings.reminder_days, plans }
 }
@@ -190,18 +197,22 @@ export async function reminderPlans(db: D1Database) {
 export async function sendDueReminders(env: Bindings, db: D1Database, today: string) {
   const settings = await sendingSettings(db)
   if (!settings.reminders_on || !settings.reminder_days.length || !operatorMail(runtimeBindings(env))) return []
-  const open = await all(db, `SELECT i.id, i.due_date, c.email FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id
-    WHERE i.kind = 'invoice' AND i.status = 'issued' AND i.sent_at IS NOT NULL AND i.reminders_paused = 0 AND c.email <> ''
+  const open = await all(db, `SELECT i.id, i.due_date, i.customer_id FROM pt_invoices i
+    WHERE i.kind = 'invoice' AND i.status = 'issued' AND i.sent_at IS NOT NULL AND i.reminders_paused = 0
       AND NOT EXISTS (SELECT 1 FROM pt_stripe_payments sp WHERE sp.invoice_id = i.id AND sp.status = 'processing')`)
   const sent: Data[] = []
   for (const row of open) {
     const inv = await invoice(db, row.id)
     if (inv.open_cents <= 0) continue
-    const steps = (await all<{ step: number }>(db, "SELECT step FROM pt_deliveries WHERE invoice_id = ? AND kind = 'reminder'", inv.id)).map(r => r.step)
-    const step = dueStep(inv.due_date, today, settings.reminder_days, steps)
-    if (step === null || daysBetween(inv.due_date, today) - step > 30) continue
-    const d = await deliver(env, db, pantry('reminders'), inv.id, row.email, 'reminder', step)
-    if (d) sent.push(d)
+    const customer = (await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', row.customer_id))!
+    const prior = await all<{ step: number; recipient: string }>(db, "SELECT step, recipient FROM pt_deliveries WHERE invoice_id = ? AND kind = 'reminder'", inv.id)
+    for (const recipient of customerRecipients(customer)) {
+      const steps = prior.filter(r => r.recipient.toLowerCase() === recipient.toLowerCase()).map(r => r.step)
+      const step = dueStep(inv.due_date, today, settings.reminder_days, steps)
+      if (step === null || daysBetween(inv.due_date, today) - step > 30) continue
+      const d = await deliver(env, db, pantry('reminders'), inv.id, recipient, 'reminder', step)
+      if (d) sent.push(d)
+    }
   }
   return sent
 }

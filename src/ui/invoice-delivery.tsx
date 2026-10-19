@@ -1,5 +1,6 @@
 // Sending an issued invoice: the customer link, sent and viewed, the next
 // reminder, online payments, and every delivery with the provider's answer.
+import { customerRecipients } from '../pantry/customer-profile'
 import { Action, Chip, command, Form, Field, Table, day, usd, useShared, useWho, type D } from './kit'
 
 type Tone = 'good' | 'warn' | 'bad' | 'info' | 'neutral'
@@ -18,6 +19,7 @@ const PAYMENT: Record<string, [string, Tone]> = { open: ['Started, not paid', 'n
 
 export function SendPanel({ i, data, onChange }: { i: D; data: D; onChange: () => Promise<void> }) {
   const { state } = useShared(), who = useWho()
+  const defaultTo = customerRecipients(state.contacts.find((c: D) => c.id === i.customer_id) ?? { email: i.customer_email }).join(',')
   const deliveries = (data.deliveries as D[]).filter(d => d.invoice_id === i.id)
   const online = (data.onlinePayments as D[]).filter(p => p.invoice_id === i.id)
   const plan = data.reminders as D, next = plan.plans[i.id]
@@ -36,8 +38,8 @@ export function SendPanel({ i, data, onChange }: { i: D; data: D; onChange: () =
         <Field label="Link expires after payment (days)" name="daysAfterPayment" type="number" min={0} max={3650} defaultValue={i.link_days_after_payment} required hint="0 expires as soon as the invoice is fully paid. A payment reversal restores access while money is owed." />
       </Form>
     </>}
-    {i.open_cents > 0 && state.actor.can.record && <Form label={i.sent_at ? 'Send again' : 'Send invoice'} submit={b => command('invoice.send', { id: i.id, to: b.to })} onDone={onChange}>
-      <Field label="Send to" name="to" type="email" multiple defaultValue={i.customer_email} required hint="The PDF is attached and the email links to the customer page. Separate several addresses with commas." />
+    {i.open_cents > 0 && state.actor.can.record && <Form label={i.sent_at ? 'Send again' : 'Send invoice'} submit={b => command('invoice.send', { id: i.id, ...(b.to === defaultTo ? {} : { to: b.to }) })} onDone={onChange}>
+      <Field label="Send to" name="to" type="email" multiple defaultValue={defaultTo} required hint="The PDF is attached and the email links to the customer page. Separate several addresses with commas." />
     </Form>}
     {i.sent_at && i.open_cents > 0 && state.actor.can.record && <Action run={async () => { await command('invoice.reminders', { id: i.id, paused: !i.reminders_paused }); await onChange() }}>{i.reminders_paused ? 'Resume reminders' : 'Pause reminders'}</Action>}
     {online.length > 0 && <><h3>Paid online</h3><ul className="send-log">

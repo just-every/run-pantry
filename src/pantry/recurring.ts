@@ -11,6 +11,7 @@ import { all, approval, audit, changed, guard, one, periodOpen, q, run, type Sql
 import { contact } from './contacts'
 import { issueStatements, lineStatements, nextNumber, parseInvoice } from './invoices'
 import { deliver } from './delivery'
+import { customerRecipients } from './customer-profile'
 import type { Command } from './context'
 import { amountSnapshot, priceFence, pricesFor, recurringPriceCommands } from './recurring-prices'
 
@@ -47,7 +48,7 @@ async function parseTemplate(db: D1Database, b: Data) {
   requireThat(Number.isInteger(terms) && terms >= 0 && terms <= 365, 'Payment terms are 0–365 days')
   const mode = text(b.mode, 'Each invoice')
   requireThat(mode === 'draft' || mode === 'send', 'Each invoice is created as a draft or sent automatically')
-  requireThat(mode === 'draft' || p.customer.email, `${p.customer.name} has no email address; add one to send invoices automatically`)
+  requireThat(mode === 'draft' || customerRecipients(p.customer).length, `${p.customer.name} has no billing email address; add one to send invoices automatically`)
   // The template keeps the lines as parsed, so an item's defaults are fixed at the approved revision.
   const lines = p.lines.map(l => ({ description: l.description, quantity: String(l.qty / 1000), rate: (l.unit / 100).toFixed(2), accountId: l.accountId, taxCode: l.chosenTaxCode, ...(l.itemId ? { itemId: l.itemId } : {}) }))
   return { p, start, end, unit, every, terms, mode, lines, memo: p.memo }
@@ -171,14 +172,17 @@ async function runOccurrence(env: Bindings, db: D1Database, t: Data) {
 async function sendRun(env: Bindings, db: D1Database, templateId: string, occ: string) {
   const r = await db.prepare("UPDATE pt_recurring_runs SET status = 'sent', at = ? WHERE recurring_id = ? AND occurrence = ? AND status = 'issued'").bind(now(), templateId, occ).run()
   if (r.meta.changes !== 1) return
-  const row = (await one(db, 'SELECT r.invoice_id, c.email FROM pt_recurring_runs r JOIN pt_invoices i ON i.id = r.invoice_id JOIN pt_contacts c ON c.id = i.customer_id WHERE r.recurring_id = ? AND r.occurrence = ?', templateId, occ))!
-  let detail = ''
+  const row = (await one(db, 'SELECT r.invoice_id, c.* FROM pt_recurring_runs r JOIN pt_invoices i ON i.id = r.invoice_id JOIN pt_contacts c ON c.id = i.customer_id WHERE r.recurring_id = ? AND r.occurrence = ?', templateId, occ))!
+  const failures: string[] = []
   try {
-    requireThat(row.email, 'The customer has no email address')
-    const d = (await deliver(env, db, pantry('recurring'), row.invoice_id, row.email, 'invoice'))!
-    if (d.status !== 'accepted') detail = `Issued, but sending was ${d.status}${d.detail ? `: ${d.detail}` : ''}`
-  } catch (error) { if (!(error instanceof Fault)) throw error; detail = `Issued, but not sent: ${error.message}` }
-  if (detail) await db.prepare("UPDATE pt_recurring_runs SET status = 'failed', detail = ? WHERE recurring_id = ? AND occurrence = ?").bind(detail, templateId, occ).run()
+    const recipients = customerRecipients(row)
+    requireThat(recipients.length, 'The customer has no billing email address')
+    for (const recipient of recipients) {
+      const d = (await deliver(env, db, pantry('recurring'), row.invoice_id, recipient, 'invoice'))!
+      if (d.status !== 'accepted') failures.push(`Issued, but sending was ${d.status}${d.detail ? `: ${d.detail}` : ''} (${recipient})`)
+    }
+  } catch (error) { if (!(error instanceof Fault)) throw error; failures.push(`Issued, but not sent: ${error.message}`) }
+  if (failures.length) await db.prepare("UPDATE pt_recurring_runs SET status = 'failed', detail = ? WHERE recurring_id = ? AND occurrence = ?").bind(failures.join('; '), templateId, occ).run()
 }
 
 /** Every occurrence due by `today` (a late run catches up, at most twelve per template), then any issued run not yet sent. */
