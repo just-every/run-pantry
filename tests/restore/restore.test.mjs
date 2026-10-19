@@ -56,7 +56,15 @@ async function dev(root, port) {
   }
   const link = output.match(/RER_OPEN (\S+)/)?.[1]
   assert.ok(link, 'dev printed its sign-in link')
-  const server = { origin: new URL(link).origin, link, async stop() { running.delete(server); await rer(root, ['dev', '--stop']); if (child.exitCode === null) { child.kill('SIGTERM'); await new Promise(r => child.once('exit', r)) } } }
+  const server = { origin: new URL(link).origin, link, async stop() {
+    running.delete(server)
+    if (child.exitCode !== null) return
+    const { stdout } = await promisify(execFile)('ps', ['-axo', 'pid=,ppid='])
+    const rows = stdout.trim().split('\n').map(line => line.trim().split(/\s+/).map(Number)), owned = new Set([child.pid])
+    for (let changed = true; changed;) { changed = false; for (const [pid, parent] of rows) if (owned.has(parent) && !owned.has(pid)) { owned.add(pid); changed = true } }
+    for (const pid of [...owned].reverse()) try { process.kill(pid, 'SIGTERM') } catch (e) { if (e.code !== 'ESRCH') throw e }
+    if (child.exitCode === null) await new Promise(r => child.once('exit', r))
+  } }
   running.add(server)
   return server
 }
@@ -91,12 +99,14 @@ async function snapshot(context, origin, docName) {
       pl: (await get('reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=cash')).netIncome,
       lines: (await get('bank/lines')).lines.map(l => [l.posted_date, l.description, l.amount_cents]).sort(),
       documents: documents.map(d => [d.name, d.sha256]).sort(),
+      audit: (await get('activity')).audit.map(({ approval, ...row }) => row).sort((a, b) => a.id.localeCompare(b.id)),
+      approvals: (await get('activity')).approvals.sort((a, b) => a.id.localeCompare(b.id)),
     },
     bytes: doc ? Buffer.from(await (await context.request.get(`${origin}/api/pantry/documents/${doc.id}`)).body()) : null,
   }
 }
 
-test('the books come back from an export into a fresh install and after starting over, and a restore over books is refused with the next step', async t => {
+test('AUDIT-001 the immutable audit and books come back from an export into a fresh install and after starting over, and a restore over books is refused with the next step', async t => {
   t.after(async () => { for (const server of [...running]) await server.stop(); for (const root of roots) await rm(root, { recursive: true, force: true }) })
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
 

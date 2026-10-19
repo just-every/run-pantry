@@ -1,7 +1,6 @@
 // Agent work, documents and the activity record.
 import { useRef } from 'react'
-import { Action, Card, Chip, command, Details, Empty, Field, FileLink, Form, Loading, PageHead, Table, day, monthName, readFileBase64, usd, useShared, useView, useWho, type D } from './kit'
-import { actionLabel, approvalLabel, detailFacts, recordLabel } from './activity-labels'
+import { Action, Card, Chip, command, Details, Empty, Field, FileLink, Form, Loading, PageHead, Table, day, readFileBase64, usd, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
 
 const KIND: Record<string, string> = { match: 'Bank match', journal: 'Journal entry', 'close-packet': 'Close packet', 'variance-note': 'Variance explanation' }
@@ -49,20 +48,5 @@ export function Documents() {
     {!data ? <Loading error={error} what="documents" /> : <Card title="All documents"><Table heads={['Name', 'Attached to', 'Size', 'Uploaded', '']} figures={[2]} empty="No documents yet.">
       {data.documents.map((d: D) => <tr key={d.id}><td><FileLink id={d.id} name={d.name} mediaType={d.media_type} /></td><td>{d.linked_label ?? 'Nothing yet'}{d.duplicate_of && <small className="sub block"><Chip tone="warn">{d.duplicate_decision === 'skip' ? 'Duplicate skipped' : d.duplicate_decision === 'keep' ? 'Kept both' : 'Duplicate'}</Chip> <a href={`/api/pantry/documents/${d.duplicate_of}`}>Original</a>{!d.duplicate_decision && <> · <a href={`/app/receipts#document-${d.id}`}>Review duplicate</a></>}{d.duplicate_reason && <> · {d.duplicate_reason}</>}</small>}</td><td className="fig">{Math.ceil(d.size / 1024)} KB</td><td>{who(d.uploaded_by)}, {day(d.uploaded_at)}</td><td><a href={`/api/pantry/documents/${d.id}`}>Download</a><Details facts={{ 'Fingerprint (SHA-256)': d.sha256 }} code={['Fingerprint (SHA-256)']} /></td></tr>)}
     </Table></Card>}
-  </>
-}
-
-export function Activity() {
-  const { data, error } = useView<D>('activity'), who = useWho()
-  if (!data) return <Loading error={error} what="activity" />
-  return <>
-    <PageHead title="Activity" lead="Who did what, and every approval with the exact version it covered." />
-    <Card title="Approvals"><Table heads={['When', 'Who', 'What', 'Decision', 'Note']} empty="No approvals yet.">
-      {data.approvals.map((a: D) => <tr key={a.id}><td>{day(a.at)}</td><td>{who(a.actor_email)}</td><td>{approvalLabel(a.subject_kind, a.action)}{a.subject_kind === 'period' && <small className="sub"> · {monthName(a.subject_id)}</small>}</td><td>{a.decision === 'approved' ? <Chip tone="good">Approved</Chip> : <Chip>Declined</Chip>}</td><td>{a.note || '—'}</td></tr>)}
-    </Table></Card>
-    <Card title="Activity"><Table heads={['When', 'Who', 'Action', 'Record']} empty="Nothing yet.">
-      {data.audit.map((e: D) => { const facts = detailFacts(e.detail)
-        return <tr key={e.id}><td>{day(e.at)}</td><td>{e.actor_kind === 'agent' ? <><Icon name="agent" /> </> : null}{who(e.actor_email)}</td><td>{actionLabel(e.action)}</td><td>{recordLabel(e.subject_kind, e.subject_id)}{Object.keys(facts).length > 0 && <Details facts={facts} />}</td></tr> })}
-    </Table></Card>
   </>
 }

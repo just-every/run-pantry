@@ -41,7 +41,7 @@ const saveEntity: Command = { need: 'owner', async run(c, b) {
       ? q('UPDATE pt_entity SET legal_name = ?, entity_type = ?, state = ?, fiscal_year_start = ?, tax_method = ?, policies = ?, books_start = ?, revision = ?, updated_by = ?, updated_at = ? WHERE id = 1 AND revision = ?', legal, entityType, state, fy, taxMethod, policies, booksStart, revision, c.actor.email, at, current.revision)
       : q("INSERT INTO pt_entity (id, legal_name, entity_type, state, currency, fiscal_year_start, book_basis, tax_method, policies, books_start, revision, updated_by, updated_at) VALUES (1, ?, ?, ?, 'USD', ?, 'accrual', ?, ?, ?, ?, ?, ?)", legal, entityType, state, fy, taxMethod, policies, booksStart, revision, c.actor.email, at),
     changed(),
-    audit(who(c.actor), current ? 'entity.update' : 'entity.create', 'entity', '1', { legalName: legal, entityType, state, fiscalYearStart: fy, taxMethod })])
+    audit(who(c.actor), current ? 'entity.update' : 'entity.create', 'entity', '1', { legalName: legal, entityType, state, fiscalYearStart: fy, taxMethod, before: current, after: { id: 1, legal_name: legal, entity_type: entityType, state, currency: 'USD', fiscal_year_start: fy, book_basis: 'accrual', tax_method: taxMethod, policies, books_start: booksStart, revision, updated_by: c.actor.email, updated_at: at } })])
   return (await entity(c.db))!
 } }
 
@@ -54,19 +54,21 @@ const saveMember: Command = { need: 'owner', async run(c, b) {
   const row = { name: text(b.name, 'Name', 200), post: flag(b.canPost), lock: flag(b.canLock), reopen: flag(b.canReopen), active: b.active === false || b.active === 'false' ? 0 : 1 }
   // Editing someone's email moves that person to the new address: the old one no longer signs in to these books.
   const previous = b.previousEmail ? text(b.previousEmail, 'Previous email', 254).toLowerCase() : email
+  const before = await one(c.db, 'SELECT * FROM pt_members WHERE email = ?', previous)
+  const revision = uid(), after = { email, name: row.name, role, can_post: row.post, can_lock: row.lock, can_reopen: row.reopen, active: row.active, revision }
   if (previous !== email) {
     requireThat(await one(c.db, 'SELECT 1 FROM pt_members WHERE email = ?', previous), 'That person is no longer in People; reload', 404)
     requireThat(!(await one(c.db, 'SELECT 1 FROM pt_members WHERE email = ?', email)), `${email} is already in People`, 409)
     await run(c.db, [authority(c.actor, 'owner'),
-      q('UPDATE pt_members SET email = ?, name = ?, role = ?, can_post = ?, can_lock = ?, can_reopen = ?, active = ?, revision = ? WHERE email = ?', email, row.name, role, row.post, row.lock, row.reopen, row.active, uid(), previous), changed(),
-      audit(who(c.actor), 'member.save', 'member', email, { previousEmail: previous, role, canPost: !!row.post, canLock: !!row.lock, canReopen: !!row.reopen, active: !!row.active })])
+      q('UPDATE pt_members SET email = ?, name = ?, role = ?, can_post = ?, can_lock = ?, can_reopen = ?, active = ?, revision = ? WHERE email = ?', email, row.name, role, row.post, row.lock, row.reopen, row.active, revision, previous), changed(),
+      audit(who(c.actor), 'member.save', 'member', email, { previousEmail: previous, role, canPost: !!row.post, canLock: !!row.lock, canReopen: !!row.reopen, active: !!row.active, before, after })])
     return (await one(c.db, 'SELECT * FROM pt_members WHERE email = ?', email))!
   }
   const added = !(await one(c.db, 'SELECT 1 FROM pt_members WHERE email = ?', email))
   await run(c.db, [authority(c.actor, 'owner'),
     q('INSERT INTO pt_members (email, name, role, can_post, can_lock, can_reopen, active, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(email) DO UPDATE SET name = excluded.name, role = excluded.role, can_post = excluded.can_post, can_lock = excluded.can_lock, can_reopen = excluded.can_reopen, active = excluded.active, revision = excluded.revision',
-      email, row.name, role, row.post, row.lock, row.reopen, row.active, uid()),
-    audit(who(c.actor), 'member.save', 'member', email, { role, canPost: !!row.post, canLock: !!row.lock, canReopen: !!row.reopen, active: !!row.active })])
+      email, row.name, role, row.post, row.lock, row.reopen, row.active, revision),
+    audit(who(c.actor), 'member.save', 'member', email, { role, canPost: !!row.post, canLock: !!row.lock, canReopen: !!row.reopen, active: !!row.active, before, after })])
   const member = (await one(c.db, 'SELECT * FROM pt_members WHERE email = ?', email))!
   // Someone new gets their sign-in invitation in the same step, so they can sign in (and, on this computer,
   // Sign in as or rer dev --as works for them) without a second action. Someone who already signs in needs none.
@@ -98,6 +100,7 @@ const inviteMember: Command = { need: 'owner', async run(c, b) {
 // proof (on this computer the dev sign-in is enough; hosted, an email-link sign-in in the last ten minutes).
 const STEP_UP = 'To change your sign-in email, sign out, sign in again with the emailed link, and change it within ten minutes.'
 const saveOwner: Command = { need: 'owner', async run(c, b) {
+  const before = await one(c.db, 'SELECT display_name, email FROM oa_operators WHERE id = ?', c.actor.id)
   const name = text(b.name, 'Name', 200), email = text(b.email, 'Email', 254).toLowerCase()
   requireThat(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email), 'Enter a valid email')
   requireThat(!(await one(c.db, 'SELECT 1 FROM pt_members WHERE email = ?', email)), `${email} is already someone in People`, 409)
@@ -114,7 +117,7 @@ const saveOwner: Command = { need: 'owner', async run(c, b) {
     }
   }
   await run(c.db, [authority(c.actor, 'owner'), q('UPDATE oa_operators SET display_name = ? WHERE id = ?', name, c.actor.id), changed(),
-    audit(who(c.actor), 'owner.save', 'owner', c.actor.id, { name, ...(email !== c.actor.email ? { previousEmail: c.actor.email, email } : {}) })])
+    audit(who(c.actor), 'owner.save', 'owner', c.actor.id, { name, before, after: { display_name: name, email }, ...(email !== c.actor.email ? { previousEmail: c.actor.email, email } : {}) })])
   return { name, email }
 } }
 
@@ -123,17 +126,18 @@ const createAgent: Command = { need: 'owner', async run(c, b) {
   requireThat(/^[A-Za-z0-9 ._-]+$/.test(name), 'Agent name uses letters, numbers, spaces, dots, dashes')
   const bytes = crypto.getRandomValues(new Uint8Array(32))
   const token = 'pantry_agent_' + btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-  const id = uid()
+  const id = uid(), revision = uid()
   await run(c.db, [authority(c.actor, 'owner'),
-    q('INSERT INTO pt_agents (id, name, token_hash, created_by, created_at, active, revision) VALUES (?, ?, ?, ?, ?, 1, ?)', id, name, await sha256(token), c.actor.email, now(), uid()),
-    audit(who(c.actor), 'agent.create', 'agent', id, { name })])
+    q('INSERT INTO pt_agents (id, name, token_hash, created_by, created_at, active, revision) VALUES (?, ?, ?, ?, ?, 1, ?)', id, name, await sha256(token), c.actor.email, now(), revision),
+    audit(who(c.actor), 'agent.create', 'agent', id, { name, before: null, after: { id, name, active: 1, revision } })])
   // The token is shown once; only its hash is stored.
   return { id, name, token }
 } }
 
 const deactivateAgent: Command = { need: 'owner', async run(c, b) {
-  const id = text(b.id, 'Agent')
-  await run(c.db, [authority(c.actor, 'owner'), q('UPDATE pt_agents SET active = 0, revision = ? WHERE id = ? AND active = 1', uid(), id), changed(), audit(who(c.actor), 'agent.deactivate', 'agent', id)])
+  const id = text(b.id, 'Agent'), revision = uid()
+  const before = await one(c.db, 'SELECT id, name, active, revision FROM pt_agents WHERE id = ?', id)
+  await run(c.db, [authority(c.actor, 'owner'), q('UPDATE pt_agents SET active = 0, revision = ? WHERE id = ? AND active = 1', revision, id), changed(), audit(who(c.actor), 'agent.deactivate', 'agent', id, { before, after: { ...before, active: 0, revision } })])
   return { id }
 } }
 

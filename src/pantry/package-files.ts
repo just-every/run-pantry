@@ -44,6 +44,7 @@ export async function packageZip(db: D1Database, period: string, basis: Basis) {
       'reconciliations.csv          Bank statements reconciled through the end of the month',
       'voided-reconciliations.json  Retained proofs, statement snapshots and undo reasons',
       'close-checklist.csv          The close checks and review tasks, with who did them',
+      'audit-history.json          Immutable actions, revisions, approvals and before/after values',
       'documents.csv                Every document kept in Pantry, with its SHA-256; open them in Pantry',
       'pantry-package.json          All of the above in one file, for software', ''].join('\r\n') },
     { name: 'trial-balance.csv', data: csv([['Account code', 'Account', 'Debit', 'Credit'], ...p.trialBalance.rows.map((r: Data) => [r.code, r.name, r.debitBalance ? money(r.debitBalance) : '', r.creditBalance ? money(r.creditBalance) : '']), ['', 'Total', money(p.trialBalance.debit), money(p.trialBalance.credit)]]) },
@@ -58,6 +59,7 @@ export async function packageZip(db: D1Database, period: string, basis: Basis) {
     { name: 'close-checklist.csv', data: csv([['Kind', 'Item', 'Result', 'Detail', 'By', 'At'],
       ...p.close.checks.map((x: Data) => ['Check', x.title, x.ok ? 'Passes' : 'Open', x.detail, '', '']),
       ...p.close.tasks.map((t: Data) => ['Review task', t.title, t.status === 'done' ? 'Done' : 'Open', t.note, t.done_by ?? '', t.done_at ?? ''])]) },
+    { name: 'audit-history.json', data: JSON.stringify({ audit: p.audit, approvals: p.approvals }, null, 2) },
     { name: 'documents.csv', data: csv([['Name', 'Type', 'Bytes', 'SHA-256', 'Attached to', 'Uploaded by', 'Uploaded at'], ...p.documents.map((d: Data) => [d.name, d.media_type, d.size, d.sha256, d.linked_kind ? `${d.linked_kind} ${d.linked_id}` : '', d.uploaded_by, d.uploaded_at])]) },
     { name: 'pantry-package.json', data: JSON.stringify(p, null, 2) },
   ]

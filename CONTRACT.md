@@ -648,8 +648,8 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 15 | 60 | 45 | 120 |
-| All | 34 | 60 | 45 | 139 |
+| Target and push further | 16 | 59 | 45 | 120 |
+| All | 35 | 59 | 45 | 139 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -778,7 +778,7 @@ The 18 October cash-flow and receipt-duplication round updates REPORT-003 to don
 | `ACCESS-001` | Narrower roles and approval limits | target | partial | `src/pantry/access.ts`, `tests/api/ledger.test.mjs` | Owner, bookkeeper, accountant, viewer and agent with post/lock/reopen grants ship; sales and payables-clerk roles, amount limits, account visibility and masking do not. |
 | `ACCESS-003` | Issuing limits for invoices, credits and sales | target | missing |  | No implementation; every invoice and credit needs a second person unless the owner prepared it (`src/pantry/invoices.ts`). |
 | `ACCESS-002` | Sign-in security | target | partial | `src/auth.server.ts`, `src/pantry/access.ts` | Native email sign-in with server-checked sessions and origin checks ships; passkey/MFA requirement, SSO, session list and step-up do not. |
-| `AUDIT-001` | Who, what and when | target | partial | `src/pantry/db.ts`, `src/routes/app.activity.tsx`, `tests/api/ledger.test.mjs` | Every write records actor, action, subject and detail, approvals name revisions and the Activity screen lists them; filters by person and record, before/after values and the audit in the package do not. |
+| `AUDIT-001` | Who, what and when | target | done | `src/pantry/db.ts`, `activity.ts`, `src/ui/activity.tsx`, `tests/api/ledger.test.mjs` › AUDIT-001, `tests/restore/restore.test.mjs` › AUDIT-001 | Atomic immutable events retain actor/origin, record or stored history revision, exact approval or standing authority, and safe before/after snapshots. Activity filters by person, date and record. Accountant JSON/ZIP packages and real rer export/import preserve the raw audit and approvals. Legacy events remain untouched. |
 | `ERASURE-001` | Erasure within record-keeping law | target | missing |  | No implementation in `src/pantry`. |
 | `DATA-001` | Declared data flows and credentials | target | missing |  | No implementation; Pantry has no outside connections (`seed.json` externals: Cloudflare only). |
 | `OPS-001` | Hosted operation, backups and scale | target | partial | `src/pantry/package.ts`, `tests/restore/restore.test.mjs` | `rer export`/`rer import` restore the books; hosted backups, object storage for documents and measured scale do not exist (documents are stored in D1). |

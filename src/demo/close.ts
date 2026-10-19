@@ -25,8 +25,5 @@ export async function closeMonth(db: D1Database, owner: { id: string; email: str
     q(`UPDATE pt_matches SET approved_at = ? WHERE reconciliation_id IN (SELECT id FROM pt_reconciliations WHERE statement_id IN (${statements}))`, plan.reconciledAt, ...plan.statements),
     q(`UPDATE pt_reconciliations SET completed_at = ? WHERE statement_id IN (${statements})`, plan.reconciledAt, ...plan.statements),
     q('UPDATE pt_periods SET locked_at = ? WHERE id = ?', plan.lockedAt, period),
-    q("UPDATE pt_approvals SET at = ? WHERE subject_kind = 'period' AND subject_id = ? AND action = 'lock'", plan.lockedAt, period),
-    q("UPDATE pt_audit SET at = ? WHERE action IN ('match.approve', 'reconciliation.complete')", plan.reconciledAt),
-    q("UPDATE pt_audit SET at = ? WHERE action = 'period.lock' AND subject_id = ?", plan.lockedAt, period),
   ])
 }

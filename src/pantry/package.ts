@@ -32,7 +32,8 @@ export async function accountantPackage(db: D1Database, period: string, basis: B
     voidedReconciliations: await reconciliationHistory(db, undefined, end),
     reversals: await all(db, "SELECT e.id, e.number, e.entry_date, e.memo, e.reverses_id, o.number AS reverses_number FROM pt_journal_entries e JOIN pt_journal_entries o ON o.id = e.reverses_id WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ?", start, end),
     // Approvals carry the time they were given, not a book date: the package holds all of them.
-    approvals: await all(db, 'SELECT * FROM pt_approvals ORDER BY at'),
+    approvals: await all(db, 'SELECT * FROM pt_approvals ORDER BY at, id'),
+    audit: await all(db, 'SELECT * FROM pt_audit ORDER BY at, id'),
     notes: await all(db, 'SELECT * FROM pt_notes WHERE period = ?', period),
     documents: await all(db, 'SELECT id, name, media_type, size, sha256, linked_kind, linked_id, uploaded_by, uploaded_at FROM pt_documents ORDER BY uploaded_at'),
     // Receipts attached in the period, with what was read and what a person accepted; the bytes are in the documents.

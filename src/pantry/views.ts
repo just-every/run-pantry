@@ -67,12 +67,7 @@ export function actorView(actor: Person): Data {
   return { email: actor.email, name: actor.name, role: actor.role, can: { record: allowed(actor, 'record'), post: allowed(actor, 'post'), lock: allowed(actor, 'lock'), reopen: allowed(actor, 'reopen'), owner: allowed(actor, 'owner') } }
 }
 
-export async function activity(db: D1Database) {
-  return {
-    audit: await all(db, 'SELECT * FROM pt_audit ORDER BY at DESC, id LIMIT 300'),
-    approvals: await all(db, 'SELECT * FROM pt_approvals ORDER BY at DESC, id LIMIT 300'),
-  }
-}
+export { activity } from './activity'
 
 export async function documents(db: D1Database) {
   return all(db, `SELECT d.id, d.name, d.media_type, d.size, d.sha256, d.linked_kind, d.linked_id, d.note, d.uploaded_by, d.uploaded_at, d.duplicate_of, d.duplicate_basis, d.duplicate_reason, d.duplicate_decision, CASE d.linked_kind

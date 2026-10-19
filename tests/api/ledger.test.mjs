@@ -76,7 +76,7 @@ test('PAN-03 customers, vendors and source documents are kept, with document byt
   await h.command('invoice.save-draft', { customerId: cedar.id, issueDate: '2026-09-01', lines: [{ description: 'x', quantity: '1', rate: '10.00', accountId: acct.id, taxCode: 'exempt' }] }, h.owner, 400)
 })
 
-test('PAN-10 a journal entry posts balanced, approved by someone other than its preparer, for the exact version reviewed', async t => {
+test('AUDIT-001 / PAN-10 a journal entry posts balanced, approved by someone other than its preparer, for the exact version reviewed', async t => {
   const h = await harness(); t.after(() => h.close())
   const { acct } = await books(h)
   const bea = await h.member('bea@example.test', 'bookkeeper'), ann = await h.member('ann@example.test', 'accountant', { canPost: true })
@@ -95,6 +95,57 @@ test('PAN-10 a journal entry posts balanced, approved by someone other than its 
   // An agent token is not a session: the command door stays shut.
   const agent = await h.agent()
   assert.equal((await h.send('/api/pantry/command/journal.post', { id: draft.id }, { headers: { authorization: `Bearer ${agent.token}` } })).status, 401)
+
+  // The history covers the exact revisions before and after a draft edit, and
+  // the posting points to the approval of the version the accountant reviewed.
+  const history = await h.view(`activity?record=${draft.id}`)
+  const edit = at(history.audit, a => a.action === 'journal.edit'), posting = at(history.audit, a => a.action === 'journal.post')
+  const difference = JSON.parse(edit.detail)
+  assert.equal(edit.subject_revision, draft.revision)
+  assert.deepEqual([difference.before.revision, difference.before.lines[0].debit, difference.after.revision, difference.after.lines[0].debit], [reviewed, 90000, draft.revision, 95000])
+  assert.equal(posting.subject_revision, posted.revision)
+  assert.equal(posting.approval_id, approvals[0].id)
+  assert.equal(posting.approval.subject_revision, draft.revision)
+  assert.equal(posting.approval.actor_email, 'ann@example.test')
+  const today = posting.at.slice(0, 10)
+  const filtered = await h.view(`activity?${new URLSearchParams({ person: 'ann@example.test', record: draft.id, from: today, to: today })}`)
+  assert.deepEqual(filtered.audit.map(a => a.id), [posting.id])
+  assert.equal((await h.view(`activity?record=${draft.id}&person=bea%40example.test`)).audit.length, 2)
+  assert.equal((await h.view(`activity?record=${draft.id}&to=2000-01-01`)).audit.length, 0)
+  await h.view('activity?from=2026-10-02&to=2026-10-01', h.owner, 400)
+  await assert.rejects(h.db.prepare("UPDATE pt_audit SET action = 'hidden' WHERE id = ?").bind(posting.id).run(), /PANTRY_AUDIT_IMMUTABLE/)
+  await assert.rejects(h.db.prepare('DELETE FROM pt_audit WHERE id = ?').bind(posting.id).run(), /PANTRY_AUDIT_IMMUTABLE/)
+  await assert.rejects(h.db.prepare("UPDATE pt_approvals SET note = 'changed' WHERE id = ?").bind(approvals[0].id).run(), /PANTRY_AUDIT_IMMUTABLE/)
+
+  const business = (await h.view('state')).settings.entity
+  const revisedBusiness = await h.command('entity.save', { revision: business.revision, legalName: business.legal_name, entityType: business.entity_type, state: business.state, fiscalYearStart: business.fiscal_year_start, taxMethod: business.tax_method, booksStart: business.books_start, policies: 'Recognize revenue when invoiced; accountant reviews exceptions.' })
+  const settingsEvent = at((await h.view('activity?kind=entity&record=1')).audit, a => a.action === 'entity.update')
+  const settingsDifference = JSON.parse(settingsEvent.detail)
+  assert.equal(settingsEvent.subject_revision, revisedBusiness.revision)
+  assert.equal(settingsDifference.before.policies, business.policies)
+  assert.equal(settingsDifference.after.policies, revisedBusiness.policies)
+
+  // Agent preparation and the human approval are separate, connected events.
+  const proposed = await agent.call('proposals', { kind: 'journal', summary: 'Accrue documented legal work', payload: { date: '2026-09-30', memo: 'Agent-prepared legal accrual', documentId: doc.id, passages: ['September legal work, $900'], lines: [{ accountId: acct['6500'], debit: '900.00' }, { accountId: acct['3000'], credit: '900.00' }] } })
+  const decided = await h.command('proposal.decide', { id: proposed.id, revision: proposed.revision, decision: 'approve' }, ann)
+  const agentEvent = at((await h.view(`activity?record=${proposed.id}`)).audit, a => a.action === 'proposal.file')
+  assert.equal(agentEvent.actor_kind, 'agent'); assert.equal(agentEvent.subject_revision, proposed.revision)
+  const agentPosting = at((await h.view(`activity?record=${decided.result_id}`)).audit, a => a.action === 'journal.post')
+  assert.equal(agentPosting.actor_email, 'ann@example.test')
+  assert.equal(agentPosting.approval.subject_id, proposed.id)
+  assert.equal(agentPosting.approval.subject_revision, proposed.revision)
+
+  // A standing bank rule retains its author and exact rule revision as the
+  // authority behind the posting; it cannot masquerade as manual approval.
+  const { rule } = await h.command('bank-rule.save', { name: 'Routine bank fee', payee: 'AUDIT BANK FEE', direction: 'out', accountId: acct['6500'] })
+  const bank = await h.command('bank-account.save', { name: 'Audit checking', institution: 'Test bank', accountId: acct['1000'], numberLast4: '2847', routing: '', openingDate: '2026-08-31', openingBalance: '100.00' })
+  await h.command('statement.import', { bankAccountId: bank.id, fileName: 'audit-september.csv', content: 'Date,Description,Amount\n09/30/2026,AUDIT BANK FEE,-5.00\n', opening: '100.00', closing: '95.00', start: '2026-09-01', end: '2026-09-30', confirmLast4: '2847' })
+  const ruleEvent = at((await h.view('activity')).audit, a => a.action === 'bank-rule.file')
+  assert.equal(ruleEvent.origin_kind, 'rule')
+  assert.deepEqual([ruleEvent.authority_kind, ruleEvent.authority_id, ruleEvent.authority_revision], ['bank-rule', rule.id, rule.revision])
+  assert.equal(ruleEvent.approval_id, null)
+  assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM pt_audit_before').first()).n, 0, 'no transaction snapshot is left outside immutable history')
+  assert.ok((await h.view('activity')).audit.every(e => e.subject_revision), 'every new write has its record or stored history revision')
 })
 
 test('PAN-11 a posted entry is corrected by a linked reversal and its history survives', async t => {

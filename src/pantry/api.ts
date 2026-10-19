@@ -104,7 +104,7 @@ view('proposals', async ctx => ({ proposals: await proposalsView(ctx.db) }))
 view('questions/record', async (ctx, c) => ({ questions: await questionThreads(ctx.db, (await all(ctx.db, 'SELECT * FROM pt_questions WHERE subject_kind = ? AND subject_id = ? ORDER BY asked_at', c.req.query('kind') ?? '', c.req.query('id') ?? '')).map(parseQuestion)) }))
 view('questions', async (ctx, c) => questionsView(ctx, c.req.query('q') || undefined))
 view('move-in', async ctx => moveInView(ctx))
-view('activity', async ctx => activity(ctx.db))
+view('activity', async (ctx, c) => activity(ctx.db, c.req.query()))
 view('exemptions', async ctx => exemptionView(ctx.db))
 view('documents', async ctx => ({ documents: await documents(ctx.db) }))
 const year = (c: C) => { const y = Number(c.req.query('year') ?? new Date().getUTCFullYear()); requireThat(Number.isInteger(y) && y >= 2000 && y <= 2100, 'Choose a tax year'); return y }
