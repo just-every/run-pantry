@@ -494,3 +494,46 @@ test('CAPTURE-007 captured bills and paid receipts become approved revision-spec
   assert.deepEqual((await h.view('close/2026-09')).receipts.missing, [], 'all split expense entries carry the original source')
   const tb = await h.view('reports/trial-balance?to=2026-09-30'); assert.ok(tb.balanced)
 })
+
+test('BILL-002 captured draft reminders send once per pending revision and stop after owner approval', async t => {
+  const { model } = fakeModel(() => ({ receipt: true, vendor: 'Valley Electric LLC', invoiceNumber: 'VE-2043', date: '2026-09-15', total: '1850.00', tax: '100.00', currency: 'USD', category: '6000', note: '', draft: { kind: 'bill', dueDate: null, termsDays: null, lines: [{ description: 'Electrical repairs', amount: '1750.00', accountCode: '6000' }] } }))
+  const h = await harness({ outbound: model }); t.after(() => h.close())
+  const { acct } = await books(h)
+  await h.command('reader.save', { provider: 'anthropic', key: 'sk-ant-test-key-2043' })
+  const vendor = await h.command('contact.save', { kind: 'vendor', name: 'Valley Electric LLC', termsDays: 30, defaultAccountId: acct['6000'], defaultClass: '', is1099: false })
+  const photo = await capture(h, Buffer.from('Valley Electric bill VE-2043'))
+  let r = at((await h.view('receipts')).review, x => x.id === photo.id)
+  await h.command('receipt.vendor-confirm', { id: r.id, revision: r.revision, vendorId: vendor.id, vendorRevision: vendor.revision, confirm: true })
+  r = at((await h.view('receipts')).review, x => x.id === photo.id)
+  const fields = { id: r.id, revision: r.revision, kind: 'bill', date: r.read_date, total: '1850.00', tax: '100.00', invoiceNumber: 'VE-2043', termsDays: 30, lines: r.draftProposal.lines.map(l => ({ ...l, amount: (l.amount / 100).toFixed(2) })) }
+  let draft = (await h.command('receipt.draft-save', fields)).saved
+
+  const agePending = async () => h.db.prepare('UPDATE pt_capture_drafts SET updated_at = ? WHERE id = ?').bind(new Date(Date.now() - 86_401_000).toISOString(), draft.id).run()
+  await agePending()
+  await h.cron()
+  let reminders = await h.db.prepare('SELECT * FROM pt_capture_approval_reminders WHERE draft_id = ? ORDER BY revision').bind(draft.id).all()
+  assert.equal(reminders.results.length, 1)
+  assert.deepEqual([reminders.results[0].recipient, reminders.results[0].email_status, reminders.results[0].email_detail], ['owner@example.test', 'accepted', 'resend: test-1'])
+  let sent = h.mail.filter(m => m.subject.includes('captured bill needs approval'))
+  assert.equal(sent.length, 1)
+  assert.equal(sent[0].to[0], 'owner@example.test')
+  assert.match(sent[0].text, new RegExp(`${h.origin}/app/receipts#receipt-${r.id}`))
+  await h.cron()
+  await h.db.prepare("UPDATE pt_due_work SET started_at = '2000-01-01T00:00:00.000Z' WHERE id = 1").run()
+  await h.view('receipts')
+  assert.equal(h.mail.filter(m => m.subject.includes('captured bill needs approval')).length, 1, 'replaying cron and ordinary requests does not resend this revision')
+
+  draft = (await h.command('receipt.draft-save', { ...fields, draftRevision: draft.revision, lines: [{ ...fields.lines[0], description: 'Electrical repairs, reviewed' }] })).saved
+  await h.cron()
+  assert.equal(h.mail.filter(m => m.subject.includes('captured bill needs approval')).length, 1, 'editing gives the new revision a fresh day to be approved')
+  await agePending()
+  await h.cron()
+  reminders = await h.db.prepare('SELECT * FROM pt_capture_approval_reminders WHERE draft_id = ? ORDER BY revision').bind(draft.id).all()
+  assert.equal(reminders.results.length, 2, 'the edited revision has its own once-only reminder')
+  assert.equal(h.mail.filter(m => m.subject.includes('captured bill needs approval')).length, 2)
+
+  await h.command('capture-draft.approve', { id: draft.id, revision: draft.revision }, h.owner)
+  await agePending()
+  await h.cron()
+  assert.equal(h.mail.filter(m => m.subject.includes('captured bill needs approval')).length, 2, 'an approved draft is no longer eligible')
+})

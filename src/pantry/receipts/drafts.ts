@@ -43,8 +43,8 @@ const save: Command = { need: 'record', async run(c, b) {
     requireThat(!await one(c.db, 'SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = ? AND active = 1', line.id), 'This charge is already filed; attach the receipt to its existing posting instead', 409)
     statements.push(guard('NOT EXISTS (SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = ? AND active = 1)', line.id))
   }
-  if (previous) statements.push(q("UPDATE pt_capture_drafts SET payload = ?, bank_line_id = ?, status = 'draft', revision = ?, prepared_by = ?, approved_by = NULL, approved_revision = NULL WHERE id = ? AND revision = ? AND status <> 'posted'", JSON.stringify(p), p.bankLineId, revision, c.actor.email, id, previous.revision), changed())
-  else statements.push(q("INSERT INTO pt_capture_drafts (id, receipt_id, kind, bill_id, bank_line_id, payload, status, revision, prepared_by, created_at) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)", id, r.id, p.kind, billId, p.bankLineId, JSON.stringify(p), revision, c.actor.email, now()))
+  if (previous) statements.push(q("UPDATE pt_capture_drafts SET payload = ?, bank_line_id = ?, status = 'draft', revision = ?, prepared_by = ?, approved_by = NULL, approved_revision = NULL, updated_at = ? WHERE id = ? AND revision = ? AND status <> 'posted'", JSON.stringify(p), p.bankLineId, revision, c.actor.email, now(), id, previous.revision), changed())
+  else statements.push(q("INSERT INTO pt_capture_drafts (id, receipt_id, kind, bill_id, bank_line_id, payload, status, revision, prepared_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)", id, r.id, p.kind, billId, p.bankLineId, JSON.stringify(p), revision, c.actor.email, now(), now()))
   statements.push(audit(who(c.actor), 'capture-draft.save', 'capture-draft', id, { revision, before: previous ? JSON.parse(previous.payload) : null, after: p }))
   await run(c.db, statements)
   return documentDraftProposal(c.db, r)
