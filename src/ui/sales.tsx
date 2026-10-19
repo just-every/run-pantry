@@ -180,7 +180,7 @@ function Contacts() {
 
 export function Sales({ billId }: { billId?: string } = {}) {
   // Overview's Customers and vendors step opens this page at ?tab=contacts.
-  const [tab, setTab] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'contacts' ? 'Customers & vendors' : billId ? 'Bills' : typeof window !== 'undefined' && window.location.hash.startsWith('#bill-') ? 'Bills' : 'Invoices'), { data, error, reload } = useView<D>('sales'), shared = useShared()
+  const [tab, setTab] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'contacts' ? 'Customers & vendors' : typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'bills' ? 'Bills' : billId ? 'Bills' : typeof window !== 'undefined' && window.location.hash.startsWith('#bill-') ? 'Bills' : 'Invoices'), { data, error, reload } = useView<D>('sales'), shared = useShared()
   const refresh = async () => { await reload(); await shared.reload() }
   return <>
     <PageHead title="Sales & bills" lead="Invoices you send and follow up, recurring invoices, bills and their evidence, and payments." />

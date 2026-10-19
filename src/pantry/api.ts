@@ -30,6 +30,7 @@ import { salesTax } from './sales-tax'
 import { contractorCommands, contractors, necCsv } from './contractors'
 import { accountantPackage, ledgerCsv } from './package'
 import { packageZip } from './package-files'
+import { dashboard } from './dashboard'
 import { activity, actorView, documents, lookups, overview } from './views'
 import { ruleCommands, rulesView } from './rules'
 import { bankLinesView } from './bank-lines'
@@ -94,6 +95,7 @@ view('integrations', async (ctx, c) => { must(ctx.actor, 'owner'); return integr
 const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10)) => date(c.req.query(name) ?? fallback, name)
 
 view('vendors/:id/history', async (ctx, c) => vendorHistory(ctx.db, c.req.param('id')!))
+view('dashboard', async (ctx, c) => dashboard(ctx.db, day(c, 'to'), c.req.query('basis') ? basisOf(c.req.query('basis')) : undefined))
 view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await lookups(ctx.db)), overview: await overview(ctx.db), settings: await settingsView(ctx) }))
 view('recurring-journals', async ctx => recurringJournalsView(ctx.db))
 view('journal', async ctx => ({ entries: await journalView(ctx.db) }))

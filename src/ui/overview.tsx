@@ -1,4 +1,5 @@
 // Overview: the first-run checklist from completion evidence, and today's queue.
+import { DashboardSummary } from './dashboard-summary'
 import { FeedHealthNotices } from './bank-feeds'
 import { Link } from '@tanstack/react-router'
 import { Card, Chip, PageHead, useShared, type D } from './kit'
@@ -12,7 +13,8 @@ export function Overview() {
   const next = steps.find((s: D) => !s.done)?.key
   const work = [
     { n: queue.questions, label: 'Questions from Pantry', to: '/app/questions' },
-    { n: queue.journalDrafts + queue.invoiceDrafts, label: 'Drafts to review or post', to: '/app/books' },
+    { n: queue.journalDrafts, label: 'Drafts to review or post', to: '/app/books' },
+    { n: queue.invoiceDrafts, label: 'Invoice drafts to review', to: '/app/sales' },
     { n: queue.unmatchedLines, label: 'Unmatched statement lines', to: '/app/bank' },
     { n: queue.receipts, label: 'Receipts to review', to: '/app/receipts' },
     { n: queue.proposals, label: 'Agent proposals waiting', to: '/app/agents' },
@@ -21,6 +23,7 @@ export function Overview() {
   return <>
     <PageHead title={entity ? entity.legal_name : 'Get started with Pantry'} lead={!open ? 'Your books are set up. Here is what needs attention.' : 'Set up your books, move in your data, and complete your first close.'} />
     <FeedHealthNotices notices={state.overview.feedHealth} onDone={reload} />
+    <DashboardSummary />
     <div className="split split-wide-left">
       <Card title="Setup steps" actions={<span className="progress-count">{done} of {steps.length} complete</span>}>
         <span className="progress-bar" aria-hidden="true"><span style={{ width: `${(done / steps.length) * 100}%` }} /></span>

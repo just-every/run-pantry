@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { fakePlaid } from './plaid.mjs'
 import { at, books, harness } from './harness.mjs'
 
 // Juniper Lane Design's October 2026, the worked example in docs/REPORTS.md:
@@ -230,4 +231,64 @@ test('REPORT-003 indirect cash flow: activity, noncash adjustments, arbitrary pe
   await h.command('cash-flow.classify', { accountId: loan.id, class: 'investing' }, viewer, 403)
   await h.command('cash-flow.classify', { accountId: loan.id, class: 'cash' }, accountant, 400)
   await h.view('reports/cash-flow?from=2026-12-31&to=2026-10-01', h.owner, 400)
+})
+
+
+test('REPORT-008 dashboard figures tie to reports, waiting work has destinations, and a month lock advances books-current date', async t => {
+  const plaid = await fakePlaid()
+  const h = await harness({ bindings: plaid.bindings, outbound: plaid.outbound }); t.after(() => h.close())
+  const s = await october(h)
+  await s.issue('Willow Services', '2026-10-01', [{ description: 'Overdue work', quantity: '1', rate: '125.00', accountId: s.acct['4000'], taxCode: 'exempt' }], { dueDate: '2026-10-03' })
+  await h.command('bill.save', { vendorId: s.c['Brightline Software'].id, reference: 'OVERDUE', billDate: '2026-10-01', dueDate: '2026-10-05', lines: [{ description: 'Support', accountId: s.acct['6200'], amount: '75.00' }], post: true })
+  await h.command('capture-approval-rule.save', { minimum: '2500.00' })
+  await h.command('bill.save', { vendorId: s.c['Brightline Software'].id, reference: 'REVIEW', billDate: '2026-10-02', lines: [{ description: 'Annual plan', accountId: s.acct['6200'], amount: '3100.00' }] })
+  const connection = await h.command('feed.connect', { publicToken: 'synthetic-public-sandbox-b0e2c4ee-a763-4df5-bfe9-46a46bce993d', institution: { name: 'First Platypus Bank' } })
+  await h.command('feed.map', { itemId: connection.id, accounts: [{ id: at(connection.accounts, a => a.mask === '0000').id, bankAccountId: s.bank.id }] })
+  await h.command('books-agent.run', {})
+  const queue = (await h.view('state')).overview.queue
+  assert.ok(queue.unmatchedLines > 0 && queue.questions > 0)
+  let d = await h.view('dashboard?to=2026-10-31')
+  const provider = at(plaid.recorded['accounts-get'].accounts, a => a.mask === '0000')
+  assert.equal(d.cash.total, Math.round(provider.balances.current * 100)); assert.equal(d.cash.observed, 1)
+  assert.equal(d.basis, 'cash', 'declared business tax method picks the default')
+  for (const basis of ['cash', 'accrual']) {
+    d = await h.view(`dashboard?to=2026-10-31&basis=${basis}`)
+    for (const m of d.trend) {
+      const pl = await h.view(`reports/profit-and-loss?from=${m.from}&to=${m.to}&basis=${basis}`)
+      assert.deepEqual([m.income, m.expenses, m.netIncome], [pl.totalIncome, pl.totalExpenses, pl.netIncome])
+    }
+  }
+  const lines = (await h.view('bank/lines')).lines.filter(l => l.posted_date >= d.from && l.posted_date <= d.asOf)
+  assert.deepEqual(d.movements, { moneyIn: lines.filter(l => l.amount_cents > 0).reduce((n, l) => n + l.amount_cents, 0), moneyOut: -lines.filter(l => l.amount_cents < 0).reduce((n, l) => n + l.amount_cents, 0) })
+  assert.equal(d.overdue.receivables.amount, 12500)
+  assert.equal(d.overdue.payables.amount, 7500, 'a bill due on the as-of date is not overdue')
+  assert.equal(d.work.billsToApprove, 1); assert.ok(d.work.missingReceipts > 0)
+  assert.equal(d.work.missingByMonth.reduce((n, m) => n + m.count, 0), d.work.missingReceipts)
+  assert.equal(d.currentThrough, null)
+  plaid.state.loginRequired = true
+  await h.command('feed.sync', { itemId: connection.id })
+  assert.equal((await h.view('dashboard?to=2026-10-31')).work.brokenConnections, 1)
+  const viewer = await h.member('dashboard@example.test', 'viewer')
+  await h.view('dashboard?to=2026-10-31', viewer)
+  assert.equal((await h.send('/api/pantry/dashboard')).status, 401)
+
+  // A genuine close on a fresh business, without a bank balance standing in
+  // for reconciliation, advances the reported date only after the lock.
+  const fresh = await harness(); t.after(() => fresh.close()); const freshBooks = await books(fresh)
+  assert.equal((await fresh.view('dashboard?to=2026-10-31')).currentThrough, null)
+  let close = await fresh.command('close.tasks', { period: '2026-09' })
+  for (const task of close.tasks) close = await fresh.command('close.task', { id: task.id, revision: task.revision, done: true, note: 'Reviewed' })
+  await fresh.command('period.lock', { period: '2026-09' })
+  assert.deepEqual([(await fresh.view('dashboard?to=2026-10-31')).currentThrough, (await fresh.view('dashboard?to=2026-10-31')).currentSource], ['2026-09-30', 'locked'])
+  const bank = await fresh.command('bank-account.save', { name: 'Checking', institution: 'Community Bank', accountId: freshBooks.acct['1000'], numberLast4: '1234', openingDate: '2026-09-30', openingBalance: '0' })
+  const statement = await fresh.command('statement.import', { bankAccountId: bank.id, fileName: 'october.csv', content: 'Posting Date,Description,Amount\n10/15/2026,INTEREST,1.00\n', opening: '0', closing: '1', start: '2026-10-01', end: '2026-10-31', confirmLast4: '1234' })
+  const interest = at((await fresh.view('bank/lines')).lines, l => l.description === 'INTEREST')
+  await fresh.command('match.approve', { bankLineIds: [interest.id], create: [{ type: 'income', amount: '1', accountId: freshBooks.acct['4900'] }] })
+  await fresh.command('reconciliation.complete', { statementId: statement.statement.id })
+  const reconciled = await fresh.view('dashboard?to=2026-10-31')
+  assert.deepEqual([reconciled.currentThrough, reconciled.currentSource], ['2026-10-31', 'fully-reconciled'])
+  const reserve = await fresh.command('account.save', { code: '1010', name: 'Savings', type: 'asset', subtype: 'bank' })
+  await fresh.command('bank-account.save', { name: 'Savings', institution: 'Community Bank', accountId: reserve.id, numberLast4: '4321', openingDate: '2026-09-30', openingBalance: '0' })
+  assert.equal((await fresh.view('dashboard?to=2026-10-31')).currentThrough, '2026-09-30', 'one unreconciled account prevents a later fully-reconciled date')
+
 })
