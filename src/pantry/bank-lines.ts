@@ -5,6 +5,7 @@ import type { Data } from './core'
 import { all } from './db'
 import { recordedPaymentCandidates } from './recorded-payments'
 import { depositProposals } from './automatch'
+import { transferState } from './transfers'
 
 export async function bankLinesView(db: D1Database): Promise<Data> {
   const lines = await all(db, `SELECT l.id, l.bank_account_id, l.posted_date, l.amount_cents, l.description, l.payee, l.source, l.statement_id, l.feed_txn_id, l.removed_at, l.rules_off,
@@ -24,5 +25,6 @@ export async function bankLinesView(db: D1Database): Promise<Data> {
   }
   const pending = await all(db, `SELECT p.feed_txn_id AS id, p.txn_date AS posted_date, p.amount_cents, p.description, p.payee, f.bank_account_id, b.name AS bank_name
     FROM pt_feed_pending p JOIN pt_feed_accounts f ON f.id = p.feed_account_id JOIN pt_bank_accounts b ON b.id = f.bank_account_id ORDER BY p.txn_date DESC, p.feed_txn_id`)
-  return { recordedPayments: await recordedPaymentCandidates(db, lines), depositProposals: await depositProposals(db, lines), lines: lines.map(l => ({ ...l, filed_to: l.match_id ? filedTo.get(l.match_id) ?? [] : [] })), pending }
+  const transfers = new Map((await transferState(db)).map(t => [t.bank_line_id, t]))
+  return { recordedPayments: await recordedPaymentCandidates(db, lines), depositProposals: await depositProposals(db, lines), lines: lines.map(l => ({ ...l, transfer: transfers.get(l.id) ?? null, filed_to: l.match_id ? filedTo.get(l.match_id) ?? [] : [] })), pending }
 }

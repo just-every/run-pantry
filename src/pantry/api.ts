@@ -55,12 +55,13 @@ import { questionCommands, questionsView } from './questions/commands'
 import { integrationCommands, integrationSettings } from './integrations/credentials'
 import { integrations } from './integrations/routes'
 import { recurringJournalCommands, recurringJournalsView } from './recurring-journals'
+import { transferCommands } from './transfers'
 import { vendorHistory } from './vendor-history'
 import { billApprovalCommands } from './bill-approval'
 import { exemptionCommands, exemptionView } from './exemptions'
 
 const commands: Record<string, Command> = {
-  ...recurringJournalCommands, ...billApprovalCommands, ...exemptionCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,

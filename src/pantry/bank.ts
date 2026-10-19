@@ -9,6 +9,7 @@ import { parseCsvStatement, parseOfxStatement, type ParsedStatement } from './st
 import { applyRulesAs } from './rules'
 import { matchDeposits, matchRecorded } from './automatch'
 import { matchConnected } from './connected-match'
+import { matchTransfers, transferAvailableLines } from './transfers'
 import type { Command } from './context'
 
 const saveBankAccount: Command = { need: 'record', async run(c, b) {
@@ -88,7 +89,9 @@ const importStatement: Command = { need: 'record', async run(c, b) {
   // Stripe payouts and Gusto payrolls already booked meet their bank lines; deposits that name exactly one
   // open invoice of their amount match themselves, as do payments already recorded; rules then file what is left.
   await matchConnected(c.db)
-  const automatic = await matchDeposits(c.db, added.map(l => l.id)), recorded = await matchRecorded(c.db, added.map(l => l.id))
+  await matchTransfers(c.db)
+  const available = await transferAvailableLines(c.db, added.map(l => l.id))
+  const automatic = await matchDeposits(c.db, available), recorded = await matchRecorded(c.db, available)
   const filed = await applyRulesAs(c, added.map(l => l.id))
   return { statement: await one(c.db, 'SELECT * FROM pt_statements WHERE id = ?', id), duplicate: false, added: added.length, automatic, recorded, duplicates: keyed.length - fresh.length, fromFeed, filedByRule: filed.filed, fileBalances: { opening, closing, lineTotal: total, agrees: closing - opening === total } }
 } }

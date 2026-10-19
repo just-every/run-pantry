@@ -55,7 +55,7 @@ export async function postingFor(h, statementId, memo) {
   return at(r.postings, p => p.memo.includes(memo))
 }
 
-/** The September lines a person matches; the Cedar deposit, which names its recorded payment, matched itself on import. */
+/** People file the remaining September lines; the named Cedar payment and reciprocal transfer already matched themselves. */
 export async function matchSeptember(h, s, st) {
   const r = await h.view(`reconciliation/${st.checking.id}`)
   const ln = text => at(r.lines, l => l.description.includes(text))
@@ -63,13 +63,19 @@ export async function matchSeptember(h, s, st) {
   await h.command('match.approve', { bankLineIds: [ln('SERVICE FEE').id], create: [{ type: 'fee', amount: '12.00', accountId: s.acct['6400'], direction: 'out', memo: 'Monthly service fee' }] })
   await h.command('match.approve', { bankLineIds: [ln('BRIGHTLINE').id], create: [{ type: 'payment', amount: '640.00', contactId: s.c['Brightline Software'].id, allocations: [{ targetId: s.bills.brightline.id, amount: '640.00' }] }] })
   await h.command('match.approve', { bankLineIds: [ln('NORTHSTAR').id], create: [{ type: 'receipt', amount: '1500.00', contactId: s.c['Northstar Consulting'].id, allocations: [{ targetId: s.inv.northstar.id, amount: '1500.00' }] }] })
-  await h.command('match.approve', { bankLineIds: [ln('TRANSFER').id], create: [{ type: 'transfer', amount: '2000.00', otherBankAccountId: s.reserve.id, direction: 'out' }] })
   const square = r.postings.filter(p => p.memo.includes('Willow') || (p.memo.includes('Cedar') && p.entry_date === '2026-09-18'))
   assert.equal(square.length, 2)
   await h.command('match.approve', { bankLineIds: [ln('SQUARE').id], journalLineIds: square.map(p => p.id) })
   await h.command('match.approve', { bankLineIds: [ln('CHECK 2052').id], journalLineIds: [posting('Payment to Harbor').id] })
   const sv = await h.view(`reconciliation/${st.savings.id}`)
-  await h.command('match.approve', { bankLineIds: [at(sv.lines, l => l.description.includes('TRANSFER')).id], journalLineIds: [at(sv.postings, p => p.memo.includes('Transfer')).id] })
+  const transfers = (await h.view('bank/lines')).lines
+  const outgoing = at(transfers, l => l.id === ln('TRANSFER').id), incoming = at(transfers, l => l.id === at(sv.lines, x => x.description.includes('TRANSFER')).id)
+  assert.ok(outgoing.match_id && incoming.match_id)
+  assert.equal(outgoing.transfer.status, 'paired'); assert.equal(outgoing.transfer.pair_id, incoming.transfer.pair_id)
+  const transferEntries = (await h.view('journal')).entries.filter(e => e.lines.length === 2 && e.lines.some(l => l.account_id === s.reserve.account_id && l.debit_cents === 200000) && e.lines.some(l => l.account_id === s.checking.account_id && l.credit_cents === 200000))
+  assert.equal(transferEntries.length, 1, 'reciprocal statement lines produce exactly one balanced internal transfer')
+  assert.equal(transferEntries[0].id, outgoing.transfer.journal_id)
+  assert.equal(transferEntries[0].lines.reduce((n, l) => n + l.debit_cents - l.credit_cents, 0), 0)
   await h.command('match.approve', { bankLineIds: [at(sv.lines, l => l.description.includes('INTEREST')).id], create: [{ type: 'income', amount: '1.25', accountId: s.acct['4900'], direction: 'in', memo: 'Interest' }] })
 }
 

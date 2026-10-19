@@ -92,7 +92,8 @@ export async function rules(db: D1Database, { active = true } = {}): Promise<Rul
 
 /** Lines no match holds, the bank has not removed and no undo has taken out of rules. */
 const OPEN_LINES = `SELECT l.* FROM pt_bank_lines l WHERE l.removed_at IS NULL AND l.rules_off = 0
-  AND NOT EXISTS (SELECT 1 FROM pt_match_bank_lines m WHERE m.bank_line_id = l.id AND m.active = 1)`
+  AND NOT EXISTS (SELECT 1 FROM pt_match_bank_lines m WHERE m.bank_line_id = l.id AND m.active = 1)
+  AND NOT EXISTS (SELECT 1 FROM pt_transfer_halves h WHERE h.bank_line_id = l.id AND h.status IN ('pending', 'exception'))`
 
 /** Why a rule may not file this line now, or null. */
 async function blocked(db: D1Database, line: Data) {
@@ -122,6 +123,7 @@ export async function fileStatements(db: D1Database, rule: Rule, line: Data, fil
   const entryId = uid(), matchId = uid()
   return [filer.authority, periodOpen(line.posted_date), notReconciled(line),
     guard('NOT EXISTS (SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = ? AND active = 1)', line.id),
+    guard("NOT EXISTS (SELECT 1 FROM pt_transfer_halves WHERE bank_line_id = ? AND status IN ('pending', 'exception'))", line.id),
     guard('EXISTS (SELECT 1 FROM pt_bank_rules WHERE id = ? AND revision = ? AND active = 1)', rule.id, rule.revision),
     ...entryStatements({ id: entryId, date: line.posted_date, memo: `${memo} · by rule ${rule.name}`, sourceKind: 'bank', sourceId: line.id, preparedBy: filer.actor.email, preparedKind: 'person', lines }, filer.actor.email),
     q("INSERT INTO pt_matches (id, bank_account_id, status, proposal_id, note, approved_by, approved_at, revision, rule_id) VALUES (?, ?, 'approved', NULL, ?, ?, ?, ?, ?)", matchId, bank.id, `Filed by rule "${rule.name}"`, filer.actor.email, now(), uid(), rule.id),

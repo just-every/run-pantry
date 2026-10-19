@@ -1,0 +1,65 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { chromium } from '@playwright/test'
+import { worker, TOKEN } from './worker.mjs'
+
+test('RULE-004 transfers, card payment, missing-half exception and two-sided undo through Bank at 1440 and 390', async t => {
+  const app = await worker(); t.after(() => app.close())
+  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
+  const owner = await browser.newContext()
+  await owner.request.post(`${app.origin}/auth/bootstrap`, { headers: { origin: app.origin }, data: { token: TOKEN, displayName: 'Rosa Rivera' }, maxRedirects: 0 })
+  await owner.request.post(`${app.origin}/setup`, { headers: { origin: app.origin }, form: { confirm: 'yes' }, maxRedirects: 0 })
+  const command = async (op, data) => {
+    const r = await owner.request.post(`${app.origin}/api/pantry/command/${op}`, { headers: { origin: app.origin }, data })
+    assert.equal(r.status(), 200, await r.text()); return r.json()
+  }
+  await command('entity.save', { legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2026-01-01', policies: 'Revenue when invoiced.' })
+  await command('chart.start', {})
+  const state = await (await owner.request.get(`${app.origin}/api/pantry/state`)).json(), acct = Object.fromEntries(state.accounts.map(a => [a.code, a.id]))
+  const reserve = await command('account.save', { code: '1010', name: 'Reserve savings', type: 'asset', subtype: 'bank' })
+  const cardLedger = await command('account.save', { code: '2110', name: 'Business card', type: 'liability', subtype: 'bank' })
+  const banks = []
+  for (const [name, accountId, numberLast4] of [['Checking', acct['1000'], '1234'], ['Reserve', reserve.id, '4321'], ['Business card', cardLedger.id, '9876']]) banks.push(await command('bank-account.save', { name, institution: 'Community Bank', accountId, numberLast4, openingDate: '2026-08-31', openingBalance: '0' }))
+  const statement = async (bank, name, content, closing) => command('statement.import', { bankAccountId: bank.id, fileName: name, content: 'Posting Date,Description,Amount\n' + content, opening: '0', closing, start: '2026-09-01', end: '2026-09-30', confirmLast4: bank.number_last4 })
+  await statement(banks[0], 'checking.csv', '09/15/2026,TRANSFER TO RESERVE 4321,-2000.00\n09/16/2026,CARD PAYMENT 9876,-3412.07\n09/17/2026,TRANSFER TO RESERVE 4321 MISSING,-125.60\n', '-5537.67')
+  await statement(banks[1], 'savings.csv', '09/15/2026,TRANSFER FROM CHECKING 1234,2000.00\n', '2000.00')
+  await statement(banks[2], 'card.csv', '09/16/2026,PAYMENT RECEIVED CHECKING 1234,3412.07\n', '3412.07')
+  const signedIn = await owner.storageState()
+  for (const width of [1440, 390]) {
+    const context = await browser.newContext({ storageState: signedIn, viewport: { width, height: width === 390 ? 844 : 1000 } })
+    const page = await context.newPage(), errors = []; page.on('pageerror', e => errors.push(String(e)))
+    await page.goto(`${app.origin}/app/bank`)
+    await page.getByRole('heading', { name: 'Transactions', exact: true }).waitFor()
+    assert.equal(await page.getByText('Transfer paired', { exact: true }).count(), 4)
+    const overdue = page.getByRole('row', { name: /TRANSFER TO RESERVE 4321 MISSING/ })
+    await overdue.getByText('Transfer counterpart overdue', { exact: true }).waitFor()
+    assert.match(await overdue.innerText(), /To Reserve/)
+    assert.ok(!(await overdue.innerText()).includes('[object Object]'), 'the expected date renders as a date')
+    await overdue.getByRole('button', { name: 'Change account', exact: true }).click()
+    await overdue.getByLabel('Other account', { exact: true }).selectOption(banks[1].id)
+    await overdue.getByRole('button', { name: 'Save account', exact: true }).click()
+    await overdue.getByRole('button', { name: 'Change account', exact: true }).waitFor()
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    await page.screenshot({ path: `/tmp/sx-pantry-r4-transfer-${width}.png`, fullPage: true })
+    assert.deepEqual(errors, [])
+    await context.close()
+  }
+  const page = await owner.newPage(); await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto(`${app.origin}/app/bank`)
+  await page.getByRole('heading', { name: 'Transactions', exact: true }).waitFor()
+  await page.screenshot({ path: '/tmp/sx-pantry-r4-transfer-before-undo.png', fullPage: true })
+  const row = page.getByRole('row', { name: /TRANSFER TO RESERVE 4321 MISSING/ })
+  await row.getByRole('button', { name: 'Not a transfer', exact: true }).click()
+  await row.getByLabel('Reason', { exact: true }).fill('Bank description was incorrect; owner will categorise after source review')
+  await row.getByRole('button', { name: 'Release line', exact: true }).click()
+  await row.getByRole('button', { name: 'File it', exact: true }).waitFor()
+  const paired = page.getByRole('row', { name: /TRANSFER TO RESERVE 4321(?! MISSING)/ }).first()
+  await paired.getByRole('button', { name: 'Undo both matches', exact: true }).click()
+  await paired.getByLabel('Reason', { exact: true }).fill('Owner requested bank statement correction')
+  await paired.getByRole('button', { name: 'Undo transfer', exact: true }).click()
+  await paired.getByRole('button', { name: 'File it', exact: true }).waitFor()
+  const lines = (await (await owner.request.get(`${app.origin}/api/pantry/bank/lines`)).json()).lines
+  assert.equal(lines.filter(l => l.match_id).length, 2, 'only the card pair remains matched after transfer undo')
+  await page.screenshot({ path: '/tmp/sx-pantry-r4-transfer-undone-1440.png', fullPage: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.screenshot({ path: '/tmp/sx-pantry-r4-transfer-undone-390.png', fullPage: true })
+})

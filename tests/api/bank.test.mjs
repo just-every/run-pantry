@@ -27,8 +27,13 @@ test('PAN-07 CSV and OFX statements import against the right bank account, and r
   const sav = await h.command('statement.import', { bankAccountId: s.reserve.id, fileName: 'savings-2026-09.ofx', content: ofx })
   assert.deepEqual([sav.added, sav.statement.closing_cents, sav.statement.opening_cents, sav.statement.end_date], [2, 200125, 0, '2026-09-30'])
   await h.command('statement.import', { bankAccountId: s.reserve.id, fileName: 'savings.csv', content: 'Date,Description,Amount\n09/15/2026,Transfer,2000.00\n', opening: '0', closing: '2000', confirmLast4: '7730' }, h.owner, 409)
-  // Statements are evidence, not postings, and the exact file is kept.
-  assert.equal(await count(h, "SELECT COUNT(*) AS n FROM pt_journal_entries WHERE source_kind = 'bank'"), 0)
+  // The files remain exact evidence. Only their explicitly identified reciprocal
+  // transfer posts itself; unrelated statement lines still await a person.
+  const automaticTransfers = (await h.view('journal')).entries.filter(e => e.source_kind === 'bank')
+  assert.equal(automaticTransfers.length, 1)
+  assert.deepEqual(automaticTransfers[0].lines.map(l => [l.account_code, l.debit_cents, l.credit_cents]), [['1010', 200000, 0], ['1000', 0, 200000]])
+  const pairedLines = (await h.view('bank/lines')).lines.filter(l => l.transfer?.status === 'paired')
+  assert.equal(pairedLines.length, 2); assert.ok(pairedLines.every(l => l.match_id))
   const doc = await h.db.prepare('SELECT CAST(content AS TEXT) AS text FROM pt_documents WHERE id = ?').bind(first.statement.document_id).first()
   assert.equal(doc.text, csv)
   await h.command('statement.import', { ...base, fileName: 'bad.csv', content: 'When,What\n09/01/2026,x\n', confirmLast4: '4821' }, h.owner, 400)
@@ -43,7 +48,7 @@ test('PAN-08 statement lines match to the books through splits, fees, transfers 
   // The Cedar payment recorded on 3 September meets its bank line, which names Cedar, as the statement arrives: no new posting.
   const cedar = at(r.postings, p => p.memo.includes('Payment from Cedar Studio') && p.entry_date === '2026-09-03')
   assert.ok(ln('CEDAR STUDIO').automatic); assert.equal(ln('CEDAR STUDIO').match_id, cedar.match_id)
-  assert.equal(await entries(), before)
+  assert.equal(await entries(), before + 1, 'the reciprocal transfer posts once while the recorded Cedar payment posts nothing again')
   await h.command('match.approve', { bankLineIds: [ln('CEDAR STUDIO').id], journalLineIds: [cedar.id] }, h.owner, 409)
   const unbalanced = await h.send('/api/pantry/command/match.approve', { bankLineIds: [ln('SERVICE FEE').id], create: [{ type: 'fee', amount: '10.00', accountId: s.acct['6400'] }] }, { cookie: h.owner })
   assert.equal(unbalanced.status, 400); assert.match(unbalanced.value.error, /does not balance/)
@@ -192,7 +197,11 @@ test('BILL-003 bills paid by credit card or line of credit', async t => {
   assert.deepEqual(transfer.lines.map(l => [l.account_code, l.debit_cents, l.credit_cents]), [['2100', 70000, 0], ['1000', 0, 70000]])
   const statement = await h.command('statement.import', { bankAccountId: card.id, fileName: 'amex-october.csv', content: 'Posting Date,Description,Amount\n10/05/2026,ACME CONTRACTORS ACME-BATCH,-700.00\n10/10/2026,PAYMENT THANK YOU,700.00\n', opening: '0', closing: '0', start: '2026-10-01', end: '2026-10-31', confirmLast4: '3333' })
   const r = await h.view('reconciliation/' + statement.statement.id)
-  await h.command('match.approve', { bankLineIds: [at(r.lines, l => l.description === 'PAYMENT THANK YOU').id], journalLineIds: [at(r.postings, p => p.id === at(transfer.lines, l => l.account_code === '2100').id).id], create: [] })
+  const incomingTransfer = at(r.lines, l => l.description === 'PAYMENT THANK YOU')
+  assert.ok(incomingTransfer.match_id)
+  assert.equal(at(r.postings, p => p.id === at(transfer.lines, l => l.account_code === '2100').id).match_id, incomingTransfer.match_id)
+  const pairedTransfer = at((await h.view('bank/lines')).lines, l => l.id === incomingTransfer.id).transfer
+  assert.equal(pairedTransfer.created_entry, 0); assert.equal(pairedTransfer.journal_id, transfer.id)
   assert.equal((await h.view('journal')).entries.length, entries.length)
   assert.ok((await h.view('reconciliation/' + statement.statement.id)).ready)
   // The remaining partial bill can be funded from a line of credit the same way.

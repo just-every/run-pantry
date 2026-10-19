@@ -298,3 +298,163 @@ test('BANK-004 real Plaid sandbox: login failure and signed consent webhook reac
 
   t.diagnostic('Real Plaid sandbox: create/exchange/accounts/sync; reset_login -> ITEM_LOGIN_REQUIRED; update-mode Link token; signed PENDING_DISCONNECT delivered and verified with live provider key; owner emails accepted at mail network edge; dashboard/close/replay checks passed. Sandbox Item and disposable receiver removed.')
 })
+
+test('RULE-004 connected transfers and card payments pair once; missing halves wait, age, and resolve without income or expense', async t => {
+  const plaid = await fakePlaid()
+  let page, sequence = 0
+  const outbound = async request => {
+    if (new URL(request.url).pathname !== '/transactions/sync') return plaid.outbound(request)
+    const delivered = page ?? {}; page = undefined
+    return Response.json({ accounts: [], added: [], modified: [], removed: [], ...delivered, has_more: false, next_cursor: `transfer-${++sequence}` })
+  }
+  const h = await harness({ bindings: plaid.bindings, outbound }); t.after(() => h.close())
+  const { acct } = await books(h)
+  // Lock a real period through its public checklist before adding the banks.
+  let close = await h.command('close.tasks', { period: '2026-01' })
+  for (const task of close.tasks) await h.command('close.task', { id: task.id, revision: task.revision, done: true })
+  await h.command('period.lock', { period: '2026-01' })
+  acct['1010'] = (await h.command('account.save', { code: '1010', name: 'Savings', type: 'asset', subtype: 'bank' })).id
+  const bank = async (name, code, numberLast4) => h.command('bank-account.save', { name, accountId: acct[code], institution: 'First Platypus Bank', numberLast4, openingDate: '2025-12-31', openingBalance: '0' })
+  const checking = await bank('Operating checking', '1000', '0000'), savings = await bank('Savings', '1010', '1111'), card = await bank('Business card', '2100', '3333')
+  // Ordinary statement files identify the same internal movements before any
+  // live feed is mapped. Their later feed observations adopt the original lines.
+  const statement = async (bank, description, amount, last4) => h.command('statement.import', {
+    bankAccountId: bank.id, fileName: `transfer-${last4}.csv`, content: `Posting Date,Description,Amount\n09/21/2026,${description},${amount}\n`,
+    opening: '0', closing: amount, start: '2026-09-21', end: '2026-09-21', confirmLast4: last4,
+  })
+  await statement(checking, 'TRANSFER TO SAVINGS 1111', '-41.00', '0000')
+  const fileFirst = at((await h.view('bank/lines')).lines, l => l.description === 'TRANSFER TO SAVINGS 1111')
+  assert.equal(fileFirst.transfer.expected_account, 'Savings'); assert.equal(fileFirst.match_id, null)
+  await statement(savings, 'TRANSFER FROM OPERATING CHECKING 0000', '41.00', '1111')
+  const filePaired = at((await h.view('bank/lines')).lines, l => l.id === fileFirst.id)
+  assert.ok(filePaired.match_id); assert.equal(filePaired.transfer.status, 'paired')
+  assert.equal((await h.view('journal')).entries.length, 1)
+  const connection = await h.command('feed.connect', { publicToken: 'synthetic-transfer-token', institution: { name: 'First Platypus Bank' } })
+  const provider = Object.fromEntries(plaid.recorded['accounts-get'].accounts.map(a => [a.mask, a.account_id]))
+  await h.command('feed.map', { itemId: connection.id, accounts: [[checking, '0000'], [savings, '1111'], [card, '3333']].map(([b, mask]) => ({ id: at(connection.accounts, a => a.mask === mask).id, bankAccountId: b.id })) })
+  await h.command('bank-rule.save', { name: 'Transfer text must not be an expense', descriptionContains: 'TRANSFER', accountId: acct['6200'] })
+  const today = new Date().toISOString().slice(0, 10)
+  const txn = (id, mask, amount, name, date = today) => ({ transaction_id: id, account_id: provider[mask], amount, name, date, pending: false, iso_currency_code: 'USD' })
+  const deliver = async data => { page = data; return h.command('feed.sync', { itemId: connection.id }) }
+  const line = async id => at((await h.view('bank/lines')).lines, l => l.feed_txn_id === id)
+  const journal = async () => (await h.view('journal')).entries
+  await deliver({ added: [txn('file-first-observed-out', '0000', 41, 'TRANSFER TO SAVINGS 1111', '2026-09-21'), txn('file-first-observed-in', '1111', -41, 'TRANSFER FROM OPERATING CHECKING 0000', '2026-09-21')] })
+  assert.equal((await line('file-first-observed-out')).id, fileFirst.id)
+  assert.equal((await line('file-first-observed-out')).transfer.pair_id, filePaired.transfer.pair_id)
+  assert.equal((await journal()).length, 1, 'later feed observations retain the file pair without another posting')
+  const out = txn('checking-to-savings', '0000', 2000, 'TRANSFER TO SAVINGS 1111')
+  const cardOut = txn('checking-card-payment', '0000', 3412.07, 'BUSINESS CARD PAYMENT 3333')
+  const cardIn = txn('card-payment-received', '3333', -3412.07, 'PAYMENT THANK YOU')
+  await deliver({ added: [out, cardIn, cardOut] })
+  const waiting = await line(out.transaction_id)
+  assert.deepEqual([waiting.match_id, waiting.transfer.status, waiting.transfer.expected_account], [null, 'pending', 'Savings'])
+  assert.ok(waiting.transfer.due_date > today)
+  const paidCard = await line(cardIn.transaction_id), paidChecking = await line(cardOut.transaction_id)
+  assert.ok(paidCard.match_id && paidChecking.match_id)
+  assert.equal(paidCard.transfer.pair_id, paidChecking.transfer.pair_id)
+  assert.equal((await journal()).length, 2)
+  assert.deepEqual(at(await journal(), e => e.id === paidCard.transfer.journal_id).lines.map(l => [l.account_code, l.debit_cents, l.credit_cents]), [['2100', 341207, 0], ['1000', 0, 341207]])
+  const incoming = txn('savings-from-checking', '1111', -2000, 'TRANSFER FROM OPERATING CHECKING 0000')
+  await deliver({ added: [incoming] })
+  assert.ok((await line(out.transaction_id)).match_id)
+  assert.equal((await line(out.transaction_id)).transfer.pair_id, (await line(incoming.transaction_id)).transfer.pair_id)
+  assert.equal((await journal()).length, 3)
+  await deliver({ added: [out, incoming, cardOut, cardIn] })
+  assert.equal((await journal()).length, 3, 'provider replay never posts a transfer twice')
+  for (const basis of ['cash', 'accrual']) {
+    const pl = await h.view(`reports/profit-and-loss?from=2026-01-01&to=${today}&basis=${basis}`)
+    assert.deepEqual([pl.totalIncome, pl.totalExpenses], [0, 0])
+  }
+
+  // The same public pending flow shows a recent half and an overdue one.
+  const recent = txn('recent-half', '0000', 75, 'TRANSFER TO SAVINGS 1111')
+  const overdue = txn('overdue-half', '0000', 80, 'TRANSFER TO SAVINGS 1111', '2026-09-04')
+  await deliver({ added: [recent, overdue] })
+  assert.equal((await line(recent.transaction_id)).transfer.status, 'pending')
+  const old = await line(overdue.transaction_id)
+  assert.equal(old.transfer.status, 'exception'); assert.equal(old.transfer.expected_account, 'Savings')
+  assert.equal(old.transfer.due_date, '2026-09-14', 'Labor Day and the weekend are not banking business days')
+  assert.equal(old.match_id, null)
+  await h.cron()
+  assert.equal((await line(overdue.transaction_id)).transfer.status, 'exception')
+  const preview = await h.command('bank-rule.preview', { name: 'Do not recode held transfers', descriptionContains: 'TRANSFER', accountId: acct['6200'] })
+  assert.ok(!preview.files.some(l => l.id === old.id || l.id === (waiting.id)))
+  await h.command('bank-rule.save', { name: 'Broad transfer rule', descriptionContains: 'TRANSFER', accountId: acct['6200'], fileExisting: true })
+  assert.equal((await journal()).length, 3)
+
+  // A late arrival has no arbitrary transit-age cap: it resolves the old
+  // exception through the same unique account evidence.
+  await deliver({ added: [txn('late-counterpart', '1111', -80, 'TRANSFER FROM OPERATING CHECKING 0000')] })
+  const late = await line(overdue.transaction_id)
+  assert.ok(late.match_id); assert.equal(late.transfer.status, 'paired')
+  assert.equal(late.transfer.pair_id, (await line('late-counterpart')).transfer.pair_id)
+
+  // Equal amounts cannot choose between two outgoing halves. A reasoned
+  // dismissal releases only the unwanted candidate, then the real pair clears.
+  const ambiguousA = txn('ambiguous-a', '0000', 90, 'TRANSFER TO SAVINGS 1111')
+  const ambiguousB = txn('ambiguous-b', '0000', 90, 'TRANSFER TO SAVINGS 1111')
+  const ambiguousIn = txn('ambiguous-in', '1111', -90, 'TRANSFER FROM OPERATING CHECKING 0000')
+  await deliver({ added: [ambiguousA, ambiguousB, ambiguousIn] })
+  assert.equal((await line(ambiguousA.transaction_id)).match_id, null)
+  assert.equal((await line(ambiguousB.transaction_id)).match_id, null)
+  assert.equal((await line(ambiguousIn.transaction_id)).match_id, null)
+  const duplicate = await line(ambiguousB.transaction_id)
+  await h.command('transfer.dismiss', { bankLineId: duplicate.id, revision: duplicate.transfer.revision, reason: 'This payment went to an external savings account' })
+  await deliver({})
+  assert.ok((await line(ambiguousA.transaction_id)).match_id)
+  assert.equal((await line(ambiguousB.transaction_id)).transfer.status, 'dismissed')
+  assert.ok((await h.view('activity')).audit.some(a => a.action === 'transfer.dismiss' && a.subject_id === duplicate.id))
+
+  // Unknown account text needs an explicit account choice. Revision and role
+  // guards protect that choice, and the receipt then pairs with no guessing.
+  const unknown = txn('unknown-account', '0000', 18, 'ONLINE TRANSFER')
+  await deliver({ added: [unknown] })
+  let unknownLine = await line(unknown.transaction_id)
+  assert.equal(unknownLine.transfer.expected_account, null)
+  const viewer = await h.member('transfer-viewer@example.test', 'viewer')
+  const choose = { bankLineId: unknownLine.id, revision: unknownLine.transfer.revision, otherBankAccountId: savings.id }
+  await h.command('transfer.expect', choose, viewer, 403)
+  await h.command('transfer.expect', choose, '', 401)
+  await h.command('transfer.expect', choose)
+  await h.command('transfer.expect', choose, h.owner, 409)
+  await deliver({ added: [txn('unknown-arrived', '1111', -18, 'TRANSFER RECEIVED')] })
+  assert.ok((await line(unknown.transaction_id)).match_id)
+
+  // A person may already have booked the transfer from its first half. The
+  // later half reuses that entry instead of introducing another posting.
+  const manualOut = txn('manual-first-half', '0000', 19, 'TRANSFER TO SAVINGS 1111')
+  await deliver({ added: [manualOut] })
+  const m = await line(manualOut.transaction_id)
+  await h.command('match.approve', { bankLineIds: [m.id], create: [{ type: 'transfer', amount: '19.00', direction: 'out', otherBankAccountId: savings.id }] })
+  const beforeManualArrival = (await journal()).length
+  await h.cron()
+  await deliver({ added: [txn('manual-other-half', '1111', -19, 'TRANSFER FROM OPERATING CHECKING 0000')] })
+  const manuallyPaired = await line('manual-other-half')
+  assert.ok(manuallyPaired.match_id)
+  assert.equal(manuallyPaired.transfer.created_entry, 0)
+  assert.equal((await journal()).length, beforeManualArrival)
+
+  // A locked period remains unposted even when both sides are identifiable.
+  const lockedOut = txn('locked-transfer-out', '0000', 30, 'TRANSFER TO SAVINGS 1111', '2026-01-12')
+  const lockedIn = txn('locked-transfer-in', '1111', -30, 'TRANSFER FROM OPERATING CHECKING 0000', '2026-01-12')
+  await deliver({ added: [lockedOut, lockedIn] })
+  const locked = await line(lockedOut.transaction_id)
+  assert.equal(locked.match_id, null); assert.match(locked.transfer.blocked, /locked/)
+  await h.command('transfer.expect', { bankLineId: locked.id, revision: locked.transfer.revision, otherBankAccountId: savings.id }, h.owner, 409)
+  assert.equal((await journal()).length, beforeManualArrival)
+
+  // Undo is one reasoned action for both sides; direct one-sided undo fails.
+  await h.command('match.undo', { id: paidCard.match_id }, h.owner, 409)
+  await h.command('transfer.undo', { id: paidCard.transfer.pair_id, reason: 'Bank described the payment incorrectly' }, viewer, 403)
+  await h.command('transfer.undo', { id: paidCard.transfer.pair_id, reason: 'Bank described the payment incorrectly' })
+  assert.equal((await line(cardIn.transaction_id)).match_id, null)
+  assert.equal((await line(cardOut.transaction_id)).match_id, null)
+  assert.equal((await line(cardIn.transaction_id)).transfer.pair_status, 'undone')
+  const afterUndo = await journal()
+  assert.ok(at(afterUndo, e => e.id === paidCard.transfer.journal_id).reversed_by_id)
+  await deliver({ added: [cardIn, cardOut] })
+  assert.equal((await journal()).length, afterUndo.length, 'an explicitly undone pair stays for a person')
+  const removed = await line(recent.transaction_id)
+  await deliver({ removed: [{ transaction_id: recent.transaction_id }] })
+  assert.ok(!(await h.view('bank/lines')).lines.some(l => l.id === removed.id))
+})

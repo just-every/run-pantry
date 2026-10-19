@@ -13,6 +13,7 @@ import { all, guard, one, q, run, type Sql } from '../db'
 import { applyRules, authorFiler } from '../rules'
 import { matchDeposits, matchRecorded } from '../automatch'
 import { matchConnected } from '../connected-match'
+import { matchTransfers, transferAvailableLines } from '../transfers'
 import { availability, plaid, PlaidError, relinkMessage, type PlaidTransaction, type SyncPage } from './plaid'
 import { open } from './vault'
 import { checkFeedHealth } from './health'
@@ -121,8 +122,10 @@ export async function syncItem(env: Bindings, itemId: string, trigger: Trigger):
     // Booked Stripe payouts and Gusto payrolls meet their bank lines; deposits that name exactly one open
     // invoice of their amount match themselves; rules then file what is left.
     await matchConnected(db)
-    await matchDeposits(db, arrived.map(l => l.id))
-    await matchRecorded(db, arrived.map(l => l.id))
+    await matchTransfers(db)
+    const available = await transferAvailableLines(db, arrived.map(l => l.id))
+    await matchDeposits(db, available)
+    await matchRecorded(db, available)
     const filed = await applyRules(db, arrived.map(l => l.id), authorFiler)
     const waiting = Number((await one(db, 'SELECT COUNT(*) AS n FROM pt_feed_pending p JOIN pt_feed_accounts f ON f.id = p.feed_account_id WHERE f.item_id = ?', itemId))?.n ?? 0)
     await run(db, [q('UPDATE pt_feed_syncs SET finished_at = ?, added = ?, updated = ?, removed = ?, pending = ?, filed = ? WHERE id = ?', now(), arrived.length, counts.updated, counts.removed, waiting, filed.filed, syncId)])
