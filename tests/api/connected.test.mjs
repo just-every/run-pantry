@@ -16,7 +16,7 @@ const net = (tb, name) => tb.rows.find(r => r.name === name)?.net ?? 0
 const entriesFor = async (h, sourceId) => (await h.view('journal')).entries.filter(e => e.source_id === sourceId && e.status === 'posted')
 const lines = e => e.lines.map(l => [l.account_name, l.debit_cents, l.credit_cents]).sort((a, b) => a[0].localeCompare(b[0]) || a[1] - b[1] || a[2] - b[2])
 
-test('PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees and refunds through clearing, transfers the payout, matches the deposit and never books twice', async t => {
+test('REPORT-005 / PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees and refunds through clearing, transfers the payout, matches the deposit and never books twice', async t => {
   for (const invoiceFirst of [true, false]) {
   const KEY = 'sk_test_' + 'Z9y8X7w6V5u4T3s2R1q0P9o8'
   const payouts = await json('stripe/payouts.json'), items = await json('stripe/balance-transactions-po_1TestAutomatic.json')
@@ -74,12 +74,21 @@ test('PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees and refunds 
   const [entry] = await entriesFor(h, 'po_1TestAutomatic')
   assert.equal(entry.entry_date, new Date(payouts.data.find(p=>p.id==='po_1TestAutomatic').created*1000).toISOString().slice(0,10))
   assert.deepEqual(lines(entry), [['Operating checking',482848,0],['Stripe balance',0,482848]])
+  const payoutSource = await h.view(`reports/record/entry/${entry.id}`)
+  assert.ok(payoutSource.providerEvents.some(e => e.provider === 'Stripe' && e.kind === 'payout' && e.id === auto.id))
+  const invoiceSource = await h.view(`reports/record/invoice/${inv.id}`)
+  assert.ok(invoiceSource.providerEvents.some(e => e.kind === 'checkout' && e.evidence.payment_intent === 'pi_card'))
+  assert.ok(!JSON.stringify(payoutSource).includes(KEY)); assert.ok(!JSON.stringify(invoiceSource).includes(KEY))
+
   const clearing = await h.view('stripe/clearing')
   assert.equal(clearing.differenceCents,0); assert.ok(clearing.ok)
   assert.equal(at(clearing.items,i=>i.id==='txn_3TestCharge23').status,'adopted',invoiceFirst?'checkout-first receipt is adopted':'importer confirms checkout before recognizing the charge')
   assert.equal((await h.view('sales')).payments.filter(p=>p.reference==='pi_card').length,1)
   assert.equal(clearing.items.length,items.data.length)
   assert.ok(clearing.items.every(i=>['posted','adopted'].includes(i.status)))
+  const charge = clearing.items.find(i => i.status === 'posted' && i.entryId)
+  assert.ok((await h.view(`reports/record/entry/${charge.entryId}`)).providerEvents.some(e => e.kind === 'balance-transaction' && e.id === charge.id))
+
 
   // The deposit arrives on the statement and meets the payout by itself.
   const csv = csvOf([['10/08/2026', 'ACH DEPOSIT NORTHSTAR CONSULTING', 300, 300], ['10/09/2026', 'STRIPE TRANSFER ST-K7Q2M9X4 JUNIPER LANE', 4828.48, 5128.48]])
@@ -108,7 +117,7 @@ test('PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees and refunds 
   }
 })
 
-test('CLOSE-005 / PAYROLL-001 a Gusto payroll posts as one balanced entry (wages, employer taxes, withholdings, net pay) matched to its bank debits, once', async t => {
+test('REPORT-005 / CLOSE-005 / PAYROLL-001 a Gusto payroll posts as one balanced entry (wages, employer taxes, withholdings, net pay) matched to its bank debits, once', async t => {
   const [token, info, company, payrolls] = await Promise.all(['gusto/oauth-token.json', 'gusto/token-info.json', 'gusto/company.json', 'gusto/payrolls.json'].map(json))
   const GUSTO = { GUSTO_CLIENT_ID: 'demo-client-id', GUSTO_CLIENT_SECRET: 'demo-client-secret', GUSTO_ENV: 'demo' }
   const refreshes = [], live = new Set([token.access_token])
@@ -191,6 +200,8 @@ test('CLOSE-005 / PAYROLL-001 a Gusto payroll posts as one balanced entry (wages
   assert.equal(net(tb, 'Operating checking'), -(1000343 + 857650), 'the two debits, against no opening entry in this test')
   assert.equal((await h.view('connected')).gusto.connected.error, '')
 
+  const payrollSource = await h.view(`reports/record/entry/${p2.entry_id}`)
+  assert.ok(payrollSource.providerEvents.some(e => e.provider === 'Gusto' && e.kind === 'payroll' && e.id === p2.uuid && e.evidence.gross_cents === 820000))
   const yearEnd = await h.view('year-end/2026')
   assert.deepEqual(yearEnd.payroll.map(p => [p.uuid, p.ties]).sort(), [[p1.uuid, true], [p2.uuid, true], [p3.uuid, false]].sort())
   assert.equal(yearEnd.payrollTotals.gross, payrolls.filter(p => p.processed && !p.external).reduce((sum, p) => sum + Math.round(Number(p.totals.gross_pay) * 100), 0))

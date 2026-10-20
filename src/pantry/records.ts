@@ -1,3 +1,4 @@
+import { recordEvidence } from './record-evidence'
 // The records behind report lines: what each posting came from, the documents
 // attached to it and the bank statement lines it was matched to, and one view
 // of any invoice, credit, bill, payment or journal entry with everything linked
@@ -85,7 +86,7 @@ const entryView = async (db: D1Database, id: string | null) => {
 }
 
 /** One record with its lines, journal entries, linked records, documents and bank lines. */
-export async function recordView(db: D1Database, kind: string, id: string) {
+async function recordData(db: D1Database, kind: string, id: string) {
   const labels = await recordLabels(db), docs = await attachments(db), bank = await bankMatches(db)
   const ref = (k: RecordRef['kind'], i: string, note = ''): Data => ({ kind: k, id: i, label: labels.label(k, i), note })
   if (kind === 'invoice') {
@@ -129,4 +130,10 @@ export async function recordView(db: D1Database, kind: string, id: string) {
   const links = [source, e.reversed_by_id ? ref('entry', e.reversed_by_id, 'Reversed by') : null].filter(Boolean)
   return { kind, id, title: labels.label('entry', id), date: e.entry_date, status: e.status, total: e.lines.reduce((s: number, l: Data) => s + l.debit_cents, 0),
     lines: [], entries: [await entryView(db, id)], links, documents: docs.forRecords([{ kind: 'entry', id }], e.document_id), bank: bank.forEntry(id) }
+}
+
+/** Report and export share the exact same transaction and evidence reader. */
+export async function recordView(db: D1Database, kind: string, id: string) {
+  const record = await recordData(db, kind, id)
+  return { ...record, ...await recordEvidence(db, record) }
 }

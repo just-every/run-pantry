@@ -1,3 +1,4 @@
+import { figureExport, recordExport } from './detail-export'
 // Pantry's HTTP surface. People use /api/pantry/* with their native session;
 // agents use /api/pantry/agent/* with a bearer token the owner issued. Every
 // route resolves its actor and checks the capability before any work.
@@ -169,6 +170,16 @@ api.get('/api/pantry/budgets/:id/report.csv', async c => {
   return new Response(budgetCsv(r), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="budget-actual.csv"', 'cache-control': 'no-store' } })
 })
 view('recognition', async (ctx, c) => recognitionView(ctx.db, day(c, 'to')))
+api.get('/api/pantry/reports/detail/export', async c => {
+  const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
+  const entity = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
+  const detail = await figureDetail(ctx.db, { report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: await reportBasis(ctx.db, c.req.query('basis')) }, Number(entity?.fiscal_year_start ?? 1))
+  return figureExport(detail, c.req.query())
+})
+api.get('/api/pantry/reports/record/:kind/:id/export', async c => {
+  const ctx = await reader(c)
+  return recordExport(await recordView(ctx.db, c.req.param('kind')!, c.req.param('id')!), c.req.query())
+})
 view('reports/detail', async (ctx, c) => {
   const to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')

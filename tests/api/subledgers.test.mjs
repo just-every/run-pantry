@@ -300,7 +300,7 @@ test('ITEM-001 products and services carry income accounts and tax categories on
 })
 
 
-test('BILL-001 captured bill visits every lifecycle state, credits and three recurring rent drafts keep payables tied', async t => {
+test('REPORT-005 / BILL-001 captured bill visits every lifecycle state, credits and three recurring rent drafts keep payables tied', async t => {
   const h = await harness(); t.after(() => h.close())
   h.capture = async form => {
     const response = await fetch(`${h.origin}/api/pantry/receipts/capture`, { method: 'POST', headers: { origin: h.origin, cookie: h.owner }, body: form })
@@ -308,6 +308,14 @@ test('BILL-001 captured bill visits every lifecycle state, credits and three rec
   }
   const { billLifecycleScenario } = await import('./bill-lifecycle-scenario.mjs')
   const { billId } = await billLifecycleScenario(h)
+  const record = await h.view(`reports/record/bill/${billId}`)
+  const captured = record.audit.find(a => a.action === 'capture-draft.post')
+  assert.ok(captured?.approval)
+  assert.equal(captured.approval.action, 'approve-document-draft')
+  assert.equal(captured.approval.subject_revision, JSON.parse(captured.detail).revision)
+  assert.ok(record.audit.some(a => a.action === 'capture-draft.approve'))
+  assert.ok(record.approvals.some(a => a.id === captured.approval.id))
+
   const viewer = await h.member('bills-viewer@example.test', 'viewer')
   await h.command('bill.schedule', { id: billId, date: '2026-09-30' }, viewer, 403)
   await h.command('recurring-bill.generate', { through: '2026-09-30' }, viewer, 403)

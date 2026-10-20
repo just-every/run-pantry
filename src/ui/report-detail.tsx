@@ -1,3 +1,4 @@
+import { RecordHistory } from './record-history'
 // A report figure opened to the lines behind it, and any record opened from
 // there with its documents, journal entries, linked records and bank lines.
 // Each level is an address, so every step links onward and back.
@@ -19,6 +20,7 @@ const Bank = ({ lines }: { lines: D[] }) => lines.length ? <>{lines.map(b => <sp
 export function FigureDetail({ report, line, from, to, basis, reportLabel }: { report: string; line: string; from: string; to: string; basis: 'cash' | 'accrual'; reportLabel: string }) {
   const search = useSearch({ from: '/app/reports' })
   const { data: d, error } = useView<D>(`reports/detail?report=${report}&line=${encodeURIComponent(line)}&from=${from}&to=${to}&basis=${basis}`)
+  const exportQuery = new URLSearchParams(Object.entries({ ...search, report, line, from, to, basis }).filter(([, value]) => value !== undefined) as [string, string][]).toString()
   const back = <Link to="/app/reports" search={{ ...search, line: undefined, record: undefined }}>{reportLabel}</Link>
   if (!d) return <><nav className="crumbs" aria-label="Report">{back}</nav><Loading error={error} what="the records behind this figure" /></>
   const accounts = new Set(d.rows.map((r: D) => r.account.id)).size > 1
@@ -27,6 +29,7 @@ export function FigureDetail({ report, line, from, to, basis, reportLabel }: { r
     <Card title={<>{d.label} <Chip tone="info">{BASIS_NAME[basis]}</Chip></>} actions={<strong className="figure-total">{usd(d.figure)}</strong>}>
       <p>{d.from ? <>{day(d.from)} to {day(d.to)}</> : <>All posted activity through {day(d.to)}</>} · {d.rows.length} line{d.rows.length === 1 ? '' : 's'} · {d.ties ? <Chip tone="good">Adds up to the report figure</Chip> : <Chip tone="bad">Does not add up to the report figure</Chip>}</p>
       {basis === 'cash' && <p className="hint">On the cash basis an invoice, credit or bill counts as it is paid or credited: each line below is the share of a document its settlement covered, spread across the document's lines.</p>}
+      <p><a href={`/api/pantry/reports/detail/export?${exportQuery}`}>Export source lines CSV</a></p>
       <AskAccountant key={JSON.stringify({ report, line, from, to, basis })} subjectKind="report-line" subjectId={JSON.stringify({ report, line, from, to, basis })} label={`${reportLabel} · ${d.label} · ${from || 'Beginning'} to ${to} · ${BASIS_NAME[basis]} · ${usd(d.figure)}`} />
       <Table heads={['Date', 'Record', 'What', ...(accounts ? ['Account'] : []), 'Documents', 'Bank', 'Amount']} figures={[accounts ? 6 : 5]} empty="No posted lines behind this figure.">
         {[...d.rows.map((r: D) => <tr key={r.key}>
@@ -54,6 +57,7 @@ export function RecordView({ record, reportLabel }: { record: string; reportLabe
   if (!r) return <>{crumbs}<Loading error={error} what="the record" /></>
   return <>
     {crumbs}
+    <p><a href={`/api/pantry/reports/record/${kind}/${id}/export?${new URLSearchParams(Object.entries(search).filter(([, value]) => value !== undefined) as [string, string][]).toString()}`}>Export record JSON</a></p>
     <div className="split split-wide-left">
       <div className="stack">
         <Card title={r.title} actions={<Chip tone={r.status === 'reversed' || r.status === 'void' ? 'warn' : 'good'}>{STATUS[r.status] ?? r.status}</Chip>}>
@@ -80,6 +84,7 @@ export function RecordView({ record, reportLabel }: { record: string; reportLabe
       <div className="stack">
         <Card title="Linked records">{r.links.length ? <ul className="plain">{r.links.map((l: D) => <li key={`${l.kind}:${l.id}`}><RecordLink r={l} />{l.note && <small className="sub"> · {l.note}</small>}</li>)}</ul> : <p>Nothing else is linked to this record.</p>}</Card>
         <Card title="Documents">{r.documents.length ? <ul className="plain">{r.documents.map((d: D) => <li key={d.id}><a href={`/api/pantry/documents/${d.id}`}>{d.name}</a></li>)}</ul> : <p>No document is attached.</p>}</Card>
+        <RecordHistory record={r} />
         <Card title="Bank statement lines">{r.bank.length ? <ul className="plain">{r.bank.map((b: D) => <li key={b.id}>{day(b.date)} · {b.description} · {usd(b.amount)} · {b.bank} · {b.reconciled ? 'reconciled' : 'matched, not yet reconciled'}{b.statementDocumentId && <> · <a href={`/api/pantry/documents/${b.statementDocumentId}`}>statement file</a></>}</li>)}</ul> : <p>Not matched to a statement line yet.</p>}</Card>
       </div>
     </div>

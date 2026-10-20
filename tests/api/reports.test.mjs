@@ -7,7 +7,7 @@ import { at, books, harness } from './harness.mjs'
 // INV-0001 $1,053.25 (600.00 design + 8.875% NYC tax, 400.00 workshop) half paid in
 // October and the rest in November; INV-0002 $2,000.00 paid in November; a $640.00
 // software bill paid by check in October; $1,300.00 rent unpaid; a $12.00 bank fee.
-async function october(h) {
+async function october(h, approveBills = false) {
   const { acct } = await books(h)
   acct['4100'] = (await h.command('account.save', { code: '4100', name: 'Workshop revenue', type: 'income' })).id
   const bank = await h.command('bank-account.save', { name: 'Operating checking', institution: 'Chase', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-09-30', openingBalance: '10000.00' })
@@ -27,7 +27,12 @@ async function october(h) {
     { description: 'Brand workshop', quantity: '1', rate: '400.00', accountId: acct['4100'], taxCode: 'exempt' }])
   assert.equal(a.total_cents, 105325)
   const b = await issue('Northstar Consulting', '2026-10-10', [{ description: 'Quarterly retainer', quantity: '1', rate: '2000.00', accountId: acct['4000'], taxCode: 'exempt' }])
-  const bill = (vendor, reference, date, account, amount) => h.command('bill.save', { vendorId: c[vendor].id, reference, billDate: date, lines: [{ description: reference, accountId: acct[account], amount }], post: true })
+  const bill = async (vendor, reference, date, account, amount) => {
+    const result = await h.command('bill.save', { vendorId: c[vendor].id, reference, billDate: date, lines: [{ description: reference, accountId: acct[account], amount }], post: !approveBills })
+    if (!approveBills) return result
+    await h.command('bill.approve', { id: result.id, revision: result.revision, note: 'Reviewed vendor invoice and software seats' })
+    return h.command('bill.record', { id: result.id, revision: result.revision })
+  }
   const x = await bill('Brightline Software', 'BL-1042', '2026-10-02', '6200', '640.00'), y = await bill('Harbor Office Rentals', 'R-1026', '2026-10-01', '6100', '1300.00')
   const pay = (direction, contact, date, amount, targetId, method) => h.command('payment.record', { direction, contactId: c[contact].id, date, amount, bankAccountId: bank.id, method, reference: `${method.toUpperCase()} ${date}`, allocations: [{ targetId, amount }] })
   const paid = { a1: await pay('received', 'Cedar Studio', '2026-10-20', '500.00', a.id, 'ach'), x: await pay('paid', 'Brightline Software', '2026-10-15', '640.00', x.id, 'check'),
@@ -119,7 +124,7 @@ test('REPORT-002 cash or accrual: one switch reads the same books both ways, par
 
 test('REPORT-005 every P&L and balance sheet figure opens to its records, documents and bank lines, and ties to the figure', async t => {
   const h = await harness(); t.after(() => h.close())
-  const s = await october(h)
+  const s = await october(h, true)
   await h.command('document.upload', { name: 'brightline-bl-1042.pdf', mediaType: 'application/pdf', base64: Buffer.from('%PDF-1.4 Brightline BL-1042 $640.00\n').toString('base64'), linkedKind: 'bill', linkedId: s.bills.x.id })
   const statement = 'Details,Posting Date,Description,Amount,Type,Balance,Check or Slip #\nDEBIT,10/16/2026,"CHECK 1001 BRIGHTLINE",-640.00,CHECK_PAID,9360.00,1001\nCREDIT,10/21/2026,"DEPOSIT CEDAR STUDIO ACH",500.00,ACH_CREDIT,9860.00,\nDEBIT,10/29/2026,"WIRE FEE",-15.00,FEE_TRANSACTION,9845.00,\n'
   const imported = await h.command('statement.import', { bankAccountId: s.bank.id, fileName: 'checking-2026-10.csv', content: statement, opening: '10000.00', closing: '9845.00', start: '2026-10-01', end: '2026-10-30', confirmLast4: '4821' })
@@ -159,6 +164,28 @@ test('REPORT-005 every P&L and balance sheet figure opens to its records, docume
   assert.deepEqual([payment.method, payment.links[0].id, payment.bank[0].description], ['check', s.bills.x.id, 'CHECK 1001 BRIGHTLINE'])
   const doc = await h.send(`/api/pantry/documents/${record.documents[0].id}`, undefined, { cookie: h.owner })
   assert.equal(doc.status, 200)
+  const approval = at(record.approvals, a => a.subject_id === s.bills.x.id && a.action === 'bill.approve')
+  assert.equal(approval.decision, 'approved'); assert.equal(approval.actor_email, 'owner@example.test')
+  assert.equal(approval.note, 'Reviewed vendor invoice and software seats')
+  const approvedEvent = at(record.audit, a => a.action === 'bill.approve')
+  assert.equal(approvedEvent.approval.id, approval.id); assert.equal(approvedEvent.subject_revision, approval.subject_revision)
+  assert.ok(record.audit.some(a => a.action === 'bill.record'))
+  assert.ok(payment.audit.some(a => a.subject_kind === 'payment' && a.subject_id === s.paid.x.id))
+  const context = `report=profit-and-loss&line=${s.acct['6200']}&${OCT}&basis=accrual&account=${s.acct['6200']}&payee=${s.c['Brightline Software'].id}`
+  const exported = await h.send(`/api/pantry/reports/detail/export?${context}`, undefined, { cookie: h.owner })
+  assert.equal(exported.status, 200); assert.equal(exported.headers.get('x-pantry-basis'), 'Accrual basis')
+  // Parse quoted CSV cells (including doubled quotes in nested evidence), then add exact cents.
+  const cells = line => [...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m => m[1].replaceAll('""', '"'))
+  const csvRows = exported.value.trim().split('\r\n').map(cells)
+  assert.equal(csvRows.slice(1).reduce((sum, row) => sum + Number(row[5]), 0), software.figure)
+  assert.equal(JSON.parse(csvRows[1][11]).payee, s.c['Brightline Software'].id)
+  assert.equal(Number(csvRows[1][6]), software.figure); assert.equal(Number(csvRows[1][7]), software.total)
+  for (const [kind, id, expected] of [['bill', record.id, record], ['payment', payment.id, payment], ['entry', record.entries[0].id, await h.view(`reports/record/entry/${record.entries[0].id}`)]]) {
+    const output = await h.send(`/api/pantry/reports/record/${kind}/${id}/export?${context}`, undefined, { cookie: h.owner })
+    assert.equal(output.status, 200); assert.deepEqual(output.value.record, expected)
+    assert.deepEqual(output.value.context, Object.fromEntries(new URLSearchParams(context)))
+  }
+  for (const path of [`reports/detail/export?${context}`, `reports/record/bill/${record.id}/export`]) assert.equal((await h.send(`/api/pantry/${path}`)).status, 401)
   await h.view('reports/detail?report=profit-and-loss&line=nothing&' + OCT, h.owner, 404)
 })
 

@@ -566,7 +566,7 @@ test('RULE-004 connected transfers and card payments pair once; missing halves w
   assert.ok(!(await h.view('bank/lines')).lines.some(l => l.id === removed.id))
 })
 
-test('BANK-005 reconciliation from feeds and statements', async t => {
+test('BANK-005 reconciliation from feeds and statements / REPORT-005 retained Plaid event', async t => {
   const { statementProvider } = await import('./statement-provider.mjs')
   const { createHash } = await import('node:crypto')
   const provider = await statementProvider(), h = await harness({ bindings: provider.bindings, outbound: provider.outbound }); t.after(() => h.close())
@@ -634,6 +634,9 @@ test('BANK-005 reconciliation from feeds and statements', async t => {
   provider.state.cardBalance = 40; await h.command('feed.sync', { itemId: connected.id })
   await h.command('reconciliation.complete', { statementId: cardSt.id }, h.owner, 409)
   provider.state.cardBalance = 50; await h.command('feed.sync', { itemId: connected.id })
+  const cardPaymentEntry = (await h.view(`reports/detail?report=balance-sheet&line=${cardLedger.id}&from=2026-12-01&to=2026-12-31&basis=accrual`)).rows[0].entry.id
+  const cardSource = await h.view(`reports/record/entry/${cardPaymentEntry}`)
+  assert.ok(cardSource.providerEvents.some(e => e.provider === 'Plaid' && e.id === 'statement-card-charge'))
   const cardProof = await h.command('reconciliation.complete', { statementId: cardSt.id })
   assert.equal(cardProof.completed.closing_cents, -5000); assert.equal(cardProof.difference, 0)
 })

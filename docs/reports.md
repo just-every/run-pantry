@@ -70,3 +70,11 @@ Choose any amount, including a section total, net change or cash balance, to see
 
 
 From **Close → Fiscal year-end**, choose the calendar year in which the fiscal year ends. Review calculated earnings on both sides of the year boundary, the current 1099 readiness and recorded Gusto totals, and every monthly close. In **Books → Journal entries**, flag an adjusting draft and date it at fiscal year end; its designation is reviewed with the exact draft and cannot change once posted. The year-end view lists the posted adjustments and downloads their PDF. Complete the final month’s 1099 and payroll review tasks, resolve all monthly checks, then lock the fiscal year to lock all twelve months together. Reopen a month through the existing request/approval path if it needs correction. These checks use Pantry’s records and do not certify external payroll or tax filings.
+
+## Source evidence and downloads
+
+On a P&L or balance-sheet figure, **Export source lines CSV** downloads the same rows and signed integer-cent amounts as the screen, with the figure total, basis, range and report context. On a native bill, invoice, payment or journal record, **Export record JSON** includes its entries, links, documents, bank lines, exact approvals, audit history and retained provider event IDs. These reads use the same financial permissions as the report. No provider event is claimed when none is linked.
+
+Follow **Linked records** from a bill to its payment and bank evidence. Approvals include the revision, decision, actor and note; audit details retain the approval actually relied on. Stripe checkout/balance transactions/payouts, Gusto payroll and matched Plaid feed transactions show the provider evidence Pantry retained, rather than claiming a fresh provider validation.
+
+REPORT-005 remains partial: the remaining report figures, filters across those doors and exports at custom/cash-flow and other drill levels are still outstanding.
