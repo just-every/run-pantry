@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "12448d6d5151e219af24e46766152139724a5f2e6f0c143ab3fb026a1ecd52ea",
+      "sha256": "48d9d7ab8fca51a37b8203f50974a2f15a2d86c3407849b26ff153d31b208ba2",
       "executable": false
     },
     "DEMO.md": {
@@ -3000,7 +3000,7 @@
       "executable": false
     },
     "src/pantry/discounts.ts": {
-      "sha256": "7148fa5358efa2584e86e8b8816fb9f9c8a2fd30b21eef365a21b031ba3f44a1",
+      "sha256": "9be41eefab95c03694738bae8fbdc46981cf3c6d383627016323c0b9fff3a940",
       "executable": false
     },
     "src/pantry/documents.ts": {
@@ -4160,7 +4160,7 @@
       "executable": false
     },
     "tests/api/invoices-out.test.mjs": {
-      "sha256": "1c411e48fbd271886db979e33f69d1f62147e6a70b7c78f82df1f87e8f96b2fc",
+      "sha256": "160f2e7c076ab7489bdccdcccaedd7ebe30663481a8b45eefa2db944a5d639bf",
       "executable": false
     },
     "tests/api/ledger.test.mjs": {

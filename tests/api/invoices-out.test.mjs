@@ -445,8 +445,8 @@ test('INVOICE-010 discounts, delivery charges and deposits on the invoice: tax o
   draft = await h.command('invoice.save-draft', { ...body, id: draft.id, revision: draft.revision })
   assert.equal(draft.discount_account_id, discounts.id)
 
-  // Refusals: delivery is not discounted, a credit carries no discount, a deposit is no more than the total and dated at issue.
-  for (const bad of [{ discounts: [{ type: 'percent', value: '10', lines: [2] }] }, { discounts: [{ type: 'percent', value: '0' }] }, { discounts: [{ type: 'amount', value: '1000.01', lines: [1] }] },
+  // Refusals: a discount names lines of the invoice, a credit carries no discount, a deposit is no more than the total and dated at issue.
+  for (const bad of [{ discounts: [{ type: 'percent', value: '10', lines: [3] }] }, { discounts: [{ type: 'percent', value: '0' }] }, { discounts: [{ type: 'amount', value: '1000.01', lines: [1] }] },
     { deposit: { ...body.deposit, amount: '1017.56' } }, { deposit: { ...body.deposit, date: '2026-11-03' } }, { deposit: { ...body.deposit, method: 'barter' } }])
     await h.command('invoice.save-draft', { ...body, ...bad }, h.owner, 400)
 
@@ -490,6 +490,9 @@ test('INVOICE-010 discounts, delivery charges and deposits on the invoice: tax o
   const otherIssued = await h.command('invoice.issue', { id: (await h.command('invoice.approve', { id: other.id, revision: other.revision })).id })
   assert.deepEqual(at((await h.view('journal')).entries, e => e.id === otherIssued.journal_id).lines.map(l => [l.account_code, l.debit_cents, l.credit_cents]),
     [['1200', 28851, 0], ['4000', 0, 20000], ['4000', 0, 10000], ['4950', 3500, 0], ['2200', 0, 2351]])
+  // A discount on chosen lines may name the delivery charge, which a subtotal discount never reaches.
+  const freeDelivery = await h.command('invoice.save-draft', { ...body, deposit: undefined, discounts: [{ type: 'percent', value: '10' }, { type: 'percent', value: '100', lines: [2] }] })
+  assert.deepEqual(freeDelivery.lines.map(l => [l.discount_cents, l.tax_cents]), [[10000, 7425], [4000, 0]])
   const credit = { kind: 'credit', creditFor: otherIssued.id, customerId: customer, issueDate, dueDate: issueDate, lines: [line('Allowance', '10.00', acct['4000'])] }
   await h.command('invoice.save-draft', { ...credit, discounts: [{ type: 'amount', value: '1.00' }] }, h.owner, 400)
   await h.command('invoice.save-draft', { ...credit, lines: [{ ...credit.lines[0], kind: 'delivery' }] }, h.owner, 400)

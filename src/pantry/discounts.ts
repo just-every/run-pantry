@@ -1,11 +1,12 @@
 // INVOICE-010 discounts, delivery charges and deposits. A discount is a
-// percentage or an amount on the subtotal of the item lines or on chosen item
-// lines. Before tax (the default) it is spread over its lines by largest
-// remainder and each line's tax is on its amount less its share; after tax it
-// leaves every line's tax on the undiscounted price. Either way it posts to the
-// discounts account the accountant chose. A delivery charge is a line with its
-// own tax code that subtotal discounts never reach. A deposit received at issue
-// becomes a payment applied to the invoice when it is issued.
+// percentage or an amount on the subtotal of the item lines or on chosen lines.
+// Before tax (the default) it is spread over its lines by largest remainder and
+// each line's tax is on its amount less its share; after tax it leaves every
+// line's tax on the undiscounted price. Either way it posts to the discounts
+// account the accountant chose. A delivery charge is a line with its own tax
+// code that subtotal discounts never reach, though a discount may name it. A
+// deposit received at issue becomes a payment applied to the invoice when it is
+// issued.
 import { authority, who } from './access'
 import { cents, date, longDay, now, optionalText, requireThat, scale, text, uid, usd, type Data } from './core'
 import { all, audit, guard, one, q, run, type Sql } from './db'
@@ -44,6 +45,7 @@ export function applyDiscounts(raw: unknown, lines: Priced[], credit: boolean): 
   requireThat(!credit || !given.length, 'A credit carries no discounts')
   requireThat(given.length <= 5, 'An invoice carries at most five discounts')
   const items = lines.map((l, i) => l.kind === 'item' ? i + 1 : 0).filter(Boolean)
+  const numbers = lines.map((_, i) => i + 1)
   let afterTax = 0
   const discounts = given.map((d: Data, n) => {
     const label = `Discount ${n + 1}`
@@ -52,7 +54,7 @@ export function applyDiscounts(raw: unknown, lines: Priced[], credit: boolean): 
     const chosen = d.lines === undefined || d.lines === null || d.lines === 'subtotal' ? null : d.lines
     requireThat(chosen === null || (Array.isArray(chosen) && chosen.length > 0), `${label} applies to the subtotal or to chosen lines`)
     const targets = chosen === null ? items : [...new Set((chosen as unknown[]).map(Number))].sort((a, b) => a - b)
-    requireThat(targets.length && targets.every(t => items.includes(t)), `${label} applies to item lines (delivery charges are not discounted)`)
+    requireThat(targets.length && targets.every(t => numbers.includes(t)), chosen === null ? `${label} applies to the subtotal of item lines; this invoice has none` : `${label} names lines of this invoice`)
     const afterTaxDiscount = d.afterTax === true || d.afterTax === 'true'
     const remaining = targets.map(t => lines[t - 1].amount - lines[t - 1].discount)
     const base = remaining.reduce((s, x) => s + x, 0)
