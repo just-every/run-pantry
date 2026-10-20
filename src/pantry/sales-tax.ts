@@ -2,7 +2,8 @@
 // ledger's sales tax liability accounts. On the accrual basis tax is owed when
 // an invoice is issued; on the cash basis when it is paid (the same settled
 // shares the cash-basis reports use). Tax collected is always what customers
-// actually paid in the period. Write-off credits (ACCT-003) are bad debts, not
+// actually paid in the period. A line's taxable sale is its amount less its
+// before-tax discount (INVOICE-010). Write-off credits (ACCT-003) are bad debts, not
 // returns: they are left out until the accountant can record a state's bad-debt
 // deduction.
 import { type Data } from './core'
@@ -18,7 +19,7 @@ export async function salesTax(db: D1Database, from: string, to: string, basis: 
   const codes = await all(db, 'SELECT t.*, a.code AS account_code, a.name AS account_name FROM pt_tax_codes t JOIN pt_accounts a ON a.id = t.account_id ORDER BY t.state, t.name')
   const byCode = new Map<string, Row>([['exempt', zero()], ...codes.map(c => [c.id, zero()] as [string, Row])])
   // Invoiced in the period (credits count against it): taxable sales and tax charged.
-  const invoiced = await all(db, `SELECT i.kind, l.tax_code, l.amount_cents, l.tax_cents FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
+  const invoiced = await all(db, `SELECT i.kind, l.tax_code, l.amount_cents - l.discount_cents AS amount_cents, l.tax_cents FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
     WHERE i.status = 'issued' AND i.journal_id IS NOT NULL AND i.write_off = 0 AND i.issue_date BETWEEN ? AND ?`, from, to)
   const accrual = new Map<string, Row>()
   for (const l of invoiced) {

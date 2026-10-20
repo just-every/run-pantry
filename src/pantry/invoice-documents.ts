@@ -8,6 +8,7 @@ import { all, guard, one, q, type Sql } from './db'
 import { invoicePdf, type InvoiceDocument } from './invoice-pdf'
 import { base64Bytes, bytesBase64 } from './invoice-logo'
 import { customValues, selectedTemplate } from './invoice-templates'
+import { depositLabel, type Deposit, type Discount } from './discounts'
 export { invoiceTemplateCommands as invoiceDocumentCommands, invoiceDocumentsView } from './invoice-templates'
 
 export async function documentInvoice(db: D1Database, id: string) {
@@ -32,6 +33,11 @@ export async function buildInvoiceDocument(db: D1Database, inv: Data, parsed?: D
   const memo = parsed?.memo ?? inv.memo ?? ''
   const exemption = parsed?.exemption ?? (inv.exemption_evidence ? JSON.parse(inv.exemption_evidence) : inv.exemption)
   const terms = Math.round((Date.parse(due) - Date.parse(inv.issue_date)) / 86400000)
+  // INVOICE-010: before-tax discounts come off the subtotal, after-tax ones off the taxed total; a deposit received at issue off the amount due.
+  const json = <T>(v: unknown, fallback: T): T => typeof v === 'string' ? JSON.parse(v) : (v as T) ?? fallback
+  const discounts: Discount[] = parsed?.discounts ?? json(inv.discounts, [])
+  const deposit: Deposit | null = parsed ? parsed.deposit ?? null : json(inv.deposit, null)
+  const minus = (c: number) => '-' + usd(c)
   return {
     business: entity?.legal_name ?? 'Pantry', title: `${inv.kind === 'credit' ? 'Credit' : 'Invoice'} ${inv.number}`,
     templateId: template.id, templateName: template.name, layout: template.layout, accentColor: template.accentColor, textColor: template.textColor, logo: template.logo,
@@ -40,7 +46,9 @@ export async function buildInvoiceDocument(db: D1Database, inv: Data, parsed?: D
       ...(template.address ? [['Business address', template.address] as [string, string]] : []), ...(template.remitTo ? [['Remit to', template.remitTo] as [string, string]] : []),
       ...template.fields.map((f: Data) => [f.label, values[f.key]] as [string, string])],
     lines: lines.map(l => ({ description: l.description, quantity: String((l.qty ?? l.quantity_milli ?? 1000) / 1000), amount: usd(l.amount ?? l.amount_cents) })),
-    totals: [['Subtotal', usd(subtotal)], ['Sales tax', usd(tax)], ['Total', usd(inv.total_cents)], ['Amount due', usd(inv.total_cents)]],
+    totals: [['Subtotal', usd(subtotal)], ...discounts.filter(d => !d.afterTax).map(d => [d.label, minus(d.amount)] as [string, string]), ['Sales tax', usd(tax)],
+      ...discounts.filter(d => d.afterTax).map(d => [d.label, minus(d.amount)] as [string, string]), ['Total', usd(inv.total_cents)],
+      ...(deposit ? [[depositLabel(deposit), minus(deposit.amount)] as [string, string]] : []), ['Amount due', usd(inv.total_cents - (deposit?.amount ?? 0))]],
     notes: [template.message, memo, ...(exemption ? [`Sales tax exempt in ${parsed?.destination ?? inv.destination_state}: certificate ${exemption.certificateNumber}, valid through ${exemption.expiresOn}.`] : []),
       template.paymentInstructions, template.footer].filter(Boolean),
   }

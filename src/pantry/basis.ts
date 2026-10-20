@@ -43,7 +43,7 @@ export type CashLine = {
   accountId: string; date: string; net: number
   docKind: 'invoice' | 'credit' | 'bill'; docId: string; docRef: string; docJournalId: string; docTotal: number
   contactId: string; contactName: string
-  role: 'control' | 'sale' | 'tax' | 'expense'; description: string; taxCode: string | null; itemId?: string | null
+  role: 'control' | 'sale' | 'tax' | 'expense' | 'discount'; description: string; taxCode: string | null; itemId?: string | null
   settledBefore: number; settledAfter: number
   settlement: Settlement
 }
@@ -52,13 +52,15 @@ type Component = { accountId: string; sign: 1 | -1; magnitude: number; role: Cas
 type Doc = { kind: CashLine['docKind']; id: string; ref: string; journalId: string; total: number; contactId: string; contactName: string; control: Component; parts: Component[] }
 type Event = { docId: string; date: string; order: string; delta: number; settlement: Settlement }
 
-/** The shares of `settled` (0..total) across parts, by largest remainder; they sum to exactly `settled`. */
-function spread(parts: Component[], total: number, settled: number): number[] {
+/** The shares of `settled` (0..total) across parts, by largest remainder; they sum to exactly `settled`.
+ *  A part on the control's own side (an invoice discount) counts against the others, so shares are signed. */
+function spread(parts: Component[], control: Component, total: number, settled: number): number[] {
   const t = BigInt(total), s = BigInt(settled)
-  const exact = parts.map(p => BigInt(p.magnitude) * s)
-  const base = exact.map(x => x / t)
+  const exact = parts.map(p => BigInt(p.sign === control.sign ? -p.magnitude : p.magnitude) * s)
+  const floor = (x: bigint) => x >= 0n || x % t === 0n ? x / t : x / t - 1n
+  const base = exact.map(floor)
   let left = settled - base.reduce((a, b) => a + Number(b), 0)
-  const order = exact.map((x, i) => ({ i, rem: x % t })).sort((a, b) => (a.rem === b.rem ? a.i - b.i : a.rem > b.rem ? -1 : 1))
+  const order = exact.map((x, i) => ({ i, rem: x - base[i] * t })).sort((a, b) => (a.rem === b.rem ? a.i - b.i : a.rem > b.rem ? -1 : 1))
   const out = base.map(Number)
   for (const { i } of order) { if (left <= 0) break; out[i] += 1; left -= 1 }
   return out
@@ -68,9 +70,9 @@ async function documents(db: D1Database): Promise<Map<string, Doc>> {
   const docs = new Map<string, Doc>()
   const control = new Map((await all(db, "SELECT subtype, id FROM pt_accounts WHERE subtype IN ('receivable', 'payable')")).map(a => [a.subtype, a.id]))
   // Only documents something has settled matter on the cash basis.
-  const invoices = await all(db, `SELECT i.id, i.kind, i.number, i.total_cents, i.journal_id, i.customer_id, c.name AS contact_name FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id
+  const invoices = await all(db, `SELECT i.id, i.kind, i.number, i.total_cents, i.journal_id, i.customer_id, i.after_tax_discount_cents, i.discount_account_id, c.name AS contact_name FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id
     WHERE i.journal_id IS NOT NULL AND (i.id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice') OR i.id IN (SELECT source_id FROM pt_allocations WHERE source_kind = 'credit'))`)
-  const invoiceLines = await all(db, `SELECT l.invoice_id, l.description, l.amount_cents, l.tax_cents, l.tax_code, l.account_id, l.item_id, t.account_id AS tax_account FROM pt_invoice_lines l LEFT JOIN pt_tax_codes t ON t.id = l.tax_code
+  const invoiceLines = await all(db, `SELECT l.invoice_id, l.description, l.amount_cents, l.discount_cents, l.tax_cents, l.tax_code, l.account_id, l.item_id, t.account_id AS tax_account FROM pt_invoice_lines l LEFT JOIN pt_tax_codes t ON t.id = l.tax_code
     WHERE l.invoice_id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice' UNION SELECT source_id FROM pt_allocations WHERE source_kind = 'credit') ORDER BY l.invoice_id, l.line_no`)
   for (const i of invoices) {
     // An invoice debits receivables and credits income and tax; a credit note the reverse.
@@ -78,8 +80,11 @@ async function documents(db: D1Database): Promise<Map<string, Doc>> {
     const parts: Component[] = []
     for (const l of invoiceLines.filter(x => x.invoice_id === i.id)) {
       parts.push({ accountId: l.account_id, sign: (-s) as 1 | -1, magnitude: l.amount_cents, role: 'sale', description: l.description, taxCode: l.tax_code, itemId: l.item_id })
+      // A before-tax discount (INVOICE-010) is a debit to the discounts account that lowers the line's taxable sale.
+      if (l.discount_cents) parts.push({ accountId: i.discount_account_id, sign: s, magnitude: l.discount_cents, role: 'sale', description: `Discount · ${l.description}`, taxCode: l.tax_code })
       if (l.tax_cents) parts.push({ accountId: l.tax_account, sign: (-s) as 1 | -1, magnitude: l.tax_cents, role: 'tax', description: `Sales tax · ${l.description}`, taxCode: l.tax_code })
     }
+    if (i.after_tax_discount_cents) parts.push({ accountId: i.discount_account_id, sign: s, magnitude: i.after_tax_discount_cents, role: 'discount', description: `Discount after tax · ${i.number}`, taxCode: null })
     docs.set(i.id, { kind: i.kind, id: i.id, ref: i.number, journalId: i.journal_id, total: i.total_cents, contactId: i.customer_id, contactName: i.contact_name,
       control: { accountId: control.get('receivable')!, sign: s, magnitude: i.total_cents, role: 'control', description: `${i.number} ${i.contact_name}`, taxCode: null }, parts })
   }
@@ -128,10 +133,10 @@ export async function cashLines(db: D1Database, from: string, to: string): Promi
     const before = settled.get(d.id) ?? 0, after = before + e.delta
     settled.set(d.id, after)
     if (e.date < from || e.date > to) continue
-    const was = spread(d.parts, d.total, before), now = spread(d.parts, d.total, after)
+    const was = spread(d.parts, d.control, d.total, before), now = spread(d.parts, d.control, d.total, after)
     const common = { date: e.date, docKind: d.kind, docId: d.id, docRef: d.ref, docJournalId: d.journalId, docTotal: d.total, contactId: d.contactId, contactName: d.contactName, settledBefore: before, settledAfter: after, settlement: e.settlement }
     out.push({ ...common, accountId: d.control.accountId, net: d.control.sign * e.delta, role: 'control', description: d.control.description, taxCode: null })
-    d.parts.forEach((p, i) => { const share = now[i] - was[i]; if (share) out.push({ ...common, accountId: p.accountId, net: p.sign * share, role: p.role, description: p.description, taxCode: p.taxCode, itemId: p.itemId ?? null }) })
+    d.parts.forEach((p, i) => { const share = now[i] - was[i]; if (share) out.push({ ...common, accountId: p.accountId, net: -d.control.sign * share, role: p.role, description: p.description, taxCode: p.taxCode, itemId: p.itemId ?? null }) })
   }
   return out
 }

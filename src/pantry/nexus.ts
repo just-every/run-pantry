@@ -50,7 +50,7 @@ function reached(t: Threshold, sales: number, transactions: number) {
  *  of the tax code chosen on the line. An invoice is one transaction in each state it ships to. */
 async function saleDays(db: D1Database, from: string) {
   return all(db, `SELECT state, issue_date, kind, SUM(amount_cents) AS amount, COUNT(DISTINCT id) AS documents FROM (
-      SELECT i.id, i.kind, i.issue_date, l.amount_cents, COALESCE(NULLIF(i.destination_state, ''), NULLIF(o.destination_state, ''), t.state, '') AS state
+      SELECT i.id, i.kind, i.issue_date, l.amount_cents - l.discount_cents AS amount_cents, COALESCE(NULLIF(i.destination_state, ''), NULLIF(o.destination_state, ''), t.state, '') AS state
       FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
       LEFT JOIN pt_invoices o ON o.id = i.credit_for
       LEFT JOIN pt_tax_codes t ON t.id = COALESCE(l.chosen_tax_code, l.tax_code)

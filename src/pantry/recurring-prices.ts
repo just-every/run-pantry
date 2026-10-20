@@ -29,9 +29,9 @@ const schedule: Command = { need: 'record', async run(c, b) {
   const effective = date(b.effectiveDate, 'Price takes effect from')
   requireThat(effective >= t.start_date && (!t.end_date || effective <= t.end_date), 'Choose a price date within the recurring schedule')
   requireThat(!await one(c.db, 'SELECT 1 FROM pt_recurring_runs WHERE recurring_id = ? AND occurrence >= ?', t.id, effective), 'Invoices have already been generated on or after that date; choose a later price date', 409)
-  const p = await parseInvoice(c.db, { customerId: t.customer_id, issueDate: effective, lines: b.lines, memo: t.memo })
+  const p = await parseInvoice(c.db, { customerId: t.customer_id, issueDate: effective, lines: b.lines, memo: t.memo, discounts: t.discounts, deposit: t.deposit })
   requireThat(p.lines.every(l => l.taxCode), 'Choose a sales tax code or exemption for every line')
-  const lines = p.lines.map(l => ({ description: l.description, quantity: String(l.qty / 1000), rate: (l.unit / 100).toFixed(2), accountId: l.accountId, taxCode: l.taxCode, ...(l.itemId ? { itemId: l.itemId } : {}) }))
+  const lines = p.lines.map(l => ({ description: l.description, quantity: String(l.qty / 1000), rate: (l.unit / 100).toFixed(2), accountId: l.accountId, taxCode: l.taxCode, ...(l.itemId ? { itemId: l.itemId } : {}), ...(l.kind === 'delivery' ? { kind: 'delivery' } : {}) }))
   const id = uid(), revision = uid()
   await run(c.db, [authority(c.actor, 'record'),
     guard("EXISTS (SELECT 1 FROM pt_recurring WHERE id = ? AND revision = ? AND status <> 'ended')", t.id, t.revision),
@@ -50,7 +50,7 @@ const approve: Command = { need: 'post', async run(c, b) {
   requireThat(price.revision === b.revision && t.revision === b.templateRevision, 'Recurring invoice or price changed since you reviewed it; review it again', 409)
   requireThat(price.approved_revision !== price.revision || price.template_revision !== t.revision, 'This price change is already approved', 409)
   requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || price.prepared_by !== c.actor.email), 'Someone other than the preparer approves this price change', 403)
-  const p = await parseInvoice(c.db, { customerId: t.customer_id, issueDate: price.effective_date, lines: JSON.parse(price.lines), memo: t.memo })
+  const p = await parseInvoice(c.db, { customerId: t.customer_id, issueDate: price.effective_date, lines: JSON.parse(price.lines), memo: t.memo, discounts: t.discounts, deposit: t.deposit })
   requireThat(amountSnapshot(p) === price.amount_snapshot, 'The price amounts changed; schedule the current amounts before approval', 409)
   await run(c.db, [authority(c.actor, 'post'),
     guard("EXISTS (SELECT 1 FROM pt_recurring WHERE id = ? AND revision = ? AND approved_revision = revision AND status <> 'ended')", t.id, t.revision),

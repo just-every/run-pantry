@@ -420,3 +420,94 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
   assert.equal((await m.view('invoicing')).stripe.managed, true)
   await m.command('stripe.connect', { secretKey: KEY }, m.owner, 409)
 })
+
+test('INVOICE-010 discounts, delivery charges and deposits on the invoice: tax on the discounted base, the discount and deposit posted, the balance due on the PDF and the hosted page', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const { acct, bank, c } = await setup(h)
+  const bookkeeper = await h.member('bea@example.test', 'bookkeeper')
+  const discounts = await h.command('account.save', { code: '4950', name: 'Sales discounts', type: 'income' })
+  const ca = await h.command('tax-code.save', { name: 'California 8.25%', rate: '8.25', accountId: acct['2200'], state: 'CA' })
+  const customer = c['Cedar Studio'].id, issueDate = '2026-11-02'
+  const body = { customerId: customer, issueDate, dueDate: '2026-12-02', lines: [
+    { description: 'Kitchen design', quantity: '1', rate: '1000.00', accountId: acct['4000'], taxCode: ca.id },
+    { kind: 'delivery', description: 'Delivery', quantity: '1', rate: '40.00', accountId: acct['4000'], taxCode: ca.id }],
+    discounts: [{ type: 'percent', value: '10' }], deposit: { amount: '300.00', method: 'check', date: issueDate, bankAccountId: bank.id, reference: '1042' } }
+
+  // The discounts account is the accountant's choice: without it approval waits; a bookkeeper cannot choose it.
+  let draft = await h.command('invoice.save-draft', body)
+  assert.deepEqual([draft.discount_account_id, draft.subtotal_cents, draft.discount_cents, draft.tax_cents, draft.total_cents], [null, 104000, 10000, 7755, 101755])
+  assert.deepEqual(draft.lines.map(l => [l.line_kind, l.amount_cents, l.discount_cents, l.tax_cents]), [['item', 100000, 10000, 7425], ['delivery', 4000, 0, 330]])
+  await h.command('invoice.approve', { id: draft.id, revision: draft.revision }, h.owner, 409)
+  await h.command('discount-settings.save', { discountAccountId: discounts.id }, bookkeeper, 403)
+  await h.command('discount-settings.save', { discountAccountId: acct['1000'] }, h.owner, 400)
+  const settings = await h.command('discount-settings.save', { discountAccountId: discounts.id })
+  assert.equal((await h.view('invoicing')).discounts.settings.discount_code, '4950')
+  draft = await h.command('invoice.save-draft', { ...body, id: draft.id, revision: draft.revision })
+  assert.equal(draft.discount_account_id, discounts.id)
+
+  // Refusals: delivery is not discounted, a credit carries no discount, a deposit is no more than the total and dated at issue.
+  for (const bad of [{ discounts: [{ type: 'percent', value: '10', lines: [2] }] }, { discounts: [{ type: 'percent', value: '0' }] }, { discounts: [{ type: 'amount', value: '1000.01', lines: [1] }] },
+    { deposit: { ...body.deposit, amount: '1017.56' } }, { deposit: { ...body.deposit, date: '2026-11-03' } }, { deposit: { ...body.deposit, method: 'barter' } }])
+    await h.command('invoice.save-draft', { ...body, ...bad }, h.owner, 400)
+
+  const approved = await h.command('invoice.approve', { id: draft.id, revision: draft.revision })
+  const issued = await h.command('invoice.issue', { id: approved.id })
+  assert.equal(issued.open_cents, 71755)
+  const entry = at((await h.view('journal')).entries, e => e.id === issued.journal_id)
+  assert.deepEqual(entry.lines.map(l => [l.account_code, l.debit_cents, l.credit_cents]), [['1200', 101755, 0], ['4000', 0, 100000], ['4000', 0, 4000], ['4950', 10000, 0], ['2200', 0, 7755]])
+  const deposit = at((await h.view('sales')).payments, p => p.id === issued.deposit_payment_id)
+  assert.deepEqual([deposit.amount_cents, deposit.method, deposit.payment_date, deposit.reference, deposit.bank_account_id], [30000, 'check', issueDate, '1042', bank.id])
+  const depositEntry = at((await h.view('journal')).entries, e => e.id === deposit.journal_id)
+  assert.deepEqual(depositEntry.lines.map(l => [l.account_code, l.debit_cents, l.credit_cents]), [['1000', 30000, 0], ['1200', 0, 30000]])
+
+  // The PDF and the hosted page show the discount, the deposit and $717.55 due.
+  await h.command('invoice.send', { id: issued.id })
+  const path = linkIn(h.mail.at(-1))
+  const pdf = (await h.send(path + '/invoice.pdf')).value
+  for (const shown of ['(Discount 10% on subtotal)', '(-$100.00)', '(Sales tax)', '($77.55)', '($1,017.55)', '(Deposit received \\(check 1042, Nov 2, 2026\\))', '(-$300.00)', '(Amount due)', '($717.55)'])
+    assert.ok(pdf.includes(shown), `PDF shows ${shown}`)
+  const page = (await h.send(path)).value
+  assert.match(page, /Discount 10% on subtotal<\/span><strong>-\$100\.00/); assert.match(page, /Amount due<\/span><strong class="due">\$717\.55/)
+  assert.match(page, /Current balance: \$717\.55/); assert.match(page, new RegExp(`\\$300\\.00 · Deposit received at issue of ${issued.number}`))
+
+  // Tax is on $940; on the cash basis the paid invoice recognises the same taxable sale, tax and discount.
+  const accrual = await h.view(`reports/sales-tax?from=2026-11-01&to=2026-11-30&basis=accrual`)
+  const caRow = at(accrual.states, s => s.state === 'CA')
+  assert.deepEqual([caRow.taxable, caRow.charged, accrual.ledger.ties], [94000, 7755, true])
+  await h.command('payment.record', { direction: 'received', contactId: customer, date: '2026-11-20', amount: '717.55', bankAccountId: bank.id, allocations: [{ targetId: issued.id, amount: '717.55' }] })
+  const cash = await h.view(`reports/sales-tax?from=2026-11-01&to=2026-11-30&basis=cash`)
+  assert.deepEqual([at(cash.states, s => s.state === 'CA').taxable, at(cash.states, s => s.state === 'CA').collected, cash.ledger.ties], [94000, 7755, true])
+  const items = await h.view(`reports/sales-by-item?from=2026-11-01&to=2026-11-30&basis=cash`)
+  assert.equal(items.total, 94000)
+
+  // An after-tax discount leaves the tax on the full price; a discount on a chosen line reaches only that line.
+  const other = await h.command('invoice.save-draft', { customerId: customer, issueDate, lines: [
+    { description: 'Consultation', quantity: '1', rate: '200.00', accountId: acct['4000'], taxCode: ca.id },
+    { description: 'Site visit', quantity: '2', rate: '50.00', accountId: acct['4000'], taxCode: ca.id }],
+    discounts: [{ type: 'amount', value: '15.00', lines: [2] }, { type: 'amount', value: '20.00', afterTax: true }] }, bookkeeper)
+  assert.deepEqual(other.lines.map(l => [l.discount_cents, l.tax_cents]), [[0, 1650], [1500, 701]])
+  assert.deepEqual([other.after_tax_discount_cents, other.total_cents], [2000, 30000 - 1500 + 2351 - 2000])
+  const otherIssued = await h.command('invoice.issue', { id: (await h.command('invoice.approve', { id: other.id, revision: other.revision })).id })
+  assert.deepEqual(at((await h.view('journal')).entries, e => e.id === otherIssued.journal_id).lines.map(l => [l.account_code, l.debit_cents, l.credit_cents]),
+    [['1200', 28851, 0], ['4000', 0, 20000], ['4000', 0, 10000], ['4950', 3500, 0], ['2200', 0, 2351]])
+  const credit = { kind: 'credit', creditFor: otherIssued.id, customerId: customer, issueDate, dueDate: issueDate, lines: [line('Allowance', '10.00', acct['4000'])] }
+  await h.command('invoice.save-draft', { ...credit, discounts: [{ type: 'amount', value: '1.00' }] }, h.owner, 400)
+  await h.command('invoice.save-draft', { ...credit, lines: [{ ...credit.lines[0], kind: 'delivery' }] }, h.owner, 400)
+
+  // A recurring template carries the discount and the delivery charge to each invoice it creates.
+  const today_ = today()
+  const template = await h.command('recurring.save', { customerId: customer, startDate: today_, unit: 'month', every: 1, mode: 'draft', termsDays: 30, lines: body.lines, discounts: body.discounts })
+  assert.deepEqual(template.discounts, [{ type: 'percent', value: '10' }])
+  await h.command('recurring.save', { customerId: customer, startDate: today_, unit: 'month', every: 1, mode: 'draft', lines: body.lines, deposit: body.deposit }, h.owner, 400)
+  const { date: _, ...each } = body.deposit
+  const withDeposit = await h.command('recurring.save', { customerId: customer, startDate: today_, unit: 'month', every: 1, mode: 'draft', termsDays: 30, lines: body.lines, deposit: each })
+  assert.deepEqual(withDeposit.deposit, { amount: '300.00', method: 'check', bankAccountId: bank.id, reference: '1042' })
+  await h.cron()
+  const occurrence = at((await h.view('sales')).invoices, i => i.recurring_id === template.id)
+  assert.deepEqual([occurrence.status, occurrence.discount_cents, occurrence.tax_cents, occurrence.total_cents, occurrence.lines.map(l => l.line_kind)], ['draft', 10000, 7755, 101755, ['item', 'delivery']])
+  const deposited = at((await h.view('sales')).invoices, i => i.recurring_id === withDeposit.id)
+  assert.deepEqual(deposited.deposit, { amount: 30000, method: 'check', date: today_, bankAccountId: bank.id, reference: '1042' })
+  const depositedIssued = await h.command('invoice.issue', { id: (await h.command('invoice.approve', { id: deposited.id, revision: deposited.revision })).id })
+  assert.equal(depositedIssued.open_cents, 104000 + 8580 - 30000)
+  assert.equal(settings.revision.length > 0, true)
+})

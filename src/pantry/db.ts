@@ -68,7 +68,7 @@ const AUDIT_RECORDS: Record<string, [string, string?]> = {
   match: ['pt_matches'], 'bank-account': ['pt_bank_accounts'], 'bank-rule': ['pt_bank_rules'], 'receipt-rule': ['pt_receipt_rules'],
   recurring: ['pt_recurring'], receipt: ['pt_receipts'], 'vendor-credit': ['pt_vendor_credits'], 'tax-code': ['pt_tax_codes'],
   exemption: ['pt_exemption_certificates'], integration: ['pt_integrations'], feed: ['pt_feed_items'], stripe: ['pt_stripe'],
-  cutover: ['pt_cutovers'], owner: ['oa_operators'], gusto: ['pt_gusto'], question: ['pt_questions'], sending: ['pt_sending'], 'books-agent': ['pt_books_agent'], 'capture-draft': ['pt_capture_drafts'], 'capture-approval-rule': ['pt_capture_approval_rules'],
+  cutover: ['pt_cutovers'], owner: ['oa_operators'], gusto: ['pt_gusto'], question: ['pt_questions'], sending: ['pt_sending'], 'books-agent': ['pt_books_agent'], 'capture-draft': ['pt_capture_drafts'], 'capture-approval-rule': ['pt_capture_approval_rules'], 'discount-settings': ['pt_discount_settings'],
 }
 const auditColumns = new WeakMap<D1Database, Map<string, Promise<string[]>>>()
 function columnsFor(db: D1Database, table: string) {

@@ -15,6 +15,7 @@ import { contactCommands } from './contacts'
 import { journalCommands, journalView } from './journal'
 import { invoiceDocumentCommands, invoiceDocumentsView, registerInvoiceDocumentRoutes } from './invoice-documents'
 import { invoiceCommands, invoicesView } from './invoices'
+import { discountAccounts, discountCommands, discountSettings } from './discounts'
 import { billLifecycleCommands, capturedBillInbox } from './bill-lifecycle'
 import { recurringBillCommands, recurringBillsView } from './recurring-bills'
 import { payableCommands, billsView, paymentsView } from './payables'
@@ -87,7 +88,7 @@ import { customReportCommands } from './custom-reports/commands'
 import { registerCustomReportRoutes } from './custom-reports/routes'
 
 const commands: Record<string, Command> = {
-  ...invoiceDocumentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...invoiceDocumentCommands, ...discountCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -132,7 +133,7 @@ view('journal', async ctx => ({ entries: await journalView(ctx.db) }))
 view('review', async ctx => reviewView(ctx.db, ctx.actor.email))
 view('write-offs/candidates', async (ctx, c) => ({ items: await smallBalances(ctx.db, c.req.query('kind') === 'bill' ? 'bill' : 'invoice', cents(c.req.query('ceiling'), 'Write off balances up to')) }))
 view('sales', async ctx => ({ capturedBills: await capturedBillInbox(ctx.db), recurringBills: await recurringBillsView(ctx.db), approvalRules: await all(ctx.db, 'SELECT * FROM pt_capture_approval_rules ORDER BY minimum_cents'), vendorCredits: await vendorCreditsView(ctx.db), invoices: await invoicesView(ctx.db), bills: await billsView(ctx.db), payments: await paymentsView(ctx.db), deliveries: await deliveriesView(ctx.db), reminders: await reminderPlans(ctx.db), recurring: await recurringView(ctx.db), onlinePayments: await all(ctx.db, 'SELECT id, invoice_id, method, amount_cents, status, fee_cents, created_at, updated_at FROM pt_stripe_payments ORDER BY created_at DESC LIMIT 500') }))
-view('invoicing', async ctx => ({ sending: await sendingView(ctx.env, ctx.db), stripe: await stripeView(ctx.env, ctx.db) }))
+view('invoicing', async ctx => ({ sending: await sendingView(ctx.env, ctx.db), stripe: await stripeView(ctx.env, ctx.db), discounts: { settings: await discountSettings(ctx.db), accounts: await discountAccounts(ctx.db) } }))
 view('stripe/clearing', async ctx => clearingState(ctx.db))
 view('connected', async ctx => ({ clearing: await clearingState(ctx.db), payouts: await payoutsView(ctx.env, ctx.db), gusto: await gustoView(ctx) }))
 view('bank', async ctx => bankView(ctx.db))

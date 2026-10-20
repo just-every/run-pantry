@@ -5,7 +5,7 @@ import type { Context } from '../context'
 import { date, now, optionalText, requireThat, text, uid, type Data } from '../core'
 import { approval, assertOpen, audit, changed, one, periodOpen, q, type Sql } from '../db'
 import { documentSelectionStatements } from '../invoice-documents'
-import { invoice, issueStatements, lineStatements, nextNumber, parseInvoice } from '../invoices'
+import { discountColumns, invoice, issueStatements, lineStatements, nextNumber, parseInvoice } from '../invoices'
 import { entryStatements, parseLines } from '../journal'
 import { bill, billStatements, paymentStatements } from '../payables'
 import type { Prepared } from './idempotency'
@@ -54,11 +54,13 @@ export async function prepareInvoice(c: Context, b: Data): Promise<Prepared> {
   }
   const post = b.post === true
   if (post) requireThat(p.lines.every(l => l.taxCode), 'Every invoice line needs a tax code or an explicit exemption', 409)
+  if (post) requireThat(!p.discounts.length || p.discountAccountId, 'No discounts account is chosen: ask your accountant to choose one in Settings', 409)
   const statements = [periodOpen(p.issueDate),
-    q("INSERT INTO pt_invoices (id,kind,number,customer_id,issue_date,due_date,status,memo,credit_for,subtotal_cents,tax_cents,total_cents,opening,prepared_by,revision,created_at,approved_by,approved_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?)", id, kind, number, p.customer.id, p.issueDate, p.dueDate, post ? 'approved' : 'draft', p.memo, creditFor, p.subtotal, p.tax, p.total, c.actor.email, revision, now(), post ? c.actor.email : null, post ? revision : null),
+    q("INSERT INTO pt_invoices (id,kind,number,customer_id,issue_date,due_date,status,memo,credit_for,subtotal_cents,tax_cents,total_cents,discounts,discount_cents,after_tax_discount_cents,discount_account_id,deposit,opening,prepared_by,revision,created_at,approved_by,approved_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?)", id, kind, number, p.customer.id, p.issueDate, p.dueDate, post ? 'approved' : 'draft', p.memo, creditFor, p.subtotal, p.tax, p.total, ...discountColumns(p), c.actor.email, revision, now(), post ? c.actor.email : null, post ? revision : null),
     ...documentSelectionStatements(id, p), ...lineStatements(id, p.lines)]
   if (post) {
     const current = { id, kind, number, customer_id: p.customer.id, customer_name: p.customer.name, issue_date: p.issueDate, total_cents: p.total, credit_for: creditFor, revision,
+      discount_cents: p.discount, after_tax_discount_cents: p.afterTax, discount_account_id: p.discountAccountId, deposit: p.deposit,
       lines: p.lines.map(l => ({ account_id: l.accountId, amount_cents: l.amount, description: l.description, tax_code: l.taxCode, tax_cents: l.tax })) }
     statements.push(approval(who(c.actor), kind, id, revision, 'integration.post', 'approved', 'Owner delegated posting to this scoped credential'), ...(await issueStatements(c.db, current, who(c.actor), c.actor.email, p)).statements)
   } else statements.push(audit(who(c.actor), `${kind}.draft`, kind, id, { number, total: p.total }))
