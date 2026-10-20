@@ -115,7 +115,7 @@ test('BOOKS-AGENT the agent asks the owner what does not add up, by email first;
   assert.ok(thread.filter(v => v === 'email').length >= 3)
 })
 
-test('ACCOUNTANT questions carry their entry or report, can be answered at close or by the invited recipient’s email, and survive agent checks', async t => {
+test('REPORT-005 / ACCOUNTANT questions carry their entry or report, can be answered at close or by the invited recipient’s email, and survive agent checks', async t => {
   const h = await harness(); t.after(() => h.close())
   const s = await september(h)
   const accountant = await h.member('jordan@example.test', 'accountant', { canLock: true })
@@ -160,6 +160,8 @@ test('ACCOUNTANT questions carry their entry or report, can be answered at close
   for (const scope of [
     { report: 'sales-tax', line: 'total', from: '2026-09-01', to: '2026-09-30', basis: 'accrual' },
     { report: 'trial-balance', line: s.acct['1000'], from: '2026-09-01', to: '2026-09-30', basis: 'accrual' },
+    { report: 'trial-balance', line: JSON.stringify(['total', 'debit']), from: '2026-09-01', to: '2026-09-30', basis: 'cash' },
+    { report: 'general-ledger', line: JSON.stringify([s.acct['1000'], 'closing']), from: '2026-09-01', to: '2026-09-30', basis: 'accrual' },
     { report: 'contractors', line: s.c['Harbor Office Rentals'].id, from: '2026-01-01', to: '2026-12-31', basis: 'cash' },
   ]) {
     const asked = (await h.command('question.ask', { subjectKind: 'report-line', subjectId: JSON.stringify(scope), question: 'Please confirm this report line.', assignee: 'jordan@example.test' })).question
