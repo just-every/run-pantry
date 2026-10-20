@@ -8,6 +8,14 @@ const CLIENT = { id: 'test-xero-client-id', secret: 'test-xero-client-secret' }
 const load = async name => JSON.parse(await fixture(`xero-api/${name}.json`))
 const bytes = name => readFile(new URL(`../../fixtures/xero-api/files/${name}`, import.meta.url))
 
+/** A Xero move-in package: the six exports Xero gives a person leaving it, with any file replaced. */
+const XERO_EXPORTS = { accounts: 'chart-of-accounts.csv', contacts: 'contacts.csv', trialBalance: 'trial-balance.csv', invoices: 'sales-invoices.csv', bills: 'bills.csv', bankTransactions: 'account-transactions.csv' }
+export async function xeroExports(overrides = {}) {
+  const files = {}
+  for (const [key, name] of Object.entries(XERO_EXPORTS)) files[key] = { name, content: overrides[key] ?? await fixture(`xero/${name}`) }
+  return { source: 'xero', files, banks: [{ account: 'Checking Account', institution: 'First Harbor Bank', last4: '4821', statementBalance: '31406.87' }, { account: 'Savings Account', institution: 'First Harbor Bank', last4: '7730', statementBalance: '12000.00' }] }
+}
+
 export async function fakeXero() {
   const token = await load('token-authorization-code'), tenants = await load('connections'), invoices = await load('invoices'), lists = await load('attachments')
   const tenant = tenants.find(t => t.tenantName === 'Juniper Lane Design LLC').tenantId
