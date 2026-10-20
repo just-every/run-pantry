@@ -47,7 +47,7 @@ function Invoices({ data, reload }: { data: D; reload: () => Promise<void> }) {
   const invoices = data.invoices as D[], current = invoices.find(i => i.id === selected)
   const sum = (f: (i: D) => boolean) => invoices.filter(i => i.kind === 'invoice' && f(i)).reduce((s, i) => s + i.total_cents, 0)
   const count = (f: (i: D) => boolean) => invoices.filter(i => i.kind === 'invoice' && f(i)).length
-  if (editing) return <InvoiceEditor {...editing} invoices={invoices} onCancel={() => setEditing(null)} onDone={async saved => { setEditing(null); await reload(); setSelected(saved.id) }} />
+  if (editing) return <InvoiceEditor {...editing} invoices={invoices} onCancel={() => setEditing(null)} onDone={async saved => { await reload(); setSelected(saved.id); setEditing(null) }} />
   const groups: [string, (i: D) => boolean][] = [['Draft', i => i.status === 'draft'], ['Approved', i => i.status === 'approved'], ['Issued', i => i.status === 'issued' && i.open_cents === i.total_cents], ['Part paid', i => i.status === 'issued' && i.open_cents > 0 && i.open_cents < i.total_cents], ['Paid', i => i.status === 'issued' && i.open_cents === 0]]
   return <>
     <Metrics items={groups.map(([label, f]) => ({ label, value: usd(sum(f)), note: `${count(f)} invoice${count(f) === 1 ? '' : 's'}` }))} />

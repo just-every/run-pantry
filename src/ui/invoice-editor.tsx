@@ -23,7 +23,7 @@ export function nextNumber(invoices: D[], kind: 'invoice' | 'credit') {
   return prefix + String(n + 1).padStart(4, '0')
 }
 
-export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCancel }: { invoice?: D; creditFor?: D; invoices?: D[]; onDone: (saved: D) => void; onCancel: () => void }) {
+export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCancel }: { invoice?: D; creditFor?: D; invoices?: D[]; onDone: (saved: D) => void | Promise<void>; onCancel: () => void }) {
   const { state } = useShared()
   const { data: documents } = useView<D>('invoice-documents')
   const [templateId, setTemplateId] = useState(invoice?.document_template_id ?? ''), [customFields, setCustomFields] = useState<D>(JSON.parse(invoice?.document_values ?? '{}'))
@@ -48,7 +48,7 @@ export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCan
   return <form className="invoice-editor" onSubmit={async e => {
     e.preventDefault(); const f = Object.fromEntries(new FormData(e.currentTarget))
     setBusy(true); setError('')
-    try { onDone(await command('invoice.save-draft', { ...f, kind, creditFor: creditFor?.id ?? invoice?.credit_for, id: invoice?.id, revision: invoice?.revision, templateId: effectiveTemplateId, customFields: Object.fromEntries((template?.fields ?? []).map((f: D) => [f.key, customFields[f.key] ?? f.defaultValue])), lines })) } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+    try { await onDone(await command('invoice.save-draft', { ...f, kind, creditFor: creditFor?.id ?? invoice?.credit_for, id: invoice?.id, revision: invoice?.revision, templateId: effectiveTemplateId, customFields: Object.fromEntries((template?.fields ?? []).map((f: D) => [f.key, customFields[f.key] ?? f.defaultValue])), lines })) } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
   }}>
     <div className="split split-wide-left">
       <div className="stack">
