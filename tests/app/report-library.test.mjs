@@ -50,7 +50,7 @@ test('REPORT-004 run the everyday library, filter journal, open records and down
       }
       if(kind==='open-invoices'){ const [download]=await Promise.all([page.waitForEvent('download'),csv.click()]); assert.equal(await download.failure(),null) }
       if(kind==='reconciliations'){
-        await table.getByText('Details',{exact:true}).first().click();await table.getByText(/"completedBy": "owner@example.test"/).first().waitFor()
+        const evidence=table.locator('details').first();await evidence.locator('summary').click();await evidence.locator('pre').waitFor();assert.ok((await evidence.innerText()).includes('owner@example.test'))
       }
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${width} ${kind} fits`)
       await page.screenshot({path:`/tmp/pantry-r14-${kind}-${width}.png`,fullPage:true})
