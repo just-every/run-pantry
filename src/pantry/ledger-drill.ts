@@ -49,5 +49,5 @@ export async function ledgerFigureDetail(db: D1Database, q: Query) {
     }
   }
   const total = rows.reduce((n, r) => n + r.amount, 0)
-  return { basis: q.basis, report: q.report, line: q.line, label, from: from === FIRST_DAY ? null : from, to, figure, rows, total, ties: total === figure }
+  return { basis: q.basis, report: q.report, line: q.line, label, ...(q.report === 'general-ledger' && metric === 'running' ? { scopeNote: 'Opening activity plus ledger rows through the selected row; later rows on the same date are excluded.' } : {}), from: from === FIRST_DAY ? null : from, to, figure, rows, total, ties: total === figure }
 }

@@ -34,7 +34,7 @@ export function CashFlowDetail({ from, to, line }: { from: string; to: string; l
   const { data: r, error } = useView<D>(`reports/cash-flow/detail?from=${from}&to=${to}&line=${encodeURIComponent(line)}`)
   return <><nav className="crumbs"><Link to="/app/reports" search={{ ...search, line: undefined, record: undefined }}>Cash flow</Link>{r && <> / {r.label}</>}</nav>
     {!r ? <Loading what="the entries" error={error} /> : <Card title={r.label} actions={<strong>{usd(r.figure)}</strong>}>
-      <p>{day(from)} to {day(to)} · Indirect method. These contributions add up to {usd(r.figure)}.</p>
+      <p>{r.from ? <>{day(r.from)} to {day(r.to)}</> : <>All posted cash activity through {day(r.to)}</>} · Indirect method. These contributions add up to {usd(r.figure)}.</p>
       <p><a href={`/api/pantry/reports/cash-flow/detail/export?${new URLSearchParams({ ...Object.fromEntries(Object.entries(search).filter(([, v]) => v !== undefined) as [string, string][]), report: 'cash-flow', line, from, to })}`}>Export source lines CSV</a></p>
       <AskAccountant key={JSON.stringify({ line, from, to })} subjectKind="report-line" subjectId={JSON.stringify({ report: 'cash-flow', line, from, to, basis: 'accrual' })} label={`Cash flow · ${r.label} · ${from} to ${to} · ${usd(r.figure)}`} />
       <Table heads={['Date', 'Record', 'Account', 'Description', 'Contribution']} figures={[4]} empty="No posted entries contribute to this figure.">

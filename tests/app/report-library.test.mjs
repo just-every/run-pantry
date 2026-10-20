@@ -198,6 +198,11 @@ test('REPORT-005 Software figure to approved bill, PDF, payment and bank; source
     await page.getByRole('heading', { name: 'Approvals', exact: true }).waitFor()
     assert.equal(new URL(page.url()).searchParams.get('report'), 'cash-flow')
     await shot('cash-flow-record')
+    for (const [line, date] of [['opening', 'Sep 30, 2026'], ['closing', 'Oct 31, 2026']]) {
+      await page.goto(`${app.origin}/app/reports?report=cash-flow&from=2026-10-01&to=2026-10-31&basis=cash&line=${line}`)
+      await page.getByText(`All posted cash activity through ${date}`, { exact: false }).waitFor()
+      await shot(`cash-flow-${line}`)
+    }
     assert.deepEqual(errors, []); await context.close()
   }
 })

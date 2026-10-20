@@ -27,7 +27,7 @@ export function FigureDetail({ report, line, from, to, basis, reportLabel }: { r
   return <>
     <nav className="crumbs" aria-label="Report">{back} <span aria-hidden="true">›</span> <span>{d.label}</span></nav>
     <Card title={<>{d.label} <Chip tone="info">{BASIS_NAME[basis]}</Chip></>} actions={<strong className="figure-total">{usd(d.figure)}</strong>}>
-      <p>{d.from ? <>{day(d.from)} to {day(d.to)}</> : <>All posted activity through {day(d.to)}</>} · {d.rows.length} line{d.rows.length === 1 ? '' : 's'} · {d.ties ? <Chip tone="good">Adds up to the report figure</Chip> : <Chip tone="bad">Does not add up to the report figure</Chip>}</p>
+      <p>{d.scopeNote ? d.scopeNote : d.from ? <>{day(d.from)} to {day(d.to)}</> : <>All posted activity through {day(d.to)}</>} · {d.rows.length} line{d.rows.length === 1 ? '' : 's'} · {d.ties ? <Chip tone="good">Adds up to the report figure</Chip> : <Chip tone="bad">Does not add up to the report figure</Chip>}</p>
       {basis === 'cash' && <p className="hint">On the cash basis an invoice, credit or bill counts as it is paid or credited: each line below is the share of a document its settlement covered, spread across the document's lines.</p>}
       <p><a href={`/api/pantry/reports/detail/export?${exportQuery}`}>Export source lines CSV</a></p>
       <AskAccountant key={JSON.stringify({ report, line, from, to, basis })} subjectKind="report-line" subjectId={JSON.stringify({ report, line, from, to, basis })} label={`${reportLabel} · ${d.label} · ${from || 'Beginning'} to ${to} · ${BASIS_NAME[basis]} · ${usd(d.figure)}`} />

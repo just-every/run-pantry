@@ -664,6 +664,12 @@ test('REPORT-004 everyday library: every current report ties to its ledger, open
 test('REPORT-005 trial-balance balances/totals and every general-ledger cell trace native signed sources, retain filters and export on each basis', async t => {
   const h = await harness(); t.after(() => h.close())
   const s = await october(h, true)
+  // Multiple same-day rows, including a cash settlement, require the native
+  // row sequence rather than a date-only cutoff for running figures.
+  for (const amount of ['25.00', '30.00']) {
+    const draft = await h.command('journal.save-draft', { date: '2026-10-20', memo: `Same-day direct receipt ${amount}`, lines: [{ accountId: s.acct['1000'], debit: amount }, { accountId: s.acct['4000'], credit: amount }] })
+    await h.command('journal.post', { id: draft.id, revision: draft.revision })
+  }
   const viewer = await h.member('ledger-source-viewer@example.test', 'viewer')
   const before = (await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results
   const detail = async (report, selection, expected, basis, account) => {
@@ -671,6 +677,7 @@ test('REPORT-005 trial-balance balances/totals and every general-ledger cell tra
     const d = await h.view(`reports/detail?${query}`, viewer)
     assert.equal(d.figure, expected, `${basis} ${report} ${JSON.stringify(selection)}`)
     assert.equal(d.total, expected); assert.equal(d.ties, true)
+    if (selection[1] === 'running') assert.match(d.scopeNote, /later rows on the same date are excluded/)
     assert.equal(d.rows.reduce((sum, row) => sum + row.amount, 0), expected)
     if (selection[0] !== 'total') assert.ok(d.rows.every(row => row.account.id === selection[0]))
     assert.equal(new Set(d.rows.map(row => row.key)).size, d.rows.length, 'opening and period settlement keys do not collide')
@@ -680,6 +687,7 @@ test('REPORT-005 trial-balance balances/totals and every general-ledger cell tra
     const csv = exported.value.trim().split('\r\n').map(line => [...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m => m[1].replaceAll('""', '"')))
     assert.equal(csv.slice(1).reduce((sum, row) => sum + Number(row[5]), 0), expected)
     assert.equal(Number(csv[1][6]), expected); assert.equal(Number(csv[1][7]), expected)
+    assert.equal(csv[1][14], d.scopeNote ?? '', 'running-row scope travels with the source export')
     assert.deepEqual(JSON.parse(csv[1][11]), Object.fromEntries(query))
     assert.equal(csv[1][8], basis === 'cash' ? 'Cash basis' : 'Accrual basis')
     assert.equal((await h.send(`/api/pantry/reports/detail/export?${query}`)).status, 401)
