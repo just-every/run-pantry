@@ -65,7 +65,12 @@ test('REPORT-005 / PROC-003 missing Stripe refund is named on dashboard, close a
         await providerCard.getByText('txn_charge',{exact:true}).waitFor()
         assert.ok((await providerCard.innerText()).includes('pi_external'))
         const output=await context.request.get(new URL(await page.getByRole('link',{name:'Export record JSON',exact:true}).getAttribute('href'),app.origin).href)
-        assert.ok((await output.json()).record.providerEvents.some(e=>e.id==='txn_charge'))
+        const exported=await output.json()
+        assert.ok(exported.record.providerEvents.some(e=>e.id==='txn_charge'))
+        assert.ok(exported.record.audit.some(e=>e.subject_id==='txn_charge'&&e.action==='stripe.clearing'))
+        const auditCard=page.locator('.card').filter({has:page.getByRole('heading',{name:'Audit history',exact:true})})
+        await auditCard.getByText(/Stripe clearing/).waitFor()
+        await auditCard.locator('summary').first().click()
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
         const evidence=process.env.PANTRY_EVIDENCE_DIR||'/tmp/sx-pantry-r16'
         await(await import('node:fs/promises')).mkdir(evidence,{recursive:true})

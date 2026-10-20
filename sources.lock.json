@@ -3336,7 +3336,7 @@
       "executable": false
     },
     "src/pantry/record-evidence.ts": {
-      "sha256": "52f6b1fae25678a986cba427f321e2f8d8fc76e21b51375537a8ab49c30f5b5d",
+      "sha256": "70acd074d5de057f4ab3e7b450b243633b371a9def591c3d8411e141755fd716",
       "executable": false
     },
     "src/pantry/recorded-payments.ts": {
@@ -4096,7 +4096,7 @@
       "executable": false
     },
     "tests/api/connected.test.mjs": {
-      "sha256": "2740c2822e12819fb4b4af743ea29e55f4d6a4a27acbda57969fe5b8001f2459",
+      "sha256": "5a69f9269761e305f2267425901fb0491b28b2b90af6346878bd9574ce57992e",
       "executable": false
     },
     "tests/api/custom-reports.test.mjs": {
@@ -4272,7 +4272,7 @@
       "executable": false
     },
     "tests/app/stripe-clearing.test.mjs": {
-      "sha256": "f4b06826482ed28677933cda5cca87fba95238717f229d3156b2c7d06ba73768",
+      "sha256": "a9d94bf0fec67d3e0a9af001d6f91a7678eae8a5c02391d2d8b79e6287f6275f",
       "executable": false
     },
     "tests/app/transfers.test.mjs": {

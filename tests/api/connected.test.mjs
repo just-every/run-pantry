@@ -87,7 +87,9 @@ test('REPORT-005 / PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees
   assert.equal(clearing.items.length,items.data.length)
   assert.ok(clearing.items.every(i=>['posted','adopted'].includes(i.status)))
   const charge = clearing.items.find(i => i.status === 'posted' && i.entryId)
-  assert.ok((await h.view(`reports/record/entry/${charge.entryId}`)).providerEvents.some(e => e.kind === 'balance-transaction' && e.id === charge.id))
+  const chargeSource = await h.view(`reports/record/entry/${charge.entryId}`)
+  assert.ok(chargeSource.providerEvents.some(e => e.kind === 'balance-transaction' && e.id === charge.id))
+  assert.ok(chargeSource.audit.some(e => e.subject_kind === 'stripe-item' && e.subject_id === charge.id && e.action === 'stripe.clearing'))
 
 
   // The deposit arrives on the statement and meets the payout by itself.
@@ -202,6 +204,7 @@ test('REPORT-005 / CLOSE-005 / PAYROLL-001 a Gusto payroll posts as one balanced
 
   const payrollSource = await h.view(`reports/record/entry/${p2.entry_id}`)
   assert.ok(payrollSource.providerEvents.some(e => e.provider === 'Gusto' && e.kind === 'payroll' && e.id === p2.uuid && e.evidence.gross_cents === 820000))
+  assert.ok(payrollSource.audit.some(e => e.subject_kind === 'gusto-payroll' && e.subject_id === p2.uuid && e.action === 'gusto.payroll'))
   const yearEnd = await h.view('year-end/2026')
   assert.deepEqual(yearEnd.payroll.map(p => [p.uuid, p.ties]).sort(), [[p1.uuid, true], [p2.uuid, true], [p3.uuid, false]].sort())
   assert.equal(yearEnd.payrollTotals.gross, payrolls.filter(p => p.processed && !p.external).reduce((sum, p) => sum + Math.round(Number(p.totals.gross_pay) * 100), 0))

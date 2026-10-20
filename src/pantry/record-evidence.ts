@@ -11,11 +11,6 @@ export async function recordEvidence(db: D1Database, record: Data) {
   const nativeKind = record.kind === 'entry' ? 'journal' : record.kind
   const captures = await all(db, `SELECT d.id, d.kind, d.receipt_id FROM pt_capture_drafts d JOIN pt_receipts r ON r.id = d.receipt_id WHERE d.bill_id = ? OR (r.linked_kind = ? AND r.linked_id = ?)`, record.kind === 'bill' ? record.id : '', nativeKind, record.id)
   for (const d of captures) subjects.push({ kind: 'capture-draft', id: d.id }, { kind: d.kind, id: record.kind === 'bill' ? record.id : d.id }, { kind: 'receipt', id: d.receipt_id })
-  const unique = [...new Map(subjects.map(s => [`${s.kind}:${s.id}`, s])).values()]
-  const where = unique.map(() => '(subject_kind = ? AND subject_id = ?)').join(' OR '), params = unique.flatMap(s => [s.kind, s.id])
-  const audit = await all(db, `SELECT * FROM pt_audit WHERE ${where} ORDER BY at, rowid`, ...params)
-  const relied = [...new Set(audit.map(a => a.approval_id).filter(Boolean))]
-  const approvals = await all(db, `SELECT * FROM pt_approvals WHERE ${where}${relied.length ? ` OR id IN (${relied.map(() => '?').join(',')})` : ''} ORDER BY at, rowid`, ...params, ...relied)
   const entries = record.entries.map((e: Data) => e.id) as string[]
   const list = entries.map(() => '?').join(',') || 'NULL'
   const [checkout, clearing, payouts, payroll, feed] = await Promise.all([
@@ -32,5 +27,14 @@ export async function recordEvidence(db: D1Database, record: Data) {
     ...payroll.map(e => ({ provider: 'Gusto', kind: 'payroll', id: e.uuid, evidence: e })),
     ...feed.map(e => ({ provider: 'Plaid', kind: 'transaction', id: e.feed_txn_id, evidence: e })),
   ]
+  for (const event of checkout) subjects.push({ kind: 'invoice', id: event.invoice_id })
+  for (const event of clearing) subjects.push({ kind: 'stripe-item', id: event.id })
+  for (const event of payouts) subjects.push({ kind: 'stripe-payout', id: event.id })
+  for (const event of payroll) subjects.push({ kind: 'gusto-payroll', id: event.uuid })
+  const unique = [...new Map(subjects.map(s => [`${s.kind}:${s.id}`, s])).values()]
+  const where = unique.map(() => '(subject_kind = ? AND subject_id = ?)').join(' OR '), params = unique.flatMap(s => [s.kind, s.id])
+  const audit = await all(db, `SELECT * FROM pt_audit WHERE ${where} ORDER BY at, rowid`, ...params)
+  const relied = [...new Set(audit.map(a => a.approval_id).filter(Boolean))]
+  const approvals = await all(db, `SELECT * FROM pt_approvals WHERE ${where}${relied.length ? ` OR id IN (${relied.map(() => '?').join(',')})` : ''} ORDER BY at, rowid`, ...params, ...relied)
   return { audit: audit.map(a => ({ ...a, approval: approvals.find(p => p.id === a.approval_id) ?? null })), approvals, providerEvents }
 }
