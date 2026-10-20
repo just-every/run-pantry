@@ -35,9 +35,10 @@ export function CashFlowDetail({ from, to, line }: { from: string; to: string; l
   return <><nav className="crumbs"><Link to="/app/reports" search={{ ...search, line: undefined, record: undefined }}>Cash flow</Link>{r && <> / {r.label}</>}</nav>
     {!r ? <Loading what="the entries" error={error} /> : <Card title={r.label} actions={<strong>{usd(r.figure)}</strong>}>
       <p>{day(from)} to {day(to)} · Indirect method. These contributions add up to {usd(r.figure)}.</p>
+      <p><a href={`/api/pantry/reports/cash-flow/detail/export?${new URLSearchParams({ ...Object.fromEntries(Object.entries(search).filter(([, v]) => v !== undefined) as [string, string][]), report: 'cash-flow', line, from, to })}`}>Export source lines CSV</a></p>
       <AskAccountant key={JSON.stringify({ line, from, to })} subjectKind="report-line" subjectId={JSON.stringify({ report: 'cash-flow', line, from, to, basis: 'accrual' })} label={`Cash flow · ${r.label} · ${from} to ${to} · ${usd(r.figure)}`} />
-      <Table heads={['Date', 'Entry', 'Account', 'Description', 'Contribution']} figures={[4]} empty="No posted entries contribute to this figure.">
-        {r.rows.map((l: D) => <tr key={l.key}><td>{day(l.date)}</td><td><Link to="/app/reports" search={{ ...search, record: `entry:${l.entryId}` }}>Entry {l.number}</Link><AskAccountant subjectKind="journal" subjectId={l.entryId} label={`Entry ${l.number} · ${l.date} · ${l.description}`} /></td><td>{r.accounts.find((a: D) => a.id === l.accountId)?.name}</td><td>{l.description}</td><td className="fig">{usd(l.amount)}</td></tr>)}
+      <Table heads={['Date', 'Record', 'Account', 'Description', 'Contribution']} figures={[4]} empty="No posted entries contribute to this figure.">
+        {r.rows.map((l: D) => <tr key={l.key}><td>{day(l.date)}</td><td><Link to="/app/reports" search={{ ...search, record: `${l.record.kind}:${l.record.id}` }}>{l.record.label}</Link><AskAccountant subjectKind="journal" subjectId={l.entryId} label={`Entry ${l.number} · ${l.date} · ${l.description}`} /></td><td>{r.accounts.find((a: D) => a.id === l.accountId)?.name}</td><td>{l.description}{l.documents.map((d: D) => <small className="sub block" key={d.id}><a href={`/api/pantry/documents/${d.id}`}>{d.name}</a></small>)}{l.bank.map((b: D) => <small className="sub block" key={b.id}>{day(b.date)} · {b.description} · {usd(b.amount)}</small>)}</td><td className="fig">{usd(l.amount)}</td></tr>)}
       </Table>
     </Card>}
   </>

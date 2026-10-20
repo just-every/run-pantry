@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { books, harness } from './harness.mjs'
 
 const basic = { name: 'Personal income', source: 'profit-and-loss', from: '2026-10-01', to: '2026-10-31', columns: ['name', 'amount'] }
-const doors = (prefix, id) => [`${prefix}/${id}`, `${prefix}/${id}/render`, `${prefix}/${id}/export.pdf`, `${prefix}/${id}/export.json`, ...(prefix === 'custom-reports' ? [`${prefix}/${id}/figures?row=missing&column=amount`] : [])]
+const doors = (prefix, id) => [`${prefix}/${id}`, `${prefix}/${id}/render`, `${prefix}/${id}/export.pdf`, `${prefix}/${id}/export.json`, ...(prefix === 'custom-reports' ? [`${prefix}/${id}/figures?row=missing&column=amount`, `${prefix}/${id}/figures/export?row=missing&column=amount`] : [])]
 
 test('REPORT-006 personal and role sharing applies on every door, owner edits, revision fences and revoked references', async t => {
   const h = await harness(); t.after(() => h.close())
@@ -27,7 +27,7 @@ test('REPORT-006 personal and role sharing applies on every door, owner edits, r
   for (const cookie of [accountant, viewer]) {
     assert.equal((await h.view('custom-reports', cookie)).reports.length, 1)
     assert.equal((await h.view(`custom-reports/${saved.id}`, cookie)).can_edit, false)
-    for (const path of doors('custom-reports', saved.id).filter(path => !path.includes('/figures?'))) await h.view(path, cookie)
+    for (const path of doors('custom-reports', saved.id).filter(path => !path.includes('/figures'))) await h.view(path, cookie)
   }
   await h.command('custom-report.save', { id: saved.id, revision: saved.revision, definition: basic }, accountant, 404)
   const pkg = await h.command('management-package.save', { name: 'October board', cover: 'October results', commentary: ['Read the margins.'], reportIds: [saved.id], sharedRoles: ['accountant', 'viewer'] }, bookkeeper)
@@ -48,7 +48,7 @@ test('REPORT-006 personal and role sharing applies on every door, owner edits, r
   assert.deepEqual((await h.view('custom-reports', accountant)).reports, [])
 })
 
-test('REPORT-006 saved P&L filters, gross margin and ratio tie to books; ordered PDF carries cover, commentary, formulas, shares and each basis', async t => {
+test('REPORT-005 / REPORT-006 saved P&L filters, gross margin and ratio tie to books; ordered PDF carries cover, commentary, formulas, shares and each basis', async t => {
   const h = await harness(); t.after(() => h.close())
   const { acct } = await books(h)
   const customer = await h.command('contact.save', { kind: 'customer', name: 'Cedar Studio' })
@@ -89,6 +89,19 @@ test('REPORT-006 saved P&L filters, gross margin and ratio tie to books; ordered
     const next = new Set([...seen, path]), figure = await h.view(path.replace(/^\/api\/pantry\//, ''), accountant)
     assert.equal(figure.basis, 'accrual')
     assert.ok(figure.to)
+    const exportPath = path.replace(/^\/api\/pantry\//, '').replace('/figures?', '/figures/export?')
+    assert.deepEqual(await h.view(`${exportPath}&format=json`, accountant), figure, 'every formula, derived value and operand exports its actual explanation')
+    const exported = await h.send(`/api/pantry/${exportPath}&format=csv`, undefined, { cookie: accountant })
+    if (figure.rows) {
+      assert.equal(exported.status, 200)
+      const cells = exported.value.trim().split('\r\n').map(line => [...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m => m[1].replaceAll('""', '"')))
+      assert.equal(cells.slice(1).reduce((sum, row) => sum + Number(row[5]), 0), figure.value)
+      assert.equal(JSON.parse(cells[1][11]).reportId, figure.context.reportId)
+      assert.deepEqual(JSON.parse(cells[1][11]).filters, figure.context.filters)
+    } else {
+      assert.equal(exported.status, 400, 'derived operands are not misrepresented as additive source rows')
+      assert.match(exported.value.error, /JSON with its operands/)
+    }
     if (figure.rows) {
       assert.equal(figure.ties, true, `${figure.label} source lines tie`)
       assert.equal(figure.rows.reduce((total, row) => total + row.amount, 0), figure.value)
@@ -107,6 +120,8 @@ test('REPORT-006 saved P&L filters, gross margin and ratio tie to books; ordered
     const detail = await followFigure(`custom-reports/${saved.id}/figures?${new URLSearchParams({ row: row.id, column: column.id })}`)
     assert.equal(detail.value, row.values[column.id], `${row.name} ${column.label} explains the displayed figure`)
   }
+  const noAuth = await h.send(`/api/pantry/custom-reports/${saved.id}/figures/export?row=margin&column=amount&format=json`)
+  assert.equal(noAuth.status, 401)
   const marginFigure = await h.view(`custom-reports/${saved.id}/figures?row=margin&column=amount`, accountant)
   assert.equal(marginFigure.expression, definition.layout.find(row => row.id === 'margin').expression)
   assert.deepEqual(marginFigure.operands.map(operand => [operand.label, operand.value]), [['Gross profit', 60000], ['Revenue', 100000]])

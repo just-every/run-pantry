@@ -5,6 +5,7 @@ import { all, audit, q, run } from './db'
 import { requireThat, text, type Data } from './core'
 import type { Command } from './context'
 import { balances, prevDay } from './reports'
+import { FIRST_DAY, reportSourceRows } from './report-sources'
 
 export const FLOW_CLASSES = ['cash', 'operating', 'investing', 'financing'] as const
 export type FlowClass = typeof FLOW_CLASSES[number]
@@ -83,16 +84,26 @@ export async function cashFlowDetail(db: D1Database, from: string, to: string, i
   const r = await cashFlow(db, from, to), allLines = [...r.operating, ...r.investing, ...r.financing]
   const totals: Record<string, [string, FlowLine[]]> = { operating: ['Net cash from operating activities', r.operating], investing: ['Net cash from investing activities', r.investing], financing: ['Net cash from financing activities', r.financing], 'net-change': ['Net change in cash', allLines] }
   const total = totals[id], line = allLines.find(l => l.id === id)
+  const detail = async (label: string, figure: number, rows: Contribution[], sourceFrom: string, sourceTo: string) => {
+    const sources = new Map((await reportSourceRows(db, { types: ['asset', 'liability', 'equity', 'income', 'expense'], from: sourceFrom, to: sourceTo, sign: 1 }, 'accrual')).map(row => [row.key, row]))
+    const enriched = rows.map(row => {
+      const source = sources.get(row.lineId)
+      requireThat(source, 'Cash-flow source line is unavailable', 409)
+      return { ...source, ...row }
+    })
+    const sum = enriched.reduce((n, row) => n + row.amount, 0)
+    return { label, figure, rows: enriched, accounts: r.accounts, basis: 'accrual' as const, basisLabel: 'Indirect method - accrual starting income', from: sourceFrom === FIRST_DAY ? null : sourceFrom, to: sourceTo, total: sum, ties: sum === figure }
+  }
   if (id === 'opening' || id === 'closing') {
     const asOf = id === 'opening' ? r.openingDate : to
     const cashIds = new Set(r.cashAccounts.map(a => a.id))
     const rows = (await all(db, `SELECT l.*, e.id AS entry_id, e.number, e.entry_date, e.memo AS entry_memo FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id WHERE e.status = 'posted' AND e.entry_date <= ? ORDER BY e.entry_date, e.number, l.line_no`, asOf)).filter(l => cashIds.has(l.account_id))
       .map(l => ({ key: l.id, lineId: l.id, accountId: l.account_id, entryId: l.entry_id, number: l.number, date: l.entry_date, description: l.entry_memo, amount: l.debit_cents - l.credit_cents }))
-    return { label: id === 'opening' ? 'Opening cash' : 'Closing cash', figure: r[id], rows, accounts: r.accounts }
+    return detail(id === 'opening' ? 'Opening cash' : 'Closing cash', r[id], rows, FIRST_DAY, asOf)
   }
   requireThat(total || line, 'Choose a cash-flow figure', 404)
   const rows = total ? total[1].flatMap(l => l.rows) : line!.rows
-  return { label: total?.[0] ?? line!.name, figure: sum(rows), rows, accounts: r.accounts }
+  return detail(total?.[0] ?? line!.name, sum(rows), rows, from, to)
 }
 
 const cell = (v: unknown) => `"${String(v).replaceAll('"', '""')}"`

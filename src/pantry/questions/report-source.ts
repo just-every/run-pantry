@@ -14,7 +14,7 @@ export async function reportSource(db: D1Database, id: string) {
   const from = date(input.from), to = date(input.to), basis = basisOf(input.basis)
   requireThat(from <= to, 'Report start must be before its end')
   const scope = { report, line, from, to, basis }
-  if (report === 'trial-balance') {
+  if (report === 'trial-balance' && !line.startsWith('[')) {
     const r = await trialBalance(db, to, basis), a = r.rows.find(a => a.id === line)
     requireThat(a, 'Choose an account on the trial balance', 404)
     return { ...scope, label: `${a.code} ${a.name}`, figure: a.debitBalance - a.creditBalance }

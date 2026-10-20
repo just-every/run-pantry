@@ -71,6 +71,7 @@ export type CustomReportFigureOperand = {
   exact?: { numerator: string; denominator: string }
 }
 export type CustomReportFigureDetail = CustomReportFigureOperand & {
+  context: { reportId: string; revision: string; source: string; basis: Basis; from: string; to: string; filters: CustomReportDefinition['filters']; comparison: CustomReportDefinition['comparison']; row: string; column: string; node: string }
   expression?: string; exact?: { numerator: string; denominator: string }; operands: CustomReportFigureOperand[]
   rows?: import('../core').Data[]; total?: number; ties?: boolean
 }

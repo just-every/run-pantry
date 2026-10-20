@@ -3,11 +3,12 @@
 // invoice, credit or bill), the record it came from, what settled it, its
 // documents and the bank statement lines it was matched to. The rows are read
 // separately from the report and must add up to the report's own figure.
-import { longDay, requireThat, type Data } from './core'
+import { longDay, requireThat } from './core'
 import { all } from './db'
-import { cashLines, sameOnCash, type Basis } from './basis'
-import { balanceSheet, prevDay, profitAndLoss, settlementMemo } from './reports'
-import { attachments, bankMatches, recordLabels, recordOf, type RecordRef } from './records'
+import type { Basis } from './basis'
+import { balanceSheet, prevDay, profitAndLoss } from './reports'
+import { reportSourceRows } from './report-sources'
+import { ledgerFigureDetail } from './ledger-drill'
 
 type Scope = { label: string; types: string[]; accountId?: string; from: string; to: string; sign: 1 | -1; figure: number }
 
@@ -48,35 +49,11 @@ async function scope(db: D1Database, report: string, line: string, from: string,
   throw new Error('unreachable')
 }
 
-export async function figureDetail(db: D1Database, q: { report: string; line: string; from: string; to: string; basis: Basis }, startMonth: number) {
+export async function figureDetail(db: D1Database, q: { report: string; line: string; from: string; to: string; basis: Basis; account?: string }, startMonth: number) {
+  requireThat(q.from <= q.to, 'The end date is on or after the start date')
+  if (q.report === 'trial-balance' || q.report === 'general-ledger') return ledgerFigureDetail(db, q)
   const s = await scope(db, q.report, q.line, q.from, q.to, q.basis, startMonth)
-  const accounts = new Map((await all(db, 'SELECT id, code, name, type FROM pt_accounts')).map(a => [a.id, a]))
-  const inScope = (accountId: string) => s.accountId ? accountId === s.accountId : s.types.includes(accounts.get(accountId)?.type)
-  const filter = s.accountId ? 'l.account_id = ?' : `a.type IN (${s.types.map(() => '?').join(', ')})`
-  const posted = await all(db, `SELECT l.id AS line_id, l.account_id, l.contact_id, l.debit_cents, l.credit_cents, l.memo, e.id AS entry_id, e.number, e.entry_date, e.memo AS entry_memo, e.source_kind, e.source_id, e.document_id, e.reverses_id
-    FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id JOIN pt_accounts a ON a.id = l.account_id
-    WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? AND ${filter} ${q.basis === 'cash' ? `AND ${sameOnCash()}` : ''}
-    ORDER BY e.entry_date, e.number, l.line_no`, s.from, s.to, ...(s.accountId ? [s.accountId] : s.types))
-  const labels = await recordLabels(db), docs = await attachments(db), bank = await bankMatches(db)
-  const account = (id: string) => { const a = accounts.get(id)!; return { id: a.id, code: a.code, name: a.name } }
-  const rows: Data[] = posted.map(l => {
-    const record = recordOf(l, labels)
-    return { contactId: l.contact_id ?? null, invoiceContactId: labels.invoiceContact(l.reverses_id ?? l.entry_id), sourceContactId: labels.sourceContact(l.reverses_id ?? l.entry_id), key: l.line_id, date: l.entry_date, account: account(l.account_id), amount: s.sign * (l.debit_cents - l.credit_cents), debit: l.debit_cents, credit: l.credit_cents,
-      description: l.entry_memo, lineMemo: l.memo, entry: { id: l.entry_id, number: l.number }, record, settlement: null,
-      documents: docs.forRecords([record, { kind: 'entry', id: l.entry_id }], l.document_id), bank: bank.forLine(l.line_id, l.entry_id, record) }
-  })
-  if (q.basis === 'cash') for (const [i, c] of (await cashLines(db, s.from, s.to)).entries()) {
-    if (!inScope(c.accountId)) continue
-    const record: RecordRef = { kind: c.docKind === 'bill' ? 'bill' : 'invoice', id: c.docId, label: labels.label(c.docKind === 'bill' ? 'bill' : 'invoice', c.docId) }
-    const by: RecordRef | null = c.settlement.paymentId ? { kind: 'payment', id: c.settlement.paymentId, label: labels.label('payment', c.settlement.paymentId) }
-      : c.settlement.kind === 'credit' ? { kind: 'invoice', id: c.settlement.creditId!, label: labels.label('invoice', c.settlement.creditId!) }
-      : { kind: 'invoice', id: c.settlement.appliedToId!, label: labels.label('invoice', c.settlement.appliedToId!) }
-    rows.push({ contactId: c.contactId, invoiceContactId: null, sourceContactId: c.contactId, key: `cash-${i}`, date: c.date, account: account(c.accountId), amount: s.sign * c.net, debit: Math.max(c.net, 0), credit: Math.max(-c.net, 0),
-      description: settlementMemo(c), lineMemo: c.description, entry: { id: c.docJournalId, number: null }, record,
-      settlement: { kind: c.settlement.kind, by, share: `${(c.settledAfter / 100).toFixed(2)} of ${(c.docTotal / 100).toFixed(2)} settled` },
-      documents: docs.forRecords([record, { kind: 'entry', id: c.docJournalId }, ...(by ? [by] : [])]), bank: by?.kind === 'payment' ? bank.forPayment(by.id) : [] })
-  }
-  rows.sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : 0)
+  const rows = await reportSourceRows(db, s, q.basis)
   const total = rows.reduce((t, r) => t + r.amount, 0)
   return { basis: q.basis, report: q.report, line: q.line, label: s.label, from: s.from === START ? null : s.from, to: s.to, figure: s.figure, rows, total, ties: total === s.figure }
 }

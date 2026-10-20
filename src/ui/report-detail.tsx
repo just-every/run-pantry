@@ -19,7 +19,7 @@ const Bank = ({ lines }: { lines: D[] }) => lines.length ? <>{lines.map(b => <sp
 
 export function FigureDetail({ report, line, from, to, basis, reportLabel }: { report: string; line: string; from: string; to: string; basis: 'cash' | 'accrual'; reportLabel: string }) {
   const search = useSearch({ from: '/app/reports' })
-  const { data: d, error } = useView<D>(`reports/detail?report=${report}&line=${encodeURIComponent(line)}&from=${from}&to=${to}&basis=${basis}`)
+  const { data: d, error } = useView<D>(`reports/detail?${new URLSearchParams({ report, line, from, to, basis, ...(search.account ? { account: search.account } : {}) })}`)
   const exportQuery = new URLSearchParams(Object.entries({ ...search, report, line, from, to, basis }).filter(([, value]) => value !== undefined) as [string, string][]).toString()
   const back = <Link to="/app/reports" search={{ ...search, line: undefined, record: undefined }}>{reportLabel}</Link>
   if (!d) return <><nav className="crumbs" aria-label="Report">{back}</nav><Loading error={error} what="the records behind this figure" /></>
@@ -53,7 +53,7 @@ export function RecordView({ record, reportLabel }: { record: string; reportLabe
   const search = useSearch({ from: '/app/reports' })
   const [kind, id] = record.split(':')
   const { data: r, error } = useView<D>(`reports/record/${kind}/${id}`)
-  const crumbs = <nav className="crumbs" aria-label="Report"><Link to="/app/reports" search={{ ...search, line: undefined, record: undefined }}>{reportLabel}</Link>{search.line && <> <span aria-hidden="true">›</span> <Link to="/app/reports" search={{ ...search, record: undefined }}>Back to the figure</Link></>}{r && <> <span aria-hidden="true">›</span> <span>{r.title}</span></>}</nav>
+  const crumbs = <nav className="crumbs" aria-label="Report"><Link to="/app/reports" search={{ ...search, line: undefined, record: undefined, customId: undefined, row: undefined, column: undefined, node: undefined, origin: undefined }}>{reportLabel}</Link>{(search.line || search.customId && search.row) && <> <span aria-hidden="true">›</span> <Link to="/app/reports" search={{ ...search, record: undefined }}>Back to the figure</Link></>}{r && <> <span aria-hidden="true">›</span> <span>{r.title}</span></>}</nav>
   if (!r) return <>{crumbs}<Loading error={error} what="the record" /></>
   return <>
     {crumbs}

@@ -140,6 +140,64 @@ test('REPORT-005 Software figure to approved bill, PDF, payment and bank; source
     await shot('payment')
     await page.getByRole('link', { name: 'Back to the figure', exact: true }).click()
     await page.getByText('Adds up to the report figure', { exact: true }).waitFor()
+    // New native report amounts are links to exactly the displayed read model.
+    const money = cents => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
+    const openFigure = async selection => {
+      const links = page.locator('a.figure-link')
+      const index = (await links.evaluateAll(nodes => nodes.map(a => new URL(a.href).searchParams.get('line')))).indexOf(JSON.stringify(selection))
+      assert.ok(index >= 0, `visible figure ${JSON.stringify(selection)}`)
+      await links.nth(index).click()
+      await page.getByText('Adds up to the report figure', { exact: true }).waitFor()
+    }
+    for (const basis of ['cash', 'accrual']) {
+      const tb = await view(`reports/trial-balance?to=2026-10-31&basis=${basis}`)
+      const query = new URLSearchParams({ report: 'trial-balance', from: '2026-10-01', to: '2026-10-31', basis })
+      await page.goto(`${app.origin}/app/reports?${query}`)
+      await page.locator('a.figure-link').first().waitFor(); await shot(`trial-${basis}`)
+      await openFigure(['total', 'debit'])
+      const totalCsv = await context.request.get(new URL(await page.getByRole('link', { name: 'Export source lines CSV', exact: true }).getAttribute('href'), app.origin).href)
+      assert.equal(totalCsv.status(), 200); assert.ok((await totalCsv.text()).includes(`"${tb.debit}"`))
+      await shot(`trial-total-${basis}`)
+      const gl = await view(`reports/general-ledger?from=2026-10-01&to=2026-10-31&basis=${basis}&account=${acct['6200']}`)
+      const a = gl.accounts[0], row = a.rows[0]
+      const ledger = new URLSearchParams({ report: 'general-ledger', from: '2026-10-01', to: '2026-10-31', basis, account: a.id })
+      for (const [selection, expected] of [[[a.id, 'opening'], a.opening], [[a.id, 'debit', row.id], row.debit_cents], [[a.id, 'running', row.id], row.running], [[a.id, 'closing'], a.closing]]) {
+        await page.goto(`${app.origin}/app/reports?${ledger}`)
+        await page.locator('a.figure-link').first().waitFor()
+        assert.equal(await page.locator('.gl-account').count(), 1, 'native account filter applies to the table')
+        if (selection[1] === 'opening') {
+          const download = new URL(await page.getByRole('link', { name: /^Download CSV/ }).getAttribute('href'), app.origin)
+          assert.equal(download.searchParams.get('account'), a.id)
+          assert.equal((await context.request.get(download.href)).status(), 200)
+          await shot(`ledger-${basis}`)
+        }
+        await openFigure(selection)
+        await page.locator('.figure-total').getByText(money(expected), { exact: true }).waitFor()
+        const href = new URL(await page.getByRole('link', { name: 'Export source lines CSV', exact: true }).getAttribute('href'), app.origin)
+        assert.equal(href.searchParams.get('account'), a.id)
+        assert.equal((await context.request.get(href.href)).status(), 200)
+        await shot(`ledger-${basis}-${selection[1]}`)
+        if (selection[1] === 'debit') {
+          await page.getByRole('link', { name: 'Bill BL-1042 · Brightline Software', exact: true }).first().click()
+          await page.getByRole('heading', { name: 'Approvals', exact: true }).waitFor()
+          assert.equal(new URL(page.url()).searchParams.get('account'), a.id)
+          await shot(`ledger-record-${basis}`)
+          await page.getByRole('link', { name: 'Back to the figure', exact: true }).click()
+          await page.getByText('Adds up to the report figure', { exact: true }).waitFor()
+        }
+      }
+    }
+    await page.goto(`${app.origin}/app/reports?report=cash-flow&from=2026-10-01&to=2026-10-31&basis=cash`)
+    await page.getByRole('link', { name: 'Net cash from operating activities', exact: true }).waitFor(); await shot('cash-flow')
+    await page.getByRole('link', { name: 'Net cash from operating activities', exact: true }).click()
+    const cashExport = new URL(await page.getByRole('link', { name: 'Export source lines CSV', exact: true }).getAttribute('href'), app.origin)
+    const cashCsv = await context.request.get(cashExport.href)
+    assert.equal(cashCsv.status(), 200); assert.equal(cashCsv.headers()['x-pantry-basis'], 'Indirect method - accrual starting income')
+    await shot('cash-flow-detail')
+    await page.getByRole('link', { name: 'Bill BL-1042 · Brightline Software', exact: true }).first().click()
+    await page.getByRole('heading', { name: 'Approvals', exact: true }).waitFor()
+    assert.equal(new URL(page.url()).searchParams.get('report'), 'cash-flow')
+    await shot('cash-flow-record')
     assert.deepEqual(errors, []); await context.close()
   }
 })

@@ -1,7 +1,8 @@
 import type { Hono, Context as HonoContext } from 'hono'
 import type { Bindings } from '../../auth.server'
 import type { Context } from '../context'
-import type { Data } from '../core'
+import { requireThat, type Data } from '../core'
+import { figureExport } from '../detail-export'
 import { one } from '../db'
 import { customReportFigure } from './drill'
 import { customReportPdf, managementReportPdf } from './pdf'
@@ -26,6 +27,14 @@ const jsonResponse = (saved: Data, filename: string) => new Response(JSON.string
 
 export function registerCustomReportRoutes(api: Hono<{ Bindings: Bindings }>, reader: (c: C) => Promise<Context>) {
   api.get('/api/pantry/custom-reports', async c => c.json({ reports: await savedReportList(await reader(c)) }))
+  api.get('/api/pantry/custom-reports/:id/figures/export', async c => {
+    const detail = await customReportFigure(await reader(c), c.req.param('id'), { row: c.req.query('row'), column: c.req.query('column'), node: c.req.query('node') })
+    const format = c.req.query('format') ?? 'json'
+    requireThat(format === 'json' || format === 'csv', 'Choose JSON or source CSV')
+    if (format === 'json') return jsonResponse(detail, 'pantry-report-figure')
+    requireThat(detail.rows !== undefined, 'This derived figure exports as JSON with its operands; open an operand for source CSV')
+    return figureExport({ ...detail, figure: detail.value }, detail.context)
+  })
   api.get('/api/pantry/custom-reports/:id/figures', async c => c.json(await customReportFigure(await reader(c), c.req.param('id'), { row: c.req.query('row'), column: c.req.query('column'), node: c.req.query('node') })))
   api.get('/api/pantry/custom-reports/:id/render', async c => c.json(await renderSavedReport(await reader(c), c.req.param('id'))))
   api.get('/api/pantry/custom-reports/:id/export.json', async c => jsonResponse(await savedReport(await reader(c), c.req.param('id')), 'pantry-custom-report'))

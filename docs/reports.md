@@ -2,7 +2,7 @@
 
 ## Every figure opens to its records
 
-On the **Profit and loss** and the **Balance sheet**, choose any account line or total. Pantry lists the lines behind it: the date, the invoice, bill, payment or journal entry it came from, the documents attached, and the bank statement lines it was matched to. The list adds up to the figure, and the page says so. Choose a record to open it with its lines, journal entry, payments, documents and statement lines, and use the trail at the top to go back to the figure or the report. The address of each step can be bookmarked or sent to your accountant.
+On the **Profit and loss**, **Balance sheet** and **Trial balance**, choose an account amount or total. On the **General ledger**, choose a debit, credit, opening, running or closing balance. Pantry lists the lines behind it: the date, the invoice, bill, payment or journal entry it came from, the documents attached, and the bank statement lines it was matched to. The list adds up to the figure, and the page says so. Choose a record to open it with its lines, journal entry, payments, documents and statement lines, and use the trail at the top to go back to the figure or the report. The address of each step can be bookmarked or sent to your accountant.
 
 ## Cash or accrual, one switch
 
@@ -77,4 +77,10 @@ On a P&L or balance-sheet figure, **Export source lines CSV** downloads the same
 
 Follow **Linked records** from a bill to its payment and bank evidence. Approvals include the revision, decision, actor and note; audit details retain the approval actually relied on. Stripe checkout/balance transactions/payouts, Gusto payroll and matched Plaid feed transactions show the provider evidence Pantry retained, rather than claiming a fresh provider validation.
 
-REPORT-005 remains partial: the remaining report figures, filters across those doors and exports at custom/cash-flow and other drill levels are still outstanding.
+Trial-balance source lists explain each net debit or credit balance, not gross turnover. Their debit and credit totals contain only the accounts contributing to that side. General-ledger running balances include opening activity and stop at the selected row in the report's own order; opening and closing balances include all earlier activity. Cash settlements keep the original document and the payment or credit that settled it.
+
+On a cash-flow contribution, **Export source lines CSV** downloads its signed contribution amounts, source transactions, documents and bank evidence. Opening cash includes all posted cash activity through the day before From; closing cash includes all activity through To. The export stays labeled indirect method with accrual starting income even if Cash is selected elsewhere.
+
+On a custom figure or operand, **Export figure JSON** downloads the value, units, exact intermediate value when applicable, formula and operand links. An additive source operand also offers **Export source lines CSV**; derived ratios and percentages retain their operand explanation rather than claiming their source amounts add to a ratio. The saved definition's filters, revision, basis, range and selected operand accompany record links and record JSON. **Back to the figure** returns to that operand; every read and export rechecks the current report access.
+
+REPORT-005 remains partial: comparison/bridge, aging, sales tax, 1099, sales/spend, everyday-library and budget figures still need their complete source, filter and export paths.

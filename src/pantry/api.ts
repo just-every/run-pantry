@@ -173,7 +173,7 @@ view('recognition', async (ctx, c) => recognitionView(ctx.db, day(c, 'to')))
 api.get('/api/pantry/reports/detail/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const entity = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
-  const detail = await figureDetail(ctx.db, { report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: await reportBasis(ctx.db, c.req.query('basis')) }, Number(entity?.fiscal_year_start ?? 1))
+  const detail = await figureDetail(ctx.db, { report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: await reportBasis(ctx.db, c.req.query('basis')), account: c.req.query('account') }, Number(entity?.fiscal_year_start ?? 1))
   return figureExport(detail, c.req.query())
 })
 api.get('/api/pantry/reports/record/:kind/:id/export', async c => {
@@ -183,11 +183,16 @@ api.get('/api/pantry/reports/record/:kind/:id/export', async c => {
 view('reports/detail', async (ctx, c) => {
   const to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
-  return figureDetail(ctx.db, { report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: await reportBasis(ctx.db, c.req.query('basis')) }, Number(e?.fiscal_year_start ?? 1))
+  return figureDetail(ctx.db, { report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: await reportBasis(ctx.db, c.req.query('basis')), account: c.req.query('account') }, Number(e?.fiscal_year_start ?? 1))
 })
 view('reports/record/:kind/:id', async (ctx, c) => recordView(ctx.db, c.req.param('kind')!, c.req.param('id')!))
 view('reports/adjusting-entries', async (ctx, c) => ({ ...await adjustingEntries(ctx.db, year(c)), basis: await reportBasis(ctx.db, c.req.query('basis')) }))
 view('reports/contractors', async (ctx, c) => contractors(ctx.db, year(c)))
+api.get('/api/pantry/reports/cash-flow/detail/export', async c => {
+  const ctx = await reader(c)
+  const detail = await cashFlowDetail(ctx.db, day(c, 'from'), day(c, 'to'), c.req.query('line') ?? '')
+  return figureExport(detail, c.req.query())
+})
 view('reports/cash-flow/detail', async (ctx, c) => cashFlowDetail(ctx.db, day(c, 'from'), day(c, 'to'), c.req.query('line') ?? ''))
 api.get('/api/pantry/reports/cash-flow.csv', async c => {
   const ctx = await reader(c), from = day(c, 'from'), to = day(c, 'to')
@@ -196,7 +201,7 @@ api.get('/api/pantry/reports/cash-flow.csv', async c => {
 api.get('/api/pantry/reports/:kind/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   if (isLibrary(c.req.param('kind')!)) return libraryExport(ctx.db, await libraryReport(ctx.db, c.req.param('kind')!, from, to, await reportBasis(ctx.db, c.req.query('basis')), c.req.query('account'), c.req.query('payee')), c.req.query('format') ?? 'pdf')
-  return reportExport(ctx.db, c.req.param('kind')!, from, to, await reportBasis(ctx.db, c.req.query('basis')), c.req.query('format') ?? 'pdf', c.req.query('columns'))
+  return reportExport(ctx.db, c.req.param('kind')!, from, to, await reportBasis(ctx.db, c.req.query('basis')), c.req.query('format') ?? 'pdf', c.req.query('columns'), c.req.query('account'))
 })
 view('reports/:kind', async (ctx, c) => {
   const kind = c.req.param('kind')!, to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01'), basis = await reportBasis(ctx.db, c.req.query('basis'))

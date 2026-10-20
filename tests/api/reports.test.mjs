@@ -322,7 +322,7 @@ test('CLOSE-005 / TAXFORM-002 1099 contractors: cash payments per calendar year 
   assert.equal((await h.send('/api/pantry/reports/contractors/2026/1099-nec.csv', undefined, { cookie: h.owner })).status, 409)
 })
 
-test('REPORT-003 indirect cash flow: activity, noncash adjustments, arbitrary periods, source entries and exports tie to cash', async t => {
+test('REPORT-003 / REPORT-005 indirect cash flow: activity, noncash adjustments, arbitrary periods, source entries and exports tie to cash', async t => {
   const h = await harness(); t.after(() => h.close())
   const s = await october(h)
   const loan = await h.command('account.save', { code: '2500', name: 'Equipment loan', type: 'liability' })
@@ -347,7 +347,21 @@ test('REPORT-003 indirect cash flow: activity, noncash adjustments, arbitrary pe
     const d = await h.view(`reports/cash-flow/detail?${range}&line=${encodeURIComponent(id)}`)
     assert.equal(d.figure, amount)
     assert.equal(d.rows.reduce((n, l) => n + l.amount, 0), amount)
-    for (const row of d.rows) assert.ok((await h.view(`reports/record/entry/${row.entryId}`)).entries.length)
+    for (const row of d.rows) {
+      assert.ok((await h.view(`reports/record/${row.record.kind}/${row.record.id}`)).entries.length)
+      assert.ok(row.account.id); assert.ok(Array.isArray(row.documents)); assert.ok(Array.isArray(row.bank))
+    }
+    const path = `reports/cash-flow/detail/export?${range}&line=${encodeURIComponent(id)}&basis=cash`
+    const exported = await h.send(`/api/pantry/${path}`, undefined, { cookie: h.owner })
+    assert.equal(exported.status, 200)
+    assert.equal(exported.headers.get('x-pantry-basis'), 'Indirect method - accrual starting income', 'cash switch never relabels indirect cash flow')
+    const parsed = exported.value.trim().split('\r\n').map(line => [...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m => m[1].replaceAll('""', '"')))
+    assert.equal(parsed.slice(1).reduce((sum, row) => sum + Number(row[5]), 0), amount)
+    assert.equal(Number(parsed[1][6]), amount)
+    assert.deepEqual(JSON.parse(parsed[1][11]), Object.fromEntries(new URLSearchParams(`${range}&line=${encodeURIComponent(id)}&basis=cash`)))
+    assert.equal(parsed[1][10], id === 'opening' ? '2026-09-30' : '2026-12-31')
+    assert.equal((await h.send(`/api/pantry/${path}`)).status, 401)
+
   }
   const start = await h.view('reports/balance-sheet?to=2026-09-30'), end = await h.view('reports/balance-sheet?to=2026-12-31')
   assert.equal(r.netChange, lineOf(end, '1000') - lineOf(start, '1000'))
@@ -644,4 +658,74 @@ test('REPORT-004 everyday library: every current report ties to its ledger, open
   }
   await h.view('reports/journal?from=2026-11-01&to=2026-10-01',h.owner,400)
   await h.view(`reports/transactions?${OCT}&account=unknown`).then(r=>assert.equal(r.rows.length,0))
+})
+
+
+test('REPORT-005 trial-balance balances/totals and every general-ledger cell trace native signed sources, retain filters and export on each basis', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const s = await october(h, true)
+  const viewer = await h.member('ledger-source-viewer@example.test', 'viewer')
+  const before = (await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results
+  const detail = async (report, selection, expected, basis, account) => {
+    const query = new URLSearchParams({ report, line: JSON.stringify(selection), from: '2026-10-01', to: '2026-10-31', basis, ...(account ? { account } : {}) })
+    const d = await h.view(`reports/detail?${query}`, viewer)
+    assert.equal(d.figure, expected, `${basis} ${report} ${JSON.stringify(selection)}`)
+    assert.equal(d.total, expected); assert.equal(d.ties, true)
+    assert.equal(d.rows.reduce((sum, row) => sum + row.amount, 0), expected)
+    if (selection[0] !== 'total') assert.ok(d.rows.every(row => row.account.id === selection[0]))
+    assert.equal(new Set(d.rows.map(row => row.key)).size, d.rows.length, 'opening and period settlement keys do not collide')
+    for (const row of d.rows) assert.ok((await h.view(`reports/record/${row.record.kind}/${row.record.id}`, viewer)).entries.length)
+    const exported = await h.send(`/api/pantry/reports/detail/export?${query}`, undefined, { cookie: viewer })
+    assert.equal(exported.status, 200)
+    const csv = exported.value.trim().split('\r\n').map(line => [...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m => m[1].replaceAll('""', '"')))
+    assert.equal(csv.slice(1).reduce((sum, row) => sum + Number(row[5]), 0), expected)
+    assert.equal(Number(csv[1][6]), expected); assert.equal(Number(csv[1][7]), expected)
+    assert.deepEqual(JSON.parse(csv[1][11]), Object.fromEntries(query))
+    assert.equal(csv[1][8], basis === 'cash' ? 'Cash basis' : 'Accrual basis')
+    assert.equal((await h.send(`/api/pantry/reports/detail/export?${query}`)).status, 401)
+    return d
+  }
+  for (const basis of ['cash', 'accrual']) {
+    const tb = await h.view(`reports/trial-balance?to=2026-10-31&basis=${basis}`)
+    for (const row of tb.rows) {
+      await detail('trial-balance', [row.id, 'debit'], row.debitBalance, basis)
+      await detail('trial-balance', [row.id, 'credit'], row.creditBalance, basis)
+    }
+    await detail('trial-balance', ['total', 'debit'], tb.debit, basis)
+    await detail('trial-balance', ['total', 'credit'], tb.credit, basis)
+    for (const filter of [undefined, s.acct['6200']]) {
+      const gl = await h.view(`reports/general-ledger?${OCT}&basis=${basis}${filter ? `&account=${filter}` : ''}`)
+      const download = await h.send(`/api/pantry/reports/general-ledger/export?${OCT}&basis=${basis}&format=csv${filter ? `&account=${filter}` : ''}`, undefined, { cookie: viewer })
+      assert.equal(download.status, 200)
+      const exportedLines = download.value.trim().split('\r\n').slice(1).map(line => [...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m => m[1].replaceAll('""', '"')))
+      const expected = gl.accounts.flatMap(a => [[`${a.code} · ${a.name} · opening`, (a.opening / 100).toFixed(2)], ...a.rows.map(row => [`${a.code} · ${row.entry_date} · ${row.entry_memo} · ${row.memo}`, ((row.debit_cents - row.credit_cents) / 100).toFixed(2)]), [`${a.code} · closing`, (a.closing / 100).toFixed(2)]])
+      assert.deepEqual(exportedLines.map(row => [row[0], row[2]]), expected, 'report download retains the same native account filter')
+      for (const a of gl.accounts) {
+        await detail('general-ledger', [a.id, 'opening'], a.opening, basis, filter)
+        for (const row of a.rows) for (const [metric, value] of [['debit', row.debit_cents], ['credit', row.credit_cents], ['running', row.running]]) {
+          const d = await detail('general-ledger', [a.id, metric, row.id], value, basis, filter)
+          if (row.id.startsWith('cash-') && metric !== 'running') {
+            assert.equal(d.rows.length, 1); assert.ok(d.rows[0].settlement.by.id, 'settled share opens the actual document and payment')
+          }
+        }
+        await detail('general-ledger', [a.id, 'closing'], a.closing, basis, filter)
+      }
+    }
+  }
+  // Settlement keys start afresh within each native date range. A later range
+  // has both earlier cash shares and current cash shares in its running total.
+  const november = await h.view(`reports/general-ledger?from=2026-11-01&to=2026-11-30&basis=cash&account=${s.acct['4000']}`)
+  const a = november.accounts[0], last = a.rows.at(-1)
+  const nov = await h.view(`reports/detail?${new URLSearchParams({ report: 'general-ledger', line: JSON.stringify([a.id, 'running', last.id]), from: '2026-11-01', to: '2026-11-30', basis: 'cash', account: a.id })}`)
+  assert.equal(nov.total, last.running); assert.equal(nov.ties, true)
+  assert.equal(new Set(nov.rows.map(row => row.key)).size, nov.rows.length)
+  assert.ok(nov.rows.some(row => row.key.startsWith('opening:cash-')))
+  assert.ok(nov.rows.some(row => row.key.startsWith('cash-')))
+  const invalid = async (report, line, extra = '') => h.view(`reports/detail?report=${report}&line=${encodeURIComponent(line)}&${OCT}${extra}`, h.owner, 404)
+  await invalid('trial-balance', 'not-json')
+  await invalid('trial-balance', JSON.stringify(['unknown', 'debit']))
+  await invalid('general-ledger', JSON.stringify([s.acct['6200'], 'running', 'unknown']))
+  await invalid('general-ledger', JSON.stringify([s.acct['6200'], 'closing']), `&account=${s.acct['1000']}`)
+  await invalid('general-ledger', JSON.stringify([s.acct['6200'], 'arbitrary']))
+  assert.deepEqual((await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results, before, 'tracing and exports do not alter the ledger')
 })

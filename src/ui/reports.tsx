@@ -13,7 +13,7 @@ import { AskAccountant } from './ask-accountant'
 import { ColumnPicker, StatementColumns, columnMode, type ColumnMode, type ColumnStatement } from './statement-columns'
 import { LIBRARY_REPORTS, ReportLibrary, hasLibraryFilters, isLibraryReport, libraryBasisLabel, libraryQuery } from './report-library'
 
-export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string; columns?: string; account?: string; payee?: string }
+export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string; columns?: string; account?: string; payee?: string; customId?: string; row?: string; column?: string; node?: string; origin?: string }
 type Basis = 'cash' | 'accrual'
 
 // [tab, slug, reads on a basis, takes a date range]
@@ -28,16 +28,16 @@ function Figure({ line, children }: { line: string; children: React.ReactNode })
 
 function Trial({ r, from, to, basis }: { r: D; from: string; to: string; basis: Basis }) {
   return <Table heads={['Code', 'Account', 'Debit', 'Credit']} figures={[2, 3]} empty="No posted balances on this date.">
-    {[...r.rows.map((x: D) => <tr key={x.id}><td>{x.code}</td><td>{x.name}<AskAccountant key={JSON.stringify({ from, to, basis })} subjectKind="report-line" subjectId={JSON.stringify({ report: 'trial-balance', line: x.id, from, to, basis })} label={`Trial balance · ${x.code} · ${x.name} · ${to} · ${BASIS_NAME[basis]}`} /></td><td className="fig">{x.debitBalance ? usd(x.debitBalance) : ''}</td><td className="fig">{x.creditBalance ? usd(x.creditBalance) : ''}</td></tr>),
-      <tr key="total" className="total"><td /><td>Total {r.balanced ? '' : '(out of balance)'}</td><td className="fig">{usd(r.debit)}</td><td className="fig">{usd(r.credit)}</td></tr>]}
+    {[...r.rows.map((x: D) => <tr key={x.id}><td>{x.code}</td><td>{x.name}<AskAccountant key={JSON.stringify({ from, to, basis })} subjectKind="report-line" subjectId={JSON.stringify({ report: 'trial-balance', line: x.id, from, to, basis })} label={`Trial balance · ${x.code} · ${x.name} · ${to} · ${BASIS_NAME[basis]}`} /></td><td className="fig">{x.debitBalance ? <Figure line={JSON.stringify([x.id, 'debit'])}>{usd(x.debitBalance)}</Figure> : ''}</td><td className="fig">{x.creditBalance ? <Figure line={JSON.stringify([x.id, 'credit'])}>{usd(x.creditBalance)}</Figure> : ''}</td></tr>),
+      <tr key="total" className="total"><td /><td>Total {r.balanced ? '' : '(out of balance)'}</td><td className="fig"><Figure line={JSON.stringify(['total', 'debit'])}>{usd(r.debit)}</Figure></td><td className="fig"><Figure line={JSON.stringify(['total', 'credit'])}>{usd(r.credit)}</Figure></td></tr>]}
   </Table>
 }
 
 function Ledger({ r }: { r: D }) {
   return <>{r.accounts.length ? r.accounts.map((a: D) => <div key={a.id} className="gl-account"><h3>{a.code} · {a.name}</h3>
     <Table heads={['Date', 'Entry', 'Description', 'Debit', 'Credit', 'Balance']} figures={[3, 4, 5]}>
-      {[<tr key="open" className="muted"><td /><td /><td>Opening balance</td><td /><td /><td className="fig">{usd(a.opening)}</td></tr>,
-        ...a.rows.map((l: D) => <tr key={l.id}><td>{day(l.entry_date)}</td><td>{l.number ?? '—'}</td><td>{l.entry_memo}{l.reverses_id ? ' (reversal)' : l.reversed_by_id ? ' (reversed)' : ''}<AskAccountant subjectKind="journal" subjectId={l.entry_id} label={`Entry ${l.number ?? ''} · ${l.entry_date} · ${l.entry_memo}`} /></td><td className="fig">{l.debit_cents ? usd(l.debit_cents) : ''}</td><td className="fig">{l.credit_cents ? usd(l.credit_cents) : ''}</td><td className="fig">{usd(l.running)}</td></tr>)]}
+      {[<tr key="open" className="muted"><td /><td /><td>Opening balance</td><td /><td /><td className="fig"><Figure line={JSON.stringify([a.id, 'opening'])}>{usd(a.opening)}</Figure></td></tr>,
+        ...a.rows.map((l: D) => <tr key={l.id}><td>{day(l.entry_date)}</td><td>{l.number ?? '—'}</td><td>{l.entry_memo}{l.reverses_id ? ' (reversal)' : l.reversed_by_id ? ' (reversed)' : ''}<AskAccountant subjectKind="journal" subjectId={l.entry_id} label={`Entry ${l.number ?? ''} · ${l.entry_date} · ${l.entry_memo}`} /></td><td className="fig">{l.debit_cents ? <Figure line={JSON.stringify([a.id, 'debit', l.id])}>{usd(l.debit_cents)}</Figure> : ''}</td><td className="fig">{l.credit_cents ? <Figure line={JSON.stringify([a.id, 'credit', l.id])}>{usd(l.credit_cents)}</Figure> : ''}</td><td className="fig"><Figure line={JSON.stringify([a.id, 'running', l.id])}>{usd(l.running)}</Figure></td></tr>), <tr key="closing" className="total"><td /><td /><td>Closing balance</td><td /><td /><td className="fig"><Figure line={JSON.stringify([a.id, 'closing'])}>{usd(a.closing)}</Figure></td></tr>]}
     </Table></div>) : <p>No activity in this range.</p>}</>
 }
 
@@ -84,8 +84,9 @@ const isDay = (v: string) => DAY.test(v)
 const periodOf = (v: string) => { const m = DAY.exec(v); return `${String(Number(m![1])).padStart(4, '0')}-${String(Number(m![2])).padStart(2, '0')}` }
 
 function Report({ slug, basis, from, to, columns }: { slug: string; basis: Basis; from: string; to: string; columns: ColumnMode }) {
+  const search = useSearch({ from: '/app/reports' })
   const ranged = KINDS.find(k => k[1] === slug)![3]
-  const { data: r, error } = useView<D>(slug === 'budget-actual' ? null : `reports/${slug}?to=${to}${ranged || columns !== 'single' ? `&from=${from}` : ''}&basis=${basis}${columns !== 'single' ? `&columns=${columns}` : ''}`)
+  const { data: r, error } = useView<D>(slug === 'budget-actual' ? null : `reports/${slug}?to=${to}${ranged || columns !== 'single' ? `&from=${from}` : ''}&basis=${basis}${columns !== 'single' ? `&columns=${columns}` : ''}${slug === 'general-ledger' && search.account ? `&account=${encodeURIComponent(search.account)}` : ''}`)
   if (slug === 'budget-actual') return <Budgets from={from} to={to} basis={basis} />
   if (!r) return <Loading error={error} what="the report" />
   if (columns !== 'single') return <StatementColumns report={r as ColumnStatement} />
@@ -117,15 +118,14 @@ export function Reports() {
   const to = search.to && isDay(search.to) ? search.to : today(), from = search.from && isDay(search.from) ? search.from : to.slice(0, 8) + '01'
   // The package is for a closed month: the one the dates point at once someone chooses them, else the last month locked.
   const period = !search.to && state.overview?.lastLocked ? state.overview.lastLocked : periodOf(to), q = basis === 'cash' ? '?basis=cash' : ''
-  const detail = (slug === 'profit-and-loss' || slug === 'balance-sheet' || slug === 'cash-flow') && search.line
+  const detail = ['profit-and-loss', 'balance-sheet', 'cash-flow', 'trial-balance', 'general-ledger'].includes(slug) && search.line
   const library = isLibraryReport(slug), filtered = hasLibraryFilters(slug)
-  const exportQuery = library ? libraryQuery(slug, from, to, basis, search.account, search.payee) : `from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}`
+  const exportQuery = library ? libraryQuery(slug, from, to, basis, search.account, search.payee) : `from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}${slug === 'general-ledger' && search.account ? `&account=${encodeURIComponent(search.account)}` : ''}`
   return <>
     <PageHead title="Reports" lead="Every report is calculated from the same posted ledger, on the cash or the accrual basis."
       actions={<><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv${q}`} download>General ledger CSV · {basis === 'cash' ? 'cash' : 'accrual'}</a><a className="btn btn-primary" href={`/api/pantry/package/${period}/accountant-package.zip${q}`} download title="A ZIP of CSV reports, the close checklist and a README">Accountant package · {monthName(period)}</a></>} />
     <Tabs tabs={KINDS.map(k => k[0])} current={label} onChange={t => set({ report: KINDS.find(k => k[0] === t)![1], line: undefined, record: undefined })} pick="Report" />
-    {slug === 'custom' ? <CustomReports /> : slug === 'contractors' ? <Contractors year={Number(search.year) || Number(today().slice(0, 4))} onYear={y => set({ year: String(y) })} />
-      : search.record ? <RecordView record={search.record} reportLabel={label} />
+    {search.record ? <RecordView record={search.record} reportLabel={label} /> : slug === 'custom' ? <CustomReports /> : slug === 'contractors' ? <Contractors year={Number(search.year) || Number(today().slice(0, 4))} onYear={y => set({ year: String(y) })} />
       : detail && slug === 'cash-flow' ? <CashFlowDetail line={search.line!} from={from} to={to} />
       : detail ? <FigureDetail report={slug} line={search.line!} from={from} to={to} basis={basis} reportLabel={label} />
       : <Card className={library ? 'report-library' : undefined} title={<>{label} <Chip tone="info">{library ? libraryBasisLabel(slug, basis) : slug === 'cash-flow' ? 'Indirect method · accrual starting income' : based ? BASIS_NAME[basis] : 'Open items · accrual basis'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}

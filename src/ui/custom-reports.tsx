@@ -1,11 +1,13 @@
 import { useState } from 'react'
+import { useSearch } from '@tanstack/react-router'
 import { Card, Chip, command, Field, Form, Loading, Table, Tabs, usd, useShared, useView, type D } from './kit'
 import { CustomReportEditor } from './custom-report-editor'
 import { Sharing } from './report-layout-editor'
 import { CustomReportDrill } from './custom-report-drill'
 
 export function CustomReportPreview({ report }: { report: D }) {
-  const [figure, setFigure] = useState('')
+  const search = useSearch({ from: '/app/reports' })
+  const [figure, setFigure] = useState(() => search.customId === report.id && search.row && search.column ? `custom-reports/${encodeURIComponent(report.id)}/figures?${new URLSearchParams({ row: search.row, column: search.column, ...(search.node ? { node: search.node } : {}) })}` : '')
   const value = (row: D, column: D) => {
     const amount = row.values[column.id]
     if (amount === null) return 'undefined'
@@ -63,7 +65,8 @@ function SavedPackage({ id, onEdit }: { id: string; onEdit: (saved: D) => void }
 
 export function CustomReports() {
   const { state } = useShared(), { data, error, reload } = useView<D>('custom-reports'), packages = useView<D>('management-packages')
-  const [tab, setTab] = useState('Saved reports'), [selected, setSelected] = useState(''), [editing, setEditing] = useState<D | null>(null)
+  const search = useSearch({ from: '/app/reports' })
+  const [tab, setTab] = useState('Saved reports'), [selected, setSelected] = useState(search.customId ?? ''), [editing, setEditing] = useState<D | null>(null)
   const packageTab = tab === 'Management packages'
   if (!data || !packages.data) return <Loading error={error || packages.error} what="custom reports" />
   const done = async (saved: D) => { await reload(); await packages.reload(); setEditing(null); setSelected(saved.id) }

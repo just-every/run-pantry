@@ -39,7 +39,8 @@ export async function customReportFigure(c: Context, id: string, query: { row?: 
     requireThat(node, 'Figure operand not found', 404)
     return { label: node.label, value: node.value, unit: node.unit, basis: report.basis, from: node.from, to: node.to, href: path(key), ...(node.exact ? { exact: { numerator: node.exact.numerator.toString(), denominator: node.exact.denominator.toString() } } : {}) }
   }
-  const result: CustomReportFigureDetail = { ...operand(key), ...(node.expression ? { expression: node.expression } : {}),
+  const result: CustomReportFigureDetail = { ...operand(key),
+    context: { reportId: id, revision: rendered.saved.revision, source: report.source, basis: report.basis, from: report.from, to: report.to, filters: rendered.saved.definition.filters ?? {}, comparison: rendered.saved.definition.comparison ?? 'single', row: row.id, column: column.id, node: key }, ...(node.expression ? { expression: node.expression } : {}),
     ...(node.exact ? { exact: { numerator: node.exact.numerator.toString(), denominator: node.exact.denominator.toString() } } : {}),
     operands: node.operands.map(operand) }
   if (node.origins) {
