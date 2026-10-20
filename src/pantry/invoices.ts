@@ -8,6 +8,8 @@ import { controlAccount } from './accounts'
 import { contact } from './contacts'
 import { entryStatements, type Line } from './journal'
 import type { Command } from './context'
+import { documentSelectionStatements, issuedDocumentStatements } from './invoice-documents'
+import { customValues, nextInvoiceNumber, selectedTemplate } from './invoice-templates'
 import { applicableExemption, assertInvoiceExemption, destinationState, exemptionDay, exemptionFence } from './exemptions'
 
 export async function invoice(db: D1Database, id: string) {
@@ -31,7 +33,9 @@ export async function parseInvoice(db: D1Database, b: Data) {
   const customer = await contact(db, text(b.customerId, 'Customer'), 'customer')
   requireThat(customer.active, 'Customer is inactive')
   const issueDate = date(b.issueDate, 'Issue date')
-  const dueDate = b.dueDate ? date(b.dueDate, 'Due date') : addDays(issueDate, customer.terms_days)
+  const documentTemplate = await selectedTemplate(db, customer, b.templateId)
+  const documentValues = customValues(documentTemplate, b.customFields)
+  const dueDate = b.dueDate ? date(b.dueDate, 'Due date') : addDays(issueDate, customer.invoice_terms_override ? customer.terms_days : documentTemplate.termsDays)
   requireThat(dueDate >= issueDate, 'Due date is on or after the issue date')
   const destination = destinationState(b.destinationState)
   const exemption = b.kind === 'credit' ? null : await applicableExemption(db, customer.id, destination, issueDate)
@@ -61,7 +65,7 @@ export async function parseInvoice(db: D1Database, b: Data) {
     return { description, qty, unit, amount, accountId: account.id, taxCode: code, chosenTaxCode: chosenCode, tax, itemId: item ? item.id as string : null }
   })
   const subtotal = lines.reduce((s, l) => s + l.amount, 0), tax = lines.reduce((s, l) => s + l.tax, 0)
-  return { customer, issueDate, dueDate, destination, exemption, lines, subtotal, tax, total: subtotal + tax, memo: optionalText(b.memo, 'Memo', 1000) }
+  return { customer, documentTemplate, documentValues, issueDate, dueDate, destination, exemption, lines, subtotal, tax, total: subtotal + tax, memo: optionalText(b.memo, 'Memo', 1000) }
 }
 
 export const lineStatements = (invoiceId: string, lines: Awaited<ReturnType<typeof parseInvoice>>['lines']) => lines.map((l, i) =>
@@ -69,7 +73,8 @@ export const lineStatements = (invoiceId: string, lines: Awaited<ReturnType<type
     uid(), invoiceId, i + 1, l.description, l.qty, l.unit, l.amount, l.accountId, l.taxCode, l.tax, l.chosenTaxCode, l.itemId))
 
 export async function nextNumber(db: D1Database, kind: 'invoice' | 'credit') {
-  const prefix = kind === 'invoice' ? 'INV-' : 'CR-'
+  if (kind === 'invoice') return nextInvoiceNumber(db)
+  const prefix = 'CR-'
   const rows = await all<{ number: string }>(db, 'SELECT number FROM pt_invoices WHERE number LIKE ?', prefix + '%')
   const n = rows.map(r => Number(r.number.slice(prefix.length))).filter(Number.isInteger).reduce((m, x) => Math.max(m, x), 0)
   return prefix + String(n + 1).padStart(4, '0')
@@ -77,7 +82,8 @@ export async function nextNumber(db: D1Database, kind: 'invoice' | 'credit') {
 
 const saveDraft: Command = { need: 'record', async run(c, b) {
   const kind = b.kind === 'credit' ? 'credit' : 'invoice'
-  const p = await parseInvoice(c.db, b)
+  const previous = b.id ? await invoice(c.db, text(b.id, 'Invoice')) : null
+  const p = await parseInvoice(c.db, { ...b, templateId: b.templateId ?? previous?.document_template_id, customFields: b.customFields ?? (previous ? JSON.parse(previous.document_values) : undefined) })
   const certificateGuards = exemptionFence(p.exemption, p.customer.id, p.destination, p.issueDate, await exemptionDay(c.db))
   // A locked month refuses drafts dated in it, as journals do (PAN-13).
   await assertOpen(c.db, p.issueDate)
@@ -97,7 +103,7 @@ const saveDraft: Command = { need: 'record', async run(c, b) {
     await run(c.db, [authority(c.actor, 'record'), ...certificateGuards, periodOpen(current.issue_date), periodOpen(p.issueDate),
       q("UPDATE pt_invoices SET customer_id = ?, destination_state = ?, exemption_evidence = ?, issue_date = ?, due_date = ?, status = 'draft', memo = ?, credit_for = ?, subtotal_cents = ?, tax_cents = ?, total_cents = ?, approved_by = NULL, approved_revision = NULL, prepared_by = ?, revision = ? WHERE id = ? AND revision = ? AND status <> 'issued'",
         p.customer.id, p.destination, p.exemption ? JSON.stringify(p.exemption) : null, p.issueDate, p.dueDate, p.memo, creditFor, p.subtotal, p.tax, p.total, c.actor.email, uid(), current.id, b.revision), changed(),
-      q('DELETE FROM pt_invoice_lines WHERE invoice_id = ?', current.id), ...lineStatements(current.id, p.lines),
+      ...documentSelectionStatements(current.id, p), q('DELETE FROM pt_invoice_lines WHERE invoice_id = ?', current.id), ...lineStatements(current.id, p.lines),
       audit(who(c.actor), `${kind}.edit`, kind, current.id, { total: p.total })])
     return invoice(c.db, current.id)
   }
@@ -105,7 +111,7 @@ const saveDraft: Command = { need: 'record', async run(c, b) {
   await run(c.db, [authority(c.actor, 'record'), ...certificateGuards, periodOpen(p.issueDate),
     q("INSERT INTO pt_invoices (id, kind, number, customer_id, destination_state, exemption_evidence, issue_date, due_date, status, memo, credit_for, subtotal_cents, tax_cents, total_cents, opening, prepared_by, revision, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, 0, ?, ?, ?)",
       id, kind, number, p.customer.id, p.destination, p.exemption ? JSON.stringify(p.exemption) : null, p.issueDate, p.dueDate, p.memo, creditFor, p.subtotal, p.tax, p.total, c.actor.email, uid(), now()),
-    ...lineStatements(id, p.lines), audit(who(c.actor), `${kind}.draft`, kind, id, { number, total: p.total })])
+    ...documentSelectionStatements(id, p), ...lineStatements(id, p.lines), audit(who(c.actor), `${kind}.draft`, kind, id, { number, total: p.total })])
   return invoice(c.db, id)
 } }
 
@@ -130,7 +136,7 @@ export type Issuable = { id: string; kind: string; number: string; customer_id: 
   lines: { account_id: string; amount_cents: number; description: string; tax_code: string | null; tax_cents: number }[] }
 
 /** Issue posts the approved revision: receivable against income and sales tax (reversed for a credit). */
-export async function issueStatements(db: D1Database, current: Issuable, actor: AuditActor, preparedBy = actor.email): Promise<{ journalId: string; statements: Sql[] }> {
+export async function issueStatements(db: D1Database, current: Issuable, actor: AuditActor, preparedBy = actor.email, parsed?: Data): Promise<{ journalId: string; statements: Sql[] }> {
   const certificateGuards = await assertInvoiceExemption(db, current)
   const receivable = await controlAccount(db, 'receivable')
   const taxAccounts = new Map((await all(db, 'SELECT id, account_id FROM pt_tax_codes')).map(t => [t.id, t.account_id]))
@@ -141,10 +147,12 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
   const tax = new Map<string, number>()
   for (const l of current.lines) if (l.tax_cents) tax.set(taxAccounts.get(l.tax_code!)!, (tax.get(taxAccounts.get(l.tax_code!)!) ?? 0) + l.tax_cents)
   for (const [accountId, amount] of tax) lines.push({ accountId, ...side(amount, credit), memo: `Sales tax ${current.number}` })
+  const issuedRevision = uid()
+  const documents = await issuedDocumentStatements(db, current, issuedRevision, parsed)
   const journalId = uid(), statements: Sql[] = [
     ...certificateGuards,
     ...entryStatements({ id: journalId, date: current.issue_date, memo: `${credit ? 'Credit' : 'Invoice'} ${current.number} — ${current.customer_name}`, sourceKind: current.kind, sourceId: current.id, preparedBy, preparedKind: 'person', lines }, actor.email),
-    q("UPDATE pt_invoices SET status = 'issued', journal_id = ?, issued_by = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'approved'", journalId, actor.email, uid(), current.id, current.revision), changed()]
+    q("UPDATE pt_invoices SET status = 'issued', journal_id = ?, issued_by = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'approved'", journalId, actor.email, issuedRevision, current.id, current.revision), changed(), ...documents]
   if (credit) {
     const target = await invoice(db, current.credit_for!)
     const applied = Math.min(current.total_cents, target.open_cents)

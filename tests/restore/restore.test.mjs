@@ -96,7 +96,10 @@ async function snapshot(context, origin, docName) {
   return {
     view: {
       business: state.settings.entity.legal_name, accounts: state.accounts.map(a => [a.code, a.name, a.subtype]), contacts: state.contacts.map(c => c.name).sort(),
-      invoices: sales.invoices.map(i => [i.number, i.total_cents, i.open_cents]), bills: sales.bills.map(b => [b.reference, b.open_cents]),
+      invoices: sales.invoices.map(i => [i.number, i.total_cents, i.open_cents]), bills: sales.bills.map(b => [b.reference, b.open_cents, b.lifecycle, b.scheduled_date, b.scheduled_note]),
+      invoiceTemplates: await get('invoice-documents'),
+      invoiceDocuments: await Promise.all(sales.invoices.filter(i => i.status === 'issued').map(i => get(`invoice-documents/${i.id}/preview`))),
+      recurringBills: sales.recurringBills,
       trialBalance: (await get('reports/trial-balance?to=2026-09-30')).rows.map(r => [r.code, r.net]),
       pl: (await get('reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=cash')).netIncome,
       lines: (await get('bank/lines')).lines.map(l => [l.posted_date, l.description, l.amount_cents]).sort(),
@@ -110,7 +113,7 @@ async function snapshot(context, origin, docName) {
   }
 }
 
-test('AUDIT-001/REPORT-006 the immutable audit, report definitions and sharing and books come back from an export into a fresh install and after starting over, and a restore over books is refused with the next step', async t => {
+test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006 the immutable audit, report definitions and sharing and books come back from an export into a fresh install and after starting over, and a restore over books is refused with the next step', async t => {
   t.after(async () => { for (const server of [...running]) await server.stop(); for (const root of roots) await rm(root, { recursive: true, force: true }) })
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
 
@@ -128,6 +131,19 @@ test('AUDIT-001/REPORT-006 the immutable audit, report definitions and sharing a
     { id: 'gross', kind: 'formula', label: 'Gross profit', expression: 'row("revenue") - row("cost")', unit: 'money' },
   ], notes: ['Definitions travel with the books.'] } })
   await command('management-package.save', { name: 'Restored management package', cover: 'Restored cover', commentary: ['Preserve the accountant review.'], reportIds: [saved.id], sharedRoles: ['accountant'] })
+  // Retained documents, customer defaults and recurring drafts must travel with the books.
+  const invoiceState = await (await context.request.get(`${server.origin}/api/pantry/state`)).json()
+  const income = invoiceState.accounts.find(a => a.code === '4000').id, rent = invoiceState.accounts.find(a => a.code === '6100').id
+  const customer = invoiceState.contacts.find(c => c.kind === 'customer'), vendor = invoiceState.contacts.find(c => c.kind === 'vendor')
+  const branded = await command('invoice-template.save', { name: 'Archived services', layout: 'banner', accentColor: '#174838', textColor: '#202234', termsDays: 45, address: '18 Cedar Street', remitTo: 'Juniper Remittance', paymentInstructions: 'Use invoice reference', footer: 'Thank you', message: 'Archived engagement', fields: [{ key: 'po', label: 'PO number', defaultValue: 'PO-RESTORE' }] })
+  const settings = (await (await context.request.get(`${server.origin}/api/pantry/invoice-documents`)).json()).settings
+  await command('invoice-document-settings.save', { revision: settings.revision, nextInvoice: 231, defaultTemplateId: branded.id })
+  await command('customer.invoice-template', { customerId: customer.id, revision: customer.revision, templateId: branded.id })
+  const brandedDraft = await command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-09-20', customFields: { po: 'PO-RESTORE' }, lines: [{ description: 'Retained engagement', quantity: '1', rate: '100.00', accountId: income, taxCode: 'exempt' }] })
+  await command('invoice.approve', { id: brandedDraft.id, revision: brandedDraft.revision }); await command('invoice.issue', { id: brandedDraft.id })
+  await command('bill.schedule', { id: bill.id, revision: bill.revision, date: '2026-09-24', note: 'Bank transfer outside Pantry' })
+  await command('recurring-bill.save', { name: 'Archived rent', vendorId: vendor.id, startDate: '2026-06-30', endDate: '2026-08-30', every: 1, unit: 'month', termsDays: 15, lines: [{ description: 'Monthly rent', amount: '1200.00', accountId: rent }] })
+  await command('recurring-bill.generate', { through: '2026-09-30' })
   const before = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(before.bytes, pdf)
   await context.close(); await server.stop()

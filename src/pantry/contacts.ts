@@ -6,6 +6,7 @@ import { audit, changed, one, q, run, type Sql } from './db'
 import type { Command, Context } from './context'
 import { vendorProfile } from './receipts/vendor-profile'
 import { customerProfile } from './customer-profile'
+import { selectedTemplate } from './invoice-templates'
 import { documentCaptureStatements, decideDocumentDuplicate } from './receipts/document-intake'
 
 export async function contact(db: D1Database, id: string, kind?: 'customer' | 'vendor') {
@@ -23,12 +24,14 @@ const saveContact: Command = { need: 'record', async run(c, b) {
   const preserve = kind === 'customer' ? current : null
   const name = text(b.name === undefined ? preserve?.name : b.name, 'Name', 200), email = optionalText(b.email === undefined ? preserve?.email : b.email, 'Email', 254).toLowerCase()
   requireThat(!email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email), 'Enter a valid email')
-  const terms = b.termsDays === undefined ? preserve?.terms_days ?? 30 : b.termsDays === '' ? 30 : Number(b.termsDays)
+  const invoiceTemplate = kind === 'customer' ? await selectedTemplate(c.db, preserve ?? {}, b.invoiceTemplateId) : null
+  const terms = b.termsDays === undefined ? preserve?.terms_days ?? invoiceTemplate?.termsDays ?? 30 : b.termsDays === '' ? invoiceTemplate?.termsDays ?? 30 : Number(b.termsDays)
   requireThat(Number.isInteger(terms) && terms >= 0 && terms <= 365, 'Payment terms are 0–365 days')
   // How the customer's deposits read on the bank statement, for automatic matching.
   const bankReference = optionalText(b.bankReference === undefined ? preserve?.bank_reference : b.bankReference, 'Bank statement reference', 120)
   const profile = kind === 'vendor' ? await vendorProfile(c.db, b, current) : null
   const customer = kind === 'customer' ? customerProfile(b, current) : null
+  if (customer?.invoiceTemplateId) await selectedTemplate(c.db, {}, customer.invoiceTemplateId)
   if (b.id) {
     requireThat(current!.revision === b.revision, 'Record changed; reload', 409)
     requireThat(current!.kind === kind, 'A customer stays a customer; add a vendor separately')
@@ -36,7 +39,7 @@ const saveContact: Command = { need: 'record', async run(c, b) {
     statements.push(q('UPDATE pt_contacts SET name = ?, email = ?, terms_days = ?, bank_reference = ?, active = ?, revision = ? WHERE id = ? AND revision = ?', name, email, terms, bankReference, active, uid(), id, b.revision), changed())
   } else statements.push(q('INSERT INTO pt_contacts (id, kind, name, email, terms_days, external_ref, bank_reference, active, revision) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)', id, kind, name, email, terms, '', bankReference, uid()))
   if (profile) statements.push(q('UPDATE pt_contacts SET address = ?, phone = ?, default_account_id = ?, default_class = ?, is_1099 = ?, vendor_ein_hash = ? WHERE id = ?', profile.address, profile.phone, profile.accountId, profile.className, profile.is1099, profile.einHash, id), changed())
-  if (customer) statements.push(q('UPDATE pt_contacts SET contacts_json = ?, billing_address = ?, service_address = ?, phone = ?, internal_notes = ?, pay_methods = ? WHERE id = ?', customer.contacts, customer.billingAddress, customer.serviceAddress, customer.phone, customer.internalNotes, customer.payMethods, id), changed())
+  if (customer) statements.push(q('UPDATE pt_contacts SET contacts_json = ?, billing_address = ?, service_address = ?, phone = ?, internal_notes = ?, pay_methods = ?, invoice_template_id = ?, invoice_terms_override = ? WHERE id = ?', customer.contacts, customer.billingAddress, customer.serviceAddress, customer.phone, customer.internalNotes, customer.payMethods, customer.invoiceTemplateId, b.termsDays === undefined ? current?.invoice_terms_override ?? 0 : b.termsDays === '' ? 0 : 1, id), changed())
   statements.push(audit(who(c.actor), b.id ? 'contact.update' : 'contact.create', kind, id, { name }))
   await run(c.db, statements)
   return contact(c.db, id)

@@ -9,6 +9,7 @@ import { authority, pantry, who } from './access'
 import { addDays, date, Fault, longDay, monthName, now, optionalText, requireThat, text, uid, type Data } from './core'
 import { all, approval, audit, changed, guard, one, periodOpen, q, run, type Sql } from './db'
 import { contact } from './contacts'
+import { documentSelectionStatements } from './invoice-documents'
 import { issueStatements, lineStatements, nextNumber, parseInvoice } from './invoices'
 import { deliver } from './delivery'
 import { customerRecipients } from './customer-profile'
@@ -145,11 +146,11 @@ async function runOccurrence(env: Bindings, db: D1Database, t: Data) {
   const statements: Sql[] = [periodOpen(occ), priceFence(t, price, occ),
     q("INSERT INTO pt_invoices (id, kind, number, customer_id, issue_date, due_date, status, memo, subtotal_cents, tax_cents, total_cents, opening, prepared_by, approved_by, approved_revision, revision, created_at, recurring_id) VALUES (?, 'invoice', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)",
       id, number, p.customer.id, occ, p.dueDate, automatic ? 'approved' : 'draft', p.memo, p.subtotal, p.tax, p.total, amounts.prepared_by, automatic ? approvedBy : null, automatic ? revision : null, revision, now(), t.id),
-    ...lineStatements(id, p.lines), claim(id, automatic ? 'issued' : 'drafted', automatic ? 'Issued under the approved template' : why), ...advance]
+    ...documentSelectionStatements(id, p), ...lineStatements(id, p.lines), claim(id, automatic ? 'issued' : 'drafted', automatic ? 'Issued under the approved template' : why), ...advance]
   if (automatic) {
     try {
       const issued = await issueStatements(db, { id, kind: 'invoice', number, customer_id: p.customer.id, customer_name: p.customer.name, issue_date: occ, total_cents: p.total, revision,
-        lines: p.lines.map(l => ({ account_id: l.accountId, amount_cents: l.amount, description: l.description, tax_code: l.taxCode, tax_cents: l.tax })) }, pantry('recurring'), amounts.prepared_by)
+        lines: p.lines.map(l => ({ account_id: l.accountId, amount_cents: l.amount, description: l.description, tax_code: l.taxCode, tax_cents: l.tax })) }, pantry('recurring'), amounts.prepared_by, p)
       statements.push(approverStillPosts(approvedBy), approval({ email: approvedBy, kind: 'person' }, 'invoice', id, revision, 'approve', 'approved', `Approved through recurring invoice ${t.number}, revision ${t.approved_revision}${price ? ', price revision ' + price.approved_revision : ''}`), ...issued.statements)
     } catch (error) { if (error instanceof Fault) return fail(error.message); throw error }
   }

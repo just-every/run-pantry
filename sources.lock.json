@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "7e492b6980687a099d7560770252b3528efb973369bd291dc37395b7dafceadf",
+      "sha256": "178894010964f82719e36a3be4f613c65eb3c5a816c8807f11559a3899513a2a",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "a477a241a4e72b4c3932376faf56bcaa14d5a45fe0bd56ae15d69b3da8bfc865",
+      "sha256": "ca37b332bbcd92681402e23b912c6947eb3ec744a6d4f94f94df223d9a2db57d",
       "executable": false
     },
     "DEMO.md": {
@@ -587,6 +587,10 @@
       "sha256": "1ee4a7117947cd0651229a10a9e89cc35b53ce7a82d94a53bfdb081c48ec9ee5",
       "executable": false
     },
+    "migrations/core/0061_invoice_documents.sql": {
+      "sha256": "3ff83ef983db9ad589d25a3b36a8f52e84f7c752094def9417224e7d17a8c709",
+      "executable": false
+    },
     "migrations/rewrites.json": {
       "sha256": "85daa9b69cfde96f1e5a82f736e59b0a98d544eea2ec518c01808b21408e2826",
       "executable": false
@@ -924,7 +928,7 @@
       "executable": false
     },
     "scripts/installer/portability.mjs": {
-      "sha256": "2b1847578f00494fffeafc78db4bedb843deb4198b450bf9d150af88629e99a3",
+      "sha256": "b4a68b77ce42075e24f5cf48cdc78428ea960065eb02ae466bde4a70ad47d483",
       "executable": false
     },
     "scripts/installer/seed.mjs": {
@@ -2772,7 +2776,7 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "e746e78b5fa8527164e218cedf08ea1eb8839182b77d398cbc16647342f3171f",
+      "sha256": "5d99f3c0c68fba65430fcc6c983325723cc124c761743120ad646921c60b5b26",
       "executable": false
     },
     "src/pantry/automatch.ts": {
@@ -2860,7 +2864,7 @@
       "executable": false
     },
     "src/pantry/contacts.ts": {
-      "sha256": "e66d7008adc41bdb110bd52b9c51283cec164d522c60d8eb682021aa518a64b4",
+      "sha256": "758f04102c33d73a324a809425287966cf5e966fad514a173463e1b09b65a439",
       "executable": false
     },
     "src/pantry/context.ts": {
@@ -2912,11 +2916,11 @@
       "executable": false
     },
     "src/pantry/customer-page.ts": {
-      "sha256": "69d870fc15a780e22c1c2bfd8654e84c329f2ca8183bc68fd280db47f0c8d495",
+      "sha256": "1093e0777e41550383499d3868b123e6074262c809c54f42fe415a05d8087a33",
       "executable": false
     },
     "src/pantry/customer-profile.ts": {
-      "sha256": "bab80fb2436641662f1f6338cc1b7b74a3d25ef65f011c2b094584a40164d407",
+      "sha256": "c45d44b02b975e43d854db0fbfcf087aeb9ea212a2ba3b9a66bef7c9c13f42b3",
       "executable": false
     },
     "src/pantry/cutover/commands.ts": {
@@ -2940,7 +2944,7 @@
       "executable": false
     },
     "src/pantry/cutover/target.ts": {
-      "sha256": "5039ba9690506a4356c9af68b1ed41f8454d29bcb67bf57b64d83c9ae64ff4f5",
+      "sha256": "a688d13943a9567b8195a2c704988a32cb2cdcfd975eff11d89c979ec6dc3030",
       "executable": false
     },
     "src/pantry/cutover/xero-api.ts": {
@@ -2964,7 +2968,7 @@
       "executable": false
     },
     "src/pantry/delivery.ts": {
-      "sha256": "f4b4ed3cd062a64215cbd732b9eb64970a66a431cdbf19f27db3baa88e39503c",
+      "sha256": "d291b4d65e0fa230b3b6c1481146109d4297995a73c1a72efe496d8957fc0fba",
       "executable": false
     },
     "src/pantry/deposit-confirm.ts": {
@@ -3060,23 +3064,39 @@
       "executable": false
     },
     "src/pantry/integrations/postings.ts": {
-      "sha256": "78ac93fff26d781ecdeffa342b8076058c6e57adc62dda7b1b4570b4f723bb37",
+      "sha256": "ff1823d2f63c851d9d5f7d8856f5c9118d79104d0f00dadde52c3064e279ac55",
       "executable": false
     },
     "src/pantry/integrations/routes.ts": {
       "sha256": "b53d2e3235dc27da7ee4fa8ab99502b7df701b35f82cc380dde35c33dcd86143",
       "executable": false
     },
+    "src/pantry/invoice-documents.ts": {
+      "sha256": "dc0de6fe26729bd1387ec458f1a58e6b80a6a26d250389ccb8a5301a4ca3f25e",
+      "executable": false
+    },
+    "src/pantry/invoice-import-documents.ts": {
+      "sha256": "fca69b3989ab4e1deeb86b84ac0db2d2dd399348698a198797612d09b2994754",
+      "executable": false
+    },
     "src/pantry/invoice-links.ts": {
       "sha256": "93485d14ac9adbe1371b518f516e8e5c16ea21b3be969cec479d3b46a4200c79",
       "executable": false
     },
+    "src/pantry/invoice-logo.ts": {
+      "sha256": "67a34fbbc065d08cbbcc9cf65d8e783061820a6d993ec6be47638e8fdb1fea0f",
+      "executable": false
+    },
     "src/pantry/invoice-pdf.ts": {
-      "sha256": "4c6cd3cfbd4b64d1ac77bcd8cb31260ee68082004e0c7a19bdd657f97a9d80b2",
+      "sha256": "a03a8f78622ed5bbdb8a8023937ba9607dffc05df1bb520a20c27fadbf9814e5",
+      "executable": false
+    },
+    "src/pantry/invoice-templates.ts": {
+      "sha256": "80cc7b503c2e311c2a763d660f0c7958934e96671a374027a5d726d77ecccaad",
       "executable": false
     },
     "src/pantry/invoices.ts": {
-      "sha256": "b18900d4dbdda5d0bcd04982ae570b132d227fc8ed08a91d42f7eedda454cafb",
+      "sha256": "97d27cadcccda8a0154efd3c39835c0ca595d659ff9492167fd7192b032164b0",
       "executable": false
     },
     "src/pantry/items/commands.ts": {
@@ -3320,7 +3340,7 @@
       "executable": false
     },
     "src/pantry/recurring.ts": {
-      "sha256": "501e2fd092b5280e208f7bcbc71d432101ec053ce8269decb3e3eae3444793b6",
+      "sha256": "6e2ee3d1202804b0df5140e2fc142e289d525b9390c02336c23fe105fa2607c1",
       "executable": false
     },
     "src/pantry/report-export.ts": {
@@ -3856,7 +3876,15 @@
       "executable": false
     },
     "src/ui/invoice-editor.tsx": {
-      "sha256": "826347617ec626315e6733a17fc5f871de9caca26da67af5823bdb3f5259cefd",
+      "sha256": "40c0f292d6b70191545571f2db647d41e4cd5d8f5350ab25b3ebd1d3efd41e52",
+      "executable": false
+    },
+    "src/ui/invoice-template-editor.tsx": {
+      "sha256": "c5dafc4a8fd3c82ed76462e3eb5335303183f959598c9a3490c72321b4786b7d",
+      "executable": false
+    },
+    "src/ui/invoice-templates.tsx": {
+      "sha256": "02b5a0d5fe8d4a68609f7f82cd2203239dc21ef7dc51fede784f2f82528fef78",
       "executable": false
     },
     "src/ui/invoicing-settings.tsx": {
@@ -3992,7 +4020,7 @@
       "executable": false
     },
     "src/ui/sales.tsx": {
-      "sha256": "a60ecd56874758cfb8e2a80ba5baf56a5ac68ba8104003acd8cc4ebdd7cd13e4",
+      "sha256": "094b6ed7322d9b948ba46a0ffb5f2df6af938c2718e5235120510701dd542acd",
       "executable": false
     },
     "src/ui/settings.tsx": {
@@ -4044,7 +4072,7 @@
       "executable": false
     },
     "tests/api/customer-delivery.test.mjs": {
-      "sha256": "353044a9efd3532e6252408588983693dc5ea614b5bd369ff7d4057c07f46289",
+      "sha256": "7f39f11cce5095462f0e6fb9facb36c49f736dec7f19c70af88dcec536d6ff8e",
       "executable": false
     },
     "tests/api/demo-worker.ts": {
@@ -4183,6 +4211,10 @@
       "sha256": "757158ebc7392775127cd10a86d2e1873a53353d2b679dff2a9b1b83abe94af2",
       "executable": false
     },
+    "tests/app/invoice-documents.test.mjs": {
+      "sha256": "01268ada715622257425a46f13f3eb3277ba7354f508e904886f631125992dc6",
+      "executable": false
+    },
     "tests/app/nexus.test.mjs": {
       "sha256": "638085f775d72e91fda188995e119639d42af3e1346687138f81296e248bb3c0",
       "executable": false
@@ -4244,7 +4276,7 @@
       "executable": false
     },
     "tests/restore/restore.test.mjs": {
-      "sha256": "bf8421e88419451d98f2a0e8c0d652312b5418bdd13b6854b1b236cc085b7277",
+      "sha256": "34a0918935dad86d10f11fbd844e43592cc0aafd81a3ab9185545d0d6da79f78",
       "executable": false
     },
     "tests/runtime.mjs": {

@@ -2,6 +2,7 @@
 // line without a tax code is shown as needing a decision; approval is refused
 // until every line has one.
 import { useState } from 'react'
+import { InvoiceDocumentPreview } from './invoice-templates'
 import { accountOptions, Card, command, contactOptions, Field, today, usd, useShared, useView, type D } from './kit'
 
 export type Line = { description: string; quantity: string; rate: string; accountId: string; taxCode: string; itemId?: string }
@@ -24,6 +25,8 @@ export function nextNumber(invoices: D[], kind: 'invoice' | 'credit') {
 
 export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCancel }: { invoice?: D; creditFor?: D; invoices?: D[]; onDone: (saved: D) => void; onCancel: () => void }) {
   const { state } = useShared()
+  const { data: documents } = useView<D>('invoice-documents')
+  const [templateId, setTemplateId] = useState(invoice?.document_template_id ?? ''), [customFields, setCustomFields] = useState<D>(JSON.parse(invoice?.document_values ?? '{}'))
   const income = accountOptions(state.accounts, a => a.type === 'income')
   const source = invoice ?? creditFor
   const [lines, setLines] = useState<Line[]>(source?.lines?.length ? source.lines.map((l: D) => ({ ...(l.item_id ? { itemId: l.item_id } : {}), description: l.description, quantity: String(l.quantity_milli / 1000), rate: (l.unit_cents / 100).toFixed(2), accountId: l.account_id, taxCode: creditFor ? l.tax_code ?? '' : ('chosen_tax_code' in l ? l.chosen_tax_code : l.tax_code) ?? '' })) : [blank(income[0]?.value)])
@@ -37,24 +40,33 @@ export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCan
   const effectiveLines = certificate ? lines.map(l => ({ ...l, taxCode: 'exempt' })) : lines
   const { tax, subtotal, missing } = lineTotals(effectiveLines, state.taxCodes)
   const [due, setDue] = useState<string | null>(invoice?.due_date ?? null)
-  const terms = state.contacts.find((c: D) => c.id === customer)?.terms_days
+  const contact = state.contacts.find((c: D) => c.id === customer)
+  const effectiveTemplateId = templateId || contact?.invoice_template_id || documents?.settings.default_template_id
+  const template = documents?.templates.find((t: D) => t.id === effectiveTemplateId)
+  const terms = contact?.invoice_terms_override ? contact.terms_days : template?.termsDays
   const dueShown = due ?? (customer && terms !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(issue) ? addDays(issue, Number(terms)) : '')
   return <form className="invoice-editor" onSubmit={async e => {
     e.preventDefault(); const f = Object.fromEntries(new FormData(e.currentTarget))
     setBusy(true); setError('')
-    try { onDone(await command('invoice.save-draft', { ...f, kind, creditFor: creditFor?.id ?? invoice?.credit_for, id: invoice?.id, revision: invoice?.revision, lines })) } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+    try { onDone(await command('invoice.save-draft', { ...f, kind, creditFor: creditFor?.id ?? invoice?.credit_for, id: invoice?.id, revision: invoice?.revision, templateId: effectiveTemplateId, customFields: Object.fromEntries((template?.fields ?? []).map((f: D) => [f.key, customFields[f.key] ?? f.defaultValue])), lines })) } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
   }}>
     <div className="split split-wide-left">
       <div className="stack">
         <Card title={kind === 'credit' ? `Credit for ${creditFor?.number ?? ''}` : 'Invoice details'}>
           <div className="grid-form">
-            <Field label="Customer" name="customerId" value={customer} onChange={(e: any) => setCustomer(e.target.value)} required options={contactOptions(state.contacts, 'customer')} />
-            <Field label={kind === 'credit' ? 'Credit number' : 'Invoice number'} name="number" defaultValue={invoice?.number ?? nextNumber(invoices, kind)} required hint={invoice ? undefined : 'The next number in sequence; change it if you need to'} />
+            <Field label="Customer" name="customerId" value={customer} onChange={(e: any) => { setCustomer(e.target.value); setTemplateId(''); setCustomFields({}) }} required options={contactOptions(state.contacts, 'customer')} />
+            <Field label={kind === 'credit' ? 'Credit number' : 'Invoice number'} name="number" key={invoice?.id ?? (kind === 'invoice' ? documents?.nextNumber : 'credit')} defaultValue={invoice?.number ?? (kind === 'invoice' ? documents?.nextNumber ?? '' : nextNumber(invoices, kind))} required hint={invoice ? undefined : 'The next number in sequence; change it if you need to'} />
             <Field label="Ship-to / destination state" name="destinationState" value={destination} onChange={(e: any) => setDestination(e.target.value.toUpperCase())} maxLength={2} hint="Two-letter US state code. Required to apply a customer exemption certificate." />
             <Field label="Issue date" name="issueDate" type="date" value={issue} onChange={(e: any) => setIssue(e.target.value)} required />
-            <Field label="Due date" name="dueDate" type="date" value={dueShown} onChange={(e: any) => setDue(e.target.value)} hint={due === null && customer && terms !== undefined ? `${terms} days after the issue date: the customer's terms` : undefined} />
+            <Field label="Due date" name="dueDate" type="date" value={dueShown} onChange={(e: any) => setDue(e.target.value)} hint={due === null && customer && terms !== undefined ? `${terms} days after the issue date` : undefined} />
           </div>
         </Card>
+        <Card title="Invoice presentation">
+          <Field label="Invoice template" name="templateId" value={effectiveTemplateId ?? ''} onChange={(e: any) => { setTemplateId(e.target.value); setCustomFields({}) }} required options={(documents?.templates ?? []).map((t: D) => ({ value: t.id, label: t.name }))} />
+          {(template?.fields ?? []).map((f: D) => <Field key={f.key} label={f.label} name={`custom-${f.key}`} value={customFields[f.key] ?? f.defaultValue} onChange={(e: any) => setCustomFields(v => ({ ...v, [f.key]: e.target.value }))} />)}
+          <p className="hint">The selected template is saved with this draft. Preview the saved draft before approval.</p>
+        </Card>
+        {invoice?.id && <InvoiceDocumentPreview invoiceId={invoice.id} />}
         {certificate && <div className="callout" role="status"><strong>Certificate {certificate.certificate_number} applies in {destination}</strong><span>Exempt through {certificate.expires_on}. <a href={`/api/pantry/documents/${certificate.document_id}`}>View certificate</a>. Your line tax choices below are kept for when the certificate no longer applies.</span></div>}
         {invoice?.exemption && !certificate && <div className="callout callout-warn" role="status"><strong>Review tax treatment</strong><span>The earlier certificate no longer applies to these details. Saving uses your original line tax choices.</span></div>}
         <ServiceLines lines={lines} setLines={setLines} />
@@ -63,7 +75,7 @@ export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCan
       <Card title={kind === 'credit' ? 'Credit summary' : 'Invoice summary'}>
         <dl className="summary"><div><dt>Subtotal</dt><dd>{usd(subtotal)}</dd></div><div><dt>Sales tax</dt><dd>{usd(tax)}</dd></div><div className="total"><dt>Total</dt><dd>{usd(subtotal + tax)}</dd></div></dl>
         {missing > 0 && <div className="callout callout-warn" role="status"><strong>Tax treatment needed before approval</strong><span>{missing} line{missing === 1 ? ' is' : 's are'} missing a sales tax code. Choose a code or mark the line exempt.</span></div>}
-        <div className="form-end column"><button className="btn btn-primary btn-block" disabled={busy}>{busy ? 'Saving…' : 'Save draft'}</button><button type="button" className="btn btn-secondary btn-block" onClick={onCancel}>Cancel</button>{error && <p role="alert" className="error">{error}</p>}</div>
+        <div className="form-end column"><button className="btn btn-primary btn-block" disabled={busy || !documents}>{busy ? 'Saving…' : 'Save draft'}</button><button type="button" className="btn btn-secondary btn-block" onClick={onCancel}>Cancel</button>{error && <p role="alert" className="error">{error}</p>}</div>
       </Card>
     </div>
   </form>

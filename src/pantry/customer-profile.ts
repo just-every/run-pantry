@@ -44,7 +44,7 @@ export function customerProfile(b: Data, current?: Data | null) {
     requireThat(b.payMethods === null || (Array.isArray(b.payMethods) && b.payMethods.every((m: unknown) => typeof m === 'string' && METHODS.includes(m))), 'Payment methods are card, us_bank_account or offline')
     payMethods = b.payMethods === null ? null : JSON.stringify([...new Set<string>(b.payMethods)])
   }
-  return { contacts: JSON.stringify(contacts), payMethods,
+  return { contacts: JSON.stringify(contacts), payMethods, invoiceTemplateId: b.invoiceTemplateId === undefined ? current?.invoice_template_id ?? null : optionalText(b.invoiceTemplateId, 'Invoice template', 80) || null,
     billingAddress: value('billingAddress', 'billing_address', 'Billing address', 1000),
     serviceAddress: value('serviceAddress', 'service_address', 'Service address', 1000),
     phone: value('phone', 'phone', 'Phone', 60), internalNotes: value('internalNotes', 'internal_notes', 'Internal notes', 10000) }

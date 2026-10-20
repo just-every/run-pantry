@@ -3,6 +3,7 @@
 // snapshot predicate compares every native column, so any edit after import,
 // such as posting the opening entry at sign-off, is a conflict the kit refuses
 // to undo.
+import { importedInvoiceDocument } from '../invoice-import-documents'
 import type { D1Sql, D1TargetAdapter, TargetRow } from '../../modules/import-kit/src/d1/index'
 
 const sql = (s: string, ...params: unknown[]): D1Sql => ({ sql: s, params })
@@ -76,7 +77,7 @@ export function targetsFor(prefix: string): D1TargetAdapter {
         ]
       }
       const k = KINDS[row.targetKind]
-      return [sql(`INSERT INTO ${k.table} (id, ${k.columns.join(', ')}, revision) VALUES (?, ${k.columns.map(() => '?').join(', ')}, ?) ON CONFLICT(id) DO UPDATE SET ${k.columns.map(c => `${c} = excluded.${c}`).join(', ')}, revision = excluded.revision`, row.targetId, ...k.columns.map(c => v[c] ?? null), row.revision)]
+      return [sql(`INSERT INTO ${k.table} (id, ${k.columns.join(', ')}, revision) VALUES (?, ${k.columns.map(() => '?').join(', ')}, ?) ON CONFLICT(id) DO UPDATE SET ${k.columns.map(c => `${c} = excluded.${c}`).join(', ')}, revision = excluded.revision`, row.targetId, ...k.columns.map(c => v[c] ?? null), row.revision), ...(row.targetKind === 'invoice' ? importedInvoiceDocument(row.targetId) : [])]
     },
     remove(_destination, kind, id) {
       if (kind === 'cutover') return [
@@ -84,7 +85,7 @@ export function targetsFor(prefix: string): D1TargetAdapter {
         sql("DELETE FROM pt_journal_lines WHERE entry_id = ? || '-entry'", id),
         sql("DELETE FROM pt_journal_entries WHERE id = ? || '-entry'", id),
       ]
-      return [sql(`DELETE FROM ${KINDS[kind].table} WHERE id = ?`, id)]
+      return [...(kind === 'invoice' ? [sql("DELETE FROM pt_invoice_documents WHERE invoice_id = ? AND basis = 'import'", id)] : []), sql(`DELETE FROM ${KINDS[kind].table} WHERE id = ?`, id)]
     },
     async list(db, destination) {
       const rows: TargetRow[] = []

@@ -13,7 +13,7 @@ import { Fault, longDay, now, usd, type Data } from './core'
 import { all, audit, one, run } from './db'
 import { invoiceByLink, LINK_TOKEN } from './invoice-links'
 import { invoiceDocument } from './delivery'
-import { invoicePdf } from './invoice-pdf'
+import { issuedDocument } from './invoice-documents'
 import { offeredMethods, startCheckout, stripeSettings, syncCheckout } from './stripe'
 import { unseal, verifySignature } from './stripe-api'
 
@@ -23,7 +23,7 @@ const escape = (s: string) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;'
 
 // In Pantry's look (rer-theme.css tokens): the white card on the lavender paper, tracked-caps heads,
 // green for paid and apricot for what is due, the navy pill to pay.
-const STYLE = '.rer-themed main.invoice{max-width:720px}.rer-themed main.invoice h1{text-align:left}'
+const STYLE = '.invoice-pdf{width:100%;height:640px;border:0}' + '.rer-themed main.invoice{max-width:720px}.rer-themed main.invoice h1{text-align:left}'
   + '.invoice .status{display:inline-block;margin:0 0 20px;padding:4px 12px;border-radius:999px;background:var(--row);color:var(--ink);font-size:14px;font-weight:600}'
   + '.invoice .status.paid{background:var(--green-tint);color:var(--green-ink)}.invoice .status.due{background:var(--apricot-tint);color:var(--apricot-text)}'
   + '.invoice table{width:100%;border-collapse:collapse;margin:0 0 16px}.invoice th,.invoice td{padding:10px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;color:var(--ink)}'
@@ -41,7 +41,7 @@ async function page(status: number, title: string, body: string) {
   const policy = frame.policy.replace("style-src 'self'", `style-src 'self' 'sha256-${await digest(STYLE)}'`)
   const html = `<!doctype html><html lang="en"${frame.htmlClass}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escape(title)}</title>${fontHead}${frame.head}<style>${STYLE}</style></head><body><main class="invoice">${body}</main></body></html>`
   return new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'x-robots-tag': 'noindex, nofollow',
-    'content-security-policy': `default-src 'none'; ${policy}; form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; base-uri 'none'` } })
+    'content-security-policy': `default-src 'none'; frame-src 'self'; ${policy}; form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; base-uri 'none'` } })
 }
 
 const notFound = () => page(404, 'Invoice not found', '<h1>Invoice not found</h1><p>This invoice link is not valid. Ask the business that sent it for a new one.</p>')
@@ -89,16 +89,16 @@ customer.get('/i/:token', async c => {
     <div class="facts">${doc.facts.map(([k, v]) => `<div><span>${escape(k)}</span><strong>${escape(v)}</strong></div>`).join('')}</div>
     <table><thead><tr><th>Description</th><th class="fig">Quantity</th><th class="fig">Amount</th></tr></thead><tbody>${doc.lines.map((l: Data) => `<tr><td>${escape(l.description)}</td><td class="fig">${escape(l.quantity)}</td><td class="fig">${escape(l.amount)}</td></tr>`).join('')}</tbody></table>
     <div class="totals">${doc.totals.map(([k, v]) => `<span${k === 'Amount due' ? ' class="due"' : ''}>${escape(k)}</span><strong${k === 'Amount due' ? ' class="due"' : ''}>${escape(v)}</strong>`).join('')}</div>
-    ${doc.notes.map(n => `<p>${escape(n)}</p>`).join('')}${pay}
+    ${doc.notes.map(n => `<p>${escape(n)}</p>`).join('')}<p class="note">Current balance: ${escape(usd(inv.open_cents))}. The issued document is retained as originally issued.</p>${pay}
     ${history.length ? `<h2>Payments</h2><ul class="history">${history.map(h => `<li>${escape(longDay(h.payment_date))}: ${escape(usd(h.amount_cents))} · ${escape(h.memo || 'Payment received')}</li>`).join('')}</ul>` : ''}
-    <p class="note"><a href="/i/${escape(token)}/invoice.pdf">Download the invoice (PDF)</a></p>`
+    <iframe title="Issued invoice PDF" src="/i/${escape(token)}/invoice.pdf" class="invoice-pdf"></iframe><p class="note"><a href="/i/${escape(token)}/invoice.pdf">Download the invoice (PDF)</a></p>`
   return page(200, `${doc.title} · ${doc.business}`, body)
 })
 
 customer.get('/i/:token/invoice.pdf', async c => {
   const inv = await invoiceByLink(c.env.DB, c.req.param('token'))
   if (!inv) return notFound()
-  return new Response(invoicePdf(await invoiceDocument(c.env.DB, inv)), { headers: { 'content-type': 'application/pdf', 'content-disposition': `inline; filename="${inv.number.replace(/[^\w.-]+/g, '_')}.pdf"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox" } })
+  return new Response((await issuedDocument(c.env.DB, inv.id)).pdf, { headers: { 'content-type': 'application/pdf', 'content-disposition': `inline; filename="${inv.number.replace(/[^\w.-]+/g, '_')}.pdf"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox" } })
 })
 
 customer.post('/i/:token/pay', async c => {

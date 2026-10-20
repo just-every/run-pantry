@@ -1,7 +1,14 @@
+import type { InvoiceLogo } from './invoice-logo'
 // The invoice as a PDF: the same facts the customer page shows, set in the
 // standard Helvetica fonts so the file needs no embedded font. Text outside
 // Windows-1252 is replaced; long invoices continue onto further pages.
 export type InvoiceDocument = {
+  templateId?: string
+  templateName?: string
+  layout?: 'classic' | 'banner'
+  accentColor?: string
+  textColor?: string
+  logo?: InvoiceLogo | null
   business: string
   title: string
   facts: [string, string][]
@@ -48,14 +55,33 @@ export function invoicePdf(doc: InvoiceDocument): Uint8Array<ArrayBuffer> {
   const W = 612, H = 792, M = 54, pages: string[][] = [[]]
   let y = H - M
   const page = () => pages[pages.length - 1]
-  const text = (x: number, size: number, value: string, bold = false) => page().push(`BT /${bold ? 'F2' : 'F1'} ${size} Tf ${x.toFixed(2)} ${y.toFixed(2)} Td ${literal(value)} Tj ET`)
+  const rgb = (hex: string) => [1, 3, 5].map(p => (parseInt(hex.slice(p, p + 2), 16) / 255).toFixed(3)).join(' ')
+  const ink = rgb(doc.textColor ?? '#202234'), accent = rgb(doc.accentColor ?? '#433b65')
+  let textColor = ink
+  const text = (x: number, size: number, value: string, bold = false) => page().push(`${textColor} rg BT /${bold ? 'F2' : 'F1'} ${size} Tf ${x.toFixed(2)} ${y.toFixed(2)} Td ${literal(value)} Tj ET`)
   const right = (xr: number, size: number, value: string, bold = false) => text(xr - figureWidth(value, size), size, value, bold)
-  const rule = () => page().push(`0.75 w ${M} ${y.toFixed(2)} m ${W - M} ${y.toFixed(2)} l S`)
+  const rule = () => page().push(`${accent} RG 0.75 w ${M} ${y.toFixed(2)} m ${W - M} ${y.toFixed(2)} l S`)
   const room = (needed: number) => { if (y - needed < M) { pages.push([]); y = H - M } }
 
-  text(M, 11, doc.business, true); y -= 30
-  text(M, 22, doc.title, true); y -= 26
-  for (const [k, v] of doc.facts) { text(M, 10, k); text(M + 110, 10, v); y -= 15 }
+  if (doc.layout === 'banner') {
+    page().push(`${accent} rg 0 ${H - 125} ${W} 125 re f`)
+    textColor = '1 1 1'
+  } else textColor = accent
+  for (const row of wrap(doc.business, 44)) { text(M, 12, row, true); y -= 16 }
+  if (doc.logo) {
+    const w = Math.min(100, 55 * doc.logo.width / doc.logo.height), h = w * doc.logo.height / doc.logo.width
+    page().push(`q ${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${(W - M - w).toFixed(2)} ${(H - M - h + 10).toFixed(2)} cm /Logo Do Q`)
+  }
+  y -= 10
+  text(M, 22, doc.title, true); y -= doc.layout === 'banner' ? 55 : 30
+  textColor = ink
+  for (const [k, v] of doc.facts) {
+    const rows = String(v).split('\n').flatMap(row => wrap(row, 65))
+    room(rows.length * 14 + 8)
+    text(M, 10, k, true)
+    for (const row of rows) { text(M + 115, 10, row); y -= 14 }
+    y -= 4
+  }
   y -= 16
   text(M, 9, 'Description', true); right(W - M - 110, 9, 'Quantity', true); right(W - M, 9, 'Amount', true); y -= 6; rule(); y -= 16
   for (const l of doc.lines) {
@@ -72,11 +98,16 @@ export function invoicePdf(doc: InvoiceDocument): Uint8Array<ArrayBuffer> {
   // Objects: 1 catalog, 2 pages, 3 Helvetica, 4 Helvetica-Bold, then page + content pairs.
   const objects: string[] = []
   const font = (name: string) => `<< /Type /Font /Subtype /Type1 /BaseFont /${name} /Encoding /WinAnsiEncoding >>`
-  const kids = pages.map((_, i) => `${5 + i * 2} 0 R`).join(' ')
+  const pageBase = doc.logo ? 6 : 5
+  const kids = pages.map((_, i) => `${pageBase + i * 2} 0 R`).join(' ')
   objects.push('<< /Type /Catalog /Pages 2 0 R >>', `<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>`, font('Helvetica'), font('Helvetica-Bold'))
+  if (doc.logo) {
+    const bytes = atob(doc.logo.base64)
+    objects.push(`<< /Type /XObject /Subtype /Image /Width ${doc.logo.width} /Height ${doc.logo.height} /ColorSpace /${doc.logo.components === 1 ? 'DeviceGray' : 'DeviceRGB'} /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>\nstream\n${bytes}\nendstream`)
+  }
   for (const [i, ops] of pages.entries()) {
     const stream = ops.join('\n')
-    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${6 + i * 2} 0 R >>`)
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> ${doc.logo ? '/XObject << /Logo 5 0 R >>' : ''} >> /Contents ${pageBase + 1 + i * 2} 0 R >>`)
     objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`)
   }
   let body = '%PDF-1.4\n%\xe2\xe3\xcf\xd3\n'

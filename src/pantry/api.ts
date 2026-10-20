@@ -12,6 +12,7 @@ import { settingsCommands, settingsView } from './settings'
 import { accountCommands } from './accounts'
 import { contactCommands } from './contacts'
 import { journalCommands, journalView } from './journal'
+import { invoiceDocumentCommands, invoiceDocumentsView, registerInvoiceDocumentRoutes } from './invoice-documents'
 import { invoiceCommands, invoicesView } from './invoices'
 import { billLifecycleCommands, capturedBillInbox } from './bill-lifecycle'
 import { recurringBillCommands, recurringBillsView } from './recurring-bills'
@@ -85,7 +86,7 @@ import { customReportCommands } from './custom-reports/commands'
 import { registerCustomReportRoutes } from './custom-reports/routes'
 
 const commands: Record<string, Command> = {
-  ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...invoiceDocumentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -117,6 +118,8 @@ api.route('/api/pantry/integration/v1', integrations)
 view('integrations', async (ctx, c) => { must(ctx.actor, 'owner'); return integrationSettings(ctx, c.req.query('cursor')) })
 const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10)) => date(c.req.query(name) ?? fallback, name)
 
+registerInvoiceDocumentRoutes(api, reader)
+view('invoice-documents', async ctx => invoiceDocumentsView(ctx.db))
 registerCustomReportRoutes(api, reader)
 view('vendors/:id/history', async (ctx, c) => vendorHistory(ctx.db, c.req.param('id')!))
 view('customers/:id', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to')))

@@ -6,7 +6,7 @@
 // archive's rows take their place.
 export default {
  product: 'just-every/pantry',
- replaceableTables: ['pt_sending', 'pt_due_work', 'pt_books_agent'],
+ replaceableTables: ['pt_sending', 'pt_due_work', 'pt_books_agent', 'pt_invoice_document_settings', 'pt_invoice_templates'],
  requiredConfiguration: ['OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN', 'AUTH_ORIGIN', 'MAIL_PROVIDER', 'MAIL_FROM'],
  validateStaged: async ({ read }) => {
   const entries = await read('pt_journal_entries'), lines = await read('pt_journal_lines')

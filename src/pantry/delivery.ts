@@ -12,7 +12,7 @@ import { invoice } from './invoices'
 import { customerRecipients } from './customer-profile'
 import { ensureLink, invoiceLinkCommands } from './invoice-links'
 export { ensureLink } from './invoice-links'
-import { invoicePdf } from './invoice-pdf'
+import { buildInvoiceDocument, issuedDocument } from './invoice-documents'
 import type { Command } from './context'
 
 type MailResult = { status: 'accepted' | 'rejected' | 'rate_limited' | 'uncertain' | 'development'; provider: string; providerMessageId: string | null; code?: string }
@@ -34,16 +34,7 @@ export const customerLink = (env: Bindings, token: string) => `${runtimeBindings
 
 /** The PDF and the customer page show the same facts. */
 export async function invoiceDocument(db: D1Database, inv: Data) {
-  const e = await one(db, 'SELECT legal_name FROM pt_entity WHERE id = 1')
-  const paid = inv.total_cents - inv.open_cents
-  return {
-    business: e?.legal_name ?? 'Pantry',
-    title: `Invoice ${inv.number}`,
-    facts: [['Billed to', inv.customer_name], ['Issued', longDay(inv.issue_date)], ['Due', longDay(inv.due_date)]] as [string, string][],
-    lines: inv.lines.map((l: Data) => ({ description: l.description, quantity: String(l.quantity_milli / 1000), amount: usd(l.amount_cents) })),
-    totals: [['Subtotal', usd(inv.subtotal_cents)], ['Sales tax', usd(inv.tax_cents)], ['Total', usd(inv.total_cents)], ...(paid ? [['Paid', usd(paid)] as [string, string]] : []), ['Amount due', usd(inv.open_cents)]] as [string, string][],
-    notes: [...(inv.memo ? [inv.memo] : []), ...(inv.exemption ? [`Sales tax exempt in ${inv.destination_state}: certificate ${inv.exemption.certificateNumber}, valid through ${inv.exemption.expiresOn}.`] : [])],
-  }
+  return inv.status === 'issued' ? (await issuedDocument(db, inv.id)).document : buildInvoiceDocument(db, inv)
 }
 
 function reminderSubject(number: string, step: number, business: string) {
@@ -65,12 +56,12 @@ export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, 
   const inv = await invoice(db, invoiceId)
   requireThat(inv.kind === 'invoice' && inv.status === 'issued', 'Issue the invoice before sending it', 409)
   const token = await ensureLink(db, inv.id), link = customerLink(env, token)
-  const doc = await invoiceDocument(db, inv), pdf = invoicePdf(doc), settings = await sendingSettings(db)
+  const retained = await issuedDocument(db, inv.id), doc = retained.document, pdf = retained.pdf, settings = await sendingSettings(db)
   const subject = kind === 'invoice' ? `Invoice ${inv.number} from ${doc.business}: ${usd(inv.open_cents)} due ${longDay(inv.due_date)}` : reminderSubject(inv.number, step!, doc.business)
   const id = uid()
   try {
     await db.prepare("INSERT INTO pt_deliveries (id, invoice_id, kind, step, recipient, subject, status, attachment_sha256, sent_by, at) VALUES (?, ?, ?, ?, ?, ?, 'sending', ?, ?, ?)")
-      .bind(id, inv.id, kind, step, recipient, subject, await sha256(pdf), actor.email, now()).run()
+      .bind(id, inv.id, kind, step, recipient, subject, retained.sha256, actor.email, now()).run()
   } catch (error) {
     if (kind === 'reminder' && String((error as Error).message).includes('UNIQUE')) return null
     throw error

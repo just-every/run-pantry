@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { Action, Card, Chip, command, contactOptions, Details, Field, Form, Loading, Metrics, PageHead, Table, Tabs, accountOptions, day, today, usd, useShared, useView, useWho, type D } from './kit'
 import { Bills } from './bills'
+import { InvoiceTemplates } from './invoice-templates'
 import { InvoiceEditor } from './invoice-editor'
 import { Deliveries, SendPanel } from './invoice-delivery'
 import { Recurring } from './recurring'
@@ -162,12 +163,12 @@ function VendorCredits({ data, reload }: { data: D; reload: () => Promise<void> 
 
 export function Sales({ billId }: { billId?: string } = {}) {
   // Overview's Customers and vendors step opens this page at ?tab=contacts.
-  const [tab, setTab] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'contacts' ? 'Customers & vendors' : typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'bills' ? 'Bills' : billId ? 'Bills' : typeof window !== 'undefined' && window.location.hash.startsWith('#bill-') ? 'Bills' : 'Invoices'), { data, error, reload } = useView<D>('sales'), shared = useShared()
+  const [tab, setTab] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'templates' ? 'Invoice templates' : typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'contacts' ? 'Customers & vendors' : typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'bills' ? 'Bills' : billId ? 'Bills' : typeof window !== 'undefined' && window.location.hash.startsWith('#bill-') ? 'Bills' : 'Invoices'), { data, error, reload } = useView<D>('sales'), shared = useShared()
   const refresh = async () => { await reload(); await shared.reload() }
   return <>
     <PageHead title="Sales & bills" lead="Invoices you send and follow up, recurring invoices, bills and their evidence, and payments." />
-    <Tabs tabs={['Invoices', 'Recurring', 'Bills', 'Payments', 'Deliveries', 'Customers & vendors', 'Products & services']} current={tab} onChange={setTab} pick="Show" />
-    {tab === 'Customers & vendors' ? <Contacts /> : tab === 'Products & services' ? <Items /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
+    <Tabs tabs={['Invoices', 'Invoice templates', 'Recurring', 'Bills', 'Payments', 'Deliveries', 'Customers & vendors', 'Products & services']} current={tab} onChange={setTab} pick="Show" />
+    {tab === 'Invoice templates' ? <InvoiceTemplates /> : tab === 'Customers & vendors' ? <Contacts /> : tab === 'Products & services' ? <Items /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
       : tab === 'Bills' ? <Bills initialBillId={billId} data={data} reload={refresh} /> : tab === 'Deliveries' ? <Card title="Deliveries"><p className="hint">Every invoice and reminder Pantry has sent, with the mail provider's answer. Accepted means the provider took the message, not that the customer read it; "Viewed" on an invoice means the customer opened its link.</p><Deliveries data={data} /></Card> : <Payments data={data} reload={refresh} />}
   </>
 }
