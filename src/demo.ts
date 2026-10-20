@@ -1,6 +1,9 @@
 import type { Bindings } from './auth.server'
 import type { Person } from './pantry/access'
 import { SERVICE_CHART } from './pantry/accounts'
+import { all, run } from './pantry/db'
+import { invoice as savedInvoice } from './pantry/invoices'
+import { issuedDocumentStatements } from './pantry/invoice-documents'
 import { addDays, sha256 } from './pantry/core'
 import { closeMonth } from './demo/close'
 import { seedFeeds } from './demo/feeds'
@@ -134,6 +137,13 @@ export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail:
   for (const [i, when, action, kind, subject] of [[1, `${openingDay}T10:00:00.000Z`, 'chart.start', 'chart', 'service-business'], [2, `${day(2)}T11:00:00.000Z`, 'invoice.issue', 'invoice', id('northstar-retainer')], [3, `${today}T09:00:00.000Z`, 'statement.import', 'statement', id('statement')]] as const)
     r.add('pt_audit', { id: id(`audit-${i}`), at: when, actor_email: ownerEmail, actor_kind: 'person', action, subject_kind: kind, subject_id: subject, detail: '{}' })
   await r.save()
+
+  // Seeded historical invoices already have their ledger entries; retain their
+  // real document before demo sends or customer views use the issued PDF door.
+  for (const row of await all(env.DB, "SELECT id FROM pt_invoices i WHERE status='issued' AND NOT EXISTS (SELECT 1 FROM pt_invoice_documents d WHERE d.invoice_id=i.id)")) {
+    const current = await savedInvoice(env.DB, row.id)
+    await run(env.DB, await issuedDocumentStatements(env.DB, current, current.revision))
+  }
 
   await closeMonth(env.DB, { id: owner.id, email: ownerEmail, name: OWNER_NAME }, prior, {
     matches: priorLines.map(([, , , key, line], i) => [id(`prior-statement-line-${i}`), id(`line-${key}-${line}`)]),

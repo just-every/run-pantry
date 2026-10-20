@@ -1068,7 +1068,7 @@
       "executable": false
     },
     "src/demo.ts": {
-      "sha256": "d10eac57b8c0243b57b7f5817e2f36ba4db4fabaa5c00d0ae12b439060479484",
+      "sha256": "36af7b2b559d022783c8d3f0068843cbf6bcaf19b0ca51070f2594a948ed8394",
       "executable": false
     },
     "src/demo/close.ts": {
@@ -4080,7 +4080,7 @@
       "executable": false
     },
     "tests/api/demo.test.mjs": {
-      "sha256": "feeb8180b9a511e77e76a3cd446cff74af7256d208df990b428eb7cd17856426",
+      "sha256": "5b3b962d2f98687f4418b6207caa8aee03057e03770d47b976ae3d60a3882cfd",
       "executable": false
     },
     "tests/api/dev-worker.ts": {
