@@ -53,6 +53,7 @@ test('REPORT-004 run the everyday library, filter journal, open records and down
         const evidence=table.locator('details').first();await evidence.locator('summary').click();await evidence.locator('pre').waitFor();assert.ok((await evidence.innerText()).includes('owner@example.test'))
       }
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${width} ${kind} fits`)
+      for(const control of await page.locator('.report-library input, .report-library select').all()){const box=await control.boundingBox();assert.ok(box.x>=0&&box.x+box.width<=width,`${width} ${kind} control fits`)}
       await page.screenshot({path:`/tmp/pantry-r14-${kind}-${width}.png`,fullPage:true})
     }
     await page.goto(`${app.origin}/app/reports?report=journal&from=2026-09-01&to=2026-09-30&basis=accrual`)

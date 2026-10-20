@@ -541,3 +541,8 @@ pre.env-lines { margin: 8px 0 0; padding: 10px 12px; background: var(--row); bor
 details.setup-steps summary { width: fit-content; margin-bottom: 8px; color: var(--ink); font-weight: 600; cursor: pointer; }
 .provider-setup, details.setup-steps, ol.how-to > li { min-width: 0; }
 .provider-setup pre.env-lines { max-width: 100%; }
+
+/* Library filters must shrink inside the existing report card on a phone. */
+.report-library .card-actions { min-width: 0; max-width: 100%; }
+.report-library .card-head h2 { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.report-library .card-head h2 .chip { white-space: normal; }
