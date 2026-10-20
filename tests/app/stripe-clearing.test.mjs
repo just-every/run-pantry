@@ -42,9 +42,17 @@ test('PROC-003 missing Stripe refund is named on dashboard, close and settings, 
           if(!repaired){await card.getByRole('cell',{name:/txn_refund/}).waitFor();await card.getByText('refund',{exact:true}).waitFor()}
           else assert.equal(await card.getByRole('cell',{name:/txn_refund/}).count(),0)
           const response=await context.request.get(new URL(await card.getByRole('link',{name:'Download comparison and item evidence',exact:true}).getAttribute('href'),app.origin).href)
-          assert.equal(response.status(),200);const data=await response.json();assert.equal(data.ok,repaired);assert.equal(data.differenceCents,repaired?0:10000)
+          assert.equal(response.status(),200);const data=await response.json();assert.equal(data.ok,repaired);assert.equal(data.differenceCents,repaired?0:10000);assert.ok((await card.innerText()).includes(data.observedAt));assert.ok(!(await card.innerText()).includes('[object Object]'))
         }
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${name} ${width} fits`)
+        if(name==='settings'){
+          await page.locator('.card').filter({has:page.getByRole('heading',{name:'Stripe clearing',exact:true})}).screenshot({path:`/tmp/pantry-r14-proc003-settings-card-${repaired?'repaired':'missing'}-${width}.png`})
+          const payout=page.locator('.card').filter({has:page.getByRole('heading',{name:'Stripe payouts',exact:true})})
+          await payout.getByText('Change payout settings',{exact:true}).click()
+          const start=payout.getByLabel('Activity start date',{exact:true});await start.waitFor();assert.equal(await start.inputValue(),'2026-09-01')
+          const box=await start.boundingBox();assert.ok(box.x>=0&&box.x+box.width<=width)
+          await payout.screenshot({path:`/tmp/pantry-r14-proc003-payout-card-${repaired?'repaired':'missing'}-${width}.png`})
+        }
         await page.screenshot({path:`/tmp/pantry-r14-proc003-${name}-${repaired?'repaired':'missing'}-${width}.png`,fullPage:true})
       }
       assert.deepEqual(errors,[]);await context.close()
