@@ -10,6 +10,7 @@ import { account } from './accounts'
 import { entry, entryStatements, reversalStatements } from './journal'
 import { paymentStatements } from './payables'
 import type { Command } from './context'
+import { reverseEarlyDiscounts } from './early-payment'
 
 export type MatchInput = { bankLineIds: string[]; journalLineIds: string[]; create: Data[]; note?: string; proposalId?: string | null }
 
@@ -118,7 +119,8 @@ const undoMatch: Command = { need: 'record', async run(c, b) {
     const payment = (await one(c.db, 'SELECT * FROM pt_payments WHERE id = ?', match.payment_id))!
     const original = await entry(c.db, payment.journal_id)
     const r = await reversalStatements(c.db, who(c.actor), original, original.entry_date, `Undo of a bank match: ${original.memo}`, { unmatching: true })
-    reversal.push(...r.statements, q('UPDATE pt_payments SET reversal_id = ? WHERE id = ? AND reversal_id IS NULL', r.id, payment.id), changed())
+    reversal.push(...r.statements, q('UPDATE pt_payments SET reversal_id = ? WHERE id = ? AND reversal_id IS NULL', r.id, payment.id), changed(),
+      ...await reverseEarlyDiscounts(c.db, who(c.actor), payment.id, original.entry_date, 'the bank match that recorded its payment was undone'))
   }
   await run(c.db, [authority(c.actor, 'record'),
     q("UPDATE pt_matches SET status = 'undone', revision = ? WHERE id = ? AND status = 'approved' AND reconciliation_id IS NULL", uid(), match.id), changed(),

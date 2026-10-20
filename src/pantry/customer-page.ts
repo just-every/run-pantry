@@ -14,7 +14,8 @@ import { all, audit, one, run } from './db'
 import { invoiceByLink, LINK_TOKEN } from './invoice-links'
 import { invoiceDocument } from './delivery'
 import { issuedDocument } from './invoice-documents'
-import { offeredMethods, startCheckout, stripeSettings, syncCheckout } from './stripe'
+import { checkoutAmount, offeredMethods, startCheckout, stripeSettings, syncCheckout } from './stripe'
+import { percentLabel } from './discounts'
 import { unseal, verifySignature } from './stripe-api'
 
 export const customer = new Hono<{ Bindings: Bindings }>()
@@ -78,18 +79,27 @@ customer.get('/i/:token', async c => {
   const chip = paid ? '<p class="status paid">Paid</p>' : processing ? '<p class="status due">Payment processing</p>' : `<p class="status due">${overdue ? 'Overdue · was due' : 'Due'} ${escape(longDay(inv.due_date))}</p>`
   const offered = paid || processing ? [] : await offeredMethods(c.env, db, inv.customer_id)
   const methods = offered.filter(m => m !== 'offline')
+  // INVOICE-010: a live early-payment offer is charged at the amount still due for its discount; afterwards the page says how it ended.
+  const charge = paid ? null : await checkoutAmount(db, inv), early = charge?.early ?? null
+  const offerNote = !early ? ''
+    : early.state === 'live' && charge!.windowEnd ? `<p class="status due">Early-payment discount: ${escape(percentLabel(early.offer.percentMilli))} if paid by ${escape(longDay(early.offer.windowEnd))}. Pay ${escape(usd(charge!.amount))} by then.</p>`
+    : early.state === 'withdrawn' ? `<p class="note">Early-payment discount ended by ${escape(early.credit ?? 'a credit')}.</p>`
+    : early.state === 'taken' ? `<p class="note">Early-payment discount taken: ${escape(early.credit ?? '')}.</p>`
+    : `<p class="note">Early-payment discount ended ${escape(longDay(early.offer.windowEnd))}.</p>`
   const online = methods.length
-    ? `<h2>Pay ${escape(usd(inv.open_cents))}</h2><div class="pay">${methods.map(m => `<form method="post" action="/i/${escape(token)}/pay"><input type="hidden" name="method" value="${m}"><button type="submit">Pay by ${m === 'card' ? 'card' : 'bank account (ACH)'}</button></form>`).join('')}</div><p class="note">Payment is handled by Stripe. Your card or bank details go to Stripe, never to ${escape(doc.business)}'s books.</p>`
+    ? `<h2>Pay ${escape(usd(charge?.amount ?? inv.open_cents))}${charge?.windowEnd ? ` by ${escape(longDay(charge.windowEnd))}` : ''}</h2><div class="pay">${methods.map(m => `<form method="post" action="/i/${escape(token)}/pay"><input type="hidden" name="method" value="${m}"><button type="submit">Pay by ${m === 'card' ? 'card' : 'bank account (ACH)'}</button></form>`).join('')}</div><p class="note">Payment is handled by Stripe. Your card or bank details go to Stripe, never to ${escape(doc.business)}'s books.</p>`
     : ''
   const offline = offered.includes('offline') ? `<h2>How to pay</h2><p class="note">This invoice can be paid to ${escape(doc.business)} directly. Pay with the details they gave you, such as their bank transfer or check details, or reply to the invoice email to ask for them.</p>` : ''
   const pay = online + offline
   const history = await all(db, `SELECT p.payment_date, a.amount_cents, p.memo FROM pt_allocations a JOIN pt_payments p ON p.id = a.source_id AND a.source_kind = 'payment'
-    WHERE a.target_kind = 'invoice' AND a.target_id = ? AND p.reversal_id IS NULL ORDER BY p.payment_date`, inv.id)
+    WHERE a.target_kind = 'invoice' AND a.target_id = ? AND p.reversal_id IS NULL
+    UNION ALL SELECT a.allocation_date, -a.amount_cents, CASE WHEN cr.early_discount = 1 THEN 'Early-payment discount ' || cr.number || ' (sales tax -' || printf('$%.2f', cr.tax_cents / 100.0) || ')' ELSE 'Credit ' || cr.number END
+    FROM pt_allocations a JOIN pt_invoices cr ON cr.id = a.source_id AND a.source_kind = 'credit' WHERE a.target_kind = 'invoice' AND a.target_id = ? AND a.voided_by IS NULL ORDER BY 1`, inv.id, inv.id)
   const body = `<p class="from">${escape(doc.business)}</p><h1>${escape(doc.title)}</h1>${outcome}${chip}
     <div class="facts">${doc.facts.map(([k, v]) => `<div><span>${escape(k)}</span><strong>${escape(v)}</strong></div>`).join('')}</div>
     <table><thead><tr><th>Description</th><th class="fig">Quantity</th><th class="fig">Amount</th></tr></thead><tbody>${doc.lines.map((l: Data) => `<tr><td>${escape(l.description)}</td><td class="fig">${escape(l.quantity)}</td><td class="fig">${escape(l.amount)}</td></tr>`).join('')}</tbody></table>
     <div class="totals">${doc.totals.map(([k, v]) => `<span${k === 'Amount due' ? ' class="due"' : ''}>${escape(k)}</span><strong${k === 'Amount due' ? ' class="due"' : ''}>${escape(v)}</strong>`).join('')}</div>
-    ${doc.notes.map(n => `<p>${escape(n)}</p>`).join('')}<p class="note">Current balance: ${escape(usd(inv.open_cents))}. The issued document is retained as originally issued.</p>${pay}
+    ${doc.notes.map(n => `<p>${escape(n)}</p>`).join('')}<p class="note">Current balance: ${escape(usd(inv.open_cents))}. The issued document is retained as originally issued.</p>${offerNote}${pay}
     ${history.length ? `<h2>Payments</h2><ul class="history">${history.map(h => `<li>${escape(longDay(h.payment_date))}: ${escape(usd(h.amount_cents))} · ${escape(h.memo || 'Payment received')}</li>`).join('')}</ul>` : ''}
     <iframe title="Issued invoice PDF" src="/i/${escape(token)}/invoice.pdf" class="invoice-pdf"></iframe><p class="note"><a href="/i/${escape(token)}/invoice.pdf">Download the invoice (PDF)</a></p>`
   return page(200, `${doc.title} · ${doc.business}`, body)

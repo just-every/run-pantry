@@ -21,7 +21,10 @@ Writes: `POST /api/pantry/command/:action` with a JSON object.
 | `journal.save-draft`, `journal.discard` | record | `date, memo, lines[{accountId, debit|credit, memo}], documentId?, id?, revision?` |
 | `journal.post` | post | `id, revision` (the version you reviewed; not your own preparation unless owner) |
 | `journal.reverse` | post | `id, date, memo` |
-| `invoice.save-draft` | record | `customerId, issueDate, dueDate?, number?, kind? ('credit'), creditFor?, lines[{description, quantity, rate, accountId, taxCode ('exempt' or a code id)}]` |
+| `invoice.save-draft` | record | `customerId, issueDate, dueDate?, number?, kind? ('credit'), creditFor?, lines[{kind? ('item'|'delivery'), description, quantity, rate, accountId, taxCode ('exempt' or a code id)}], discounts?[{type ('percent'|'amount'), value, lines? (line numbers; default the subtotal), afterTax?}], deposit?{amount, method, date?, bankAccountId, reference?}, earlyPayment?{percent, days}` (INVOICE-010; invoices only) |
+| `discount-settings.save` | post | `discountAccountId, earlyAccountId?, revision?` (active income or expense accounts) |
+| `tax-code.early-treatment` | post | `id, revision, treatment ('retain'|'reduce'), source?{url, section, date}, reason?` (source prefilled from the suggestion table; a reason when it has no row or the choice goes against it) |
+| `early-discount.reverse` | post | `id` (the discount credit), `date, reason` |
 | `invoice.approve` / `invoice.issue` | post / record | `id, revision` / `id` |
 | `bill.save`, `bill.record` | record | `vendorId, reference, billDate, dueDate?, lines[{description, accountId, amount}], post` / `id, revision` |
 | `bill.waive-evidence` | post | `id, revision, reason` |

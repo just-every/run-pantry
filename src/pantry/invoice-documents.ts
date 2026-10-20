@@ -9,6 +9,7 @@ import { invoicePdf, type InvoiceDocument } from './invoice-pdf'
 import { base64Bytes, bytesBase64 } from './invoice-logo'
 import { customValues, selectedTemplate } from './invoice-templates'
 import { depositLabel, type Deposit, type Discount } from './discounts'
+import { offerText, type Offer } from './early-payment'
 export { invoiceTemplateCommands as invoiceDocumentCommands, invoiceDocumentsView } from './invoice-templates'
 
 export async function documentInvoice(db: D1Database, id: string) {
@@ -38,8 +39,9 @@ export async function buildInvoiceDocument(db: D1Database, inv: Data, parsed?: D
   const discounts: Discount[] = parsed?.discounts ?? json(inv.discounts, [])
   const deposit: Deposit | null = parsed ? parsed.deposit ?? null : json(inv.deposit, null)
   const minus = (c: number) => '-' + usd(c)
+  const offer: Offer | null = parsed ? parsed.offer ?? null : json(inv.early_offer, null)
   return {
-    business: entity?.legal_name ?? 'Pantry', title: `${inv.kind === 'credit' ? 'Credit' : 'Invoice'} ${inv.number}`,
+    business: entity?.legal_name ?? 'Pantry', title: inv.early_for_number ? `Early-payment discount on ${inv.early_for_number} (${inv.number})` : `${inv.kind === 'credit' ? 'Credit' : 'Invoice'} ${inv.number}`,
     templateId: template.id, templateName: template.name, layout: template.layout, accentColor: template.accentColor, textColor: template.textColor, logo: template.logo,
     facts: [['Billed to', inv.customer_name ?? customer.name], ...(customer.billing_address ? [['Billing address', customer.billing_address] as [string, string]] : []),
       ['Issued', longDay(inv.issue_date)], ['Due', longDay(due)], ['Terms', terms === 0 ? 'Due on receipt' : `Net ${terms} days`],
@@ -49,7 +51,7 @@ export async function buildInvoiceDocument(db: D1Database, inv: Data, parsed?: D
     totals: [['Subtotal', usd(subtotal)], ...discounts.filter(d => !d.afterTax).map(d => [d.label, minus(d.amount)] as [string, string]), ['Sales tax', usd(tax)],
       ...discounts.filter(d => d.afterTax).map(d => [d.label, minus(d.amount)] as [string, string]), ['Total', usd(inv.total_cents)],
       ...(deposit ? [[depositLabel(deposit), minus(deposit.amount)] as [string, string]] : []), ['Amount due', usd(inv.total_cents - (deposit?.amount ?? 0))]],
-    notes: [template.message, memo, ...(exemption ? [`Sales tax exempt in ${parsed?.destination ?? inv.destination_state}: certificate ${exemption.certificateNumber}, valid through ${exemption.expiresOn}.`] : []),
+    notes: [template.message, memo, ...(offer ? offerText(offer) : []), ...(exemption ? [`Sales tax exempt in ${parsed?.destination ?? inv.destination_state}: certificate ${exemption.certificateNumber}, valid through ${exemption.expiresOn}.`] : []),
       template.paymentInstructions, template.footer].filter(Boolean),
   }
 }

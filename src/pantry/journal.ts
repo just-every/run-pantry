@@ -6,6 +6,7 @@ import { cents, date, now, optionalText, requireThat, text, uid, list, type Data
 import { all, approval, assertOpen, audit, changed, one, q, run, type AuditActor, type Sql } from './db'
 import type { Command } from './context'
 import { entryDocuments } from './receipts/attachments'
+import { reverseEarlyDiscounts } from './early-payment'
 
 export type Line = { accountId: string; debit: number; credit: number; memo?: string; contactId?: string | null }
 export type Entry = {
@@ -147,7 +148,8 @@ export async function reversalStatements(db: D1Database, actor: AuditActor, orig
 const reverse: Command = { need: 'post', async run(c, b) {
   const original = await entry(c.db, text(b.id, 'Entry'))
   requireThat(!await one(c.db, `SELECT 1 FROM pt_checks WHERE status <> 'void' AND ((? = 'payment' AND payment_id = ?) OR (? = 'bill' AND expense_bill_id = ?))`, original.source_kind, original.source_id, original.source_kind, original.source_id), 'Void this payment from Checks so its number and reason are retained', 409)
-  requireThat(!['invoice', 'credit'].includes(original.source_kind), 'Correct an issued invoice by issuing a credit for it', 409)
+  requireThat(!['invoice', 'credit'].includes(original.source_kind), original.source_kind === 'credit' && await one(c.db, 'SELECT 1 FROM pt_invoices WHERE id = ? AND early_discount = 1', original.source_id)
+    ? 'An early-payment discount is reversed with its payment, or by someone with the post grant giving a reason' : 'Correct an issued invoice by issuing a credit for it', 409)
   requireThat(original.source_kind !== 'reversal', 'Reverse the original entry again by posting a new correcting entry', 409)
   const day = date(b.date ?? original.entry_date, 'Reversal date'), memo = optionalText(b.memo, 'Reason', 500) || `Reversal of entry ${original.number}`
   const r = await reversalStatements(c.db, c.actor, original, day, memo)
@@ -157,7 +159,8 @@ const reverse: Command = { need: 'post', async run(c, b) {
     requireThat(!allocated, 'This bill has payments or vendor credits allocated; resolve those allocations first', 409)
     extra.push(q("UPDATE pt_bills SET status = 'void', revision = ? WHERE id = ? AND status = 'posted'", uid(), original.source_id), changed())
   }
-  if (original.source_kind === 'payment') extra.push(q('UPDATE pt_payments SET reversal_id = ? WHERE journal_id = ? AND reversal_id IS NULL', r.id, original.id), changed())
+  if (original.source_kind === 'payment') extra.push(q('UPDATE pt_payments SET reversal_id = ? WHERE journal_id = ? AND reversal_id IS NULL', r.id, original.id), changed(),
+    ...await reverseEarlyDiscounts(c.db, who(c.actor), original.source_id, day, memo))
   await run(c.db, [authority(c.actor, 'post'), approval(who(c.actor), 'journal', original.id, original.revision, 'reverse', 'approved', memo), ...r.statements, ...extra, audit(who(c.actor), 'journal.reverse', 'journal', original.id, { reversal: r.id, date: day, memo })])
   return entry(c.db, r.id)
 } }

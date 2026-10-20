@@ -22,7 +22,7 @@ export async function invoiceByLink(db: D1Database, token: string) {
   if (inv.open_cents <= 0) {
     const settlement = await one<{ at: string | null }>(db, `SELECT MAX(a.created_at) AS at FROM pt_allocations a
       LEFT JOIN pt_payments p ON a.source_kind = 'payment' AND p.id = a.source_id
-      WHERE a.target_kind = 'invoice' AND a.target_id = ? AND (a.source_kind = 'credit' OR p.reversal_id IS NULL)`, inv.id)
+      WHERE a.target_kind = 'invoice' AND a.target_id = ? AND (a.source_kind = 'credit' OR p.reversal_id IS NULL) AND a.voided_by IS NULL`, inv.id)
     if (settlement?.at && Date.parse(settlement.at) + inv.link_days_after_payment * 86400000 <= Date.now()) return null
   }
   return inv

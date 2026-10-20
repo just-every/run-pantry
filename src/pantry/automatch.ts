@@ -5,6 +5,7 @@ import { Fault, usd, type Data } from './core'
 import { all, one, run } from './db'
 import { matchPlan } from './matching'
 import { recordedPaymentCandidates } from './recorded-payments'
+import { offerState } from './early-payment'
 
 const canonical = (s: string) => s.normalize('NFKD').toUpperCase().replace(/\p{M}/gu, '')
 /** Name the complete value, ignoring case and separators, without accepting a prefix. */
@@ -15,21 +16,27 @@ function names(deposit: string, value: string) {
   return new RegExp(`(?:^|${gap})${[...letters].join(gap + '*')}(?:$|${gap})`, 'u').test(canonical(deposit))
 }
 
-type Candidate = { id: string; number: string; customer_id: string; customer_name: string; bank_reference: string; open_cents: number }
+type Candidate = { id: string; number: string; customer_id: string; customer_name: string; bank_reference: string; open_cents: number; early_due?: number; window_end?: string }
 
 /** Open invoices with their balances, the pool deposits are compared against. */
 async function openInvoices(db: D1Database): Promise<Candidate[]> {
-  return all<Candidate>(db, `SELECT i.id, i.number, i.customer_id, c.name AS customer_name, c.bank_reference,
+  const rows = await all<Candidate & Data>(db, `SELECT i.id, i.number, i.customer_id, i.kind, i.status, i.early_offer, i.early_withdrawn_by, c.name AS customer_name, c.bank_reference,
       i.total_cents - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a LEFT JOIN pt_payments p ON a.source_kind = 'payment' AND p.id = a.source_id
-        WHERE a.target_kind = 'invoice' AND a.target_id = i.id AND (a.source_kind = 'credit' OR p.reversal_id IS NULL)), 0) AS open_cents
+        WHERE a.target_kind = 'invoice' AND a.target_id = i.id AND (a.source_kind = 'credit' OR p.reversal_id IS NULL) AND a.voided_by IS NULL), 0) AS open_cents
     FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id WHERE i.kind = 'invoice' AND i.status = 'issued'`)
+  // A live early-payment offer (INVOICE-010) also takes a deposit of the amount still due for its discount, dated in its window.
+  for (const r of rows) if (r.early_offer) {
+    const early = await offerState(db, r, '0000-00-00')
+    if (early?.state === 'live' && early.due > 0) Object.assign(r, { early_due: early.due, window_end: early.offer.windowEnd })
+  }
+  return rows
 }
 
 /** What Pantry makes of one deposit line: the single invoice it pays, or why a person should decide. */
 export function judge(line: Data, invoices: Candidate[]): { invoice?: Candidate; namedInvoice?: boolean; reason?: string; possible: Candidate[] } {
   if (line.amount_cents <= 0) return { possible: [] }
   const words = `${line.description} ${line.reference}`
-  const same = invoices.filter(i => i.open_cents === line.amount_cents)
+  const same = invoices.filter(i => i.open_cents === line.amount_cents || (i.early_due === line.amount_cents && line.posted_date <= i.window_end!))
   if (!same.length) return { possible: [] }
   const byNumber = same.filter(i => names(words, i.number))
   if (byNumber.length === 1) return { invoice: byNumber[0], namedInvoice: true, possible: same }

@@ -12,6 +12,7 @@ import { billLifecycle } from './bill-lifecycle'
 import { METHODS } from './contractors'
 import { requiresOwner } from './receipts/draft-approval'
 import { billRulePayload, billRules, manualBillPostingApproval } from './bill-approval'
+import { takeEarlyDiscounts } from './early-payment'
 
 export async function bill(db: D1Database, id: string) {
   const row = await one(db, 'SELECT b.*, c.name AS vendor_name FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id WHERE b.id = ?', id)
@@ -97,16 +98,17 @@ export async function allocations(db: D1Database, direction: 'received' | 'paid'
     requireThat((kind === 'invoice' ? item.customer_id : item.vendor_id) === contactId, 'Allocate only to the same customer or vendor')
     requireThat(kind === 'invoice' ? item.status === 'issued' : item.status === 'posted' || item.opening, 'Only issued invoices and recorded bills take payments')
     requireThat(a.amount <= item.open_cents, `${item.number ?? item.reference} has ${(item.open_cents / 100).toFixed(2)} open`)
-    guards.push(q(`INSERT INTO pt_guard SELECT CASE WHEN (SELECT total_cents FROM ${kind === 'invoice' ? 'pt_invoices' : 'pt_bills'} WHERE id = ?) - (SELECT COALESCE(SUM(a.amount_cents), 0) FROM pt_allocations a LEFT JOIN pt_payments p ON a.source_kind = 'payment' AND p.id = a.source_id WHERE a.target_kind = ? AND a.target_id = ? AND (a.source_kind = 'credit' OR p.reversal_id IS NULL)) >= 0 THEN 1 ELSE 0 END`, a.targetId, kind, a.targetId))
+    guards.push(q(`INSERT INTO pt_guard SELECT CASE WHEN (SELECT total_cents FROM ${kind === 'invoice' ? 'pt_invoices' : 'pt_bills'} WHERE id = ?) - (SELECT COALESCE(SUM(a.amount_cents), 0) FROM pt_allocations a LEFT JOIN pt_payments p ON a.source_kind = 'payment' AND p.id = a.source_id WHERE a.target_kind = ? AND a.target_id = ? AND (a.source_kind = 'credit' OR p.reversal_id IS NULL) AND a.voided_by IS NULL) >= 0 THEN 1 ELSE 0 END`, a.targetId, kind, a.targetId))
   }
   return { list: items, guards }
 }
 
-const allocationInsert = (actor: AuditActor, paymentId: string, kind: string, a: Allocation, day: string) =>
-  q("INSERT INTO pt_allocations (id, source_kind, source_id, target_kind, target_id, amount_cents, allocation_date, created_by, created_at) VALUES (?, 'payment', ?, ?, ?, ?, ?, ?, ?)", uid(), paymentId, kind, a.targetId, a.amount, day, actor.email, now())
+const allocationInsert = (actor: AuditActor, paymentId: string, kind: string, a: Allocation & { counted?: boolean }, day: string) =>
+  q("INSERT INTO pt_allocations (id, source_kind, source_id, target_kind, target_id, amount_cents, allocation_date, created_by, created_at, early_counted) VALUES (?, 'payment', ?, ?, ?, ?, ?, ?, ?, ?)", uid(), paymentId, kind, a.targetId, a.amount, day, actor.email, now(), a.counted ? 1 : 0)
 
-/** Statements recording one external payment and its allocations; used directly, from bank matching and by Pantry itself (Stripe, automatic matches). */
-export async function paymentStatements(db: D1Database, actor: AuditActor, b: Data) {
+/** Statements recording one external payment and its allocations; used directly, from bank matching and by Pantry itself (Stripe, automatic matches).
+ *  `sessionCounts` is Pantry's own word (never a client's) that a Stripe Checkout session qualified for an early-payment offer. */
+export async function paymentStatements(db: D1Database, actor: AuditActor, b: Data, opts: { sessionCounts?: boolean } = {}) {
   const direction = text(b.direction, 'Direction')
   requireThat(direction === 'received' || direction === 'paid', 'A payment is received or paid')
   const who_ = await contact(db, text(b.contactId, direction === 'received' ? 'Customer' : 'Vendor'), direction === 'received' ? 'customer' : 'vendor')
@@ -122,6 +124,8 @@ export async function paymentStatements(db: D1Database, actor: AuditActor, b: Da
   const control = await controlAccount(db, direction === 'received' ? 'receivable' : 'payable')
   const allocated = await allocations(db, direction, who_.id, b.allocations, amount)
   const id = uid(), journalId = uid(), received = direction === 'received'
+  // An allocation that first meets an invoice's early-payment offer posts its discount first and is capped (INVOICE-010).
+  const early = received ? await takeEarlyDiscounts(db, actor, allocated.list, day, { sessionCounts: opts.sessionCounts, payments: id }) : { allocations: allocated.list.map(a => ({ ...a, counted: false })), before: [], after: [] }
   const lines: Line[] = received
     ? [{ accountId: bank.account_id, debit: amount, credit: 0, memo: `Received from ${who_.name}` }, { accountId: control.id, debit: 0, credit: amount, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }]
     : [{ accountId: control.id, debit: amount, credit: 0, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }, { accountId: bank.account_id, debit: 0, credit: amount, memo: `Paid to ${who_.name}` }]
@@ -129,8 +133,8 @@ export async function paymentStatements(db: D1Database, actor: AuditActor, b: Da
     ...entryStatements({ id: journalId, date: day, memo: `${received ? 'Payment from' : 'Payment to'} ${who_.name}`, sourceKind: 'payment', sourceId: id, preparedBy: actor.email, preparedKind: actor.kind === 'system' ? 'import' : 'person', lines }, actor.email),
     q('INSERT INTO pt_payments (id, direction, contact_id, payment_date, amount_cents, bank_account_id, reference, memo, method, card_last4, journal_id, recorded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       id, direction, who_.id, day, amount, bank.id, optionalText(b.reference, 'Reference', 80), optionalText(b.memo, 'Memo', 500), method, cardLast4, journalId, actor.email, now()),
-    ...allocated.list.map(a => allocationInsert(actor, id, received ? 'invoice' : 'bill', a, day)), ...allocated.guards,
-    audit(who(actor), 'payment.record', 'payment', id, { direction, amount, method, cardLast4, allocations: allocated.list }),
+    ...early.before, ...early.allocations.map(a => allocationInsert(actor, id, received ? 'invoice' : 'bill', a, day)), ...allocated.guards, ...early.after,
+    audit(who(actor), 'payment.record', 'payment', id, { direction, amount, method, cardLast4, allocations: early.allocations }),
   ]
   return { id, journalId, bankLedgerAccount: bank.account_id, statements, signed: received ? amount : -amount }
 }
@@ -151,7 +155,8 @@ const allocate: Command = { need: 'record', async run(c, b) {
   await assertOpen(c.db, day)
   const allocated = await allocations(c.db, payment.direction, payment.contact_id, b.allocations, payment.amount_cents - used)
   requireThat(allocated.list.length, 'Choose what to allocate')
-  await run(c.db, [authority(c.actor, 'record'), ...allocated.list.map(a => allocationInsert(c.actor, payment.id, payment.direction === 'received' ? 'invoice' : 'bill', a, day)), ...allocated.guards,
+  const early = payment.direction === 'received' ? await takeEarlyDiscounts(c.db, who(c.actor), allocated.list, day, { payments: payment.id }) : { allocations: allocated.list.map(a => ({ ...a, counted: false })), before: [], after: [] }
+  await run(c.db, [authority(c.actor, 'record'), ...early.before, ...early.allocations.map(a => allocationInsert(c.actor, payment.id, payment.direction === 'received' ? 'invoice' : 'bill', a, day)), ...allocated.guards, ...early.after,
     q(`INSERT INTO pt_guard SELECT CASE WHEN (SELECT COALESCE(SUM(amount_cents), 0) FROM pt_allocations WHERE source_kind = 'payment' AND source_id = ?) <= ? THEN 1 ELSE 0 END`, payment.id, payment.amount_cents),
     audit(who(c.actor), 'payment.allocate', 'payment', payment.id, { allocations: allocated.list })])
   return (await one(c.db, 'SELECT * FROM pt_payments WHERE id = ?', payment.id))!

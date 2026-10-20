@@ -13,6 +13,7 @@ import { customValues, nextInvoiceNumber, selectedTemplate } from './invoice-tem
 import { applicableExemption, assertInvoiceExemption, destinationState, exemptionDay, exemptionFence } from './exemptions'
 import { applyDiscounts, discountSettings, parseDeposit, type Deposit } from './discounts'
 import { paymentStatements } from './payables'
+import { computeOffer, offerRefusal, parseTerms, treatmentFence, withdrawalStatements, type Offer } from './early-payment'
 
 const parsed = <T>(value: unknown, fallback: T): T => typeof value === 'string' ? JSON.parse(value) : (value as T) ?? fallback
 
@@ -21,6 +22,7 @@ export async function invoice(db: D1Database, id: string) {
   requireThat(row, 'Invoice not found', 404)
   row.exemption = row.exemption_evidence ? JSON.parse(row.exemption_evidence) : null
   row.discounts = parsed(row.discounts, []); row.deposit = parsed(row.deposit, null)
+  row.early_terms = parsed(row.early_terms, null); row.early_offer = parsed(row.early_offer, null); row.early_detail = parsed(row.early_detail, null)
   row.lines = await all(db, 'SELECT * FROM pt_invoice_lines WHERE invoice_id = ? ORDER BY line_no', id)
   row.open_cents = await openBalance(db, 'invoice', id, row.total_cents)
   return row
@@ -30,7 +32,7 @@ export async function invoice(db: D1Database, id: string) {
 export async function openBalance(db: D1Database, kind: 'invoice' | 'bill', id: string, total: number, asOf = '9999-12-31') {
   const r = await one<{ applied: number }>(db, `SELECT COALESCE(SUM(a.amount_cents), 0) AS applied FROM pt_allocations a
     LEFT JOIN pt_payments p ON a.source_kind = 'payment' AND p.id = a.source_id
-    WHERE a.target_kind = ? AND a.target_id = ? AND a.allocation_date <= ? AND (a.source_kind = 'credit' OR p.reversal_id IS NULL)`, kind, id, asOf)
+    WHERE a.target_kind = ? AND a.target_id = ? AND a.allocation_date <= ? AND (a.source_kind = 'credit' OR p.reversal_id IS NULL) AND (a.voided_on IS NULL OR a.voided_on > ?)`, kind, id, asOf, asOf)
   return total - Number(r?.applied ?? 0)
 }
 
@@ -81,12 +83,17 @@ export async function parseInvoice(db: D1Database, b: Data) {
   const total = subtotal - discount + tax - afterTax
   requireThat(total > 0, 'The invoice total after discounts is more than zero')
   const deposit = await parseDeposit(db, b.deposit, issueDate, total, credit)
-  const discountAccountId = discounts.length ? (await discountSettings(db))?.discount_account_id ?? null : null
-  return { customer, documentTemplate, documentValues, issueDate, dueDate, destination, exemption, lines, subtotal, discount, afterTax, discounts, discountAccountId, deposit, tax, total, memo: optionalText(b.memo, 'Memo', 1000) }
+  const settings = discounts.length || b.earlyPayment ? await discountSettings(db) : null
+  const discountAccountId = discounts.length ? settings?.discount_account_id ?? null : null
+  // An early-payment term (INVOICE-010) becomes an offer computed now and approved with this exact revision.
+  const terms = parseTerms(b.earlyPayment, issueDate, dueDate, credit ? 'credit' : 'invoice')
+  const offer: Offer | null = terms ? await computeOffer(db, terms, issueDate, lines, total, deposit?.amount ?? 0, settings?.early_account_id ?? settings?.discount_account_id ?? null) : null
+  requireThat(!offer || offer.payBy > 0, 'The deposit already covers the early-payment amount; lower the deposit or leave out the term')
+  return { customer, documentTemplate, documentValues, issueDate, dueDate, destination, exemption, lines, subtotal, discount, afterTax, discounts, discountAccountId, deposit, terms, offer, tax, total, memo: optionalText(b.memo, 'Memo', 1000) }
 }
 
 /** The INVOICE-010 columns a draft keeps: discounts as entered, their parts, the discounts account and the deposit. */
-export const discountColumns = (p: Awaited<ReturnType<typeof parseInvoice>>) => [JSON.stringify(p.discounts), p.discount, p.afterTax, p.discountAccountId, p.deposit ? JSON.stringify(p.deposit) : null]
+export const discountColumns = (p: Awaited<ReturnType<typeof parseInvoice>>) => [JSON.stringify(p.discounts), p.discount, p.afterTax, p.discountAccountId, p.deposit ? JSON.stringify(p.deposit) : null, p.terms ? JSON.stringify(p.terms) : null, p.offer ? JSON.stringify(p.offer) : null]
 
 export const lineStatements = (invoiceId: string, lines: Awaited<ReturnType<typeof parseInvoice>>['lines']) => lines.map((l, i) =>
   q('INSERT INTO pt_invoice_lines (id, invoice_id, line_no, description, quantity_milli, unit_cents, amount_cents, account_id, tax_code, tax_cents, chosen_tax_code, item_id, line_kind, discount_cents) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -121,17 +128,17 @@ const saveDraft: Command = { need: 'record', async run(c, b) {
     // Editing an approved invoice returns it to draft: approval covered the earlier revision.
     // The editor becomes the preparer, so whoever last changed it cannot approve it.
     await run(c.db, [authority(c.actor, 'record'), ...certificateGuards, periodOpen(current.issue_date), periodOpen(p.issueDate),
-      q("UPDATE pt_invoices SET customer_id = ?, destination_state = ?, exemption_evidence = ?, issue_date = ?, due_date = ?, status = 'draft', memo = ?, credit_for = ?, subtotal_cents = ?, tax_cents = ?, total_cents = ?, discounts = ?, discount_cents = ?, after_tax_discount_cents = ?, discount_account_id = ?, deposit = ?, approved_by = NULL, approved_revision = NULL, prepared_by = ?, revision = ? WHERE id = ? AND revision = ? AND status <> 'issued'",
+      q("UPDATE pt_invoices SET customer_id = ?, destination_state = ?, exemption_evidence = ?, issue_date = ?, due_date = ?, status = 'draft', memo = ?, credit_for = ?, subtotal_cents = ?, tax_cents = ?, total_cents = ?, discounts = ?, discount_cents = ?, after_tax_discount_cents = ?, discount_account_id = ?, deposit = ?, early_terms = ?, early_offer = ?, approved_by = NULL, approved_revision = NULL, prepared_by = ?, revision = ? WHERE id = ? AND revision = ? AND status <> 'issued'",
         p.customer.id, p.destination, p.exemption ? JSON.stringify(p.exemption) : null, p.issueDate, p.dueDate, p.memo, creditFor, p.subtotal, p.tax, p.total, ...discountColumns(p), c.actor.email, uid(), current.id, b.revision), changed(),
       ...documentSelectionStatements(current.id, p), q('DELETE FROM pt_invoice_lines WHERE invoice_id = ?', current.id), ...lineStatements(current.id, p.lines),
-      audit(who(c.actor), `${kind}.edit`, kind, current.id, { total: p.total })])
+      audit(who(c.actor), `${kind}.edit`, kind, current.id, { total: p.total, earlyOffer: p.offer })])
     return invoice(c.db, current.id)
   }
   const id = uid(), number = b.number ? text(b.number, 'Number', 40) : await nextNumber(c.db, kind)
   await run(c.db, [authority(c.actor, 'record'), ...certificateGuards, periodOpen(p.issueDate),
-    q("INSERT INTO pt_invoices (id, kind, number, customer_id, destination_state, exemption_evidence, issue_date, due_date, status, memo, credit_for, subtotal_cents, tax_cents, total_cents, discounts, discount_cents, after_tax_discount_cents, discount_account_id, deposit, opening, prepared_by, revision, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
+    q("INSERT INTO pt_invoices (id, kind, number, customer_id, destination_state, exemption_evidence, issue_date, due_date, status, memo, credit_for, subtotal_cents, tax_cents, total_cents, discounts, discount_cents, after_tax_discount_cents, discount_account_id, deposit, early_terms, early_offer, opening, prepared_by, revision, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
       id, kind, number, p.customer.id, p.destination, p.exemption ? JSON.stringify(p.exemption) : null, p.issueDate, p.dueDate, p.memo, creditFor, p.subtotal, p.tax, p.total, ...discountColumns(p), c.actor.email, uid(), now()),
-    ...documentSelectionStatements(id, p), ...lineStatements(id, p.lines), audit(who(c.actor), `${kind}.draft`, kind, id, { number, total: p.total })])
+    ...documentSelectionStatements(id, p), ...lineStatements(id, p.lines), audit(who(c.actor), `${kind}.draft`, kind, id, { number, total: p.total, earlyOffer: p.offer })])
   return invoice(c.db, id)
 } }
 
@@ -144,17 +151,19 @@ const approve: Command = { need: 'post', async run(c, b) {
   const untaxed = current.lines.filter((l: Data) => !l.tax_code)
   requireThat(!untaxed.length, `Tax treatment needed before approval: line ${untaxed.map((l: Data) => l.line_no).join(', ')}`, 409)
   requireThat(!current.discounts.length || current.discount_account_id, 'No discounts account was chosen when this draft was saved: ask your accountant to choose one in Settings, then save the draft again', 409)
+  const refusal = await offerRefusal(c.db, current.early_offer)
+  requireThat(!refusal, refusal!, 409)
   await assertOpen(c.db, current.issue_date)
   const revision = uid()
-  await run(c.db, [authority(c.actor, 'post'), ...certificateGuards, periodOpen(current.issue_date), approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
+  await run(c.db, [authority(c.actor, 'post'), ...certificateGuards, ...treatmentFence(current.early_offer), periodOpen(current.issue_date), approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
     q("UPDATE pt_invoices SET status = 'approved', approved_by = ?, approved_revision = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'draft'", c.actor.email, revision, revision, current.id, b.revision), changed(),
-    audit(who(c.actor), `${current.kind}.approve`, current.kind, current.id)])
+    audit(who(c.actor), `${current.kind}.approve`, current.kind, current.id, current.early_offer ? { earlyOffer: current.early_offer } : {})])
   return invoice(c.db, current.id)
 } }
 
 /** The invoice fields issuing reads; an invoice being created in the same batch passes them directly. */
 export type Issuable = { id: string; kind: string; number: string; customer_id: string; customer_name: string; issue_date: string; total_cents: number; credit_for?: string | null; revision: string; destination_state?: string; exemption_evidence?: string | null
-  discount_cents?: number; after_tax_discount_cents?: number; discount_account_id?: string | null; deposit?: Deposit | null
+  discount_cents?: number; after_tax_discount_cents?: number; discount_account_id?: string | null; deposit?: Deposit | null; early_offer?: Offer | null; early_for_number?: string
   lines: { account_id: string; amount_cents: number; description: string; tax_code: string | null; tax_cents: number }[] }
 
 /** Issue posts the approved revision: receivable against income and sales tax (reversed for a credit). */
@@ -183,10 +192,13 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
     const d = current.deposit, deposit = await paymentStatements(db, actor, { direction: 'received', contactId: current.customer_id, date: d.date, amount: (d.amount / 100).toFixed(2), method: d.method,
       bankAccountId: d.bankAccountId, reference: d.reference || current.number, memo: `Deposit received at issue of ${current.number}` })
     statements.push(...deposit.statements, q("INSERT INTO pt_allocations (id, source_kind, source_id, target_kind, target_id, amount_cents, allocation_date, created_by, created_at) VALUES (?, 'payment', ?, 'invoice', ?, ?, ?, ?, ?)", uid(), deposit.id, current.id, d.amount, current.issue_date, actor.email, now()),
-      q('UPDATE pt_invoices SET deposit_payment_id = ? WHERE id = ?', deposit.id, current.id), changed())
+      q('UPDATE pt_invoices SET deposit_payment_id = ? WHERE id = ?', deposit.id, current.id), changed(),
+      q('UPDATE pt_allocations SET early_counted = 1 WHERE source_kind = ? AND source_id = ? AND ? = 1', 'payment', deposit.id, current.early_offer ? 1 : 0))
   }
   if (credit) {
     const target = await invoice(db, current.credit_for!)
+    // Any credit other than the early-payment discount itself withdraws a live early-payment offer (INVOICE-010).
+    if (!current.early_for_number) statements.push(...await withdrawalStatements(db, actor, target, current.id, current.number))
     const applied = Math.min(current.total_cents, target.open_cents)
     if (applied > 0) statements.push(q("INSERT INTO pt_allocations (id, source_kind, source_id, target_kind, target_id, amount_cents, allocation_date, created_by, created_at) VALUES (?, 'credit', ?, 'invoice', ?, ?, ?, ?, ?)", uid(), current.id, target.id, applied, current.issue_date, actor.email, now()))
   }
@@ -214,9 +226,9 @@ export async function invoicesView(db: D1Database) {
   const lines = await all(db, 'SELECT * FROM pt_invoice_lines ORDER BY invoice_id, line_no')
   for (const r of rows) {
     r.exemption = r.exemption_evidence ? JSON.parse(r.exemption_evidence) : null
-    r.discounts = parsed(r.discounts, []); r.deposit = parsed(r.deposit, null)
+    r.discounts = parsed(r.discounts, []); r.deposit = parsed(r.deposit, null); r.early_offer = parsed(r.early_offer, null); r.early_detail = parsed(r.early_detail, null)
     r.lines = lines.filter(l => l.invoice_id === r.id)
-    r.open_cents = r.kind === 'invoice' && r.status === 'issued' ? await openBalance(db, 'invoice', r.id, r.total_cents) : r.kind === 'credit' && r.status === 'issued' ? r.total_cents - Number((await one(db, "SELECT COALESCE(SUM(amount_cents),0) AS n FROM pt_allocations WHERE source_kind = 'credit' AND source_id = ?", r.id))?.n ?? 0) : r.total_cents
+    r.open_cents = r.kind === 'invoice' && r.status === 'issued' ? await openBalance(db, 'invoice', r.id, r.total_cents) : r.kind === 'credit' && r.status === 'issued' ? (r.early_reversal_id ? 0 : r.total_cents - Number((await one(db, "SELECT COALESCE(SUM(amount_cents),0) AS n FROM pt_allocations WHERE source_kind = 'credit' AND source_id = ?", r.id))?.n ?? 0)) : r.total_cents
   }
   return rows
 }

@@ -123,7 +123,7 @@ async function deposits(c: Ctx, lines: Data[]): Promise<Issue[]> {
   const open: Data[] = []
   for (const inv of invoices) {
     const applied = Number((await one(c.db, `SELECT COALESCE(SUM(a.amount_cents), 0) AS n FROM pt_allocations a LEFT JOIN pt_payments p ON a.source_kind = 'payment' AND p.id = a.source_id
-      WHERE a.target_kind = 'invoice' AND a.target_id = ? AND (a.source_kind = 'credit' OR p.reversal_id IS NULL)`, inv.id))?.n ?? 0)
+      WHERE a.target_kind = 'invoice' AND a.target_id = ? AND (a.source_kind = 'credit' OR p.reversal_id IS NULL) AND a.voided_by IS NULL`, inv.id))?.n ?? 0)
     if (inv.total_cents - applied > 0) open.push({ ...inv, open: inv.total_cents - applied })
   }
   for (const line of lines.filter(l => l.amount_cents > 0 && daysBetween(l.posted_date, c.today) >= c.settings.deposit_days)) {

@@ -511,3 +511,239 @@ test('INVOICE-010 discounts, delivery charges and deposits on the invoice: tax o
   assert.equal(depositedIssued.open_cents, 104000 + 8580 - 30000)
   assert.equal(settings.revision.length > 0, true)
 })
+
+test('INVOICE-010 early-payment terms (with SALESTAX-001/002/004, INVOICE-001/003/005, PAY-001/002/004): per-code treatment, the offer approved with the invoice, an all-or-nothing linked discount credit in the window, reversal, Stripe and PAY-004, sales-tax columns and refusals', async t => {
+  const KEY = 'sk_test_' + 'A1b2C3d4E5f6G7h8I9j0K1l2', sessions = new Map()
+  const outbound = async request => {
+    const url = new URL(request.url)
+    if (request.method === 'GET' && url.pathname === '/v1/account') return Response.json({ id: 'acct_1Test', country: 'US', default_currency: 'usd', settings: { dashboard: { display_name: 'Juniper Lane Design' } } })
+    if (request.method === 'POST' && url.pathname === '/v1/checkout/sessions') {
+      const id = `cs_test_${sessions.size + 1}`
+      sessions.set(id, { body: new URLSearchParams(await request.text()), status: 'open', pi: null })
+      return Response.json({ id, url: `https://checkout.stripe.com/c/pay/${id}` })
+    }
+    const session = url.pathname.match(/^\/v1\/checkout\/sessions\/(cs_test_\d+)$/)
+    if (request.method === 'GET' && session) { const s = sessions.get(session[1]); return Response.json({ id: session[1], object: 'checkout.session', status: s.status, payment_intent: s.pi }) }
+    throw new Error(`unexpected Stripe call ${request.method} ${url.pathname}`)
+  }
+  const h = await harness({ outbound }); t.after(() => h.close())
+  const { acct, bank, c } = await setup(h)
+  const la = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+  const { sending } = await h.view('invoicing')
+  await h.command('sending.save', { revision: sending.revision, remindersOn: false, reminderDays: '0', timeZone: 'America/Los_Angeles' })
+  const day = la(), long = d => { const [y, m, dd] = d.split('-').map(Number); return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]} ${dd}, ${y}` }
+  const ann = await h.member('ann@example.test', 'accountant', { canPost: true }), bea = await h.member('bea@example.test', 'bookkeeper'), vic = await h.member('vic@example.test', 'viewer')
+  const agent = await h.agent()
+  const discounts = await h.command('account.save', { code: '4950', name: 'Sales discounts', type: 'income' })
+  const code = (name, rate, state) => h.command('tax-code.save', { name, rate, accountId: acct['2200'], state })
+  const ca = await code('California 8.25%', '8.25', 'CA'), caB = await code('California 8.25% (B)', '8.25', 'CA'), ca95 = await code('California 9.5%', '9.5', 'CA')
+  const ny = await code('New York 8%', '8', 'NY'), tx = await code('Texas 8.25%', '8.25', 'TX'), wa = await code('Washington 8.25%', '8.25', 'WA'), spare = await code('Spare 8.25%', '8.25', 'CA')
+  const svc = (rate, taxCode, description = 'Design services') => ({ description, quantity: '1', rate, accountId: acct['4000'], taxCode })
+  const term = { percent: '2', days: 10 }
+  const customer = c['Cedar Studio'].id, other = c['Willow Services'].id
+  const draft = (issueDate, lines, extra = {}, cookie = bea, who = customer) => h.command('invoice.save-draft', { customerId: who, issueDate, dueDate: addDays(issueDate, 30), lines, ...extra }, cookie)
+  const issue = async (d, cookie = ann) => h.command('invoice.issue', { id: (await h.command('invoice.approve', { id: d.id, revision: d.revision }, cookie)).id }, cookie)
+  const entryLines = async id => at((await h.view('journal')).entries, e => e.id === id).lines.map(l => [l.account_code, l.debit_cents, l.credit_cents])
+  const discountOf = async id => (await h.view('sales')).invoices.filter(i => i.credit_for === id && i.early_discount === 1)
+  const pay = (inv, date, amount, extra = {}) => h.command('payment.record', { direction: 'received', contactId: inv.customer_id, date, amount, bankAccountId: bank.id, reference: `CHK ${amount}`, allocations: [{ targetId: inv.id, amount }], ...extra })
+
+  // R2 / F5: only the post grant records a treatment, sourced from the table; a choice against a row needs a reason; a new state resets it.
+  const revisionOf = async tc => at((await h.view('invoicing')).earlyPayment.codes, x => x.id === tc.id).revision
+  const treat = async (tc, treatment, extra = {}, cookie = ann, status = 200) => h.command('tax-code.early-treatment', { id: tc.id, revision: await revisionOf(tc), treatment, ...extra }, cookie, status)
+  await treat(ca, 'reduce', {}, bea, 403); await treat(ca, 'reduce', {}, vic, 403)
+  assert.equal((await h.send('/api/pantry/command/tax-code.early-treatment', { id: ca.id, revision: ca.revision, treatment: 'reduce' }, { headers: { authorization: `Bearer ${agent.token}` } })).status, 401)
+  const caT = await treat(ca, 'reduce')
+  assert.deepEqual([caT.early_treatment, caT.early_treatment_source.section.startsWith('Reg. 1671.1(b)(1)'), caT.against_suggestion, caT.early_treatment_by], ['reduce', true, false, 'ann@example.test'])
+  await treat(caB, 'reduce'); await treat(ca95, 'reduce'); await treat(ny, 'retain')
+  await treat(ny, 'reduce', {}, ann, 400)
+  await treat(wa, 'retain', {}, ann, 400)
+  const waT = await treat(wa, 'retain', { reason: 'The accountant keeps the tax charged on Washington sales' })
+  assert.equal(waT.against_suggestion, true)
+  const spareT = await treat(spare, 'reduce')
+  const moved = await h.command('tax-code.save', { id: spare.id, revision: await revisionOf(spare), name: spare.name, state: 'NV' })
+  assert.deepEqual([moved.early_treatment, moved.early_treatment_revision], ['undecided', null])
+  const treatments = (await h.view('invoicing')).earlyPayment
+  assert.equal(treatments.version, '2026-10-20'); assert.equal(at(treatments.codes, x => x.id === tx.id).early_treatment, 'undecided')
+
+  // F3: with no discounts account chosen, an invoice with a term waits; F4: a bad term is refused.
+  const before = await draft(addDays(day, -8), [svc('1000.00', caB.id)], { earlyPayment: term })
+  await h.command('invoice.approve', { id: before.id, revision: before.revision }, ann, 409)
+  for (const bad of [{ percent: '0', days: 10 }, { percent: '100', days: 10 }, { percent: '2.0001', days: 10 }, { percent: '2', days: 0 }, { percent: '2', days: 31 }, { percent: '2', days: 1.5 }])
+    await h.command('invoice.save-draft', { customerId: customer, issueDate: day, dueDate: addDays(day, 30), lines: [svc('1000.00', caB.id)], earlyPayment: bad }, bea, 400)
+  await h.command('invoice.save-draft', { customerId: customer, issueDate: day, dueDate: day, lines: [svc('1000.00', caB.id)], earlyPayment: term }, bea, 400)
+  await h.command('discount-settings.save', { discountAccountId: discounts.id }, ann)
+
+  // F1: an undecided code stops a term; without the term, or with only exempt lines, the invoice approves.
+  const texan = await draft(day, [svc('100.00', tx.id)], { earlyPayment: term })
+  await h.command('invoice.approve', { id: texan.id, revision: texan.revision }, ann, 409)
+  const plain = await draft(day, [svc('100.00', tx.id)]); await h.command('invoice.approve', { id: plain.id, revision: plain.revision }, ann)
+  const exemptOnly = await draft(day, [svc('100.00', 'exempt')], { earlyPayment: term }); await h.command('invoice.approve', { id: exemptOnly.id, revision: exemptOnly.revision }, ann)
+
+  // A1: the base case's offer under reduce and under retain, after the $300 deposit.
+  const base = (taxCode) => ({ lines: [svc('1000.00', taxCode), { kind: 'delivery', description: 'Delivery', quantity: '1', rate: '40.00', accountId: acct['4000'], taxCode }],
+    discounts: [{ type: 'percent', value: '10' }], deposit: { amount: '300.00', method: 'check', date: day, bankAccountId: bank.id }, earlyPayment: term })
+  const a1 = await draft(day, base(caB.id).lines, base(caB.id), bea, other), a1k = await draft(day, base(wa.id).lines, base(wa.id), bea, other)
+  assert.deepEqual([a1.total_cents, a1.early_offer.discount, a1.early_offer.reduction, a1.early_offer.settle, a1.early_offer.payBy], [101755, 1880, 155, 99720, 69720])
+  assert.deepEqual([a1k.early_offer.discount, a1k.early_offer.reduction, a1k.early_offer.payBy], [1880, 0, 69875])
+  await h.command('invoice.save-draft', { customerId: other, issueDate: day, dueDate: addDays(day, 30), ...base(caB.id), deposit: { ...base(caB.id).deposit, amount: '997.20' } }, bea, 400)
+  // A7: mixed reduce lines and an exempt line.
+  const a7 = await draft(day, [svc('100.00', ca.id), svc('100.00', ca95.id), svc('100.00', 'exempt')], { earlyPayment: term })
+  assert.deepEqual([a7.early_offer.discount, a7.early_offer.reduction, a7.early_offer.payBy], [600, 35, 31140])
+
+  // F2: a treatment recorded again after the draft was saved stops approval until the draft is saved again.
+  const f2 = await draft(day, [svc('100.00', ca95.id)], { earlyPayment: term })
+  await treat(ca95, 'reduce')
+  await h.command('invoice.approve', { id: f2.id, revision: f2.revision }, ann, 409)
+  const f2b = await h.command('invoice.save-draft', { id: f2.id, revision: f2.revision, customerId: customer, issueDate: day, dueDate: addDays(day, 30), lines: [svc('100.00', ca95.id)], earlyPayment: term }, bea)
+  await h.command('invoice.approve', { id: f2b.id, revision: f2b.revision }, ann)
+
+  // A2: issued on day 0, the PDF and page offer $1,060.85; paying it on day 8 posts the linked $21.65 credit.
+  const nexusBefore = at((await h.view('sales-tax/nexus')).states, s => s.state === 'CA').sales
+  const d0 = addDays(day, -8), a2 = await issue(await draft(d0, [svc('1000.00', ca.id)], { earlyPayment: term }))
+  await h.command('invoice.send', { id: a2.id }); const a2Page = linkIn(h.mail.at(-1))
+  const pdfBefore = (await h.send(a2Page + '/invoice.pdf')).value, shaBefore = (await invoiceOf(h, a2.id)).issued_pdf_sha256
+  assert.ok(pdfBefore.includes(`(Early-payment discount: 2% if paid by ${long(addDays(d0, 10))}. Pay $1,060.85 by then.)`)); assert.ok(pdfBefore.includes('(Sales tax on the discounted price: $80.85.)'))
+  const live = (await h.send(a2Page)).value
+  assert.match(live, new RegExp(`Early-payment discount: 2% if paid by ${long(addDays(d0, 10))}\\. Pay \\$1,060\\.85 by then\\.`))
+  const a2Pay = await pay(a2, day, '1060.85')
+  const [a2Credit] = await discountOf(a2.id)
+  assert.deepEqual([a2Credit.number.startsWith('CR-'), a2Credit.total_cents, a2Credit.tax_cents, a2Credit.issue_date, a2Credit.early_detail.windowEnd, a2Credit.early_detail.takenOn], [true, 2165, 165, day, addDays(d0, 10), day])
+  assert.deepEqual(await entryLines(a2Credit.journal_id), [['1200', 0, 2165], ['4950', 2000, 0], ['2200', 165, 0]])
+  assert.equal((await invoiceOf(h, a2.id)).open_cents, 0)
+  assert.equal((await h.send(a2Page + '/invoice.pdf')).value, pdfBefore); assert.equal((await invoiceOf(h, a2.id)).issued_pdf_sha256, shaBefore)
+  assert.deepEqual(await entryLines(a2.journal_id), [['1200', 108250, 0], ['4000', 0, 100000], ['2200', 0, 8250]])
+  assert.match((await h.send(a2Page)).value, new RegExp(`-\\$21\\.65 · Early-payment discount ${a2Credit.number} \\(sales tax -\\$1\\.65\\)`))
+  const creditPdf = await h.send(`/api/pantry/invoice-documents/${a2Credit.id}/pdf`, undefined, { cookie: h.owner })
+  assert.ok(creditPdf.value.includes(`(Early-payment discount on ${a2.number} \\(${a2Credit.number}\\))`))
+  // A4: New York keeps the tax; the discount shows in the tax-kept column.
+  const a4 = await issue(await draft(d0, [svc('350.00', ny.id)], { earlyPayment: { percent: '10', days: 10 } }))
+  assert.equal(a4.early_offer.payBy, 34300)
+  await pay(a4, day, '343.00')
+  const [a4Credit] = await discountOf(a4.id)
+  assert.deepEqual(await entryLines(a4Credit.journal_id), [['1200', 0, 3500], ['4950', 3500, 0]])
+  let report = await h.view(`reports/sales-tax?from=${d0}&to=${day}&basis=accrual`)
+  const row = (r, id) => at(r.states.flatMap(s => s.codes), x => x.id === id)
+  assert.deepEqual([row(report, ca.id).taxable, row(report, ca.id).charged, row(report, ca.id).early.reduced, row(report, ca.id).early.taxReduced], [98000, 8085, 2000, 165])
+  assert.deepEqual([row(report, ny.id).taxable, row(report, ny.id).charged, row(report, ny.id).early.kept], [35000, 2800, 3500])
+  assert.equal(report.ledger.ties, true)
+  const cashReport = await h.view(`reports/sales-tax?from=${d0}&to=${day}&basis=cash`)
+  assert.deepEqual([row(cashReport, ca.id).taxable, row(cashReport, ca.id).collected, row(cashReport, ca.id).early.reduced, row(cashReport, ny.id).taxable, row(cashReport, ny.id).collected, row(cashReport, ny.id).early.kept, cashReport.ledger.ties], [98000, 8085, 2000, 35000, 2800, 3500, true])
+  assert.deepEqual(report.againstSuggestion.map(x => x.id), [wa.id])
+  // A12: the nexus watch keeps gross sales.
+  assert.equal(at((await h.view('sales-tax/nexus')).states, s => s.state === 'CA').sales, nexusBefore + 100000)
+
+  // A3: issued twelve days ago the offer has ended: paying in full gets no discount, paying the early amount leaves $21.65 open.
+  const d12 = addDays(day, -12)
+  const a3full = await issue(await draft(d12, [svc('1000.00', caB.id)], { earlyPayment: term }))
+  await pay(a3full, day, '1082.50')
+  const a3short = await issue(await draft(d12, [svc('1000.00', caB.id)], { earlyPayment: term }))
+  await h.command('invoice.send', { id: a3short.id }); const endedPage = linkIn(h.mail.at(-1))
+  const endedBefore = (await h.send(endedPage)).value
+  assert.match(endedBefore, /Current balance: \$1,082\.50/); assert.match(endedBefore, new RegExp(`Early-payment discount ended ${long(addDays(d12, 10))}\\.`))
+  await pay(a3short, day, '1060.85')
+  assert.deepEqual([(await discountOf(a3full.id)).length, (await discountOf(a3short.id)).length, (await invoiceOf(h, a3short.id)).open_cents], [0, 0, 2165])
+  assert.match((await h.send(endedPage)).value, new RegExp(`Early-payment discount ended ${long(addDays(d12, 10))}\\.`))
+  // A5: partial payments in the window add up; a second part after the window gives no discount.
+  const a5 = await issue(await draft(d0, [svc('1000.00', caB.id)], { earlyPayment: term }))
+  await pay(a5, addDays(day, -3), '500.00')
+  assert.equal((await discountOf(a5.id)).length, 0)
+  await pay(a5, day, '560.85')
+  assert.deepEqual([(await discountOf(a5.id))[0].issue_date, (await invoiceOf(h, a5.id)).open_cents], [day, 0])
+  const a5late = await issue(await draft(d12, [svc('1000.00', caB.id)], { earlyPayment: term }))
+  await pay(a5late, addDays(d12, 5), '500.00'); await pay(a5late, day, '560.85')
+  assert.deepEqual([(await discountOf(a5late.id)).length, (await invoiceOf(h, a5late.id)).open_cents], [0, 2165])
+  // A6: an overpayment in the window is capped after the discount; the rest stays unapplied.
+  const a6 = await issue(await draft(d0, [svc('1000.00', caB.id)], { earlyPayment: term }))
+  const a6Pay = await pay(a6, day, '1082.50')
+  const a6Row = at((await h.view('sales')).payments, p => p.id === a6Pay.id)
+  assert.deepEqual([a6Row.unallocated_cents, (await invoiceOf(h, a6.id)).open_cents, (await discountOf(a6.id)).length], [2165, 0, 1])
+
+  // F6: a client cannot mark a credit as a discount; an ordinary credit is never a discount and withdraws the offer.
+  const f6 = await issue(await draft(addDays(day, -3), [svc('1000.00', caB.id)], { earlyPayment: term }))
+  await h.command('invoice.send', { id: f6.id }); const f6Page = linkIn(h.mail.at(-1))
+  const allowance = await issue(await h.command('invoice.save-draft', { kind: 'credit', creditFor: f6.id, customerId: customer, issueDate: day, dueDate: day, lines: [line('Allowance', '10.00', acct['4000'])], earlyDiscount: 1, early_discount: 1 }, bea))
+  assert.deepEqual([allowance.early_discount, (await invoiceOf(h, f6.id)).early_withdrawn_by], [0, allowance.id])
+  assert.match((await h.send(f6Page)).value, new RegExp(`Early-payment discount ended by ${allowance.number}\\.`))
+  await pay(f6, day, '1050.85')
+  assert.deepEqual([(await discountOf(f6.id)).length, (await invoiceOf(h, f6.id)).open_cents], [0, 2165])
+
+  // F9 / F11: the issued invoice cannot change, and the discount credit is not reversed through journal.reverse.
+  await h.command('invoice.save-draft', { id: a2.id, revision: (await invoiceOf(h, a2.id)).revision, customerId: customer, issueDate: d0, dueDate: addDays(d0, 30), lines: [svc('1.00', ca.id)] }, h.owner, 409)
+  assert.equal((await invoiceOf(h, a2.id)).issued_pdf_sha256, shaBefore)
+  await h.command('journal.reverse', { id: a2Credit.journal_id, date: day }, h.owner, 409)
+  // A10: reversing the counted payment reverses the discount in the same write; the balance is $1,082.50 and nothing is granted again.
+  await h.command('journal.reverse', { id: a2Pay.journal_id, date: day, memo: 'Check returned' })
+  const reversedCredit = at((await h.view('sales')).invoices, i => i.id === a2Credit.id)
+  assert.ok(reversedCredit.early_reversal_id)
+  assert.deepEqual(await entryLines(reversedCredit.early_reversal_id), [['1200', 2165, 0], ['4950', 0, 2000], ['2200', 0, 165]])
+  assert.deepEqual([(await invoiceOf(h, a2.id)).open_cents, (await discountOf(a2.id)).filter(x => !x.early_reversal_id).length], [108250, 0])
+  report = await h.view(`reports/sales-tax?from=${d0}&to=${day}&basis=accrual`)
+  assert.deepEqual([row(report, ca.id).taxable, row(report, ca.id).charged, row(report, ca.id).early.reduced, report.ledger.ties], [100000, 8250, 0, true])
+  assert.equal((await h.view(`reports/receivables?to=${day}`)).agrees, true)
+  assert.equal((await invoiceOf(h, a2.id)).issued_pdf_sha256, shaBefore); assert.equal((await h.send(a2Page + '/invoice.pdf')).value, pdfBefore)
+  assert.equal((await h.view(`reports/sales-tax?from=${d0}&to=${day}&basis=cash`)).ledger.ties, true)
+
+  // A8: Stripe Checkout in the window charges the early amount and expires by the end of the window day; card and ACH (settling after the window) both take the discount once.
+  await h.command('stripe.connect', { secretKey: KEY })
+  const d2 = addDays(day, -2)
+  const card = await issue(await draft(d2, [svc('1000.00', caB.id)], { earlyPayment: term })), ach = await issue(await draft(d2, [svc('1000.00', caB.id)], { earlyPayment: term }))
+  await h.command('invoice.send', { id: card.id }); const cardPage = linkIn(h.mail.at(-1))
+  await h.command('invoice.send', { id: ach.id }); const achPage = linkIn(h.mail.at(-1))
+  assert.match((await h.send(cardPage)).value, new RegExp(`Pay \\$1,060\\.85 by ${long(addDays(d2, 10))}`))
+  const started = Math.floor(Date.now() / 1000)
+  await h.send(cardPage + '/pay', undefined, { headers: { 'content-type': 'application/x-www-form-urlencoded' }, raw: 'method=card' })
+  const s1 = sessions.get('cs_test_1'), expires = Number(s1.body.get('expires_at'))
+  assert.equal(s1.body.get('line_items[0][price_data][unit_amount]'), '106085')
+  assert.ok(expires >= started + 30 * 60 && expires <= started + 24 * 3600, 'Checkout expires within Stripe\'s limits and by the end of the window day')
+  Object.assign(s1, { status: 'complete', pi: { id: 'pi_card', status: 'succeeded', amount_received: 106085, latest_charge: { id: 'ch_1', balance_transaction: { id: 'txn_1', amount: 106085, currency: 'usd', fee: 3100, exchange_rate: null, created: started } } } })
+  await h.send(cardPage + '?checkout=cs_test_1')
+  assert.deepEqual([(await discountOf(card.id)).length, (await invoiceOf(h, card.id)).open_cents], [1, 0])
+  await h.send(achPage + '/pay', undefined, { headers: { 'content-type': 'application/x-www-form-urlencoded' }, raw: 'method=us_bank_account' })
+  const s2 = sessions.get('cs_test_2')
+  assert.equal(s2.body.get('line_items[0][price_data][unit_amount]'), '106085')
+  Object.assign(s2, { status: 'complete', pi: { id: 'pi_ach', status: 'processing', amount_received: 0, latest_charge: null } })
+  await h.send(achPage + '?checkout=cs_test_2')
+  const settled = Math.floor(Date.parse(addDays(d2, 14) + 'T18:00:00Z') / 1000)
+  s2.pi = { id: 'pi_ach', status: 'succeeded', amount_received: 106085, latest_charge: { id: 'ch_2', balance_transaction: { id: 'txn_2', amount: 106085, currency: 'usd', fee: 500, exchange_rate: null, created: settled } } }
+  await h.cron()
+  const [achCredit] = await discountOf(ach.id)
+  assert.deepEqual([achCredit.issue_date, (await invoiceOf(h, ach.id)).open_cents], [addDays(d2, 14), 0])
+  // F10: replaying the confirmations posts nothing twice.
+  await h.send(cardPage + '?checkout=cs_test_1'); await h.send(achPage + '?checkout=cs_test_2'); await h.cron()
+  assert.deepEqual([(await discountOf(card.id)).length, (await discountOf(ach.id)).length], [1, 1])
+
+  // A9: PAY-004 matches a deposit of the early amount inside the window with its discount; undo reverses both; after the window it is not applied.
+  const north = c['Northstar Consulting'].id
+  const a9 = await issue(await draft(d0, [svc('1000.00', caB.id)], { earlyPayment: term }, bea, north))
+  const a9late = await issue(await draft(d12, [svc('1000.00', caB.id)], { earlyPayment: term }, bea, north))
+  const [y, m, dd] = day.split('-')
+  const imported = await h.command('statement.import', { bankAccountId: bank.id, fileName: 'early.csv', content: `Date,Description,Amount\n${m}/${dd}/${y},DEPOSIT ${a9.number},1060.85\n${m}/${dd}/${y},DEPOSIT ${a9late.number},1060.85\n`,
+    opening: '0.00', closing: '2121.70', start: day, end: day, confirmLast4: '4821' })
+  assert.deepEqual(imported.automatic.matched.map(x => x.invoiceId), [a9.id])
+  assert.deepEqual([(await discountOf(a9.id)).length, (await invoiceOf(h, a9.id)).open_cents, (await invoiceOf(h, a9late.id)).open_cents], [1, 0, 108250])
+  await h.command('match.undo', { id: imported.automatic.matched[0].matchId })
+  assert.deepEqual([(await discountOf(a9.id)).filter(x => !x.early_reversal_id).length, (await invoiceOf(h, a9.id)).open_cents], [0, 108250])
+
+  // A11: a sale invoiced before the report's range is flagged as an earlier-period sale with its date and state.
+  const monthStart = day.slice(0, 8) + '01', a11Issue = addDays(monthStart, -3)
+  const a11 = await issue(await draft(a11Issue, [svc('1000.00', caB.id)], { earlyPayment: term }))
+  await pay(a11, addDays(monthStart, 2), '1060.85')
+  const monthly = await h.view(`reports/sales-tax?from=${monthStart}&to=${addDays(monthStart, 27)}&basis=accrual`)
+  const flagged = at(monthly.earlyItems, i => i.invoice === a11.number)
+  assert.deepEqual([flagged.earlierPeriod, flagged.label, flagged.invoiceDate, flagged.state, flagged.discount, flagged.taxReduced], [true, 'Sale in an earlier period', a11Issue, 'CA', 2000, 165])
+
+  // F7: a payment dated in a locked month is refused.
+  const close = await h.command('close.tasks', { period: '2025-12' })
+  for (const task of close.tasks) await h.command('close.task', { id: task.id, revision: task.revision, done: true })
+  await h.command('period.lock', { period: '2025-12' })
+  const f7 = await issue(await draft(d0, [svc('100.00', caB.id)], { earlyPayment: term }))
+  await h.command('payment.record', { direction: 'received', contactId: customer, date: '2025-12-15', amount: '106.08', bankAccountId: bank.id, allocations: [{ targetId: f7.id, amount: '106.08' }] }, h.owner, 409)
+
+  // A13: a sending template's approval covers its term and treatment revisions; a treatment change makes the next occurrence a draft that says why.
+  const template = await h.command('recurring.save', { customerId: customer, startDate: day, unit: 'month', every: 1, mode: 'send', termsDays: 30, lines: [svc('500.00', caB.id)], earlyPayment: term })
+  await h.command('recurring.approve', { id: template.id, revision: template.revision }, ann)
+  await treat(caB, 'retain', { reason: 'The accountant keeps the tax on this code' })
+  await h.cron()
+  const run = (await h.view('sales')).recurring.find(r => r.id === template.id).runs_list[0]
+  assert.equal(run.status, 'drafted'); assert.match(run.detail, /early-payment treatment changed/)
+})

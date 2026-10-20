@@ -49,7 +49,7 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
   const documentHref = (documentId: string) => `/api/pantry/documents/${encodeURIComponent(documentId)}`
   const sum = (rows: Data[], key: string) => rows.reduce((n, r) => n + Number(r[key]), 0)
   for (const a of allocations) {
-    a.included_in_balance = a.allocation_date <= asOf && (a.source_kind === 'credit' || !a.reversal_id || a.reversal_date > asOf)
+    a.included_in_balance = a.allocation_date <= asOf && (a.source_kind === 'credit' || !a.reversal_id || a.reversal_date > asOf) && (!a.voided_on || a.voided_on > asOf)
     a.source_href = recordHref(a.source_kind === 'credit' ? 'invoice' : 'payment', a.source_id)
     a.target_href = recordHref(a.target_kind, a.target_id)
   }
@@ -64,11 +64,13 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
   const rows: Data[] = invoices.map(i => {
     const issued = i.status === 'issued' && i.issue_date <= asOf
     const applied = allocations.filter(a => i.kind === 'credit' ? a.source_kind === 'credit' && a.source_id === i.id : a.target_kind === 'invoice' && a.target_id === i.id)
-    const balance = !issued ? null : i.kind === 'credit' ? i.total_cents - sum(applied.filter(a => a.included_in_balance), 'amount_cents') : openById.get(i.id) ?? 0
+    // A reversed early-payment discount credit (INVOICE-010) nets to nothing from its reversal date.
+    const reversed = i.kind === 'credit' && applied.some(a => a.voided_on && a.voided_on <= asOf)
+    const balance = !issued ? null : reversed ? 0 : i.kind === 'credit' ? i.total_cents - sum(applied.filter(a => a.included_in_balance), 'amount_cents') : openById.get(i.id) ?? 0
     return { kind: i.kind, id: i.id, date: i.issue_date, due_date: i.due_date, created_at: i.created_at, reference: i.number,
       href: recordHref('invoice', i.id), total_cents: i.total_cents, balance_cents: balance,
       balance_label: i.kind === 'credit' ? 'Unallocated' : 'Open', included_in_balance: issued,
-      status: !issued ? i.status === 'issued' ? 'After reporting date' : i.status : balance === 0 ? i.kind === 'credit' ? 'Fully applied' : 'Paid' : i.kind === 'credit' ? 'Unallocated' : 'Open',
+      status: !issued ? i.status === 'issued' ? 'After reporting date' : i.status : reversed ? 'Reversed' : balance === 0 ? i.kind === 'credit' ? 'Fully applied' : 'Paid' : i.kind === 'credit' ? 'Unallocated' : 'Open',
       memo: i.memo, credit_for: i.credit_for, credit_for_href: i.credit_for ? recordHref('invoice', i.credit_for) : null,
       allocations: applied, documents: docsFor('invoice', i), deliveries: deliveries.filter(d => d.invoice_id === i.id),
       exemption: i.exemption_evidence ? JSON.parse(i.exemption_evidence) : null }

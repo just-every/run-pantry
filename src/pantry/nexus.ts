@@ -54,7 +54,7 @@ async function saleDays(db: D1Database, from: string) {
       FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
       LEFT JOIN pt_invoices o ON o.id = i.credit_for
       LEFT JOIN pt_tax_codes t ON t.id = COALESCE(l.chosen_tax_code, l.tax_code)
-      WHERE i.status = 'issued' AND i.journal_id IS NOT NULL AND i.write_off = 0 AND i.issue_date >= ?)
+      WHERE i.status = 'issued' AND i.journal_id IS NOT NULL AND i.write_off = 0 AND i.early_discount = 0 AND i.issue_date >= ?)
     GROUP BY state, issue_date, kind`, from)
 }
 

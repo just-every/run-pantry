@@ -92,8 +92,11 @@ const saveTaxCode: Command = { need: 'post', async run(c, b) {
     const current = await one(c.db, 'SELECT * FROM pt_tax_codes WHERE id = ?', text(b.id, 'Tax code'))
     requireThat(current, 'Tax code not found', 404)
     requireThat(current.revision === b.revision, 'Tax code changed; reload', 409)
-    await run(c.db, [authority(c.actor, 'post'), q('UPDATE pt_tax_codes SET name = ?, state = ?, revision = ? WHERE id = ? AND revision = ?', name, state, uid(), current.id, b.revision), changed(),
-      audit(who(c.actor), 'tax-code.update', 'tax-code', current.id, { name, state })])
+    // A new state resets the early-payment treatment to undecided (INVOICE-010); issued offers keep their snapshots.
+    const reset = state !== current.state && current.early_treatment !== 'undecided'
+    await run(c.db, [authority(c.actor, 'post'), q("UPDATE pt_tax_codes SET name = ?, state = ?, revision = ?, early_treatment = CASE WHEN ? THEN 'undecided' ELSE early_treatment END, early_treatment_revision = CASE WHEN ? THEN NULL ELSE early_treatment_revision END WHERE id = ? AND revision = ?",
+      name, state, uid(), state !== current.state ? 1 : 0, state !== current.state ? 1 : 0, current.id, b.revision), changed(),
+      audit(who(c.actor), 'tax-code.update', 'tax-code', current.id, { name, state, ...(reset ? { earlyTreatment: { before: current.early_treatment, after: 'undecided' } } : {}) })])
     return (await one(c.db, 'SELECT * FROM pt_tax_codes WHERE id = ?', current.id))!
   }
   const rate = text(String(b.rate ?? ''), 'Rate')

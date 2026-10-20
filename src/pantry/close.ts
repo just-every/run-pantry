@@ -52,7 +52,7 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
   // Money paid or received but left unapplied while the same customer or vendor has open invoices or bills: the bill still
   // reads as owed and the cash-basis profit misses it. A prepayment with nothing open is fine.
   const applied = (target: string) => `COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a LEFT JOIN pt_payments ap ON a.source_kind = 'payment' AND ap.id = a.source_id
-    WHERE a.target_kind = '${target}' AND a.target_id = t.id AND (a.source_kind = 'credit' OR ap.reversal_id IS NULL)), 0)`
+    WHERE a.target_kind = '${target}' AND a.target_id = t.id AND (a.source_kind = 'credit' OR ap.reversal_id IS NULL) AND a.voided_by IS NULL), 0)`
   const unapplied = await all(db, `SELECT p.id, p.direction, c.name, p.amount_cents - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a WHERE a.source_kind = 'payment' AND a.source_id = p.id), 0) AS left_cents
     FROM pt_payments p JOIN pt_contacts c ON c.id = p.contact_id WHERE p.reversal_id IS NULL AND p.payment_date <= ?
       AND p.amount_cents > COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a WHERE a.source_kind = 'payment' AND a.source_id = p.id), 0)

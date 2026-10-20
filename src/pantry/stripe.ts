@@ -16,6 +16,26 @@ import { invoice } from './invoices'
 import { customerPaymentMethods } from './customer-profile'
 import { businessDay, customerLink, sendingSettings } from './delivery'
 import { managedInstall, seal, STRIPE_VERSION, stripeCall, unseal } from './stripe-api'
+import { offerState } from './early-payment'
+
+/** The UTC instant (ms) at which `day` ends in `timeZone`. */
+function dayEnd(day: string, timeZone: string) {
+  const guess = Date.parse(day + 'T23:59:59Z')
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(guess)).map(p => [p.type, p.value]))
+  const local = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second))
+  return guess - (local - guess) + 999
+}
+
+/** What Checkout charges now (INVOICE-010 R10): while an early-payment offer is live with at least 30 minutes of its last day left,
+ *  the amount still due for the discount, expiring by the end of that day; otherwise the open balance. */
+export async function checkoutAmount(db: D1Database, inv: Data) {
+  const tz = (await sendingSettings(db)).time_zone, early = await offerState(db, inv, businessDay(tz))
+  if (early?.state === 'live' && early.due > 0 && early.due <= inv.open_cents) {
+    const end = dayEnd(early.offer.windowEnd, tz)
+    if (end - Date.now() >= 30 * 60000) return { amount: early.due, windowEnd: early.offer.windowEnd, expiresAt: Math.floor(Math.min(end, Date.now() + 23.9 * 3600000) / 1000), early }
+  }
+  return { amount: inv.open_cents, windowEnd: null, expiresAt: null, early }
+}
 import type { Command } from './context'
 
 export const METHODS = { card: 'Card', us_bank_account: 'Bank account (ACH)' } as const
@@ -125,14 +145,15 @@ export async function startCheckout(env: Bindings, db: D1Database, token: string
   requireThat((method === 'card' || method === 'us_bank_account') && (offered as string[]).includes(method), 'That payment method is not offered for this invoice', 409)
   const s = (await stripeSettings(db))!, link = customerLink(env, token)
   const e = await one(db, 'SELECT legal_name FROM pt_entity WHERE id = 1')
+  const charge = await checkoutAmount(db, inv)
   const session = await stripeCall(await unseal(env, s.key_sealed), 'POST', '/checkout/sessions', {
-    mode: 'payment', allowed_payment_method_types: [method], client_reference_id: inv.id, ...(inv.customer_email ? { customer_email: inv.customer_email } : {}),
-    line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: inv.open_cents, product_data: { name: `Invoice ${inv.number}`, description: `${e?.legal_name ?? 'Pantry'} · ${inv.customer_name}` } } }],
+    mode: 'payment', allowed_payment_method_types: [method], client_reference_id: inv.id, ...(inv.customer_email ? { customer_email: inv.customer_email } : {}), ...(charge.expiresAt ? { expires_at: charge.expiresAt } : {}),
+    line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: charge.amount, product_data: { name: `Invoice ${inv.number}`, description: `${e?.legal_name ?? 'Pantry'} · ${inv.customer_name}${charge.windowEnd ? ' · early-payment discount' : ''}` } } }],
     metadata: { pantry_invoice: inv.id, pantry_number: inv.number }, payment_intent_data: { description: `Invoice ${inv.number}`, metadata: { pantry_invoice: inv.id, pantry_number: inv.number } },
     success_url: `${link}?checkout={CHECKOUT_SESSION_ID}`, cancel_url: link,
   })
-  await run(db, [q("INSERT INTO pt_stripe_payments (id, invoice_id, method, amount_cents, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'open', ?, ?)", session.id, inv.id, method, inv.open_cents, now(), now()),
-    audit(pantry('customer'), 'stripe.checkout', 'invoice', inv.id, { method, amount: inv.open_cents })])
+  await run(db, [q("INSERT INTO pt_stripe_payments (id, invoice_id, method, amount_cents, status, created_at, updated_at, early_window_end) VALUES (?, ?, ?, ?, 'open', ?, ?, ?)", session.id, inv.id, method, charge.amount, now(), now(), charge.windowEnd),
+    audit(pantry('customer'), 'stripe.checkout', 'invoice', inv.id, { method, amount: charge.amount, earlyPaymentWindowEnd: charge.windowEnd })])
   return String(session.url)
 }
 
@@ -170,7 +191,7 @@ async function recordSucceeded(env: Bindings, db: D1Database, row: Data, pi: Dat
       direction: 'received', contactId: inv.customer_id, date: day, amount: dollars(amount), bankAccountId: s.bank_account_id, reference: pi.id,
       memo: `Paid ${row.method === 'card' ? 'by card' : 'by ACH bank debit'} through the invoice link`,
       allocations: inv.open_cents > 0 ? [{ targetId: inv.id, amount: dollars(Math.min(amount, inv.open_cents)) }] : [],
-    })
+    }, { sessionCounts: !!row.early_window_end })
     statements.push(guard("NOT EXISTS (SELECT 1 FROM pt_stripe_clearing_items WHERE payment_intent = ? AND status IN ('posted', 'legacy-covered') AND entry_id IS NOT NULL)", pi.id), ...p.statements, q("UPDATE pt_stripe_payments SET status = 'succeeded', payment_intent = ?, payment_id = ?, updated_at = ? WHERE id = ? AND status <> 'succeeded'", pi.id, p.id, now(), row.id), changed())
   }
   // Pantry keeps USD books. An account that settles in another currency reports its fee in that

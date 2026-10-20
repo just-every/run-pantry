@@ -21,7 +21,7 @@ export async function writeOffLimit(db: D1Database) {
   return Number((await one(db, 'SELECT limit_cents FROM pt_write_off_policy WHERE id = 1'))?.limit_cents ?? DEFAULT_LIMIT)
 }
 const standing = (kind: 'invoice' | 'bill') => `(SELECT total_cents FROM ${kind === 'invoice' ? 'pt_invoices' : 'pt_bills'} WHERE id = ?) - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a
-  LEFT JOIN pt_payments p ON a.source_kind = 'payment' AND p.id = a.source_id WHERE a.target_kind = '${kind}' AND a.target_id = ? AND (a.source_kind = 'credit' OR p.reversal_id IS NULL)), 0)`
+  LEFT JOIN pt_payments p ON a.source_kind = 'payment' AND p.id = a.source_id WHERE a.target_kind = '${kind}' AND a.target_id = ? AND (a.source_kind = 'credit' OR p.reversal_id IS NULL) AND a.voided_by IS NULL), 0)`
 
 /** Open invoices or bills whose balance is above zero and at most `ceiling`. */
 export async function smallBalances(db: D1Database, kind: 'invoice' | 'bill', ceiling: number) {

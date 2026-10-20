@@ -32,7 +32,7 @@ const DOCUMENT_KINDS = "('invoice', 'credit', 'bill')"
 export const sameOnCash = (e = 'e') => `NOT (${e}.source_kind IN ${DOCUMENT_KINDS} OR (${e}.source_kind = 'reversal' AND EXISTS (SELECT 1 FROM pt_journal_entries o WHERE o.id = ${e}.reverses_id AND o.source_kind IN ${DOCUMENT_KINDS})))`
 
 export type Settlement = {
-  kind: 'payment' | 'payment-reversed' | 'credit' | 'credit-applied'
+  kind: 'payment' | 'payment-reversed' | 'credit' | 'credit-applied' | 'credit-reversed'
   date: string; amount: number
   paymentId: string | null; paymentReference: string; paymentJournalId: string | null; reversalJournalId: string | null
   creditId: string | null; creditNumber: string | null; appliedToId: string | null; appliedToNumber: string | null
@@ -44,11 +44,13 @@ export type CashLine = {
   docKind: 'invoice' | 'credit' | 'bill'; docId: string; docRef: string; docJournalId: string; docTotal: number
   contactId: string; contactName: string
   role: 'control' | 'sale' | 'tax' | 'expense' | 'discount'; description: string; taxCode: string | null; itemId?: string | null
+  /** On an early-payment discount credit's line (INVOICE-010): the treatment it applied. */
+  early?: string | null
   settledBefore: number; settledAfter: number
   settlement: Settlement
 }
 
-type Component = { accountId: string; sign: 1 | -1; magnitude: number; role: CashLine['role']; description: string; taxCode: string | null; itemId?: string | null }
+type Component = { accountId: string; sign: 1 | -1; magnitude: number; role: CashLine['role']; description: string; taxCode: string | null; itemId?: string | null; early?: string | null }
 type Doc = { kind: CashLine['docKind']; id: string; ref: string; journalId: string; total: number; contactId: string; contactName: string; control: Component; parts: Component[] }
 type Event = { docId: string; date: string; order: string; delta: number; settlement: Settlement }
 
@@ -72,17 +74,17 @@ async function documents(db: D1Database): Promise<Map<string, Doc>> {
   // Only documents something has settled matter on the cash basis.
   const invoices = await all(db, `SELECT i.id, i.kind, i.number, i.total_cents, i.journal_id, i.customer_id, i.after_tax_discount_cents, i.discount_account_id, c.name AS contact_name FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id
     WHERE i.journal_id IS NOT NULL AND (i.id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice') OR i.id IN (SELECT source_id FROM pt_allocations WHERE source_kind = 'credit'))`)
-  const invoiceLines = await all(db, `SELECT l.invoice_id, l.description, l.amount_cents, l.discount_cents, l.tax_cents, l.tax_code, l.account_id, l.item_id, t.account_id AS tax_account FROM pt_invoice_lines l LEFT JOIN pt_tax_codes t ON t.id = l.tax_code
+  const invoiceLines = await all(db, `SELECT l.invoice_id, l.description, l.amount_cents, l.discount_cents, l.tax_cents, l.tax_code, l.account_id, l.item_id, l.early_treatment, t.account_id AS tax_account FROM pt_invoice_lines l LEFT JOIN pt_tax_codes t ON t.id = l.tax_code
     WHERE l.invoice_id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice' UNION SELECT source_id FROM pt_allocations WHERE source_kind = 'credit') ORDER BY l.invoice_id, l.line_no`)
   for (const i of invoices) {
     // An invoice debits receivables and credits income and tax; a credit note the reverse.
     const s: 1 | -1 = i.kind === 'invoice' ? 1 : -1
     const parts: Component[] = []
     for (const l of invoiceLines.filter(x => x.invoice_id === i.id)) {
-      parts.push({ accountId: l.account_id, sign: (-s) as 1 | -1, magnitude: l.amount_cents, role: 'sale', description: l.description, taxCode: l.tax_code, itemId: l.item_id })
+      parts.push({ accountId: l.account_id, sign: (-s) as 1 | -1, magnitude: l.amount_cents, role: 'sale', description: l.description, taxCode: l.tax_code, itemId: l.item_id, early: l.early_treatment })
       // A before-tax discount (INVOICE-010) is a debit to the discounts account that lowers the line's taxable sale.
       if (l.discount_cents) parts.push({ accountId: i.discount_account_id, sign: s, magnitude: l.discount_cents, role: 'sale', description: `Discount · ${l.description}`, taxCode: l.tax_code })
-      if (l.tax_cents) parts.push({ accountId: l.tax_account, sign: (-s) as 1 | -1, magnitude: l.tax_cents, role: 'tax', description: `Sales tax · ${l.description}`, taxCode: l.tax_code })
+      if (l.tax_cents) parts.push({ accountId: l.tax_account, sign: (-s) as 1 | -1, magnitude: l.tax_cents, role: 'tax', description: `Sales tax · ${l.description}`, taxCode: l.tax_code, early: l.early_treatment })
     }
     if (i.after_tax_discount_cents) parts.push({ accountId: i.discount_account_id, sign: s, magnitude: i.after_tax_discount_cents, role: 'discount', description: `Discount after tax · ${i.number}`, taxCode: null })
     docs.set(i.id, { kind: i.kind, id: i.id, ref: i.number, journalId: i.journal_id, total: i.total_cents, contactId: i.customer_id, contactName: i.contact_name,
@@ -120,6 +122,9 @@ async function events(db: D1Database, docs: Map<string, Doc>): Promise<Event[]> 
     }
     if (a.source_kind === 'credit' && docs.has(a.source_id))
       out.push({ docId: a.source_id, date: a.allocation_date, order, delta: a.amount_cents, settlement: { ...base, kind: 'credit-applied', date: a.allocation_date, amount: a.amount_cents } })
+    // A credit allocation voided by a linked reversal (a reversed early-payment discount) un-recognises both sides on its date.
+    if (a.voided_on) for (const docId of [a.target_id, a.source_id]) if (docs.has(docId))
+      out.push({ docId, date: a.voided_on, order: `~${order}`, delta: -a.amount_cents, settlement: { ...base, kind: 'credit-reversed', date: a.voided_on, amount: -a.amount_cents, reversalJournalId: a.voided_by } })
   }
   return out.sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : x.order < y.order ? -1 : x.order > y.order ? 1 : 0)
 }
@@ -136,7 +141,7 @@ export async function cashLines(db: D1Database, from: string, to: string): Promi
     const was = spread(d.parts, d.control, d.total, before), now = spread(d.parts, d.control, d.total, after)
     const common = { date: e.date, docKind: d.kind, docId: d.id, docRef: d.ref, docJournalId: d.journalId, docTotal: d.total, contactId: d.contactId, contactName: d.contactName, settledBefore: before, settledAfter: after, settlement: e.settlement }
     out.push({ ...common, accountId: d.control.accountId, net: d.control.sign * e.delta, role: 'control', description: d.control.description, taxCode: null })
-    d.parts.forEach((p, i) => { const share = now[i] - was[i]; if (share) out.push({ ...common, accountId: p.accountId, net: -d.control.sign * share, role: p.role, description: p.description, taxCode: p.taxCode, itemId: p.itemId ?? null }) })
+    d.parts.forEach((p, i) => { const share = now[i] - was[i]; if (share) out.push({ ...common, accountId: p.accountId, net: -d.control.sign * share, role: p.role, description: p.description, taxCode: p.taxCode, itemId: p.itemId ?? null, early: p.early ?? null }) })
   }
   return out
 }
