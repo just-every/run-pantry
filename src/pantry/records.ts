@@ -12,12 +12,19 @@ export type RecordRef = { kind: 'invoice' | 'bill' | 'payment' | 'entry'; id: st
 
 /** Labels for every record a report line can name. */
 export async function recordLabels(db: D1Database) {
-  const invoices = new Map((await all(db, 'SELECT i.id, i.kind, i.number, c.name FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id')).map(r => [r.id, `${r.kind === 'credit' ? 'Credit' : 'Invoice'} ${r.number} · ${r.name}`]))
-  const bills = new Map((await all(db, 'SELECT b.id, b.reference, c.name FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id')).map(r => [r.id, `Bill ${r.reference} · ${r.name}`]))
+  const invoiceRows = await all(db, 'SELECT i.id, i.kind, i.number, i.customer_id, i.journal_id, c.name FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id')
+  const billRows = await all(db, 'SELECT b.id, b.reference, b.vendor_id, b.journal_id, c.name FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id')
+  const invoices = new Map(invoiceRows.map(r => [r.id, `${r.kind === 'credit' ? 'Credit' : 'Invoice'} ${r.number} · ${r.name}`]))
+  const bills = new Map(billRows.map(r => [r.id, `Bill ${r.reference} · ${r.name}`]))
   const payments = new Map((await all(db, 'SELECT p.id, p.direction, p.payment_date, c.name FROM pt_payments p JOIN pt_contacts c ON c.id = p.contact_id')).map(r => [r.id, `Payment ${r.direction === 'received' ? 'from' : 'to'} ${r.name}`]))
   const entries = new Map((await all(db, "SELECT id, number FROM pt_journal_entries WHERE status = 'posted'")).map(r => [r.id, `Journal entry ${r.number}`]))
-  const vendorCreditEntries = new Map((await all(db, 'SELECT id, journal_id FROM pt_vendor_credits')).map(v => [v.id, v.journal_id]))
-  return { vendorCreditEntries, label: (kind: string, id: string) => (kind === 'invoice' ? invoices : kind === 'bill' ? bills : kind === 'payment' ? payments : entries).get(id) ?? 'Record' }
+  const credits = await all(db, 'SELECT id, journal_id, vendor_id FROM pt_vendor_credits')
+  const vendorCreditEntries = new Map(credits.map(v => [v.id, v.journal_id]))
+  const invoiceContacts = new Map(invoiceRows.filter(r => r.journal_id).map(r => [r.journal_id, r.customer_id]))
+  const sourceContacts = new Map([...credits.filter(r => r.journal_id).map(r => [r.journal_id, r.vendor_id] as [string, string]), ...billRows.filter(r => r.journal_id).map(r => [r.journal_id, r.vendor_id] as [string, string]), ...invoiceContacts])
+  return { vendorCreditEntries, invoiceContact: (entryId: string) => invoiceContacts.get(entryId) ?? null,
+    sourceContact: (entryId: string) => sourceContacts.get(entryId) ?? null,
+    label: (kind: string, id: string) => (kind === 'invoice' ? invoices : kind === 'bill' ? bills : kind === 'payment' ? payments : entries).get(id) ?? 'Record' }
 }
 
 /** The record a posted entry came from. */

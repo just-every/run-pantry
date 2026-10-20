@@ -90,6 +90,8 @@ async function signIn(browser, server) {
 async function snapshot(context, origin, docName) {
   const get = async path => (await context.request.get(`${origin}/api/pantry/${path}`)).json()
   const state = await get('state'), sales = await get('sales'), documents = (await get('documents')).documents
+  const reports = (await get('custom-reports')).reports, packages = (await get('management-packages')).packages
+  const definitions = rows => rows.map(({ id, name, definition, shared_roles, created_by }) => ({ id, name, definition, shared_roles, created_by })).sort((a, b) => a.id.localeCompare(b.id))
   const doc = documents.find(d => d.name === docName)
   return {
     view: {
@@ -99,6 +101,8 @@ async function snapshot(context, origin, docName) {
       pl: (await get('reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=cash')).netIncome,
       lines: (await get('bank/lines')).lines.map(l => [l.posted_date, l.description, l.amount_cents]).sort(),
       documents: documents.map(d => [d.name, d.sha256]).sort(),
+      customReports: definitions(reports), managementPackages: definitions(packages),
+      customReportValues: await Promise.all(reports.map(async r => (await get(`custom-reports/${r.id}/render`)).report)),
       audit: (await get('activity')).audit.map(({ approval, ...row }) => row).sort((a, b) => a.id.localeCompare(b.id)),
       approvals: (await get('activity')).approvals.sort((a, b) => a.id.localeCompare(b.id)),
     },
@@ -106,7 +110,7 @@ async function snapshot(context, origin, docName) {
   }
 }
 
-test('AUDIT-001 the immutable audit and books come back from an export into a fresh install and after starting over, and a restore over books is refused with the next step', async t => {
+test('AUDIT-001/REPORT-006 the immutable audit, report definitions and sharing and books come back from an export into a fresh install and after starting over, and a restore over books is refused with the next step', async t => {
   t.after(async () => { for (const server of [...running]) await server.stop(); for (const root of roots) await rm(root, { recursive: true, force: true }) })
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
 
@@ -118,6 +122,12 @@ test('AUDIT-001 the immutable audit and books come back from an export into a fr
   const pdf = Buffer.from('%PDF-1.4 Acme invoice A-778 for $1,500.00\n')
   const bill = (await (await context.request.get(`${server.origin}/api/pantry/sales`)).json()).bills.find(b => b.reference === 'A-778')
   assert.equal((await context.request.post(`${server.origin}/api/pantry/command/document.upload`, { headers: { origin: server.origin }, data: { name: 'acme-a-778.pdf', mediaType: 'application/pdf', base64: pdf.toString('base64'), linkedKind: 'bill', linkedId: bill.id } })).status(), 200)
+  const command = async (op, data) => { const r = await context.request.post(`${server.origin}/api/pantry/command/${op}`, { headers: { origin: server.origin }, data }); assert.equal(r.status(), 200, await r.text()); return r.json() }
+  const saved = await command('custom-report.save', { sharedRoles: ['accountant'], definition: { name: 'Restored management margin', source: 'profit-and-loss', from: '2026-09-01', to: '2026-09-30', basis: 'accrual', columns: ['name', 'amount'], layout: [
+    { id: 'revenue', kind: 'section', label: 'Revenue', accountTypes: ['income'] }, { id: 'cost', kind: 'section', label: 'Costs', accountTypes: ['expense'] },
+    { id: 'gross', kind: 'formula', label: 'Gross profit', expression: 'row("revenue") - row("cost")', unit: 'money' },
+  ], notes: ['Definitions travel with the books.'] } })
+  await command('management-package.save', { name: 'Restored management package', cover: 'Restored cover', commentary: ['Preserve the accountant review.'], reportIds: [saved.id], sharedRoles: ['accountant'] })
   const before = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(before.bytes, pdf)
   await context.close(); await server.stop()
