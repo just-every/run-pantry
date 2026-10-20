@@ -94,7 +94,7 @@ test('REPORT-006 build and reopen a role-shared gross-margin layout, choose base
     await page.screenshot({ path: `/tmp/sx-pantry-r12-report-lines-${width}.png`, fullPage: true })
     await invoiceLink.click()
     await page.getByRole('heading', { name: `Invoice ${inv.number} · Cedar Studio`, exact: true }).waitFor()
-    await page.getByText('Unpaid design work', { exact: true }).waitFor()
+    await page.locator('td[data-label="Line"]').getByText('Unpaid design work', { exact: true }).waitFor()
     await page.goBack()
     await page.getByRole('button', { name: `Open ${name}`, exact: true }).click()
     await page.getByRole('row').filter({ has: page.getByText('Direct costs', { exact: true }) }).getByRole('button', { name: /^Open Direct costs Amount/ }).click()
