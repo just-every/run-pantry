@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "just-every/run-pantry",
+  "toolchain": {
+    "id": "runeditrun/edition-authoring",
+    "version": "1.1.0"
+  },
+  "custody": {
+    "repository": "https://github.com/just-every/run-pantry"
+  },
+  "components": [
+    {
+      "id": "just-every/pantry",
+      "role": "edition",
+      "source": {
+        "kind": "local",
+        "paths": [
+          "src",
+          "scripts",
+          "tests",
+          "migrations",
+          "fixtures",
+          "public",
+          "docs"
+        ]
+      }
+    }
+  ]
+}
