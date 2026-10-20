@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "961f782c3b3353fef0072365614ed86ff8b86e7b1b2a625cd4126f1a60b95e86",
+      "sha256": "7e492b6980687a099d7560770252b3528efb973369bd291dc37395b7dafceadf",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "51e412e2e6b1c57fdbe51f13d9e2859857b75f482b9a2a96241e2f062d09b735",
+      "sha256": "a477a241a4e72b4c3932376faf56bcaa14d5a45fe0bd56ae15d69b3da8bfc865",
       "executable": false
     },
     "DEMO.md": {
@@ -581,6 +581,10 @@
     },
     "migrations/core/0059_stripe_clearing.sql": {
       "sha256": "a9fa5cf20f5766c05fec3f75dbfeae1e00735dd48e298eb06260b6c8952922b3",
+      "executable": false
+    },
+    "migrations/core/0060_bill_lifecycle.sql": {
+      "sha256": "1ee4a7117947cd0651229a10a9e89cc35b53ce7a82d94a53bfdb081c48ec9ee5",
       "executable": false
     },
     "migrations/rewrites.json": {
@@ -2768,7 +2772,7 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "aa38a40c6ac32ded503d24fe57878c69936e3ffeb488bba9b3b0c5b833df4aaa",
+      "sha256": "e746e78b5fa8527164e218cedf08ea1eb8839182b77d398cbc16647342f3171f",
       "executable": false
     },
     "src/pantry/automatch.ts": {
@@ -2789,6 +2793,10 @@
     },
     "src/pantry/bill-approval.ts": {
       "sha256": "81a02c120c868c2ef2074dd1a375fc77ff00104b7683faa281c4c6e4c71004bb",
+      "executable": false
+    },
+    "src/pantry/bill-lifecycle.ts": {
+      "sha256": "77afa0587a0212f7d407a90fb5fd5e74ae4f59fe7243f7a0a5f208f9681485c8",
       "executable": false
     },
     "src/pantry/budgets/commands.ts": {
@@ -2972,7 +2980,7 @@
       "executable": false
     },
     "src/pantry/due.ts": {
-      "sha256": "b269f35aa027f47f79f000bc97bfb855aa0983773cd756f446c06148de12f02c",
+      "sha256": "352a558442b4878514e4ebafd2e68c029949f74a89a68ec195758b84ea2e95b0",
       "executable": false
     },
     "src/pantry/exemption-reminders.ts": {
@@ -3108,7 +3116,7 @@
       "executable": false
     },
     "src/pantry/payables.ts": {
-      "sha256": "fec0a4800c0a66ddfc55c9f86904d4404ee804e6827cc134d2df661c92858f60",
+      "sha256": "4dbfbd919cc04fd1cc55ac03cf0f23484e6bee859295b074fda64c3a63dd02da",
       "executable": false
     },
     "src/pantry/payout-split.ts": {
@@ -3295,6 +3303,10 @@
       "sha256": "a53cb8127ccb9aaed1c96dd5cef66af7b2bbf0d7652feaac2b64f298d0260f1b",
       "executable": false
     },
+    "src/pantry/recurring-bills.ts": {
+      "sha256": "07858eb469e1e417cf0dee43ac1fa432b6f7f6c708924b31b280073fbcc92525",
+      "executable": false
+    },
     "src/pantry/recurring-journal-runs.ts": {
       "sha256": "3f25188b0927299f5f7dc45ede68724e03644a5b9cd2663551bce1cabbc5feb8",
       "executable": false
@@ -3420,7 +3432,7 @@
       "executable": false
     },
     "src/pantry/vendor-history.ts": {
-      "sha256": "ec8ec86d039eae30a505f4ea6c7a1fa8fda45f4600145b0a3982046e68024168",
+      "sha256": "e103c4e861b465e4a702ab347709cbd25ca59dd648c7f9b479bf07e4d0e74ede",
       "executable": false
     },
     "src/pantry/views.ts": {
@@ -3755,8 +3767,12 @@
       "sha256": "9741dc94b8015fcdad6b76bc25f3ecec9194bdbc9ff5a82621734d130d22ccbc",
       "executable": false
     },
+    "src/ui/bill-workflow.tsx": {
+      "sha256": "f038e6e66b192fec1cc8324ce69fdb8313e1f1755ba53c616c377b81f7f7570c",
+      "executable": false
+    },
     "src/ui/bills.tsx": {
-      "sha256": "4401032ed63552713a1c7b6c3e42277058757a4faa3f2efec59b693dadc37466",
+      "sha256": "892381370c1564a18d23c93b98cde2a50982de6dc0638e0487afb8dc31ac0f1d",
       "executable": false
     },
     "src/ui/books.tsx": {
@@ -4011,6 +4027,10 @@
       "sha256": "fb12c386c986c53a89a6d8bf5c2ff86b3c87f6530faace55bdb7fa220f455ac0",
       "executable": false
     },
+    "tests/api/bill-lifecycle-scenario.mjs": {
+      "sha256": "7354ef2ee7d8110831e8f90771b490fffe21d1c75b331e9044d8782fe74e3fd8",
+      "executable": false
+    },
     "tests/api/close.test.mjs": {
       "sha256": "3399d755569995c6db9b91d4cdda418914b28a7c1948a20797298b525d7a285a",
       "executable": false
@@ -4100,7 +4120,7 @@
       "executable": false
     },
     "tests/api/subledgers.test.mjs": {
-      "sha256": "759609ecff16f0d0501e9ab3b99402475a21408900aab177c8b89435aceeb5fd",
+      "sha256": "9ec11049c04a64e0bad774f3a5997fee7dec67886aa5b8e5d81fac69e71c0f6c",
       "executable": false
     },
     "tests/api/worker.ts": {
@@ -4117,6 +4137,10 @@
     },
     "tests/app/bank-rules.test.mjs": {
       "sha256": "3653d6aea6934662980565731c47de801763c0ac702ffc2f0a8aa641438f553b",
+      "executable": false
+    },
+    "tests/app/bill-lifecycle.test.mjs": {
+      "sha256": "8f724ef604fb45d963af6c77bb4786568655ba64cd2a653257312cefab9314d2",
       "executable": false
     },
     "tests/app/books.mjs": {

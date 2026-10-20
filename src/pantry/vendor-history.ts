@@ -111,7 +111,7 @@ export async function vendorHistory(db: D1Database, rawId: string) {
       balance_cents: null, balance_label: '', included_in_balance: false, pending,
       posted_expense: d.kind === 'expense' && d.status === 'posted' && posted(d),
       href: `/app/receipts#receipt-${d.receipt_id}`, record_href: d.bill_id ? recordHref('bill', d.bill_id) : d.linked_kind === 'journal' && d.linked_id ? recordHref('entry', d.linked_id) : null,
-      status: dismissed ? 'Dismissed' : stale ? 'Needs review' : reversed ? 'Reversed' : d.status === 'posted' ? 'Posted' : approved ? 'Approved' : 'Awaiting approval',
+      status: dismissed ? 'Dismissed' : stale ? 'Needs review' : reversed ? 'Reversed' : d.status === 'posted' ? 'Posted' : approved ? 'Approved' : d.submitted_revision === d.revision ? 'Awaiting approval' : 'Draft',
       status_reason: dismissed ? 'Source receipt was dismissed; excluded from pending drafts' : stale ? 'Vendor identity changed; review the source' : reversed ? 'Posted record was voided or reversed' : d.status === 'posted' ? d.kind === 'bill' ? 'Counted through the linked bill; not counted twice' : 'Paid expense posted directly to the ledger' : approved ? 'This exact revision is approved; waiting to post' : 'Unposted draft; excluded from payables',
       class_name: p.className, tax_cents: p.tax, prepared_by: d.prepared_by, approved_by: approved || d.status === 'posted' ? d.approved_by : null,
       coding: p.lines.map((l: Data) => ({ account_id: l.accountId, description: l.description, amount_cents: l.amount })),

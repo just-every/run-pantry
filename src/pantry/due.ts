@@ -7,6 +7,7 @@ import type { Bindings } from '../auth.server'
 import { now } from './core'
 import { one } from './db'
 import { businessDay, sendDueReminders, sendingSettings } from './delivery'
+import { runDueBills } from './recurring-bills'
 import { runDueRecurring } from './recurring'
 import { syncPendingCheckouts } from './stripe'
 import { syncDuePayouts } from './payouts'
@@ -28,7 +29,7 @@ export async function runDueWork(env: Bindings, { scheduled = false } = {}) {
   } else await db.prepare('UPDATE pt_due_work SET started_at = ? WHERE id = 1').bind(now()).run()
   if (!await one(db, 'SELECT 1 FROM pt_entity WHERE id = 1')) return
   const today = businessDay((await sendingSettings(db)).time_zone)
-  for (const [name, job] of [['recognition schedules', () => runDueRecognition(db, today)], ['recurring journals', () => runDueRecurringJournals(db, today)], ['transfers', () => matchTransfers(db)], ['exemption certificates', () => runExemptionReminders(env, db, today)], ['economic nexus', () => runNexusAlerts(env, db)], ['captured draft approvals', () => sendDueApprovalReminders(env, db)], ['recurring invoices', () => runDueRecurring(env, db, today)], ['Stripe payments', () => syncPendingCheckouts(env, db)], ['reminders', () => sendDueReminders(env, db, today)], ['Stripe payouts', () => syncDuePayouts(env, db)], ['Gusto payrolls', () => syncDuePayrolls(env, db)]] as const) {
+  for (const [name, job] of [['recurring bills', () => runDueBills(db, today)], ['recognition schedules', () => runDueRecognition(db, today)], ['recurring journals', () => runDueRecurringJournals(db, today)], ['transfers', () => matchTransfers(db)], ['exemption certificates', () => runExemptionReminders(env, db, today)], ['economic nexus', () => runNexusAlerts(env, db)], ['captured draft approvals', () => sendDueApprovalReminders(env, db)], ['recurring invoices', () => runDueRecurring(env, db, today)], ['Stripe payments', () => syncPendingCheckouts(env, db)], ['reminders', () => sendDueReminders(env, db, today)], ['Stripe payouts', () => syncDuePayouts(env, db)], ['Gusto payrolls', () => syncDuePayrolls(env, db)]] as const) {
     try { await job() } catch (error) { console.error(`Pantry due work (${name}) failed:`, error) }
   }
 }

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Action, Card, Chip, command, contactOptions, Field, Form, Table, accountOptions, day, readFileBase64, today, usd, useShared, type D } from './kit'
 import { CaptureApprovalRules } from './capture-approval-rules'
+import { BillWorkflow, CapturedBills, RecurringBills } from './bill-workflow'
 import { VendorHistory } from './vendor-history'
 
 function BillForm({ bill, onDone, onCancel }: { bill?: D; onDone: () => Promise<void>; onCancel?: () => void }) {
@@ -30,18 +31,18 @@ function BillForm({ bill, onDone, onCancel }: { bill?: D; onDone: () => Promise<
 export function Bills({ data, reload, initialBillId }: { data: D; reload: () => Promise<void>; initialBillId?: string }) {
   const { state } = useShared(), file = useRef<HTMLInputElement>(null), [selected, setSelected] = useState<string | null>(() => initialBillId ?? (typeof window !== 'undefined' && window.location.hash.startsWith('#bill-') ? window.location.hash.slice(6) : null)), [editing, setEditing] = useState(false)
   const current = (data.bills as D[]).find(b => b.id === selected)
-  return <><CaptureApprovalRules rules={data.approvalRules ?? []} accounts={state.accounts} onChange={reload} /><div className="split split-wide-left">
+  return <><CapturedBills documents={data.capturedBills ?? []} /><CaptureApprovalRules rules={data.approvalRules ?? []} accounts={state.accounts} onChange={reload} /><div className="split split-wide-left">
     <div className="stack"><Card title="Bills">
-      <Table heads={['Vendor', 'Reference', 'Bill date', 'Due', 'Amount', 'Open', 'Evidence', 'Status']} figures={[4, 5]} empty="No bills yet.">
+      <Table caption="Bill inbox" heads={['Vendor', 'Reference / evidence', 'Due', 'Amount', 'Open', 'State / next actor']} figures={[3, 4]} empty="No bills yet.">
         {(data.bills as D[]).map(b => <tr key={b.id} className={selected === b.id ? 'selected' : ''} tabIndex={0} onClick={() => { setSelected(b.id); setEditing(false) }} onKeyDown={k => { if (k.key === 'Enter') setSelected(b.id) }}>
-          <td>{b.vendor_name}</td><td className="nowrap">{b.reference}</td><td>{day(b.bill_date)}</td><td>{day(b.due_date)}</td><td className="fig">{usd(b.total_cents)}</td><td className="fig">{usd(b.open_cents)}</td>
-          <td>{b.documents.length ? <Chip tone="good">Attached</Chip> : b.evidence_waived ? <Chip>Reason recorded</Chip> : <Chip tone="warn">Missing</Chip>}</td>
-          <td>{b.status === 'void' ? <Chip>Void</Chip> : b.status === 'draft' ? <Chip tone={b.owner_required && !b.approved_by ? 'warn' : 'neutral'}>{b.approved_revision === b.revision ? 'Approved' : b.owner_required ? 'Awaiting owner' : 'Draft'}</Chip> : b.open_cents === 0 ? <Chip tone="good">Paid</Chip> : <Chip tone="info">{b.opening ? 'Open (moved in)' : 'To pay'}</Chip>}</td></tr>)}
+          <td>{b.vendor_name}</td><td><span>{b.reference}</span><small className="sub block">{b.documents.length ? <Chip tone="good">Attached</Chip> : b.evidence_waived ? <Chip>Reason recorded</Chip> : <Chip tone="warn">Missing</Chip>}</small></td><td>{day(b.due_date)}</td><td className="fig">{usd(b.total_cents)}</td><td className="fig">{usd(b.open_cents)}</td>
+          <td><Chip tone={['Paid', 'Reconciled'].includes(b.lifecycle.stage) ? 'good' : 'neutral'}>{b.lifecycle.stage}</Chip><small className="sub block">Next: {b.lifecycle.nextActor}</small></td></tr>)}
       </Table>
     </Card>
     {current && <VendorHistory key={current.vendor_id + current.revision} vendorId={current.vendor_id} />}
     </div><div className="stack">
       {current && <Card title={`${current.vendor_name} ${current.reference}`}>
+        <BillWorkflow bill={current} reload={reload} />
         <p>{usd(current.total_cents)} due {day(current.due_date)}; {usd(current.open_cents)} open.</p>
         {!!current.received && <p><Chip tone="good">Received</Chip> {current.ready_to_pay ? <Chip tone="good">Ready to pay</Chip> : <Chip>Not ready to pay</Chip>}</p>}
         {current.status === 'draft' && current.capture_receipt_id && <a href={`/app/receipts#receipt-${current.capture_receipt_id}`}>Review and approve document draft</a>}
@@ -62,6 +63,6 @@ export function Bills({ data, reload, initialBillId }: { data: D; reload: () => 
       </Card>}
       {!editing && state.actor.can.record && <Card title="Record a bill or expense"><BillForm onDone={reload} /></Card>}
     </div>
-  </div></>
+  </div><RecurringBills templates={data.recurringBills ?? []} reload={reload} /></>
 }
 

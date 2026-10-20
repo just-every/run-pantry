@@ -8,6 +8,7 @@ import { contact } from './contacts'
 import { entryStatements, type Line } from './journal'
 import { invoice, openBalance } from './invoices'
 import type { Command, Context } from './context'
+import { billLifecycle } from './bill-lifecycle'
 import { METHODS } from './contractors'
 import { requiresOwner } from './receipts/draft-approval'
 import { billRulePayload, billRules, manualBillPostingApproval } from './bill-approval'
@@ -168,7 +169,7 @@ export async function billsView(db: D1Database) {
   const rows = await all(db, 'SELECT b.*, c.name AS vendor_name FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id ORDER BY b.bill_date DESC, b.reference, b.id LIMIT 500')
   const lines = await all(db, 'SELECT * FROM pt_bill_lines ORDER BY bill_id, line_no')
   const docs = await all(db, "SELECT id, name, linked_id FROM pt_documents WHERE linked_kind = 'bill'")
-  const captured = await all(db, 'SELECT receipt_id, bill_id FROM pt_capture_drafts WHERE bill_id IS NOT NULL')
+  const captured = await all(db, 'SELECT * FROM pt_capture_drafts WHERE bill_id IS NOT NULL')
   const approvalRules = await all(db, 'SELECT * FROM pt_capture_approval_rules')
   for (const r of rows) {
     r.lines = lines.filter(l => l.bill_id === r.id)
@@ -176,6 +177,7 @@ export async function billsView(db: D1Database) {
     r.capture_receipt_id = captured.find(d => d.bill_id === r.id)?.receipt_id ?? null
     r.owner_required = await requiresOwner(db, billRulePayload(r), approvalRules)
     r.open_cents = r.status === 'void' ? 0 : await openBalance(db, 'bill', r.id, r.total_cents)
+    r.lifecycle = await billLifecycle(db, r, captured.find(d => d.bill_id === r.id))
   }
   return rows
 }
