@@ -13,7 +13,7 @@ export function CustomReportDrill({ path, onClose }: { path: string; onClose: ()
     <p><strong>{reportFigureValue(d.value, d.unit)}</strong> · {d.from ? <>{day(d.from)} to {day(d.to)}</> : <>All activity through {day(d.to)}</>}</p>
     {d.expression && <p>Formula: <code>{d.expression}</code></p>}
     {d.operands.length > 0 && <Table heads={['Operand', 'Value', 'Basis and range']} figures={[1]}>
-      {d.operands.map((o: D, i: number) => <tr key={`${o.href}-${i}`}><td><button className="btn btn-link" type="button" onClick={() => setSteps(s => [...s, o.href])}>Open operand {o.label}</button></td><td className="fig">{reportFigureValue(o.value, o.unit)}{o.exact && <small className="sub block">Exact intermediate: {o.exact.numerator}/{o.exact.denominator} {o.unit === 'money' ? 'cents' : o.unit}</small>}</td><td>{o.basis === 'cash' ? 'Cash basis' : 'Accrual basis'} · {o.from || 'Beginning'} to {o.to}</td></tr>)}
+      {d.operands.map((o: D, i: number) => <tr key={`${o.href}-${i}`}><td><button className="btn btn-link" type="button" onClick={() => setSteps(s => [...s, o.href])}>Open operand {o.label}</button></td><td className="fig">{reportFigureValue(o.value, o.unit)}{o.exact && o.exact.denominator !== '1' && <small className="sub block">Exact intermediate: {o.exact.numerator}/{o.exact.denominator} {o.unit === 'money' ? 'cents' : o.unit}</small>}</td><td>{o.basis === 'cash' ? 'Cash basis' : 'Accrual basis'} · {o.from || 'Beginning'} to {o.to}</td></tr>)}
     </Table>}
     {d.rows && <>
       <p><Chip tone={d.ties ? 'good' : 'bad'}>{d.ties ? 'Adds up to the report figure' : 'Does not add up to the report figure'}</Chip></p>
