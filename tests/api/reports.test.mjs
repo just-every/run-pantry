@@ -536,3 +536,81 @@ test('BUDGET-001 annual account/month plans copy posted actuals plus 5%, edit a 
   await h.view(`budgets/${plan.id}/report?from=2025-12-31&to=2026-03-31`, h.owner, 400)
   assert.deepEqual(await h.view('reports/trial-balance?to=2026-12-31&basis=accrual'), before, 'planning never changes the posted ledger')
 })
+
+test('REPORT-004 everyday library: every current report ties to its ledger, open items, payments or saved reconciliation, on its actual basis', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const s = await october(h)
+  await h.command('contractor.save', { contactId: s.c['Brightline Software'].id, is1099: true })
+  const statement = await h.command('statement.import', { bankAccountId: s.bank.id, fileName: 'october.csv', content: 'Posting Date,Description,Amount\n10/15/2026,CHECK SOFTWARE,-640.00\n10/20/2026,CEDAR RECEIPT,500.00\n10/31/2026,SERVICE FEE,-12.00\n', opening: '10000.00', closing: '9848.00', start: '2026-10-01', end: '2026-10-31', confirmLast4: '4821' })
+  const reconcile = await h.view(`reconciliation/${statement.statement.id}`)
+  for (const [description, amount] of [['CHECK SOFTWARE', -64000], ['CEDAR RECEIPT', 50000], ['SERVICE FEE', -1200]]) {
+    const line = at(reconcile.lines, l => l.description === description)
+    if (!line.match_id) await h.command('match.approve', { bankLineIds: [line.id], journalLineIds: [at(reconcile.postings, p => Number(p.amount) === amount).id] })
+  }
+  const complete = await h.command('reconciliation.complete', { statementId: statement.statement.id })
+  assert.ok(complete.completed)
+  const viewer = await h.member('library@example.test', 'viewer')
+  const sum = (r, index) => r.rows.reduce((n, l) => n + l.cells[index], 0)
+  const ar = await h.view('reports/receivables?to=2026-10-31'), ap = await h.view('reports/payables?to=2026-10-31')
+  const expected = { 'receivables-summary': ar.itemsTotal, 'payables-summary': ap.itemsTotal, 'open-invoices': ar.itemsTotal, 'unpaid-bills': ap.itemsTotal, 'customer-balances': ar.control.balance, 'vendor-balances': ap.control.balance }
+  for (const basis of ['cash', 'accrual']) {
+    const gl = await h.view(`reports/general-ledger?${OCT}&basis=${basis}`)
+    for (const kind of ['transactions', 'journal']) {
+      const r = await h.view(`reports/${kind}?${OCT}&basis=${basis}`, viewer)
+      const lines = gl.accounts.flatMap(a => a.rows)
+      assert.deepEqual(r.totals.map(t => t.amount), [lines.reduce((n,l) => n+l.debit_cents,0), lines.reduce((n,l) => n+l.credit_cents,0)])
+      assert.deepEqual([sum(r,5),sum(r,6)],r.totals.map(t => t.amount))
+      assert.equal(r.basis,basis)
+      assert.equal(r.rows.length, lines.length)
+      const filtered = await h.view(`reports/${kind}?${OCT}&basis=${basis}&account=${s.acct['6200']}&payee=${s.c['Brightline Software'].id}`)
+      assert.ok(filtered.rows.length > 0)
+      assert.ok(filtered.rows.every(l => String(l.cells[2]).startsWith('6200') && l.cells[3] === 'Brightline Software'))
+      assert.equal(sum(filtered,5)-sum(filtered,6),64000)
+    }
+    for (const [kind, amount] of Object.entries(expected)) {
+      const r = await h.view(`reports/${kind}?from=2026-01-01&to=2026-10-31&basis=${basis}`, viewer)
+      assert.equal(r.basis,'accrual'); assert.equal(r.totals[0].amount,amount,kind)
+      assert.equal(sum(r,r.moneyColumns.at(-1)),amount,kind)
+    }
+    const pl = await h.view(`reports/profit-and-loss?${OCT}&basis=${basis}`)
+    const tb = await h.view(`reports/trial-balance?to=2026-10-31&basis=${basis}`), bs = await h.view(`reports/balance-sheet?to=2026-10-31&basis=${basis}`)
+    assert.ok(tb.balanced); assert.ok(bs.balanced)
+    assert.equal(bs.equity.find(r=>r.id==='current-earnings').amount,pl.netIncome)
+    for (const account of gl.accounts) assert.equal(account.closing,tb.rows.find(r=>r.id===account.id)?.net??0)
+    for (const kind of ['sales-by-customer','sales-by-item','expenses-by-vendor']) {
+      const r = await h.view(`reports/${kind}?${OCT}&basis=${basis}`)
+      assert.equal(r.total,kind === 'expenses-by-vendor' ? pl.totalExpenses : pl.totalIncome,kind)
+    }
+    const tax = await h.view(`reports/sales-tax?${OCT}&basis=${basis}`)
+    assert.equal(tax.totals.owed,(await h.view(`reports/trial-balance?to=2026-10-31&basis=${basis}`)).rows.find(r => r.code==='2200').creditBalance)
+  }
+  const deposit = await h.view(`reports/deposits?${OCT}`), check = await h.view(`reports/check-detail?${OCT}`), contractors = await h.view(`reports/contractor-summary?${OCT}`)
+  assert.deepEqual([deposit.totals[0].amount,check.totals[0].amount,contractors.totals[0].amount],[50000,64000,64000])
+  assert.equal(check.rows[0].record,`payment:${s.paid.x.id}`)
+  assert.equal(contractors.rows[0].cells[1],'Brightline Software')
+  assert.equal((await h.view('reports/contractors?year=2026')).contractors[0].box1,contractors.totals[0].amount)
+  const proof = await h.view(`reports/reconciliations?${OCT}`)
+  assert.equal(proof.rows.length,1)
+  assert.deepEqual(proof.rows[0].cells.slice(2,8),[1000000,984800,984800,0,984800,0])
+  assert.deepEqual(proof.rows[0].details.proof,JSON.parse(complete.completed.proof))
+  const today = new Date().toISOString().slice(0,10)
+  const audit = await h.view(`reports/audit-log?from=${today}&to=${today}`)
+  assert.ok(audit.rows.some(r => r.cells[2]==='reconciliation.complete'))
+  assert.ok(audit.rows.some(r => r.details.detail && r.details.subject_id===s.paid.x.id))
+  assert.equal((await h.view('reports/audit-log?from=2025-01-01&to=2025-12-31')).rows.length,0)
+  const narrower = await h.view('reports/open-invoices?from=2026-10-06&to=2026-10-31')
+  assert.equal(narrower.rows.length,1); assert.equal(narrower.rows[0].id,s.inv.b.id)
+  for (const kind of [...Object.keys(expected),'transactions','journal','deposits','check-detail','reconciliations','audit-log','contractor-summary']) {
+    const from = kind==='audit-log' ? today : '2026-10-01', to=kind==='audit-log' ? today : '2026-10-31'
+    const r = await h.view(`reports/${kind}?from=${from}&to=${to}`)
+    assert.ok(r.rows.length>0,kind)
+    for (const format of ['csv','pdf']) {
+      const e=await h.send(`/api/pantry/reports/${kind}/export?from=${from}&to=${to}&format=${format}`,undefined,{cookie:viewer})
+      assert.equal(e.status,200); assert.equal(e.headers.get('x-pantry-basis'),r.basisLabel)
+      assert.ok(e.value.includes(format==='csv' ? r.columns[0] : '%PDF-'),`${kind} ${format}`)
+    }
+    await h.view(`reports/${kind}?from=${from}&to=${to}`,'',401)
+  }
+  await h.view('reports/journal?from=2026-11-01&to=2026-10-01',h.owner,400)
+  await h.view(`reports/transactions?${OCT}&account=unknown`).then(r=>assert.equal(r.rows.length,0))
+})

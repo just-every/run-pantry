@@ -2,7 +2,7 @@
 // accountant package download. Every figure on the profit and loss and the
 // balance sheet opens to the records behind it (report-detail.tsx).
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
-import { Card, Chip, Loading, PageHead, Table, Tabs, day, monthName, today, usd, useShared, useView, type D } from './kit'
+import { Card, Chip, Field, Loading, PageHead, Table, Tabs, day, monthName, today, usd, useShared, useView, type D } from './kit'
 import { BASIS_NAME, FigureDetail, RecordView } from './report-detail'
 import { Budgets } from './budgets'
 import { CustomReports } from './custom-reports'
@@ -11,13 +11,14 @@ import { Contractors } from './contractors'
 import { CashFlow, CashFlowDetail } from './cash-flow'
 import { AskAccountant } from './ask-accountant'
 import { ColumnPicker, StatementColumns, columnMode, type ColumnMode, type ColumnStatement } from './statement-columns'
+import { LIBRARY_REPORTS, ReportLibrary, hasLibraryFilters, isLibraryReport, libraryBasisLabel, libraryQuery } from './report-library'
 
-export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string; columns?: string }
+export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string; columns?: string; account?: string; payee?: string }
 type Basis = 'cash' | 'accrual'
 
 // [tab, slug, reads on a basis, takes a date range]
 const KINDS: [string, string, boolean, boolean][] = [['Trial balance', 'trial-balance', true, false], ['General ledger', 'general-ledger', true, true], ['Profit and loss', 'profit-and-loss', true, true], ['Balance sheet', 'balance-sheet', true, false],
-  ['Sales by customer', 'sales-by-customer', true, true], ['Sales by item', 'sales-by-item', true, true], ['Expenses by vendor', 'expenses-by-vendor', true, true], ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false], ['Budget versus actual', 'budget-actual', true, true], ['Custom reports', 'custom', false, false]]
+  ['Sales by customer', 'sales-by-customer', true, true], ['Sales by item', 'sales-by-item', true, true], ['Expenses by vendor', 'expenses-by-vendor', true, true], ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false], ['Budget versus actual', 'budget-actual', true, true], ['Custom reports', 'custom', false, false], ...LIBRARY_REPORTS]
 
 /** A figure that opens to its records. */
 function Figure({ line, children }: { line: string; children: React.ReactNode }) {
@@ -117,6 +118,8 @@ export function Reports() {
   // The package is for a closed month: the one the dates point at once someone chooses them, else the last month locked.
   const period = !search.to && state.overview?.lastLocked ? state.overview.lastLocked : periodOf(to), q = basis === 'cash' ? '?basis=cash' : ''
   const detail = (slug === 'profit-and-loss' || slug === 'balance-sheet' || slug === 'cash-flow') && search.line
+  const library = isLibraryReport(slug), filtered = hasLibraryFilters(slug)
+  const exportQuery = library ? libraryQuery(slug, from, to, basis, search.account, search.payee) : `from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}`
   return <>
     <PageHead title="Reports" lead="Every report is calculated from the same posted ledger, on the cash or the accrual basis."
       actions={<><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv${q}`} download>General ledger CSV · {basis === 'cash' ? 'cash' : 'accrual'}</a><a className="btn btn-primary" href={`/api/pantry/package/${period}/accountant-package.zip${q}`} download title="A ZIP of CSV reports, the close checklist and a README">Accountant package · {monthName(period)}</a></>} />
@@ -125,12 +128,15 @@ export function Reports() {
       : search.record ? <RecordView record={search.record} reportLabel={label} />
       : detail && slug === 'cash-flow' ? <CashFlowDetail line={search.line!} from={from} to={to} />
       : detail ? <FigureDetail report={slug} line={search.line!} from={from} to={to} basis={basis} reportLabel={label} />
-      : <Card title={<>{label} <Chip tone="info">{slug === 'cash-flow' ? 'Indirect method · accrual starting income' : based ? BASIS_NAME[basis] : 'Open items · accrual basis'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}
+      : <Card title={<>{label} <Chip tone="info">{library ? libraryBasisLabel(slug, basis) : slug === 'cash-flow' ? 'Indirect method · accrual starting income' : based ? BASIS_NAME[basis] : 'Open items · accrual basis'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}
           {statement && <ColumnPicker mode={columns} kind={slug} onChange={mode => set({ columns: mode, line: undefined, record: undefined })} />}
           {ranged && <div className="field inline"><label htmlFor="r-from">From</label><input id="r-from" type="date" value={from} onChange={e => isDay(e.target.value) && set({ from: e.target.value })} /></div>}
-          <div className="field inline"><label htmlFor="r-to">{ranged ? 'To' : 'As of'}</label><input id="r-to" type="date" value={to} onChange={e => isDay(e.target.value) && set({ to: e.target.value })} /></div></div>}>
-          {based && slug !== 'budget-actual' && <p className="row-actions"><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}&format=pdf`} download>Download PDF · {basis}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}&format=csv`} download>Download CSV · {basis}</a></p>}
-          <Report slug={slug} basis={basis} from={from} to={to} columns={columns} />
+          <div className="field inline"><label htmlFor="r-to">{ranged ? 'To' : 'As of'}</label><input id="r-to" type="date" value={to} onChange={e => isDay(e.target.value) && set({ to: e.target.value })} /></div>
+          {filtered && <><Field label="Account filter" name="account" value={search.account ?? ''} empty="All accounts" options={state.accounts.map((a: D) => ({ value: a.id, label: `${a.code} · ${a.name}` }))} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => set({ account: e.target.value || undefined })} />
+            <Field label="Payee filter" name="payee" value={search.payee ?? ''} empty="All payees" options={state.contacts.map((c: D) => ({ value: c.id, label: c.name }))} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => set({ payee: e.target.value || undefined })} /></>}
+          </div>}>
+          {(library || based && slug !== 'budget-actual') && <p className="row-actions"><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=pdf`} download>Download PDF{based ? ` · ${basis}` : ''}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=csv`} download>Download CSV{based ? ` · ${basis}` : ''}</a></p>}
+          {library ? <ReportLibrary slug={slug} basis={basis} from={from} to={to} /> : <Report slug={slug} basis={basis} from={from} to={to} columns={columns} />}
         </Card>}
   </>
 }

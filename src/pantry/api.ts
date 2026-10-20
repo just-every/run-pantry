@@ -30,6 +30,8 @@ import { cashFlow, cashFlowCommands, cashFlowCsv, cashFlowDetail } from './cash-
 import { contactTotals } from './contact-totals'
 import { statementColumns } from './statement-columns'
 import { reportExport } from './report-export'
+import { isLibrary, libraryReport } from './report-library'
+import { libraryExport } from './report-library/export'
 import { recordView } from './records'
 import { salesTax } from './sales-tax'
 import { contractorCommands, contractors, necCsv } from './contractors'
@@ -175,10 +177,12 @@ api.get('/api/pantry/reports/cash-flow.csv', async c => {
 })
 api.get('/api/pantry/reports/:kind/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
+  if (isLibrary(c.req.param('kind')!)) return libraryExport(ctx.db, await libraryReport(ctx.db, c.req.param('kind')!, from, to, await reportBasis(ctx.db, c.req.query('basis')), c.req.query('account'), c.req.query('payee')), c.req.query('format') ?? 'pdf')
   return reportExport(ctx.db, c.req.param('kind')!, from, to, await reportBasis(ctx.db, c.req.query('basis')), c.req.query('format') ?? 'pdf', c.req.query('columns'))
 })
 view('reports/:kind', async (ctx, c) => {
-  const kind = c.req.param('kind'), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01'), basis = await reportBasis(ctx.db, c.req.query('basis'))
+  const kind = c.req.param('kind')!, to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01'), basis = await reportBasis(ctx.db, c.req.query('basis'))
+  if (isLibrary(kind)) return libraryReport(ctx.db, kind, from, to, basis, c.req.query('account'), c.req.query('payee'))
   const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
   if (kind === 'sales-by-customer' || kind === 'expenses-by-vendor') return contactTotals(ctx.db, kind === 'sales-by-customer' ? 'customer' : 'vendor', from, to, basis)
   if (kind === 'sales-by-item') return salesByItem(ctx.db, from, to, basis)
