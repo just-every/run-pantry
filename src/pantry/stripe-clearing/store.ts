@@ -11,9 +11,9 @@ export async function observe(db: D1Database, account: string, bt: Data, scan: s
     (id, account_id, type, event_date, currency, amount_cents, net_cents, fee_cents, payment_intent, source_id, payout_id, status, reason, seen_scan)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET seen_scan = excluded.seen_scan, payout_id = COALESCE(excluded.payout_id, pt_stripe_clearing_items.payout_id),
-    reason = CASE WHEN pt_stripe_clearing_items.amount_cents <> excluded.amount_cents OR pt_stripe_clearing_items.net_cents <> excluded.net_cents OR pt_stripe_clearing_items.fee_cents <> excluded.fee_cents OR pt_stripe_clearing_items.currency <> excluded.currency OR pt_stripe_clearing_items.event_date IS NOT excluded.event_date THEN 'Provider item changed after observation; review its posting.' ELSE CASE WHEN pt_stripe_clearing_items.entry_id IS NULL THEN excluded.reason ELSE pt_stripe_clearing_items.reason END END`,
+    reason = CASE WHEN pt_stripe_clearing_items.amount_cents <> excluded.amount_cents OR pt_stripe_clearing_items.net_cents <> excluded.net_cents OR pt_stripe_clearing_items.fee_cents <> excluded.fee_cents OR pt_stripe_clearing_items.currency <> excluded.currency OR pt_stripe_clearing_items.event_date IS NOT excluded.event_date THEN 'Provider item changed after observation; review its posting.' ELSE CASE WHEN pt_stripe_clearing_items.entry_id IS NULL AND ? THEN excluded.reason ELSE pt_stripe_clearing_items.reason END END`,
   bt.id, account, categoryOf(bt), eventDate, String(bt.currency ?? '').toLowerCase(), valid ? amount : 0, valid ? net : 0, valid ? fee : 0,
-  intentOf(bt), objectId(bt.source), payoutId ?? (isPayout(bt) ? objectId(bt.source) : null), valid && eventDate ? 'observed' : 'held', valid && eventDate ? '' : 'Stripe item has invalid amounts or no event creation time.', scan)])
+  intentOf(bt), objectId(bt.source), payoutId ?? (isPayout(bt) ? objectId(bt.source) : null), valid && eventDate ? 'observed' : 'held', valid && eventDate ? '' : 'Stripe item has invalid amounts or no event creation time.', scan, payoutId === null ? 1 : 0)])
 }
 
 export async function hold(db: D1Database, id: string, reason: string) {

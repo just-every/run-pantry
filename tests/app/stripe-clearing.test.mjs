@@ -39,8 +39,8 @@ test('PROC-003 missing Stripe refund is named on dashboard, close and settings, 
         }else{
           const card=page.locator('.card').filter({has:page.getByRole('heading',{name:'Stripe clearing',exact:true})})
           await card.getByText(repaired?'Matches provider':'Needs attention',{exact:true}).waitFor()
-          if(!repaired){await card.getByRole('cell',{name:/^txn_refund/}).waitFor();await card.getByText('refund',{exact:true}).waitFor()}
-          else assert.equal(await card.getByRole('cell',{name:/^txn_refund/}).count(),0)
+          if(!repaired){await card.getByRole('cell',{name:/txn_refund/}).waitFor();await card.getByText('refund',{exact:true}).waitFor()}
+          else assert.equal(await card.getByRole('cell',{name:/txn_refund/}).count(),0)
           const response=await context.request.get(new URL(await card.getByRole('link',{name:'Download comparison and item evidence',exact:true}).getAttribute('href'),app.origin).href)
           assert.equal(response.status(),200);const data=await response.json();assert.equal(data.ok,repaired);assert.equal(data.differenceCents,repaired?0:10000)
         }

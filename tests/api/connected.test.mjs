@@ -17,6 +17,7 @@ const entriesFor = async (h, sourceId) => (await h.view('journal')).entries.filt
 const lines = e => e.lines.map(l => [l.account_name, l.debit_cents, l.credit_cents]).sort((a, b) => a[0].localeCompare(b[0]) || a[1] - b[1] || a[2] - b[2])
 
 test('PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees and refunds through clearing, transfers the payout, matches the deposit and never books twice', async t => {
+  for (const invoiceFirst of [true, false]) {
   const KEY = 'sk_test_' + 'Z9y8X7w6V5u4T3s2R1q0P9o8'
   const payouts = await json('stripe/payouts.json'), items = await json('stripe/balance-transactions-po_1TestAutomatic.json')
   const calls = [], sessions = new Map()
@@ -56,7 +57,7 @@ test('PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees and refunds 
   await h.command('stripe.connect', { secretKey: KEY })
   await h.send(link + '/pay', undefined, { headers: { 'content-type': 'application/x-www-form-urlencoded' }, raw: 'method=card' })
   Object.assign(sessions.get('cs_test_1'), { status: 'complete', pi: { id: 'pi_card', status: 'succeeded', amount_received: 240000, latest_charge: { id: 'ch_3TestCharge23', balance_transaction: { id: 'txn_3TestCharge23', amount: 240000, currency: 'usd', fee: 6990, exchange_rate: null } } } })
-  await h.send(link + '?checkout=cs_test_1')
+  if (invoiceFirst) await h.send(link + '?checkout=cs_test_1')
 
   // The owner says where payouts land and where sales go; Pantry reads and books them.
   const stripeBalance = at((await h.view('bank')).accounts, a => a.name === 'Stripe balance')
@@ -75,6 +76,8 @@ test('PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees and refunds 
   assert.deepEqual(lines(entry), [['Operating checking',482848,0],['Stripe balance',0,482848]])
   const clearing = await h.view('stripe/clearing')
   assert.equal(clearing.differenceCents,0); assert.ok(clearing.ok)
+  assert.equal(at(clearing.items,i=>i.id==='txn_3TestCharge23').status,'adopted',invoiceFirst?'checkout-first receipt is adopted':'importer confirms checkout before recognizing the charge')
+  assert.equal((await h.view('sales')).payments.filter(p=>p.reference==='pi_card').length,1)
   assert.equal(clearing.items.length,items.data.length)
   assert.ok(clearing.items.every(i=>['posted','adopted'].includes(i.status)))
 
@@ -102,6 +105,7 @@ test('PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees and refunds 
   const mp = (await m.view('connected')).payouts
   assert.equal(mp.available, false); assert.match(mp.reason, /not available yet on RER Managed/)
   await m.command('stripe.payouts', { bankAccountId: 'x', salesAccountId: mb.acct['4000'], from: '2026-10-01' }, m.owner, 409)
+  }
 })
 
 test('CLOSE-005 / PAYROLL-001 a Gusto payroll posts as one balanced entry (wages, employer taxes, withholdings, net pay) matched to its bank debits, once', async t => {
@@ -240,4 +244,36 @@ test('PROC-003 omitted refund remains a named dashboard and close exception unti
   // A correcting reversal changes the live comparison; no stale stored pass can hide it.
   await h.command('journal.reverse',{id:entry.id,date:'2026-09-20'})
   assert.equal((await h.view('stripe/clearing')).ok,false)
+})
+
+test('PROC-003 a locked event and an incomplete Stripe inventory stay named and never claim a clearing tie',async t=>{
+  const provider=clearingProvider({missingRefund:false})
+  let incomplete=false
+  const h=await harness({outbound:request=>{
+    const u=new URL(request.url)
+    if(incomplete&&u.pathname==='/v1/balance_transactions'&&!u.searchParams.has('payout'))return Response.json({object:'list',has_more:true,data:provider.items})
+    return provider.outbound(request)
+  }});t.after(()=>h.close())
+  const {acct}=await books(h)
+  // Lock the empty month, then add a previously unconnected bank and its late Stripe evidence.
+  let close=await h.command('close.tasks',{period:'2026-09'})
+  for(const task of close.tasks)await h.command('close.task',{id:task.id,revision:task.revision,done:true,note:'Reviewed empty month'})
+  await h.command('period.lock',{period:'2026-09'})
+  const bank=await h.command('bank-account.save',{name:'Operating checking',institution:'Chase',accountId:acct['1000'],numberLast4:'4821',openingDate:'2026-01-01',openingBalance:'0.00'})
+  await h.command('stripe.connect',{secretKey:'sk_test_'+'syntheticclearingfixture0123456789'})
+  await h.command('stripe.payouts',{bankAccountId:bank.id,salesAccountId:acct['4000'],from:'2026-09-01'})
+  let state=await h.view('stripe/clearing')
+  assert.equal(state.ok,false);assert.equal(state.ledgerCents,0)
+  assert.ok(state.items.every(i=>i.status==='held'&&/locked/i.test(i.reason)),JSON.stringify(state.items))
+  assert.equal((await h.view('journal')).entries.filter(e=>e.status==='posted').length,0)
+  const bea=await h.member('bea-clearing@example.test','bookkeeper')
+  const reopening=await h.command('period.request-reopen',{period:'2026-09',reason:'Post late Stripe evidence'},bea)
+  await h.command('period.decide-reopen',{id:reopening.requests[0].id,decision:'approve',note:'Approved source activity'})
+  await h.command('stripe.payouts-sync',{})
+  state=await h.view('stripe/clearing');assert.equal(state.ok,true)
+  assert.ok(state.items.every(i=>i.status==='posted'))
+  incomplete=true;await h.command('stripe.payouts-sync',{})
+  state=await h.view('stripe/clearing');assert.equal(state.ok,false);assert.equal(state.complete,false)
+  assert.match(state.reason,/incomplete|pagination/i)
+  assert.equal(at((await h.view('close/2026-09')).checks,c=>c.key==='stripe-clearing').ok,false)
 })
