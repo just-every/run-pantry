@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { at, fixture, harness } from './harness.mjs'
-import { fakeXero } from './xero.mjs'
+import { fakeXero, xeroExports } from './xero.mjs'
 
 const FILES = { accounts: 'account-list.csv', customers: 'customer-contact-list.csv', vendors: 'vendor-contact-list.csv', trialBalance: 'trial-balance.csv', openInvoices: 'open-invoices.csv', unpaidBills: 'unpaid-bills.csv', generalLedger: 'general-ledger.csv' }
 async function cutoverPackage(overrides = {}) {
@@ -70,12 +70,6 @@ test('PAN-16 a QuickBooks Online cutover is previewed, imported as staged record
   assert.ok(!r.blockers.some(b => b.kind === 'baseline' || b.kind === 'opening'), JSON.stringify(r.blockers))
 })
 
-const XERO = { accounts: 'chart-of-accounts.csv', contacts: 'contacts.csv', trialBalance: 'trial-balance.csv', invoices: 'sales-invoices.csv', bills: 'bills.csv', bankTransactions: 'account-transactions.csv' }
-async function xeroExports(overrides = {}) {
-  const files = {}
-  for (const [key, name] of Object.entries(XERO)) files[key] = { name, content: overrides[key] ?? await fixture(`xero/${name}`) }
-  return { source: 'xero', files, banks: [{ account: 'Checking Account', institution: 'First Harbor Bank', last4: '4821', statementBalance: '31406.87' }, { account: 'Savings Account', institution: 'First Harbor Bank', last4: '7730', statementBalance: '12000.00' }] }
-}
 
 test('XERO-001 Xero exports are previewed, imported, carry their attachments over, undone, and sign off to Xero\'s trial balance to the cent', async t => {
   const xero = await fakeXero()
