@@ -3912,7 +3912,7 @@
       "executable": false
     },
     "src/ui/invoice-editor.tsx": {
-      "sha256": "ea095871ea5d188a425947be99117bfaec8bedf9a7a2b165dc23454be4787f4c",
+      "sha256": "4c255edf04180742bb02a32f1ec563d13254cf6b21ddfe6370ba8d8bf558306c",
       "executable": false
     },
     "src/ui/invoice-template-editor.tsx": {
@@ -4256,7 +4256,7 @@
       "executable": false
     },
     "tests/app/invoice-documents.test.mjs": {
-      "sha256": "a045d6591bcb4437757c6cdff68f66459825906db0f6edd1f0c6ae699b9a1d31",
+      "sha256": "8007dfa7ee3521efa36dee6cea386c6cea2f7774856adca33f5ccdaccc83a397",
       "executable": false
     },
     "tests/app/nexus.test.mjs": {

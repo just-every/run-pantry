@@ -75,7 +75,7 @@ export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCan
       <Card title={kind === 'credit' ? 'Credit summary' : 'Invoice summary'}>
         <dl className="summary"><div><dt>Subtotal</dt><dd>{usd(subtotal)}</dd></div><div><dt>Sales tax</dt><dd>{usd(tax)}</dd></div><div className="total"><dt>Total</dt><dd>{usd(subtotal + tax)}</dd></div></dl>
         {missing > 0 && <div className="callout callout-warn" role="status"><strong>Tax treatment needed before approval</strong><span>{missing} line{missing === 1 ? ' is' : 's are'} missing a sales tax code. Choose a code or mark the line exempt.</span></div>}
-        <div className="form-end column"><button className="btn btn-primary btn-block" disabled={busy || !documents}>{busy ? 'Saving…' : 'Save draft'}</button><button type="button" className="btn btn-secondary btn-block" onClick={onCancel}>Cancel</button>{error && <p role="alert" className="error">{error}</p>}</div>
+        <div className="form-end column"><button className="btn btn-primary btn-block" disabled={busy || !documents}>{busy ? 'Saving…' : 'Save draft'}</button><button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={onCancel}>Cancel</button>{error && <p role="alert" className="error">{error}</p>}</div>
       </Card>
     </div>
   </form>

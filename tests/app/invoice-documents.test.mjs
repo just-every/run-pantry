@@ -93,6 +93,7 @@ test('INVOICE-001 owner edits branded templates and sequence, previews real invo
         assert.equal(await page.getByRole('button', { name: 'Approve', exact: true }).count(), 0, 'the stale draft is not exposed for approval during reload')
         assert.equal(await page.getByRole('button', { name: 'Saving…', exact: true }).count(), 1, 'the saved editor stays visible until its new revision is loaded')
         assert.equal(await page.getByRole('button', { name: 'Saving…', exact: true }).isDisabled(), true)
+        assert.equal(await page.getByRole('button', { name: 'Cancel', exact: true }).isDisabled(), true, 'pending save cannot expose the stale panel through cancellation')
         await page.screenshot({ path: `${evidence}/invoice-reload-wait-${width}.png`, fullPage: true })
       } finally {
         releaseRead()
