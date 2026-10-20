@@ -6,6 +6,7 @@ import { type Basis } from './basis'
 import { entity } from './settings'
 import { missingReceipts } from './receipts/attachments'
 import { feedHealth } from './feeds/health'
+import { clearingState } from './stripe-clearing'
 
 export async function dashboard(db: D1Database, asOf: string, selectedBasis?: Basis) {
   const business = await entity(db), basis = selectedBasis ?? (business?.tax_method === 'cash' ? 'cash' : 'accrual')
@@ -52,7 +53,7 @@ export async function dashboard(db: D1Database, asOf: string, selectedBasis?: Ba
     FROM pt_bank_accounts b JOIN pt_accounts a ON a.id = b.account_id WHERE a.active = 1 AND b.opening_date < ?`, asOf, asOf)
   const fullyReconciled = reconciled.length && reconciled.every(r => r.through) ? reconciled.map(r => r.through as string).sort()[0] : null
   const currentThrough = [latestLocked, fullyReconciled].filter(Boolean).sort().at(-1) ?? null
-  return { asOf, from, basis, cash, movements, trend, overdue: { receivables: overdue(receivables), payables: overdue(payables) },
+  return { asOf, from, basis, cash, movements, trend, clearing: await clearingState(db), overdue: { receivables: overdue(receivables), payables: overdue(payables) },
     work: { missingReceipts: sources.length, missingByMonth: [...missingByMonth].sort().map(([month, count]) => ({ month, count })), billsToApprove: Number(bills?.n ?? 0), brokenConnections: (await feedHealth(db)).length },
     currentThrough, currentSource: currentThrough ? (currentThrough === latestLocked ? 'locked' : 'fully-reconciled') : null }
 }

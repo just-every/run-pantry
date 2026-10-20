@@ -50,6 +50,7 @@ import { receiptCommands, receiptRoutes } from './receipts/routes'
 import { deliveryCommands, deliveriesView, reminderPlans, sendingView } from './delivery'
 import { recurringCommands, recurringView } from './recurring'
 import { stripeCommands, stripeView } from './stripe'
+import { clearingState } from './stripe-clearing'
 import { payoutCommands, payoutsView } from './payouts'
 import { gustoCommands, gustoRoutes, gustoView } from './gusto/commands'
 import { depositNotes, depositProposals } from './automatch'
@@ -126,7 +127,8 @@ view('review', async ctx => reviewView(ctx.db, ctx.actor.email))
 view('write-offs/candidates', async (ctx, c) => ({ items: await smallBalances(ctx.db, c.req.query('kind') === 'bill' ? 'bill' : 'invoice', cents(c.req.query('ceiling'), 'Write off balances up to')) }))
 view('sales', async ctx => ({ approvalRules: await all(ctx.db, 'SELECT * FROM pt_capture_approval_rules ORDER BY minimum_cents'), vendorCredits: await vendorCreditsView(ctx.db), invoices: await invoicesView(ctx.db), bills: await billsView(ctx.db), payments: await paymentsView(ctx.db), deliveries: await deliveriesView(ctx.db), reminders: await reminderPlans(ctx.db), recurring: await recurringView(ctx.db), onlinePayments: await all(ctx.db, 'SELECT id, invoice_id, method, amount_cents, status, fee_cents, created_at, updated_at FROM pt_stripe_payments ORDER BY created_at DESC LIMIT 500') }))
 view('invoicing', async ctx => ({ sending: await sendingView(ctx.env, ctx.db), stripe: await stripeView(ctx.env, ctx.db) }))
-view('connected', async ctx => ({ payouts: await payoutsView(ctx.env, ctx.db), gusto: await gustoView(ctx) }))
+view('stripe/clearing', async ctx => clearingState(ctx.db))
+view('connected', async ctx => ({ clearing: await clearingState(ctx.db), payouts: await payoutsView(ctx.env, ctx.db), gusto: await gustoView(ctx) }))
 view('bank', async ctx => bankView(ctx.db))
 view('bank/lines', async ctx => bankLinesView(ctx.db))
 view('bank/rules', async ctx => rulesView(ctx.db))

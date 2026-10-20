@@ -8,7 +8,7 @@ import { invoiceByLink } from './invoice-links'
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { authority, pantry, who } from './access'
 import { Fault, now, requireThat, text, uid, usd, type Data } from './core'
-import { all, audit, changed, one, q, run, type Sql } from './db'
+import { all, audit, changed, guard, one, q, run, type Sql } from './db'
 import { accountInsert } from './accounts'
 import { entryStatements } from './journal'
 import { paymentStatements } from './payables'
@@ -160,21 +160,23 @@ async function recordSucceeded(env: Bindings, db: D1Database, row: Data, pi: Dat
   const charge = typeof pi.latest_charge === 'object' ? pi.latest_charge : null
   let bt = charge && typeof charge.balance_transaction === 'object' ? charge.balance_transaction : null
   if (!bt && charge && typeof charge.balance_transaction === 'string') bt = await stripeCall(key, 'GET', `/balance_transactions/${charge.balance_transaction}`)
-  const inv = await invoice(db, row.invoice_id), day = businessDay((await sendingSettings(db)).time_zone)
+  const inv = await invoice(db, row.invoice_id), day = bt?.created ? new Date(Number(bt.created) * 1000).toISOString().slice(0, 10) : businessDay((await sendingSettings(db)).time_zone)
   const statements: Sql[] = []
   if (row.status !== 'succeeded') {
+    const imported = await one(db, "SELECT id FROM pt_stripe_clearing_items WHERE payment_intent = ? AND status IN ('posted', 'legacy-covered') AND entry_id IS NOT NULL", pi.id)
+    requireThat(!imported, `Stripe charge ${imported?.id} was already imported; review its sales entry before recording this invoice receipt`, 409)
     const amount = Number(pi.amount_received)
     const p = await paymentStatements(db, pantry('stripe'), {
       direction: 'received', contactId: inv.customer_id, date: day, amount: dollars(amount), bankAccountId: s.bank_account_id, reference: pi.id,
       memo: `Paid ${row.method === 'card' ? 'by card' : 'by ACH bank debit'} through the invoice link`,
       allocations: inv.open_cents > 0 ? [{ targetId: inv.id, amount: dollars(Math.min(amount, inv.open_cents)) }] : [],
     })
-    statements.push(...p.statements, q("UPDATE pt_stripe_payments SET status = 'succeeded', payment_intent = ?, payment_id = ?, updated_at = ? WHERE id = ? AND status <> 'succeeded'", pi.id, p.id, now(), row.id), changed())
+    statements.push(guard("NOT EXISTS (SELECT 1 FROM pt_stripe_clearing_items WHERE payment_intent = ? AND status IN ('posted', 'legacy-covered') AND entry_id IS NOT NULL)", pi.id), ...p.statements, q("UPDATE pt_stripe_payments SET status = 'succeeded', payment_intent = ?, payment_id = ?, updated_at = ? WHERE id = ? AND status <> 'succeeded'", pi.id, p.id, now(), row.id), changed())
   }
   // Pantry keeps USD books. An account that settles in another currency reports its fee in that
   // currency; the fee is booked in dollars at Stripe's own conversion rate for the charge.
   const usdFee = !bt || !(Number(bt.fee) > 0) ? 0 : bt.currency === 'usd' ? Number(bt.fee) : bt.exchange_rate ? Math.round(Number(bt.fee) / Number(bt.exchange_rate)) : 0
-  if (usdFee > 0) {
+  if (usdFee > 0 && !row.fee_entry_id) {
     const feeEntry = uid(), fee = usdFee
     const converted = bt.currency === 'usd' ? '' : `, ${String(bt.currency).toUpperCase()} ${(Number(bt.fee) / 100).toFixed(2)} at Stripe's rate ${bt.exchange_rate}`
     statements.push(...entryStatements({ id: feeEntry, date: day, memo: `Stripe fee on invoice ${inv.number} (${usd(fee)}${converted})`, sourceKind: 'bank', sourceId: row.id, preparedBy: pantry('stripe').email, preparedKind: 'import', lines: [

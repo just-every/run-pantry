@@ -6,6 +6,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { at, books, fixture, harness } from './harness.mjs'
+import { clearingProvider } from '../providers/stripe-clearing.mjs'
 
 const MANAGED = { RER_INSTALLATION_ID: 'inst_test', RER_MANAGEMENT_ORIGIN: 'https://manage.runeditrun.example' }
 const json = async name => JSON.parse(await fixture(name))
@@ -15,7 +16,7 @@ const net = (tb, name) => tb.rows.find(r => r.name === name)?.net ?? 0
 const entriesFor = async (h, sourceId) => (await h.view('journal')).entries.filter(e => e.source_id === sourceId && e.status === 'posted')
 const lines = e => e.lines.map(l => [l.account_name, l.debit_cents, l.credit_cents]).sort((a, b) => a[0].localeCompare(b[0]) || a[1] - b[1] || a[2] - b[2])
 
-test('PAYOUT-001 a Stripe payout is split into gross sales, Stripe fees and refunds, matched to its bank deposit, and never booked twice', async t => {
+test('PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees and refunds through clearing, transfers the payout, matches the deposit and never books twice', async t => {
   const KEY = 'sk_test_' + 'Z9y8X7w6V5u4T3s2R1q0P9o8'
   const payouts = await json('stripe/payouts.json'), items = await json('stripe/balance-transactions-po_1TestAutomatic.json')
   const calls = [], sessions = new Map()
@@ -28,13 +29,14 @@ test('PAYOUT-001 a Stripe payout is split into gross sales, Stripe fees and refu
     if (request.method === 'POST' && url.pathname === '/v1/checkout/sessions') { const id = `cs_test_${sessions.size + 1}`; sessions.set(id, { status: 'open', pi: null }); return Response.json({ id, url: `https://checkout.stripe.com/c/pay/${id}` }) }
     const session = url.pathname.match(/^\/v1\/checkout\/sessions\/(cs_test_\d+)$/)
     if (session) { const s = sessions.get(session[1]); return Response.json({ id: session[1], object: 'checkout.session', status: s.status, payment_intent: s.pi }) }
+    if (url.pathname === '/v1/balance') return Response.json({ object: 'balance', available: [{currency:'usd',amount:0}], pending: [{currency:'usd',amount:0}] })
     if (url.pathname === '/v1/payouts') {
       assert.equal(url.searchParams.get('status'), 'paid')
       assert.equal(url.searchParams.get('arrival_date[gte]'), String(Date.parse('2026-10-01T00:00:00Z') / 1000))
       return Response.json(payouts)
     }
     if (url.pathname === '/v1/balance_transactions') {
-      assert.equal(url.searchParams.get('payout'), 'po_1TestAutomatic', 'only automatic payouts are itemized')
+      if (url.searchParams.has('payout')) assert.equal(url.searchParams.get('payout'), 'po_1TestAutomatic', 'only automatic payouts are itemized')
       assert.equal(url.searchParams.get('expand[0]'), 'data.source')
       return Response.json(items)
     }
@@ -67,16 +69,14 @@ test('PAYOUT-001 a Stripe payout is split into gross sales, Stripe fees and refu
   assert.equal(auto.match, null, 'no deposit yet')
   assert.equal(manual.status, 'held'); assert.match(manual.reason, /only automatic payouts/)
 
-  // One balanced entry: the deposit, fees and refunds against sales and the invoice money already in Stripe balance.
+  // Event-time recognition is separate from the two-line payout transfer.
   const [entry] = await entriesFor(h, 'po_1TestAutomatic')
-  assert.equal(entry.entry_date, '2026-10-09')
-  assert.deepEqual(lines(entry), [
-    ['Operating checking', 482848, 0],
-    ['Refunds and disputes', 4500, 0],
-    ['Service revenue', 0, 263798],
-    ['Stripe balance', 0, 240000 - 6990],
-    ['Stripe fees', 16450 - 6990, 0],
-  ])
+  assert.equal(entry.entry_date, new Date(payouts.data.find(p=>p.id==='po_1TestAutomatic').created*1000).toISOString().slice(0,10))
+  assert.deepEqual(lines(entry), [['Operating checking',482848,0],['Stripe balance',0,482848]])
+  const clearing = await h.view('stripe/clearing')
+  assert.equal(clearing.differenceCents,0); assert.ok(clearing.ok)
+  assert.equal(clearing.items.length,items.data.length)
+  assert.ok(clearing.items.every(i=>['posted','adopted'].includes(i.status)))
 
   // The deposit arrives on the statement and meets the payout by itself.
   const csv = csvOf([['10/08/2026', 'ACH DEPOSIT NORTHSTAR CONSULTING', 300, 300], ['10/09/2026', 'STRIPE TRANSFER ST-K7Q2M9X4 JUNIPER LANE', 4828.48, 5128.48]])
@@ -93,7 +93,8 @@ test('PAYOUT-001 a Stripe payout is split into gross sales, Stripe fees and refu
   assert.equal(net(tb, 'Stripe balance'), 0, 'the invoice payment left Stripe balance with the payout')
   assert.equal(net(tb, 'Service revenue'), -(240000 + 263798))
   assert.equal(net(tb, 'Stripe fees'), 16450)
-  assert.equal(calls.filter(c => c === 'GET /v1/balance_transactions').length, 1, 'a booked payout is not itemized again')
+  assert.ok(calls.includes('GET /v1/balance'), 'the comparison uses Stripe’s reported balance')
+  assert.deepEqual((await h.view('stripe/clearing')).items.map(i=>[i.id,i.entryId]).sort(),clearing.items.map(i=>[i.id,i.entryId]).sort(),'provider items keep their posting identities on replay')
 
   // RER Managed cannot reach Stripe yet: one plain line, and nothing to configure.
   const m = await harness({ bindings: MANAGED }); t.after(() => m.close())
@@ -204,4 +205,39 @@ test('CLOSE-005 / PAYROLL-001 a Gusto payroll posts as one balanced entry (wages
   const mg = (await m.view('connected')).gusto
   assert.equal(mg.availability.available, false); assert.match(mg.availability.reason, /not available yet on RER Managed/)
   await m.command('gusto.connect', {}, m.owner, 503)
+})
+
+
+test('PROC-003 omitted refund remains a named dashboard and close exception until event sync is repaired, without a balancing adjustment', async t => {
+  const provider=clearingProvider(), h=await harness({outbound:provider.outbound});t.after(()=>h.close())
+  const {acct}=await books(h)
+  const bank=await h.command('bank-account.save',{name:'Operating checking',institution:'Chase',accountId:acct['1000'],numberLast4:'4821',openingDate:'2026-01-01',openingBalance:'0.00'})
+  await h.command('stripe.connect',{secretKey:'sk_test_'+'syntheticclearingfixture0123456789'})
+  await h.command('stripe.payouts',{bankAccountId:bank.id,salesAccountId:acct['4000'],from:'2026-09-01'})
+  const missing=await h.view('stripe/clearing')
+  assert.equal(missing.providerCents,0);assert.equal(missing.ledgerCents,10000);assert.equal(missing.differenceCents,10000);assert.equal(missing.ok,false)
+  assert.ok(missing.observedAt);assert.equal(missing.complete,true)
+  const refund=at(missing.items,i=>i.id==='txn_refund')
+  assert.equal(refund.type,'refund');assert.equal(refund.sourceId,'re_missing');assert.equal(refund.netCents,-10000);assert.notEqual(refund.status,'posted');assert.ok(refund.reason)
+  const close=at((await h.view('close/2026-09')).checks,c=>c.key==='stripe-clearing')
+  assert.equal(close.ok,false);assert.ok(close.detail.includes('txn_refund'));assert.ok(close.items.some(i=>i.id==='txn_refund'))
+  const dashboard=await h.view('dashboard?to=2026-09-30')
+  assert.equal(dashboard.clearing.differenceCents,10000);assert.equal(dashboard.clearing.ok,false)
+  const before=(await h.view('journal')).entries.filter(e=>e.status==='posted')
+  assert.ok(before.every(e=>e.source_id!=='txn_refund'),'the omitted event has not been replaced by a made-up balancing entry')
+  provider.repair();await h.command('stripe.payouts-sync',{})
+  const repaired=await h.view('stripe/clearing')
+  assert.equal(repaired.differenceCents,0);assert.equal(repaired.ok,true);assert.equal(at(repaired.items,i=>i.id==='txn_refund').status,'posted')
+  assert.equal(at((await h.view('close/2026-09')).checks,c=>c.key==='stripe-clearing').ok,true)
+  assert.equal((await h.view('dashboard?to=2026-09-30')).clearing.ok,true)
+  const after=(await h.view('journal')).entries.filter(e=>e.status==='posted')
+  assert.equal(after.length,before.length+1)
+  const entry=at(after,e=>e.id===at(repaired.items,i=>i.id==='txn_refund').entryId)
+  assert.equal(entry.entry_date,'2026-09-06');assert.deepEqual(lines(entry),[['Refunds and disputes',10000,0],['Stripe balance',0,10000]])
+  await h.command('stripe.payouts-sync',{});assert.equal((await h.view('journal')).entries.filter(e=>e.status==='posted').length,after.length)
+  const viewer=await h.member('clearing@example.test','viewer');assert.equal((await h.view('stripe/clearing',viewer)).differenceCents,0)
+  await h.view('stripe/clearing','',401)
+  // A correcting reversal changes the live comparison; no stale stored pass can hide it.
+  await h.command('journal.reverse',{id:entry.id,date:'2026-09-20'})
+  assert.equal((await h.view('stripe/clearing')).ok,false)
 })

@@ -1,6 +1,8 @@
 import { YEAR_END_TASKS, yearEndChecks } from './year-end-checks'
 import { recognitionCloseGuards, recognitionTies } from './recognition'
 import { feedCloseExceptions } from './feeds/health'
+import { clearingState } from './stripe-clearing'
+import { clearingCloseGuards } from './stripe-clearing-close'
 // Period close: calculated checks plus reviewed tasks, then a lock that both
 // people and agents' approved work must respect. Reopening is a separate
 // request approved by someone holding the reopen grant.
@@ -67,6 +69,11 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
     items: feedExceptions.map(f => ({ kind: 'feed', id: f.id, label: f.label })),
     detail: feedExceptions.length ? feedExceptions.map(f => f.label).join('; ') : 'Every connected feed is synced through month end' })
 
+  const clearing = await clearingState(db)
+  if (clearing) checks.push({ key: 'stripe-clearing', title: 'Stripe clearing agrees to the provider', ok: clearing.ok,
+    detail: `Latest provider comparison${clearing.observedAt ? ' at ' + clearing.observedAt : ''}: ledger ${usd(clearing.ledgerCents)}, Stripe ${clearing.providerCents === null ? 'not observed' : usd(clearing.providerCents)}, difference ${clearing.differenceCents === null ? 'not compared' : usd(clearing.differenceCents)}. ${clearing.reason || ''} ${clearing.items.filter((i: Data) => !['posted', 'adopted', 'legacy-covered', 'covered'].includes(i.status)).map((i: Data) => `${i.id} (${i.type}): ${i.reason}`).join('; ')}`,
+    items: clearing.items.filter((i: Data) => !['posted', 'adopted', 'legacy-covered', 'covered'].includes(i.status)).map((i: Data) => ({ kind: 'stripe-clearing', id: i.id, label: `${i.id} · ${i.type} · ${i.reason}` })) })
+
   const tb = await trialBalance(db, end)
   checks.push({ key: 'trial-balance', title: 'Trial balance balances', ok: tb.balanced, detail: `Debits ${usd(tb.debit)}, credits ${usd(tb.credit)}` })
 
@@ -129,6 +136,7 @@ export async function lockPlan(db: D1Database, actor: Actor, id: string, note: s
   const revision = uid()
   return [
     ...await recognitionCloseGuards(db, state.end),
+    ...await clearingCloseGuards(db),
     // The checked state must still hold: no task reopened, no draft or posting added in the period meanwhile.
     guard("(SELECT COUNT(*) FROM pt_close_tasks WHERE period = ? AND status <> 'done') = 0", id),
     guard("NOT EXISTS (SELECT 1 FROM pt_journal_entries WHERE status = 'draft' AND entry_date BETWEEN ? AND ?)", state.start, state.end),

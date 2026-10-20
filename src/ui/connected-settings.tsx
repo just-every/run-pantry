@@ -1,6 +1,7 @@
 // Connected: Stripe payouts booked as sales, fees and refunds against the
 // deposit, and Gusto payrolls posted as one entry against their debits. Each
 // card is completed from this page and says plainly what this install can do.
+import { StripeClearing } from './stripe-clearing'
 import { SetupSteps } from './provider-guides'
 import { ago } from './bank-feeds'
 import { Action, Card, Chip, command, day, Field, Form, Loading, Table, today, usd, useShared, useView, type D } from './kit'
@@ -35,7 +36,7 @@ function Payouts({ v, onDone }: { v: D; onDone: () => Promise<void> }) {
   const owner = useShared().state.actor.can.owner, can = useShared().state.actor.can.record, s = v.settings
   if (!v.available) return <Card title="Stripe payouts"><p className="hint">{v.reason}</p></Card>
   return <Card title="Stripe payouts" actions={s.bank && can && <Action run={async () => { await command('stripe.payouts-sync', {}); await onDone() }}>Read payouts now</Action>}>
-    <p>Each payout is split into gross sales, Stripe fees and refunds, posted as one entry, and matched to its deposit when the bank line arrives. Reading a payout again never books it twice.</p>
+    <p>Stripe charges, fees, refunds and disputes post through Stripe clearing on their provider event dates. Each payout transfers clearing to the bank and matches its deposit when the bank line arrives. Reading the same provider item again never books it twice.</p>
     {s.bank ? <dl className="facts">
       <div><dt>Lands in</dt><dd>{s.bank.name} (…{s.bank.number_last4})</dd></div>
       <div><dt>Posted to</dt><dd>{s.sales.code} {s.sales.name} · {s.fees.code} {s.fees.name} · {s.refunds.code} {s.refunds.name}</dd></div>
@@ -98,5 +99,5 @@ export function ConnectedSettings() {
   const { data, error, reload } = useView<D>('connected'), shared = useShared()
   if (!data) return <Loading error={error} what="connected services" />
   const done = async () => { await Promise.all([reload(), shared.reload()]) }
-  return <><Payouts v={data.payouts} onDone={done} /><Payroll g={data.gusto} onDone={done} /></>
+  return <><StripeClearing value={data.clearing} /><Payouts v={data.payouts} onDone={done} /><Payroll g={data.gusto} onDone={done} /></>
 }

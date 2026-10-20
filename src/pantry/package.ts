@@ -3,6 +3,7 @@
 import { monthBounds, type Data } from './core'
 import { all } from './db'
 import { closeState } from './close'
+import { clearingState } from './stripe-clearing'
 import { ageing, balanceSheet, fiscalYearStart, generalLedger, profitAndLoss, trialBalance } from './reports'
 import { requireEntity } from './settings'
 import { BASIS_LABEL, type Basis } from './basis'
@@ -21,6 +22,7 @@ export async function accountantPackage(db: D1Database, period: string, basis: B
     entity: { legalName: entity.legal_name, entityType: entity.entity_type, state: entity.state, currency: entity.currency, bookBasis: entity.book_basis, declaredTaxMethod: entity.tax_method, policies: entity.policies, fiscalYearStart: entity.fiscal_year_start },
     period: { id: period, start, end },
     close: await closeState(db, period),
+    stripeClearing: await clearingState(db),
     trialBalance: await trialBalance(db, end, basis),
     profitAndLoss: { period: await profitAndLoss(db, start, end, basis), yearToDate: await profitAndLoss(db, fiscalYearStart(end, entity.fiscal_year_start), end, basis) },
     cashFlow: await cashFlow(db, start, end),

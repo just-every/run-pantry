@@ -16,7 +16,9 @@ import { invoice, issueStatements, type Issuable } from '../pantry/invoices'
 import { matchPlan } from '../pantry/matching'
 import { paymentStatements } from '../pantry/payables'
 import { splitPayout } from '../pantry/payout-split'
-import { bookStatements, matchPayouts, payoutRow } from '../pantry/payouts'
+import { matchPayouts, payoutRow } from '../pantry/payouts'
+import { observe, snapshot } from '../pantry/stripe-clearing/store'
+import { postItem } from '../pantry/stripe-clearing/posting'
 import { runDueRecurring } from '../pantry/recurring'
 import { seal } from '../pantry/stripe-api'
 import { demoId as id } from './records'
@@ -56,9 +58,16 @@ export async function bookPayout({ env, owner, now }: Seed) {
   const s = (await one(db, 'SELECT * FROM pt_stripe WHERE id = 1'))!, sales = (await one(db, 'SELECT * FROM pt_accounts WHERE id = ?', id('4000')))!
   const { payout, items } = demoPayout(line.posted_date), split = splitPayout(payout, items, new Map())
   if (!split.ok) throw new Error(`Demo payout does not split: ${split.reason}`)
-  const entryId = id('stripe-payout-entry')
-  await run(db, [...bookStatements(s, payout, split, entryId, id('1000'), id('1050'), sales), payoutRow(payout, split, 'booked', '', entryId),
+  const scan = id('stripe-clearing-scan')
+  const payoutItem = { id: 'txn_demo_payout', type: 'payout', reporting_category: 'payout', amount: -payout.amount, fee: 0, net: -payout.amount, currency: 'usd', created: payout.created, source: payout }
+  for (const item of [...items, payoutItem]) {
+    await observe(db, s.account_id, item, scan, payout.id)
+    if (!await postItem(db, s, item, id('1050'), id('1000'), [])) throw new Error(`Demo Stripe item did not post: ${item.id}`)
+  }
+  const transfer = (await one(db, 'SELECT entry_id FROM pt_stripe_clearing_items WHERE id = ?', payoutItem.id))!
+  await run(db, [payoutRow(payout, split, 'booked', '', transfer.entry_id),
     audit(pantry('stripe'), 'stripe.payout', 'stripe-payout', payout.id, { net: split.net, gross: split.gross, fees: split.fees, refunds: split.refunds, charges: split.charges, invoiced: split.invoiced })])
+  await snapshot(db, s, scan, 0, true, '')
   await matchPayouts(db)
 }
 

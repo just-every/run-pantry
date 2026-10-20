@@ -1,3 +1,4 @@
+import { StripeClearing } from './stripe-clearing'
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Card, day, Field, Loading, Table, today, usd, useView, type D } from './kit'
@@ -7,6 +8,7 @@ export function DashboardSummary() {
   const { data: d, error } = useView<D>(`dashboard?to=${asOf}${basis ? `&basis=${basis}` : ''}`)
   if (!d) return <Loading error={error} what="dashboard figures" />
   return <>
+    <StripeClearing value={d.clearing} />
     <Card title="Books up to date through" actions={<Field label="As of" name="dashboard-date" type="date" value={asOf} onChange={(e: any) => e.target.value && setAsOf(e.target.value)} />}>
       <p><strong>{d.currentThrough ? day(d.currentThrough) : 'No locked or fully reconciled date yet'}</strong>{d.currentThrough && <> · {d.currentSource === 'locked' ? 'month locked' : 'all bank and card accounts reconciled'}</>}</p>
       <Link to="/app/close" search={d.currentThrough ? { period: d.currentThrough.slice(0, 7) } : undefined}>Open close</Link>

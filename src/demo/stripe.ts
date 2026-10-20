@@ -10,6 +10,7 @@ export const PAYOUT_ID = 'po_1QJuniperLaneDemo'
 export const payoutNet = SALES.reduce((s, a) => s + a - fee(a), 0)
 
 export function demoPayout(arrival: string): { payout: Data; items: Data[] } {
-  const items = SALES.map((amount, i) => ({ id: `txn_demo_${i + 1}`, type: 'charge', reporting_category: 'charge', amount, fee: fee(amount), net: amount - fee(amount), currency: 'usd', source: { id: `ch_demo_${i + 1}`, payment_intent: `pi_demo_${i + 1}` } }))
-  return { payout: { id: PAYOUT_ID, amount: payoutNet, currency: 'usd', automatic: true, status: 'paid', arrival_date: Math.floor(Date.parse(`${arrival}T00:00:00Z`) / 1000) }, items }
+  const created = Math.floor(Date.parse(`${arrival}T09:00:00Z`)/1000)
+  const items = SALES.map((amount, i) => ({ id: `txn_demo_${i + 1}`, type: 'charge', reporting_category: 'charge', amount, fee: fee(amount), net: amount - fee(amount), currency: 'usd', created: created - 3600, source: { id: `ch_demo_${i + 1}`, payment_intent: `pi_demo_${i + 1}` } }))
+  return { payout: { id: PAYOUT_ID, amount: payoutNet, currency: 'usd', automatic: true, status: 'paid', created, balance_transaction: { id: 'txn_demo_payout', created }, arrival_date: Math.floor(Date.parse(`${arrival}T00:00:00Z`) / 1000) }, items }
 }
