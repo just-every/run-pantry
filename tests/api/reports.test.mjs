@@ -186,6 +186,10 @@ test('REPORT-005 every P&L and balance sheet figure opens to its records, docume
     assert.deepEqual(output.value.context, Object.fromEntries(new URLSearchParams(context)))
   }
   for (const path of [`reports/detail/export?${context}`, `reports/record/bill/${record.id}/export`]) assert.equal((await h.send(`/api/pantry/${path}`)).status, 401)
+  const credit = await s.issue('Northstar Consulting', '2026-10-25', [{ description: 'Credit for undelivered work', quantity: '1', rate: '50', accountId: s.acct['4000'], taxCode: 'exempt' }], { kind: 'credit', creditFor: s.inv.b.id })
+  const creditSource = await h.view(`reports/record/invoice/${credit.id}`)
+  assert.ok(creditSource.audit.some(a => a.action === 'credit.issue'))
+  assert.ok(creditSource.approvals.some(a => a.subject_kind === 'credit' && a.subject_id === credit.id && a.decision === 'approved'))
   await h.view('reports/detail?report=profit-and-loss&line=nothing&' + OCT, h.owner, 404)
 })
 

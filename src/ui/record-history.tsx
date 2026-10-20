@@ -1,12 +1,14 @@
 import { actionLabel } from './activity-labels'
-import { Card, Details, Table, day, type D } from './kit'
+import { Card, Details, day, type D } from './kit'
 
 export function RecordHistory({ record }: { record: D }) {
   return <>
     <Card title="Approvals">
-      {record.approvals.length ? <Table heads={['When', 'Who', 'Action', 'Revision', 'Decision']} empty="No recorded approval.">
-        {record.approvals.map((a: D) => <tr key={a.id}><td>{day(a.at)}</td><td>{a.actor_email}</td><td>{actionLabel(a.action)}</td><td>{a.subject_revision ?? 'Not recorded'}</td><td>{a.decision}{a.note && <small className="sub"> · {a.note}</small>}</td></tr>)}
-      </Table> : <p>No approval is recorded for this transaction or its journal entries.</p>}
+      {record.approvals.length ? record.approvals.map((a: D) => <div key={a.id}>
+        <p>{a.decision === 'approved' ? 'Approved' : 'Declined'} by {a.actor_email} · {day(a.at)}</p>
+        {a.note && <p>{a.note}</p>}
+        <Details facts={{ 'Action': actionLabel(a.action), 'Record revision': a.subject_revision, 'Approval ID': a.id }} />
+      </div>) : <p>No approval is recorded for this transaction or its journal entries.</p>}
     </Card>
     <Card title="Audit history">
       {record.audit.length ? record.audit.map((e: D) => <div key={e.id}>

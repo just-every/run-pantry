@@ -5,6 +5,7 @@ import type { Data } from './core'
 
 export async function recordEvidence(db: D1Database, record: Data) {
   const subjects = [{ kind: record.kind === 'entry' ? 'journal' : record.kind, id: record.id }, ...record.entries.map((e: Data) => ({ kind: 'journal', id: e.id }))]
+  if (record.kind === 'invoice' && record.sourceKind === 'credit') subjects.push({ kind: 'credit', id: record.id })
   // Vendor credits open through their native journal entry.
   if (record.kind === 'entry') for (const c of await all(db, 'SELECT id FROM pt_vendor_credits WHERE journal_id = ?', record.id)) subjects.push({ kind: 'vendor-credit', id: c.id })
   const nativeKind = record.kind === 'entry' ? 'journal' : record.kind

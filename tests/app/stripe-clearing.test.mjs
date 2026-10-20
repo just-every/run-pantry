@@ -5,7 +5,7 @@ import { providerWorker } from './provider-worker.mjs'
 import { TOKEN } from './worker.mjs'
 import { clearingProvider } from '../providers/stripe-clearing.mjs'
 
-test('PROC-003 missing Stripe refund is named on dashboard, close and settings, then disappears when repaired at 1440 and 390',async t=>{
+test('REPORT-005 / PROC-003 missing Stripe refund is named on dashboard, close and settings, then disappears when repaired at 1440 and 390',async t=>{
   const provider=clearingProvider(),app=await providerWorker({bindings:{},outbound:provider.outbound});t.after(()=>app.close())
   const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});t.after(()=>browser.close())
   const owner=await browser.newContext()
@@ -54,6 +54,22 @@ test('PROC-003 missing Stripe refund is named on dashboard, close and settings, 
           await payout.screenshot({path:`/tmp/pantry-r14-proc003-payout-card-${repaired?'repaired':'missing'}-${width}.png`})
         }
         await page.screenshot({path:`/tmp/pantry-r14-proc003-${name}-${repaired?'repaired':'missing'}-${width}.png`,fullPage:true})
+      }
+      if(repaired){
+        const clearing=await(await context.request.get(`${app.origin}/api/pantry/stripe/clearing`)).json()
+        const charge=clearing.items.find(i=>i.id==='txn_charge')
+        await page.goto(`${app.origin}/app/reports?report=profit-and-loss&line=income&record=entry:${charge.entryId}&from=2026-09-01&to=2026-09-30&basis=accrual`)
+        const providerCard=page.locator('.card').filter({has:page.getByRole('heading',{name:'Provider events',exact:true})})
+        await providerCard.getByText('Stripe · balance-transaction',{exact:true}).waitFor()
+        await providerCard.locator('summary').first().click()
+        await providerCard.getByText('txn_charge',{exact:true}).waitFor()
+        assert.ok((await providerCard.innerText()).includes('pi_external'))
+        const output=await context.request.get(new URL(await page.getByRole('link',{name:'Export record JSON',exact:true}).getAttribute('href'),app.origin).href)
+        assert.ok((await output.json()).record.providerEvents.some(e=>e.id==='txn_charge'))
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+        const evidence=process.env.PANTRY_EVIDENCE_DIR||'/tmp/sx-pantry-r16'
+        await(await import('node:fs/promises')).mkdir(evidence,{recursive:true})
+        await page.screenshot({path:`${evidence}/report005-provider-${width}.png`,fullPage:true})
       }
       assert.deepEqual(errors,[]);await context.close()
     }

@@ -3336,7 +3336,7 @@
       "executable": false
     },
     "src/pantry/record-evidence.ts": {
-      "sha256": "727a17d4c5e4bc0b3d9ff1485dca75f65f6aad1a64bba3f4bc7e5c5b38d07001",
+      "sha256": "52f6b1fae25678a986cba427f321e2f8d8fc76e21b51375537a8ab49c30f5b5d",
       "executable": false
     },
     "src/pantry/recorded-payments.ts": {
@@ -3344,7 +3344,7 @@
       "executable": false
     },
     "src/pantry/records.ts": {
-      "sha256": "295a5d903d852b48a7b69d31bc4bf12a338c55fa6064d200e8712141ab26c90c",
+      "sha256": "8be819c3cf03cfba8dac25d198e7d5f1b375fb88ced95f0176a9dfa08098d0f1",
       "executable": false
     },
     "src/pantry/recurring-bills.ts": {
@@ -4012,7 +4012,7 @@
       "executable": false
     },
     "src/ui/record-history.tsx": {
-      "sha256": "cf3fbd000923acaf587a01d5d3e4919a55dfef2ec0b6e881fb3253a83ce0ab10",
+      "sha256": "c24e4f2d7f0b55c58b9c7cb0931b9f69114735c1a9c3b4d8e04d8fdf70f02d14",
       "executable": false
     },
     "src/ui/recorded-payment-proposal.tsx": {
@@ -4168,7 +4168,7 @@
       "executable": false
     },
     "tests/api/reports.test.mjs": {
-      "sha256": "6fe2a730a4b8e804add58455fc7595247503d4638d23c1da12da692dd766fb5e",
+      "sha256": "99dc9961ee8dab06c4e21fe784096bf78f2dba9b0b563a93d87519a000074d2b",
       "executable": false
     },
     "tests/api/rules.test.mjs": {
@@ -4264,7 +4264,7 @@
       "executable": false
     },
     "tests/app/report-library.test.mjs": {
-      "sha256": "9094606c0c6bdf90dc07e51858cd91e82e216792e57d7e38043b603b8f6efa7a",
+      "sha256": "9e1e7f9cbfe3e196ecbbca2d1cb834c2de6841c2fd55a75d247ad7ed40189c5f",
       "executable": false
     },
     "tests/app/review.test.mjs": {
@@ -4272,7 +4272,7 @@
       "executable": false
     },
     "tests/app/stripe-clearing.test.mjs": {
-      "sha256": "c5ce1e4f8f7348781c892805bd00025372e25feb302c6816d24d4282aa2f510e",
+      "sha256": "f4b06826482ed28677933cda5cca87fba95238717f229d3156b2c7d06ba73768",
       "executable": false
     },
     "tests/app/transfers.test.mjs": {

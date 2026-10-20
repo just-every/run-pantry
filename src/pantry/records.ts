@@ -98,7 +98,7 @@ async function recordData(db: D1Database, kind: string, id: string) {
       : ref(a.source_kind === 'credit' ? 'invoice' : 'payment', a.source_id, `${(a.amount_cents / 100).toFixed(2)} applied ${a.allocation_date}${a.reversal_id ? ' (payment reversed)' : ''}`))
     if (i.credit_for) links.unshift(ref('invoice', i.credit_for, 'Invoice this credit is for'))
     const payments = applied.filter(a => a.source_kind === 'payment').map(a => a.source_id)
-    return { kind, id, title: labels.label('invoice', id), date: i.issue_date, status: i.status, total: i.total_cents, open: i.open_cents,
+    return { kind, id, sourceKind: i.kind, title: labels.label('invoice', id), date: i.issue_date, status: i.status, total: i.total_cents, open: i.open_cents,
       lines: i.lines.map((l: Data) => ({ description: l.description, amount: l.amount_cents, tax: l.tax_cents, taxCode: l.tax_code === 'exempt' ? 'Exempt' : taxNames.get(l.tax_code) ?? '' })),
       entries: [await entryView(db, i.journal_id)].filter(Boolean), links,
       documents: docs.forRecords([{ kind: 'invoice', id }, ...(i.journal_id ? [{ kind: 'entry' as const, id: i.journal_id }] : []), ...payments.map(p => ({ kind: 'payment' as const, id: p }))]),
