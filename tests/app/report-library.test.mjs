@@ -22,7 +22,7 @@ test('REPORT-004 run the everyday library, filter journal, open records and down
   await matchSeptember(h,s,st); await closeReady(h,s,st)
   await command('bill.save',{vendorId:s.c['Brightline Software'].id,reference:'BL-SEPT-UNPAID',billDate:'2026-09-28',post:true,lines:[{description:'Additional seats',accountId:s.acct['6200'],amount:'125.00'}]})
   await command('contractor.save',{contactId:s.c['Harbor Office Rentals'].id,is1099:true})
-  await command('payment.method',{id:s.paid.harbor.id,method:'check'})
+  await command('payment.set-method',{id:s.paid.harbor.id,method:'check'})
   const storageState=await owner.storageState(), money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n/100)
   const today=new Date().toISOString().slice(0,10)
   for(const width of [1440,390]){
@@ -48,6 +48,7 @@ test('REPORT-004 run the everyday library, filter journal, open records and down
         assert.equal(response.status(),200);assert.equal(response.headers()['x-pantry-basis'],r.basisLabel)
         if(format==='csv')assert.ok((await response.text()).includes(r.columns[0]));else assert.equal((await response.body()).subarray(0,5).toString(),'%PDF-')
       }
+      if(kind==='open-invoices'){ const [download]=await Promise.all([page.waitForEvent('download'),csv.click()]); assert.equal(await download.failure(),null) }
       if(kind==='reconciliations'){
         await table.getByText('Details',{exact:true}).first().click();await table.getByText(/"completedBy": "owner@example.test"/).first().waitFor()
       }
@@ -63,7 +64,7 @@ test('REPORT-004 run the everyday library, filter journal, open records and down
     assert.equal(new URL(await csv.getAttribute('href'),app.origin).searchParams.get('account'),s.acct['6200'])
     await page.screenshot({path:`/tmp/pantry-r14-journal-filter-${width}.png`,fullPage:true})
     await filtered.getByRole('link',{name:'View record',exact:true}).last().click()
-    await page.getByRole('heading',{name:/Journal entry/}).waitFor()
+    await page.getByRole('heading',{name:/Journal entry/}).first().waitFor()
     assert.equal(new URL(page.url()).searchParams.get('payee'),s.c['Brightline Software'].id)
     await page.screenshot({path:`/tmp/pantry-r14-record-${width}.png`,fullPage:true})
     await page.goBack();await page.getByRole('radio',{name:'Cash',exact:true}).click()
