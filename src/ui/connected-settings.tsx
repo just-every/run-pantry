@@ -28,7 +28,7 @@ function PayoutSettings({ v, onDone }: { v: D; onDone: () => Promise<void> }) {
   return <Form label={s.bank ? 'Save payout settings' : 'Book Stripe payouts'} submit={b => command('stripe.payouts', b)} onDone={onDone} className="grid-form">
     <Field label="Payouts land in" name="bankAccountId" required defaultValue={s.bank?.id ?? (banks.length === 1 ? banks[0].value : '')} options={banks} hint="The bank account Stripe pays out to" />
     <Field label="Sales go to" name="salesAccountId" required defaultValue={s.sales?.id ?? income[0]?.value} options={income} hint="For charges Pantry did not invoice; invoice payments are already in the books" />
-    <Field label="Book payouts arriving from" name="from" type="date" required defaultValue={s.from ?? today().slice(0, 8) + '01'} />
+    <Field label="Activity start date" name="from" type="date" required defaultValue={s.from ?? today().slice(0, 8) + '01'} hint="Earlier unowned activity stays in historical review; no opening adjustment is invented." />
   </Form>
 }
 
@@ -40,7 +40,7 @@ function Payouts({ v, onDone }: { v: D; onDone: () => Promise<void> }) {
     {s.bank ? <dl className="facts">
       <div><dt>Lands in</dt><dd>{s.bank.name} (…{s.bank.number_last4})</dd></div>
       <div><dt>Posted to</dt><dd>{s.sales.code} {s.sales.name} · {s.fees.code} {s.fees.name} · {s.refunds.code} {s.refunds.name}</dd></div>
-      <div><dt>From</dt><dd>Payouts arriving on or after {day(s.from)}</dd></div>
+      <div><dt>From</dt><dd>Activity starts {day(s.from)}; earlier unowned items need historical review</dd></div>
       <div><dt>Last read</dt><dd>{ago(s.syncedAt)}{s.error ? ` · ${s.error}` : ''}</dd></div>
     </dl> : !owner && <p className="hint">The owner chooses where payouts land.</p>}
     {v.currency !== 'usd' && <div className="callout callout-warn" role="status"><strong>This Stripe account pays out in {String(v.currency).toUpperCase()}</strong><span>Pantry keeps US-dollar books, so it shows these payouts split but books only payouts in US dollars.</span></div>}

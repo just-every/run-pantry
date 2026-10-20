@@ -1,15 +1,19 @@
-Connect the Stripe account customers pay you through and the Gusto company you run payroll in, and Pantry books what they move by itself: each Stripe payout split into sales, fees and refunds, and each Gusto payroll as one balanced entry. Both are matched to the bank line that shows the money when it arrives.
+Connect the Stripe account customers pay you through and the Gusto company you run payroll in, and Pantry books what they move by itself: Stripe charges, fees and refunds posted through clearing at their event dates, and each Gusto payroll as one balanced entry. Both are matched to the bank line that shows the money when it arrives.
 
 ## Stripe payouts
 
 Stripe pays out the money it collected less its fees and any refunds. Pantry books the whole of it, not just the deposit.
 
 1. Connect Stripe under **People & settings → Online payments (Stripe)** by pasting your Stripe secret key (the same connection invoices use for card and ACH payment).
-2. Under **Stripe payouts**, choose the bank account Stripe pays out to, the income account for sales, and the first arrival date to book. Choose **Book Stripe payouts**.
+2. Under **Stripe payouts**, choose the bank account Stripe pays out to, the income account for sales, and the activity start date. Choose **Book Stripe payouts**.
 
-Pantry reads each paid payout with the charges, refunds and fees inside it and posts one entry on its arrival date: the deposit to your bank account, Stripe's fees to **Stripe fees**, refunds and lost disputes to **Refunds and disputes**, and gross sales to the income account you chose. A charge that paid one of your invoices from its link is already in the books, so its money comes out of **Stripe balance** instead of being booked as a second sale. When the deposit's bank line arrives, from a feed or a statement file, Pantry matches it, marked **Matched automatically** with an undo.
+Pantry reads Stripe’s balance transactions independently of paid payouts. Each USD charge, refund, dispute or fee posts at its provider creation date (UTC), with its own provider ID. Invoice-link payments use their existing receipt and fee entries, so the charge is never also booked as sales. A payout moves money from **Stripe balance** to the receiving bank on its provider event date; the expected arrival date is used to match its bank deposit. The payout view retains its gross sales, fees and refund totals.
 
-Payouts are read again every few hours and when you choose **Read payouts now**; a payout is booked once however often it is read. Pantry leaves a payout for you, with the reason, when Stripe does not itemize it (a manual payout) or it holds something Pantry does not book by itself. Pantry keeps US-dollar books, so a Stripe account that pays out in another currency shows its payouts split but books none.
+**Stripe clearing** on the dashboard, settings and close compares the current posted clearing ledger with Stripe’s reported USD available plus pending balance and names every missing, changed, unsupported, reversed or held provider item. The observation time is shown. An incomplete provider inventory cannot establish a tie. Re-reading is idempotent, and repairing a missing event clears its exception only when the actual ledger agrees; Pantry creates no unexplained balancing adjustment.
+
+Prior payout entries stay immutable and their constituent provider IDs are associated with those entries before new recognition. Native invoice receipts are adopted once. The configured activity start date keeps otherwise-unowned earlier activity in a named historical review queue; use the accountant’s existing correction/opening-entry process to resolve a historical difference. Locked event dates remain held until an approved reopening permits their posting.
+
+Payouts are read every few hours and when you choose **Read payouts now**. Manual, unsupported and non-USD movements remain named items for review. Pantry keeps USD books.
 
 ## Gusto payroll
 
