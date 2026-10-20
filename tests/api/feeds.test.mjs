@@ -622,4 +622,18 @@ test('BANK-005 reconciliation from feeds and statements', async t => {
   r = await h.command('reconciliation.complete', { statementId: pdfSt.id })
   assert.equal(r.completed.closing_cents, 10000); assert.equal(r.difference, 0); assert.deepEqual(r.blockers, [])
   assert.deepEqual((await h.view(`reconciliation/${st.id}`)).completed.proof, JSON.stringify(proof))
+  // Provider card debt is positive, while the statement/ledger balance is signed negative.
+  const cardLedger = await h.command('account.save', { code: '2195', name: 'Statement card', type: 'liability', subtype: 'bank' })
+  const cardBank = await h.command('bank-account.save', { name: 'Business card', institution: 'First Platypus Bank', accountId: cardLedger.id, numberLast4: '3333', openingDate: '2026-11-30', openingBalance: '0' })
+  provider.state.transactions.push({ transaction_id: 'statement-card-charge', account_id: provider.cardId, date: '2026-12-05', name: 'December software', amount: 50, pending: false })
+  const cardFeed = at(connected.accounts, a => a.mask === '3333')
+  await h.command('feed.map', { itemId: connected.id, accounts: [{ id: cardFeed.id, bankAccountId: cardBank.id }] })
+  const cardSt = (await h.command('statement.from-feed', { feedAccountId: cardFeed.id, start: '2026-12-01', end: '2026-12-31', opening: '0', closing: '-50' })).statement
+  const cardLine = (await h.view(`reconciliation/${cardSt.id}`)).lines[0]
+  await h.command('match.approve', { bankLineIds: [cardLine.id], create: [{ type: 'fee', amount: '50', accountId: acct['6200'] }] })
+  provider.state.cardBalance = 40; await h.command('feed.sync', { itemId: connected.id })
+  await h.command('reconciliation.complete', { statementId: cardSt.id }, h.owner, 409)
+  provider.state.cardBalance = 50; await h.command('feed.sync', { itemId: connected.id })
+  const cardProof = await h.command('reconciliation.complete', { statementId: cardSt.id })
+  assert.equal(cardProof.completed.closing_cents, -5000); assert.equal(cardProof.difference, 0)
 })
