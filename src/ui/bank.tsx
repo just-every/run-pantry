@@ -1,3 +1,4 @@
+import { FeedStatement } from './feed-statement'
 // Bank: transactions from feeds and statement files, the rules that file them,
 // and accounts, statement imports (CSV or OFX) and the statements waiting to reconcile.
 import { useRef, useState } from 'react'
@@ -51,7 +52,7 @@ function NewBankAccount({ onDone }: { onDone: () => Promise<void> }) {
 
 const TABS = ['Transactions', 'Rules', 'Statements', 'Checks', 'Accountant review'] as const
 
-function Statements({ data, refresh, open }: { data: D; refresh: () => Promise<void>; open: (id: string) => void }) {
+function Statements({ data, connections, refresh, open }: { connections: D[]; data: D; refresh: () => Promise<void>; open: (id: string) => void }) {
   const shared = useShared()
   return <div className="split split-wide-left split-bank">
     <div className="stack">
@@ -63,7 +64,7 @@ function Statements({ data, refresh, open }: { data: D; refresh: () => Promise<v
           <td>{s.reconciliation_id ? <Chip tone="good">Reconciled</Chip> : <Chip tone="warn">To reconcile</Chip>}</td><td><button type="button" className="btn btn-secondary" onClick={() => open(s.id)}>{s.reconciliation_id ? 'View' : 'Reconcile'}</button></td></tr>)}
       </Table></Card>
     </div>
-    {shared.state.actor.can.record && <div className="stack" id="import"><Import accounts={data.accounts} onDone={refresh} /><NewBankAccount onDone={refresh} /></div>}
+    {shared.state.actor.can.record && <div className="stack" id="import"><FeedStatement connections={connections} onDone={refresh} /><Import accounts={data.accounts} onDone={refresh} /><NewBankAccount onDone={refresh} /></div>}
   </div>
 }
 
@@ -92,6 +93,6 @@ export function Bank() {
     {tab === 'Accountant review' && ['owner', 'accountant'].includes(shared.state.actor.role) && <ReconciliationReview data={data} open={reconcile} />}
     {tab === 'Rules' && <Rules data={rules.data} draft={draft} setDraft={setDraft} onDone={refresh} />}
     {tab === 'Checks' && <Checks />}
-    {tab === 'Statements' && <Statements data={data} refresh={refresh} open={reconcile} />}
+    {tab === 'Statements' && <Statements data={data} connections={feeds.data?.connections ?? []} refresh={refresh} open={reconcile} />}
   </>
 }

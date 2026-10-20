@@ -126,7 +126,7 @@ test('CHECK-001 write expense and bill checks, align and print both stocks, expo
   assert.ok((await h.view('activity')).audit.some(a => a.action === 'check.void' && a.subject_id === voided.id))
 })
 
-test('PAN-07 CSV and OFX statements import against the right bank account, and repeats create no duplicates', async t => {
+test('BANK-005 / PAN-07 CSV and OFX statements import against the right bank account, and repeats create no duplicates', async t => {
   const h = await harness(); t.after(() => h.close())
   const s = await september(h)
   const csv = await fixture('bank/operating-checking-2026-09.csv'), ofx = await fixture('bank/savings-2026-09.ofx')
@@ -189,7 +189,7 @@ test('PAN-08 statement lines match to the books through splits, fees, transfers 
   assert.equal(at(tb.rows, x => x.code === '1010').net, 200125)
 })
 
-test('PAN-09 a statement reconciles only when its balances are proven, and every difference is explained first', async t => {
+test('BANK-005 / PAN-09 a statement reconciles only when its balances are proven, and every difference is explained first', async t => {
   const h = await harness(); t.after(() => h.close())
   const s = await september(h)
   // A statement whose stated closing does not follow from its lines is blocked.

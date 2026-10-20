@@ -28,3 +28,11 @@ If you typed a balance from the statement wrongly, correct it with a reason befo
 ## When your agent proposes a match
 
 Lines your agent has matched show **Proposed by agent**. Review the proposal under the tables and choose **Approve match** or **Reject**. Approving re-checks every line and posting it used. See [Agent work](/docs/agent-work).
+
+## Reconcile a connected account
+
+Under **Bank → Statements → Reconcile existing feed lines**, choose the connected account and enter the dates and balances printed on the bank statement. Existing categories and matches stay in place; no transactions are invented or uploaded again. The typed-only evidence is clearly labelled as a local record of your entries.
+
+Where the institution supports Plaid Statements, enter the period dates and choose **Enable statement PDFs through Plaid** to authorize Statements on the existing connection (your Plaid agreement's fees apply). Then choose **Find Plaid statement PDFs** for statements already extracted, select the month, and enter the dates and balances from that PDF. Plaid returns PDF bytes rather than parsed balances. Pantry stores the original PDF with its SHA-256 and links it from the reconciliation's **Statement evidence** card. A failed download or checksum mismatch creates no statement.
+
+The bank's current balance shows its provider as-of time and Pantry's observation time. An undated balance is labelled as such. Only a provider-stated date equal to statement end can block completion when its balance disagrees (card debt is negative in the proof). Earlier or later balances are context, never substitutes for the printed balance. All ordinary proof rules and locked-period protections still apply.

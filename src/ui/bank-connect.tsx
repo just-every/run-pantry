@@ -75,6 +75,10 @@ export function Connect() {
   const start = async (resume?: { token: string; purpose: string }) => {
     setBusy(true); setError('')
     try {
+      if (resume?.purpose.startsWith('statements:')) {
+        if (await openLink(resume.token, resume.purpose, true)) window.location.assign('/app/bank?tab=statements')
+        return
+      }
       if (resume?.purpose.startsWith('relink:')) {
         if (await openLink(resume.token, resume.purpose, true)) setResult(await command('feed.relinked', { itemId: resume.purpose.slice(7) }))
         return

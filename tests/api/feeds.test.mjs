@@ -67,7 +67,7 @@ test('Bank and card feeds: connect once, choose accounts, and transactions arriv
   plaid.state.updatesArrived = true
   const hook = await plaid.webhook({ webhook_type: 'TRANSACTIONS', webhook_code: 'SYNC_UPDATES_AVAILABLE', initial_update_complete: true, historical_update_complete: true })
   assert.equal((await h.send('/api/pantry/feeds/plaid/webhook', JSON.parse(hook.body), { headers: { 'plaid-verification': hook.jwt } })).status, 200)
-  ;({ lines, pending } = await until(async () => { const v = await h.view('bank/lines'); return v.pending.length === 0 && v }, 'the webhook sync'))
+  ;({ lines, pending } = await until(async () => { const v = await h.view('bank/lines'), feed = (await h.view('bank/feeds')).connections[0]; return v.pending.length === 0 && feed.lastSync?.trigger === 'webhook' && feed.lastSync.finished_at && v }, 'the completed webhook sync'))
   assert.equal(line('UBER', '2026-10-07').amount_cents, -1875)
   assert.ok(!lines.some(l => l.description === 'MONTHLY SERVICE FEE'), 'a transaction the bank removed leaves')
   assert.ok(line('UNITED AIRLINES 0162345678', '2026-10-05'))
@@ -564,4 +564,62 @@ test('RULE-004 connected transfers and card payments pair once; missing halves w
   const removed = await line(recent.transaction_id)
   await deliver({ removed: [{ transaction_id: recent.transaction_id }] })
   assert.ok(!(await h.view('bank/lines')).lines.some(l => l.id === removed.id))
+})
+
+test('BANK-005 reconciliation from feeds and statements', async t => {
+  const { statementProvider } = await import('./statement-provider.mjs')
+  const { createHash } = await import('node:crypto')
+  const provider = await statementProvider(), h = await harness({ bindings: provider.bindings, outbound: provider.outbound }); t.after(() => h.close())
+  const { acct } = await books(h)
+  const bank = await h.command('bank-account.save', { name: 'Operating checking', institution: 'First Platypus Bank', accountId: acct['1000'], numberLast4: '0000', openingDate: '2026-09-30', openingBalance: '0' })
+  const connected = await h.command('feed.connect', { publicToken: 'synthetic-statements-token' }), feed = at(connected.accounts, a => a.mask === '0000')
+  await h.command('feed.map', { itemId: connected.id, accounts: [{ id: feed.id, bankAccountId: bank.id }] })
+  const reader = await h.member('statement-reader@example.test', 'viewer')
+  const typed = { feedAccountId: feed.id, start: '2026-10-01', end: '2026-10-31', opening: '0', closing: '80' }
+  await h.command('statement.from-feed', typed, reader, 403)
+  await h.command('statement.from-feed', typed, '', 401)
+  const st = (await h.command('statement.from-feed', typed)).statement
+  let r = await h.view(`reconciliation/${st.id}`)
+  assert.equal(r.lines.length, 2); assert.ok(r.blockers.some(b => b.kind === 'unmatched'))
+  assert.equal(r.feedBalances[0].balance_as_of, provider.state.asOf)
+  assert.ok(Date.parse(r.feedBalances[0].balance_observed_at)); assert.ok(!r.blockers.some(b => b.kind.startsWith('feed-balance')))
+  await h.command('reconciliation.complete', { statementId: st.id }, h.owner, 409)
+  for (const l of r.lines) await h.command('match.approve', { bankLineIds: [l.id], create: [{ type: l.amount_cents > 0 ? 'income' : 'fee', amount: (Math.abs(l.amount_cents) / 100).toFixed(2), accountId: acct[l.amount_cents > 0 ? '4000' : '6200'] }] })
+  // A book item not on the statement remains outstanding, under unchanged PAN-09 proof rules.
+  const outstanding = await h.command('journal.save-draft', { date: '2026-10-20', memo: 'Deposit in transit', lines: [{ accountId: acct['1000'], debit: '15' }, { accountId: acct['4000'], credit: '15' }] })
+  await h.command('journal.post', { id: outstanding.id, revision: outstanding.revision })
+  r = await h.command('reconciliation.complete', { statementId: st.id })
+  assert.deepEqual([r.opening, r.closing, r.book, r.outstandingTotal, r.cleared, r.difference], [0, 8000, 9500, 1500, 8000, 0])
+  const proof = JSON.parse(r.completed.proof); assert.equal(proof.lines.length, 2); assert.ok(proof.lines.every(l => l.match))
+  await h.command('statement.from-feed', typed, h.owner, 409)
+
+  await h.command('feed.statement-link', { feedAccountId: feed.id, start: '2026-11-01', end: '2026-11-30' })
+  assert.deepEqual(provider.state.statementLink.products, ['statements']); assert.equal(provider.state.statementLink.statements.start_date, '2026-11-01')
+  const available = await h.command('feed.statements', { feedAccountId: feed.id })
+  assert.ok(available.statements.some(s => s.statement_id === 'statement-november'))
+  const pdfInput = { feedAccountId: feed.id, start: '2026-11-01', end: '2026-11-30', opening: '80', closing: '100', providerStatementId: 'statement-november' }
+  await h.command('statement.from-feed', { ...pdfInput, providerStatementId: 'another-account-statement' }, h.owner, 409)
+  provider.state.badHash = true
+  await h.command('statement.from-feed', pdfInput, h.owner, 502)
+  assert.equal((await h.view('bank')).statements.length, 1)
+  provider.state.badHash = false
+  const pdfSt = (await h.command('statement.from-feed', pdfInput)).statement
+  assert.equal(pdfSt.source_kind, 'plaid'); assert.equal(pdfSt.source_sha256, createHash('sha256').update(provider.pdf).digest('hex'))
+  const doc = await h.view('documents')
+  assert.ok(doc.documents.some(d => d.id === pdfSt.document_id && d.linked_kind === 'statement' && d.linked_id === pdfSt.id && d.sha256 === pdfSt.source_sha256))
+  const downloaded = await h.send(`/api/pantry/documents/${pdfSt.document_id}`, undefined, { cookie: h.owner })
+  assert.equal(downloaded.status, 200); assert.equal(downloaded.value, provider.pdf.toString())
+  r = await h.view(`reconciliation/${pdfSt.id}`)
+  for (const l of r.lines) await h.command('match.approve', { bankLineIds: [l.id], create: [{ type: 'income', amount: '20', accountId: acct['4000'] }] })
+  assert.ok(r.blockers.some(b => b.kind.startsWith('feed-balance')))
+  await h.command('reconciliation.complete', { statementId: pdfSt.id }, h.owner, 409)
+  provider.state.asOf = null
+  await h.command('feed.sync', { itemId: connected.id })
+  assert.ok(!(await h.view(`reconciliation/${pdfSt.id}`)).blockers.some(b => b.kind.startsWith('feed-balance')))
+  provider.state.asOf = '2026-11-30T23:00:00Z'
+  provider.state.balance = 100
+  await h.command('feed.sync', { itemId: connected.id })
+  r = await h.command('reconciliation.complete', { statementId: pdfSt.id })
+  assert.equal(r.completed.closing_cents, 10000); assert.equal(r.difference, 0); assert.deepEqual(r.blockers, [])
+  assert.deepEqual((await h.view(`reconciliation/${st.id}`)).completed.proof, JSON.stringify(proof))
 })

@@ -2,7 +2,7 @@
 // API (https://plaid.com/docs/api/) and nothing else. On RER Managed there is
 // no egress for seed integrations yet, so every call is refused with one line.
 import type { Bindings } from '../../auth.server'
-import { Fault } from '../core'
+import { Fault, requireThat, sha256 } from '../core'
 
 const HOSTS: Record<string, string> = { sandbox: 'https://sandbox.plaid.com', production: 'https://production.plaid.com' }
 
@@ -39,12 +39,14 @@ export function availability(env: Bindings): Availability {
   return { available: true, environment }
 }
 
-export type PlaidAccount = { account_id: string; name: string; official_name?: string | null; mask?: string | null; type: string; subtype?: string | null; balances?: { current?: number | null; available?: number | null } }
+export type PlaidAccount = { account_id: string; name: string; official_name?: string | null; mask?: string | null; type: string; subtype?: string | null; balances?: { current?: number | null; available?: number | null; last_updated_datetime?: string | null } }
 export type PlaidTransaction = {
   transaction_id: string; account_id: string; amount: number; date: string; authorized_date?: string | null
   name: string; merchant_name?: string | null; original_description?: string | null; pending: boolean; pending_transaction_id?: string | null
   check_number?: string | null; iso_currency_code?: string | null
 }
+export type PlaidStatement = { statement_id: string; month: number; year: number; date_posted?: string | null }
+export type StatementList = { accounts: { account_id: string; statements: PlaidStatement[] }[] }
 export type SyncPage = { added: PlaidTransaction[]; modified: PlaidTransaction[]; removed: { transaction_id: string; account_id?: string }[]; next_cursor: string; has_more: boolean; accounts?: PlaidAccount[] }
 
 export function plaid(env: Bindings) {
@@ -60,14 +62,27 @@ export function plaid(env: Bindings) {
   return {
     environment: a.environment,
     /** A Link token for a new connection, or with `accessToken` for re-linking (update mode). */
-    linkToken: (o: { userId: string; webhook?: string; accessToken?: string; redirectUri?: string }) => call<{ link_token: string; expiration: string }>('/link/token/create', {
+    linkToken: (o: { userId: string; webhook?: string; accessToken?: string; redirectUri?: string; statements?: { start_date: string; end_date: string } }) => call<{ link_token: string; expiration: string }>('/link/token/create', {
       client_name: 'Pantry', language: 'en', country_codes: ['US'], user: { client_user_id: o.userId },
-      ...(o.accessToken ? { access_token: o.accessToken } : { products: ['transactions'], transactions: { days_requested: 730 } }),
+      ...(o.accessToken ? { access_token: o.accessToken, ...(o.statements ? { products: ['statements'], statements: o.statements } : {}) } : { products: ['transactions'], transactions: { days_requested: 730 } }),
       ...(o.webhook ? { webhook: o.webhook } : {}), ...(o.redirectUri ? { redirect_uri: o.redirectUri } : {}),
     }),
     exchange: (publicToken: string) => call<{ access_token: string; item_id: string }>('/item/public_token/exchange', { public_token: publicToken }),
     accounts: (accessToken: string) => call<{ accounts: PlaidAccount[]; item: { item_id: string; institution_id?: string | null; consent_expiration_time?: string | null } }>('/accounts/get', { access_token: accessToken }),
     sync: (accessToken: string, cursor: string) => call<SyncPage>('/transactions/sync', { access_token: accessToken, count: 500, ...(cursor ? { cursor } : {}) }),
+    statements: (accessToken: string) => call<StatementList>('/statements/list', { access_token: accessToken }),
+    async statementPdf(accessToken: string, statementId: string) {
+      const response = await fetch(host + '/statements/download', { method: 'POST', headers: { 'content-type': 'application/json', 'plaid-version': '2020-09-14' }, body: JSON.stringify({ client_id: env.PLAID_CLIENT_ID, secret: env.PLAID_SECRET, access_token: accessToken, statement_id: statementId }) })
+      if (!response.ok) {
+        const error: any = await response.json().catch(() => ({}))
+        throw new PlaidError(error.error_code ?? `HTTP_${response.status}`, error.error_type ?? 'API_ERROR', error.error_message ?? 'Statement download failed', response.status, error.display_message ?? '')
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer())
+      requireThat(new TextDecoder().decode(bytes.slice(0, 5)) === '%PDF-', 'Plaid did not return a PDF', 502)
+      const hash = response.headers.get('Plaid-Content-Hash')
+      requireThat(!hash || hash.toLowerCase() === await sha256(bytes), 'Plaid statement checksum does not match', 502)
+      return bytes
+    },
     verificationKey: (keyId: string) => call<{ key: JsonWebKey & { kid: string; expired_at: number | null } }>('/webhook_verification_key/get', { key_id: keyId }),
     remove: (accessToken: string) => call<{ request_id: string }>('/item/remove', { access_token: accessToken }),
   }

@@ -33,7 +33,7 @@ function Connection({ c, notice, onDone }: { c: D; notice?: D; onDone: () => Pro
     <div className="feed-head"><strong>{c.institution_name}</strong>{notice ? <Chip tone="warn">{notice.kind === 'expiring' ? 'Consent expiring' : notice.requiresRelink ? 'Needs re-link' : 'Needs attention'}</Chip> : <Chip tone="good">Live</Chip>}</div>
     <ul className="feed-accounts">{c.accounts.map((a: D) => <li key={a.id}>
       <span>{a.name} <small className="sub">••{a.mask}</small></span>
-      {a.bank_account_id ? <small>→ {a.bank_name} · {a.last_synced_at ? <>synced {ago(a.last_synced_at)}</> : 'not synced yet'}{a.pending ? ` · ${a.pending} pending` : ''}{a.balance_cents !== null ? ` · bank shows ${usd(a.balance_cents)}${a.kind.startsWith('credit') ? ' owed' : ''}` : ''}</small> : <small className="sub">Not brought in</small>}
+      {a.bank_account_id ? <small>→ {a.bank_name} · {a.last_synced_at ? <>synced {ago(a.last_synced_at)}</> : 'not synced yet'}{a.pending ? ` · ${a.pending} pending` : ''}{a.balance_cents !== null ? ` · bank shows ${usd(a.balance_cents)}${a.kind.startsWith('credit') ? ' owed' : ''} · ${a.balance_as_of ? `as of ${a.balance_as_of}` : `observed ${a.balance_observed_at ?? a.last_synced_at ?? 'at an unknown time'} (bank gave no as-of time)`}` : ''}</small> : <small className="sub">Not brought in</small>}
       {a.bank_account_id && can && <HistoryChoice account={a} onDone={onDone} />}
     </li>)}</ul>
     {c.status === 'active' && brought.length > 0 && <p className="hint">Next sync: {new Date(c.sync_due_at).getTime() <= Date.now() ? 'due now' : new Date(c.sync_due_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</p>}

@@ -12,6 +12,7 @@ import { syncItem } from './sync'
 import { open, seal } from './vault'
 import { checkFeedHealth, feedHealth } from './health'
 import { transactionExceptions } from './transaction-exceptions'
+import { statementCommands } from './statements'
 import { duplicateDecision, feedAccountIdle, historyChoice, historyOptions, historyView } from './history'
 
 const webhookUrl = (c: Context) => {
@@ -56,8 +57,8 @@ const connect: Command = { need: 'record', async run(c, b) {
   await run(c.db, [authority(c.actor, 'record'),
     q("INSERT INTO pt_feed_items (id, provider, item_id, institution_id, institution_name, access_token, status, sync_due_at, connected_by, connected_at, revision, consent_expires_at) VALUES (?, 'plaid', ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)",
       id, exchanged.item_id, String(institution.institution_id ?? found.item.institution_id ?? '').slice(0, 60), name, sealed, '9999-12-31T00:00:00Z', c.actor.email, now(), uid(), found.item.consent_expiration_time ?? null),
-    ...found.accounts.map(a => q('INSERT INTO pt_feed_accounts (id, item_id, provider_account_id, name, mask, kind, balance_cents, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      uid(), id, a.account_id, (a.name || a.official_name || 'Account').slice(0, 120), a.mask ?? '', [a.type, a.subtype].filter(Boolean).join(' '), typeof a.balances?.current === 'number' ? Math.round(a.balances.current * 100) : null, uid())),
+    ...found.accounts.map(a => q('INSERT INTO pt_feed_accounts (id, item_id, provider_account_id, name, mask, kind, balance_cents, balance_as_of, balance_observed_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      uid(), id, a.account_id, (a.name || a.official_name || 'Account').slice(0, 120), a.mask ?? '', [a.type, a.subtype].filter(Boolean).join(' '), typeof a.balances?.current === 'number' ? Math.round(a.balances.current * 100) : null, a.balances?.last_updated_datetime ?? null, now(), uid())),
     audit(who(c.actor), 'feed.connect', 'feed', id, { institution: name, accounts: found.accounts.length })])
   return connectionView(c.db, id)
 } }
@@ -143,6 +144,7 @@ const setupHistory: Command = { need: 'record', async run(c, b) {
 } }
 
 export const feedCommands: Record<string, Command> = {
+  ...statementCommands,
   'feed.link-token': linkToken,
   'feed.connect': connect,
   'feed.map': mapAccounts,
@@ -155,7 +157,7 @@ export const feedCommands: Record<string, Command> = {
 
 async function connectionView(db: D1Database, id: string) {
   const row = (await one(db, 'SELECT id, institution_name, status, error_code, error_message, last_sync_at, sync_due_at, last_sync_error, consent_expires_at, connected_by, connected_at, revision FROM pt_feed_items WHERE id = ?', id))!
-  const accounts = await all(db, `SELECT f.id, f.name, f.mask, f.kind, f.bank_account_id, f.balance_cents, f.last_synced_at, f.revision, f.history_mode, f.history_start, f.available_from, b.name AS bank_name,
+  const accounts = await all(db, `SELECT f.id, f.name, f.mask, f.kind, f.bank_account_id, f.balance_cents, f.balance_as_of, f.balance_observed_at, f.last_synced_at, f.revision, f.history_mode, f.history_start, f.available_from, b.name AS bank_name,
       (SELECT COUNT(*) FROM pt_feed_pending p WHERE p.feed_account_id = f.id) AS pending
     FROM pt_feed_accounts f LEFT JOIN pt_bank_accounts b ON b.id = f.bank_account_id WHERE f.item_id = ? ORDER BY f.name`, id)
   const last = await one(db, 'SELECT * FROM pt_feed_syncs WHERE item_id = ? ORDER BY started_at DESC LIMIT 1', id)

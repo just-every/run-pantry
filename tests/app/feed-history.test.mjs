@@ -68,3 +68,70 @@ test('BANK-002 history choices, reference-only observations and duplicate decisi
     assert.deepEqual(errors, []); await context.close()
   }
 })
+
+test('BANK-005 typed and Plaid PDF reconciliation preserve matched feed lines and show dated balance blockers at 1440 and 390', async t => {
+  const { statementProvider } = await import('../api/statement-provider.mjs')
+  const { mkdir } = await import('node:fs/promises')
+  const evidence = process.env.PANTRY_EVIDENCE_DIR || '/tmp/sx-pantry-r16'
+  await mkdir(evidence, { recursive: true })
+  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
+  for (const width of [1440, 390]) {
+    const provider = await statementProvider(), app = await providerWorker({ bindings: provider.bindings, outbound: provider.outbound })
+    const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 1000 } })
+    try {
+      await context.request.post(`${app.origin}/auth/bootstrap`, { headers: { origin: app.origin }, data: { token: TOKEN, displayName: 'Rosa Rivera' }, maxRedirects: 0 })
+      await context.request.post(`${app.origin}/setup`, { headers: { origin: app.origin }, form: { confirm: 'yes' }, maxRedirects: 0 })
+      const command = async (op, data) => { const r = await context.request.post(`${app.origin}/api/pantry/command/${op}`, { headers: { origin: app.origin }, data }); assert.equal(r.status(), 200, await r.text()); return r.json() }
+      const view = async path => (await context.request.get(`${app.origin}/api/pantry/${path}`)).json()
+      await command('entity.save', { legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2026-01-01' })
+      await command('chart.start', {})
+      const acct = Object.fromEntries((await view('state')).accounts.map(a => [a.code, a.id]))
+      const bank = await command('bank-account.save', { name: 'Operating checking', institution: 'First Platypus Bank', accountId: acct['1000'], numberLast4: '0000', openingDate: '2026-09-30', openingBalance: '0' })
+      const connected = await command('feed.connect', { publicToken: 'synthetic-browser-statements-token' }), feed = connected.accounts.find(a => a.mask === '0000')
+      await command('feed.map', { itemId: connected.id, accounts: [{ id: feed.id, bankAccountId: bank.id }] })
+      for (const l of (await view('bank/lines')).lines) await command('match.approve', { bankLineIds: [l.id], create: [{ type: l.amount_cents > 0 ? 'income' : 'fee', amount: (Math.abs(l.amount_cents) / 100).toFixed(2), accountId: acct[l.amount_cents > 0 ? '4000' : '6200'] }] })
+      const page = await context.newPage(), errors = []; page.on('pageerror', e => errors.push(String(e)))
+      const shot = async state => { assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true); await page.screenshot({ path: `${evidence}/bank005-${state}-${width}.png`, fullPage: true }) }
+      await page.goto(`${app.origin}/app/bank`)
+      await page.getByText(/bank shows \$120.00/).waitFor(); await shot('feed-context')
+      await page.goto(`${app.origin}/app/bank?tab=statements`)
+      const card = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Reconcile existing feed lines', exact: true }) })
+      await card.getByLabel('Connected account', { exact: true }).selectOption(feed.id)
+      const fill = async (start, end, opening, closing) => {
+        await card.getByLabel('Statement start', { exact: true }).fill(start)
+        await card.getByLabel('Statement end', { exact: true }).fill(end)
+        await card.getByLabel('Printed opening balance', { exact: true }).fill(opening)
+        await card.getByLabel('Printed closing balance', { exact: true }).fill(closing)
+      }
+      await fill('2026-10-01', '2026-10-31', '0', '80'); await shot('typed-form')
+      await card.getByRole('button', { name: 'Start reconciliation', exact: true }).click()
+      await page.getByRole('button', { name: 'Reconcile', exact: true }).click()
+      await page.getByRole('button', { name: 'Finish reconciliation', exact: true }).waitFor()
+      await page.getByText(/Context only; does not replace/).waitFor()
+      assert.equal(await page.getByRole('button', { name: 'Finish reconciliation', exact: true }).isEnabled(), true)
+      await page.getByRole('button', { name: 'Finish reconciliation', exact: true }).click()
+      await page.getByText('Reconciled', { exact: true }).waitFor(); await shot('typed-complete')
+      await page.getByRole('button', { name: '← Bank', exact: true }).click()
+      await card.getByLabel('Connected account', { exact: true }).selectOption(feed.id)
+      await fill('2026-11-01', '2026-11-30', '80', '100')
+      // Plaid Link is the provider's browser edge, while the app's command and return flow are real.
+      await page.route('https://cdn.plaid.com/link/v2/stable/link-initialize.js', route => route.fulfill({ contentType: 'application/javascript', body: 'window.Plaid = { create(o) { return { open() { o.onSuccess("synthetic-update-success", {}); }, destroy() {} }; } };' }))
+      await card.getByRole('button', { name: 'Enable statement PDFs through Plaid', exact: true }).click()
+      await card.getByLabel('Statement evidence', { exact: true }).selectOption('statement-november')
+      await fill('2026-11-01', '2026-11-30', '80', '100'); await shot('pdf-form')
+      await card.getByRole('button', { name: 'Start reconciliation', exact: true }).click()
+      await page.getByRole('button', { name: 'Reconcile', exact: true }).click()
+      await page.getByText(/Bank balance \$120.00 as of/).waitFor()
+      assert.equal(await page.getByRole('button', { name: 'Finish reconciliation', exact: true }).isDisabled(), true)
+      await shot('pdf-blocked')
+      const link = page.getByRole('link', { name: 'Open statement evidence', exact: true })
+      const pdf = await context.request.get(new URL(await link.getAttribute('href'), app.origin).href)
+      assert.equal(pdf.status(), 200); assert.deepEqual(await pdf.body(), provider.pdf)
+      provider.state.balance = 100; await command('feed.sync', { itemId: connected.id }); await page.reload()
+      await page.getByRole('button', { name: 'Finish reconciliation', exact: true }).click()
+      await page.getByText('Reconciled', { exact: true }).waitFor(); await shot('pdf-complete')
+      const final = await view('bank'); assert.equal(final.statements.length, 2); assert.ok(final.statements.every(s => s.reconciliation_id))
+      assert.deepEqual(errors, [])
+    } finally { await context.close(); await app.close() }
+  }
+})

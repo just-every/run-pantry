@@ -1,0 +1,21 @@
+{
+  "accounts": [
+    {
+      "account_id": "checking-statements",
+      "account_mask": "0000",
+      "account_name": "Operating checking",
+      "account_official_name": "Operating checking",
+      "account_type": "depository",
+      "account_subtype": "checking",
+      "statements": [
+        {
+          "statement_id": "statement-november",
+          "month": 11,
+          "year": 2026,
+          "date_posted": "2026-12-01"
+        }
+      ]
+    }
+  ],
+  "request_id": "fixture-statements"
+}

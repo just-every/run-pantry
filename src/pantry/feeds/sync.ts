@@ -101,7 +101,7 @@ export async function syncItem(env: Bindings, itemId: string, trigger: Trigger):
       for (const r of page.removed) { statements.push(removed(r.transaction_id, stamp)); counts.removed++ }
       for (const pa of page.accounts ?? []) {
         const a = accounts.get(pa.account_id), balance = pa.balances?.current
-        if (a && typeof balance === 'number') statements.push([q('UPDATE pt_feed_accounts SET balance_cents = ? WHERE id = ?', Math.round(balance * 100), a.id)])
+        if (a && typeof balance === 'number') statements.push([q('UPDATE pt_feed_accounts SET balance_cents = ?, balance_as_of = ?, balance_observed_at = ? WHERE id = ?', Math.round(balance * 100), pa.balances?.last_updated_datetime ?? null, stamp, a.id)])
       }
     }
     // Keep each observation, exception and line change in one atomic batch.

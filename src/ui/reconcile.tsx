@@ -126,6 +126,12 @@ export function Reconcile({ statementId, back }: { statementId: string; back: ()
             <p>{r.ready ? 'Every line is matched and the balances agree.' : 'You can finish when every difference is explained.'}</p></>}
       </div>
     </div>
+    <Card title="Statement evidence">
+      <p>{r.statement.source_kind === 'typed' ? 'Balances entered by a person from their statement. The attached record is a local record of those entries.' : r.statement.source_kind === 'plaid' ? 'Original statement PDF downloaded from Plaid. Balances entered by a person from the PDF.' : 'Imported statement file.'}</p>
+      <p><a href={`/api/pantry/documents/${r.statement.document_id}`} target="_blank" rel="noreferrer">Open statement evidence</a></p>
+      <Details facts={{ 'SHA-256': r.statement.source_sha256 }} />
+      {r.feedBalances.map((f: D) => <p key={f.id}>Bank reports {usd(f.balance_cents)}{f.kind.startsWith('credit') ? ' owed' : ''} · {f.balance_as_of ? `as of ${f.balance_as_of}` : `observed ${f.balance_observed_at ?? 'at an unknown time'}; bank gave no as-of time`}. {f.balance_as_of?.slice(0, 10) === r.statement.end_date ? 'Dated to statement end; must agree with the closing balance.' : 'Context only; does not replace the statement balance or block completion.'}</p>)}
+    </Card>
     <ReconciliationUndo info={r.undo} history={r.history} statementId={statementId} onDone={refresh} />
     {!finished && r.blockers.length > 0 && <div className="callout callout-warn" role="status"><Icon name="alert" /><div><strong>Before you can finish</strong><ul>{r.blockers.map((b: D) => <li key={b.kind}>{b.message}</li>)}</ul></div></div>}
     <div className="split even">

@@ -12,9 +12,15 @@ export async function reconciliationState(db: D1Database, statementId: string): 
   const statement = await one(db, 'SELECT * FROM pt_statements WHERE id = ?', statementId)
   requireThat(statement, 'Statement not found', 404)
   const bank = (await one(db, 'SELECT * FROM pt_bank_accounts WHERE id = ?', statement.bank_account_id))!
+  const feedBalances = await all(db, 'SELECT id, name, balance_cents, balance_as_of, balance_observed_at, kind FROM pt_feed_accounts WHERE bank_account_id = ? AND balance_cents IS NOT NULL', bank.id)
   const done = await one(db, 'SELECT * FROM pt_reconciliations WHERE statement_id = ?', statement.id)
   const previous = await one(db, 'SELECT * FROM pt_reconciliations WHERE bank_account_id = ? AND end_date < ? ORDER BY end_date DESC LIMIT 1', bank.id, statement.end_date)
   const blockers: { kind: string; message: string; amount?: number; ids?: string[] }[] = []
+
+  for (const f of feedBalances) {
+    const signed = f.kind.startsWith('credit') || f.kind === 'loan line of credit' ? -f.balance_cents : f.balance_cents
+    if (f.balance_as_of?.slice(0, 10) === statement.end_date && signed !== statement.closing_cents) blockers.push({ kind: `feed-balance-${f.id}`, amount: signed - statement.closing_cents, message: `Bank balance ${usd(signed)} as of ${f.balance_as_of} disagrees with the statement closing ${usd(statement.closing_cents)}` })
+  }
 
   const earlier = await one(db, 'SELECT s.end_date FROM pt_statements s LEFT JOIN pt_reconciliations r ON r.statement_id = s.id WHERE s.bank_account_id = ? AND s.end_date < ? AND s.end_date > ? AND r.id IS NULL ORDER BY s.end_date LIMIT 1', bank.id, statement.end_date, previous?.end_date ?? bank.opening_date)
   if (earlier) blockers.push({ kind: 'order', message: `Reconcile the statement ending ${earlier.end_date} first` })
@@ -47,7 +53,7 @@ export async function reconciliationState(db: D1Database, statementId: string): 
   const postings = await all(db, `SELECT l.id, l.debit_cents - l.credit_cents AS amount, e.entry_date, e.memo, e.number, mp.match_id FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id
     LEFT JOIN pt_match_postings mp ON mp.journal_line_id = l.id AND mp.active = 1
     WHERE e.status = 'posted' AND l.account_id = ? AND e.entry_date > ? AND e.entry_date <= ? AND e.reversed_by_id IS NULL ORDER BY e.entry_date, e.number, l.id`, bank.account_id, bank.opening_date, statement.end_date)
-  return { undo: await reconciliationUndoPreview(db, statementId), history: await reconciliationHistory(db, statementId), statement, bank, completed: done, opening: statement.opening_cents, closing: statement.closing_cents, book, outstanding, outstandingTotal, cleared, difference, lines, postings, blockers, ready: !done && blockers.length === 0 }
+  return { undo: await reconciliationUndoPreview(db, statementId), history: await reconciliationHistory(db, statementId), feedBalances, statement, bank, completed: done, opening: statement.opening_cents, closing: statement.closing_cents, book, outstanding, outstandingTotal, cleared, difference, lines, postings, blockers, ready: !done && blockers.length === 0 }
 }
 
 /** The batch that records a ready statement's reconciliation with its proof. */
@@ -63,6 +69,7 @@ export async function completion(db: D1Database, actor: Actor, statementId: stri
     guard("NOT EXISTS (SELECT 1 FROM pt_periods WHERE status = 'locked' AND start_date <= ? AND end_date >= ?)", state.statement.end_date, state.statement.start_date),
     guard(`(SELECT COUNT(*) FROM pt_match_bank_lines mb JOIN pt_bank_lines l ON l.id = mb.bank_line_id WHERE mb.active = 1 AND l.bank_account_id = ? AND l.posted_date BETWEEN ? AND ?) = ?`, state.bank.id, state.statement.start_date, state.statement.end_date, state.lines.length),
     guard("(SELECT COALESCE(SUM(l.debit_cents - l.credit_cents), 0) FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id WHERE e.status = 'posted' AND l.account_id = ? AND e.entry_date <= ?) = ?", state.bank.account_id, state.statement.end_date, state.book),
+    guard(`NOT EXISTS (SELECT 1 FROM pt_feed_accounts WHERE bank_account_id = ? AND substr(balance_as_of, 1, 10) = ? AND balance_cents IS NOT NULL AND (CASE WHEN kind LIKE 'credit%' OR kind = 'loan line of credit' THEN -balance_cents ELSE balance_cents END) <> ?)`, state.bank.id, state.statement.end_date, state.closing),
     q('INSERT INTO pt_reconciliations (id, bank_account_id, statement_id, end_date, opening_cents, closing_cents, book_cents, outstanding_cents, proof, completed_by, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       id, state.bank.id, state.statement.id, state.statement.end_date, state.opening, state.closing, state.book, state.outstandingTotal, JSON.stringify(proof), actor.email, now()),
     ...matchIds.map(m => q('UPDATE pt_matches SET reconciliation_id = ? WHERE id = ?', id, m)),
