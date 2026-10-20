@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "178894010964f82719e36a3be4f613c65eb3c5a816c8807f11559a3899513a2a",
+      "sha256": "735278950f24c4afbc2409bec56732d7421f59258feb8101b12601690a4bc5f4",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "ca37b332bbcd92681402e23b912c6947eb3ec744a6d4f94f94df223d9a2db57d",
+      "sha256": "46aab37ffe9c3805028cd5d034e644f52b0916671e5aeb9ec5be7e14b7c4a0d2",
       "executable": false
     },
     "DEMO.md": {
@@ -164,7 +164,7 @@
       "executable": false
     },
     "docs/reconcile.md": {
-      "sha256": "8ddb66768862b1143f18e91f995a906a411e3d75e3e6b361e04db943b30b117d",
+      "sha256": "ec86ce75bf74041e146454e7032c675973a1dd36178f21035daae15aea87004e",
       "executable": false
     },
     "docs/reports.md": {
@@ -229,6 +229,14 @@
     },
     "fixtures/plaid/link-token-create.json": {
       "sha256": "5a0871476549c55af98b208ec37567cc487e1eae1c12a33cbab85c2548166491",
+      "executable": false
+    },
+    "fixtures/plaid/statements-list.json": {
+      "sha256": "c2bd9c27a227f95d92565fbd5e45e5b22cb75e2c82ba8be3250ad15f1eeb92b5",
+      "executable": false
+    },
+    "fixtures/plaid/statements-november.pdf": {
+      "sha256": "afc8efea741179cfab6c9c6ca9cec60f5130822d919514506ea870266c5b0975",
       "executable": false
     },
     "fixtures/plaid/transactions-sync-1.json": {
@@ -589,6 +597,10 @@
     },
     "migrations/core/0061_invoice_documents.sql": {
       "sha256": "3ff83ef983db9ad589d25a3b36a8f52e84f7c752094def9417224e7d17a8c709",
+      "executable": false
+    },
+    "migrations/core/0062_feed_statement_evidence.sql": {
+      "sha256": "987c6e12f90c12c974650c88d0ebbc4733866570951067832e66799bb834031e",
       "executable": false
     },
     "migrations/rewrites.json": {
@@ -2996,7 +3008,7 @@
       "executable": false
     },
     "src/pantry/feeds/commands.ts": {
-      "sha256": "46756f4ada0279ecda9fef07e8eb6786fb7d170351c2386b4600688767957a6f",
+      "sha256": "cee365f36d2733669a1ff0317a1212dd8e31515d2e605cca2383b34a80c5261e",
       "executable": false
     },
     "src/pantry/feeds/health.ts": {
@@ -3016,11 +3028,15 @@
       "executable": false
     },
     "src/pantry/feeds/plaid.ts": {
-      "sha256": "9d5e888fe191ac9580f7323b8caf09b626ac2c26a80971cd5843b1442f4a0700",
+      "sha256": "e562d7fd87f7666abc1da94a23f1115726db6bc32613e32461d1ec4fcb5605ca",
+      "executable": false
+    },
+    "src/pantry/feeds/statements.ts": {
+      "sha256": "6c78c70ca9d9690c41e1301fb1392e21205595747ec9f9e16baf5338356ae60e",
       "executable": false
     },
     "src/pantry/feeds/sync.ts": {
-      "sha256": "8c26e05579e73cdc05311e5104703f3284214e874103097ad304e39e7e8ad4fc",
+      "sha256": "20b5afcccfe34a76f6d85eef9467c3825212a5aae1b090d3b2ac516c92198d2d",
       "executable": false
     },
     "src/pantry/feeds/transaction-exceptions.ts": {
@@ -3308,7 +3324,7 @@
       "executable": false
     },
     "src/pantry/reconcile.ts": {
-      "sha256": "5b3811ea2d8f68ce42e54ec6a67c0407d57d24211da26cf7f20a3f6560de7961",
+      "sha256": "c0f0ea12587941a4399b134a9d7e4f1db8809e71b50da2320e00fd76e9f7e89b",
       "executable": false
     },
     "src/pantry/reconciliation-undo.ts": {
@@ -3768,11 +3784,11 @@
       "executable": false
     },
     "src/ui/bank-connect.tsx": {
-      "sha256": "f2b360a46076a6720b87fa8504fb58f90a765d9fc9d4295e6a6d1a6312f4fd20",
+      "sha256": "f29d0472629ed9971fc27dc2114ba7c8caa912d44ff45d4f12cfbf52171785b4",
       "executable": false
     },
     "src/ui/bank-feeds.tsx": {
-      "sha256": "3fa0629589b5dba8c402bf98a63b92919060861e0f2470e171c95c090426695b",
+      "sha256": "b79f6ced9a6107caebe3fa5c879dee6a9a5df91c39db7ce03e0185a9600eaddf",
       "executable": false
     },
     "src/ui/bank-lines.tsx": {
@@ -3784,7 +3800,7 @@
       "executable": false
     },
     "src/ui/bank.tsx": {
-      "sha256": "9741dc94b8015fcdad6b76bc25f3ecec9194bdbc9ff5a82621734d130d22ccbc",
+      "sha256": "0561f8f1336f2248827bbc1ff21b78913c91ad61bbc2836696f5a61a809ff6f7",
       "executable": false
     },
     "src/ui/bill-workflow.tsx": {
@@ -3861,6 +3877,10 @@
     },
     "src/ui/feed-history.tsx": {
       "sha256": "f6b4266ead3e7fc21eb1e19d62745c8ae78b75c76fba6d124d7e79e7adff928e",
+      "executable": false
+    },
+    "src/ui/feed-statement.tsx": {
+      "sha256": "0000008942df68c9b54f9f7e041077a40da68b99ef6a66aabfa387a5f69f7f7c",
       "executable": false
     },
     "src/ui/icons.tsx": {
@@ -3972,7 +3992,7 @@
       "executable": false
     },
     "src/ui/reconcile.tsx": {
-      "sha256": "37eb96d4bfb66139a4fbbe894bcc2671efff899cd748e2cc4aecd783c33ffb98",
+      "sha256": "d700f472099f1e178369e0538f197c0b5fcefab07ab1754b5483b3df79300d64",
       "executable": false
     },
     "src/ui/reconciliation-review.tsx": {
@@ -4052,7 +4072,7 @@
       "executable": false
     },
     "tests/api/bank.test.mjs": {
-      "sha256": "fb12c386c986c53a89a6d8bf5c2ff86b3c87f6530faace55bdb7fa220f455ac0",
+      "sha256": "3988bd447ccef4e5745f9ceebb517de540b7d48d994b0631de859244652899b5",
       "executable": false
     },
     "tests/api/bill-lifecycle-scenario.mjs": {
@@ -4088,7 +4108,7 @@
       "executable": false
     },
     "tests/api/feeds.test.mjs": {
-      "sha256": "9404fdf887d4a5eb57f0fbd999ea61522fb66e5fc5aa0759eb27e094d01c20ab",
+      "sha256": "fff62bdaca723b4a1c5c528945141bb0b7af161f5784d26e6b624e1582e98d5f",
       "executable": false
     },
     "tests/api/harness.mjs": {
@@ -4145,6 +4165,10 @@
     },
     "tests/api/scenario.mjs": {
       "sha256": "8d26ce32a60234011cb7bb3169b02898100c3265005005eb838e2916cd6b719e",
+      "executable": false
+    },
+    "tests/api/statement-provider.mjs": {
+      "sha256": "8c0ccb44b161cebdd58a1a495eed1c8dc1abfac25c3a3569fa0e4e4abe63f2a2",
       "executable": false
     },
     "tests/api/subledgers.test.mjs": {
@@ -4208,7 +4232,7 @@
       "executable": false
     },
     "tests/app/feed-history.test.mjs": {
-      "sha256": "757158ebc7392775127cd10a86d2e1873a53353d2b679dff2a9b1b83abe94af2",
+      "sha256": "5c36f5a913fabb2733966435f43377890841f20a13f2fa724bd181a9e5ee79f6",
       "executable": false
     },
     "tests/app/invoice-documents.test.mjs": {
