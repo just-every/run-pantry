@@ -1,12 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { chromium } from '@playwright/test'
 import { providerWorker } from './provider-worker.mjs'
 import { TOKEN } from './worker.mjs'
 
 test('INVOICE-001 owner edits branded templates and sequence, previews real invoices, selects customer defaults and shares retained PDFs at 1440 and 390', async t => {
+  const evidence = process.env.PANTRY_EVIDENCE_DIR || '/tmp/pantry-invoice-proof'
+  await mkdir(evidence, { recursive: true })
   const app = await providerWorker({ bindings: {}, outbound: async request => { throw new Error(`Unexpected provider request: ${new URL(request.url).hostname}`) } })
   t.after(() => app.close())
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
@@ -72,9 +74,37 @@ test('INVOICE-001 owner edits branded templates and sequence, previews real invo
       await page.getByRole('heading', { name: 'Template preview on this invoice', exact: true }).waitFor()
       await page.screenshot({ path: `/tmp/sx-pantry-r15-invoice-saved-edit-${width}-${field === 'PO number' ? 'services' : 'projects'}.png`, fullPage: true })
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
-      await page.getByRole('button', { name: 'Save draft', exact: true }).click()
+      // Hold the real sales read after saving. The old revision must never
+      // reappear as approvable while that read is still in flight.
+      let releaseRead, readStarted, readFinished, holding = false
+      const readGate = new Promise(resolve => { releaseRead = resolve })
+      const reloading = new Promise(resolve => { readStarted = resolve })
+      const readDone = new Promise(resolve => { readFinished = resolve })
+      const holdRead = async route => { holding = true; readStarted(); try { await readGate; await route.continue() } finally { readFinished() } }
+      await page.route('**/api/pantry/sales', holdRead)
+      let revised
+      try {
+        const [saved] = await Promise.all([page.waitForResponse(r => r.url().includes('/command/invoice.save-draft')), page.getByRole('button', { name: 'Save draft', exact: true }).click()])
+        assert.equal(saved.status(), 200)
+        revised = await saved.json()
+        assert.equal(revised.id, draft.id); assert.notEqual(revised.revision, draft.revision)
+        await reloading
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+        assert.equal(await page.getByRole('button', { name: 'Approve', exact: true }).count(), 0, 'the stale draft is not exposed for approval during reload')
+        assert.equal(await page.getByRole('button', { name: 'Saving…', exact: true }).count(), 1, 'the saved editor stays visible until its new revision is loaded')
+        assert.equal(await page.getByRole('button', { name: 'Saving…', exact: true }).isDisabled(), true)
+        await page.screenshot({ path: `${evidence}/invoice-reload-wait-${width}.png`, fullPage: true })
+      } finally {
+        releaseRead()
+        if (holding) await readDone
+        await page.unroute('**/api/pantry/sales', holdRead)
+      }
       await page.getByRole('button', { name: 'Approve', exact: true }).waitFor()
-      await page.getByRole('button', { name: 'Approve', exact: true }).click()
+      const [approved] = await Promise.all([page.waitForResponse(r => r.url().includes('/command/invoice.approve')), page.getByRole('button', { name: 'Approve', exact: true }).click()])
+      assert.equal(approved.status(), 200)
+      assert.equal(approved.request().postDataJSON().revision, revised.revision, 'approval names the saved revision')
+      await page.getByRole('button', { name: 'Issue', exact: true }).waitFor()
+      await page.screenshot({ path: `${evidence}/invoice-approved-${width}.png`, fullPage: true })
       await page.getByRole('button', { name: 'Issue', exact: true }).click()
       await page.getByRole('button', { name: 'Send invoice', exact: true }).waitFor()
       return draft
