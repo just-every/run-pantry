@@ -144,7 +144,7 @@ test('REPORT-005 Software figure to approved bill, PDF, payment and bank; source
     const money = cents => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
     const openFigure = async selection => {
       const links = page.locator('a.figure-link')
-      const index = (await links.evaluateAll(nodes => nodes.map(a => new URL(a.href).searchParams.get('line')))).indexOf(JSON.stringify(selection))
+      const index = (await links.evaluateAll(nodes => nodes.map(a => { const value = new URL(a.href).searchParams.get('line'); try { const parsed = JSON.parse(value); return typeof parsed === 'string' ? parsed : JSON.stringify(parsed) } catch { return value } }))).indexOf(JSON.stringify(selection))
       assert.ok(index >= 0, `visible figure ${JSON.stringify(selection)}`)
       await links.nth(index).click()
       await page.getByText('Adds up to the report figure', { exact: true }).waitFor()
