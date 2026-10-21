@@ -66,7 +66,7 @@ export async function journey(t) {
   const custom = await h.command('custom-report.save', { definition: { name: 'Private October statement', source: 'profit-and-loss', from: '2026-10-01', to: '2026-10-31', basis: 'cash' }, sharedRoles: [] })
   await h.command('management-package.save', { name: 'Private board pack', cover: 'October management review', reportIds: [custom.id], commentary: ['Review cash collections.'], sharedRoles: [] })
   const connection = await h.command('feed.connect', { publicToken: 'synthetic-pantry-19', institution: { name: 'Synthetic Community Bank' } })
-  await h.command('feed.map', { itemId: connection.id, accounts: [{ id: connection.accounts[0].id, bankAccountId: s.checking.id }] })
+  await h.command('feed.map', { itemId: connection.id, accounts: [{ id: connection.accounts[0].id, bankAccountId: s.checking.id,history:{mode:'explicit',startDate:'2025-01-01'} }] })
   await h.command('feed.sync', { itemId: connection.id })
   const gusto = new URL((await h.command('gusto.connect', {})).url)
   const callback = await h.send('/api/pantry/gusto/callback?code=synthetic-pantry-21&state=' + encodeURIComponent(gusto.searchParams.get('state')), undefined, { cookie: h.owner })
