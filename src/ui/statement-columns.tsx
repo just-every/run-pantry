@@ -1,3 +1,4 @@
+import { Link, useSearch } from '@tanstack/react-router'
 import { Table, day, usd } from './kit'
 
 export const COLUMN_MODES = [
@@ -30,11 +31,14 @@ const value = (n: number | null, column: Column) => n === null ? '—' : column.
 const grand = (row: Row) => ['net-income', 'liabilities-and-equity'].includes(row.id)
 
 export function StatementColumns({ report: r }: { report: ColumnStatement }) {
+  const search = useSearch({ from: '/app/reports' })
+  // Each cell opens to the records behind it for its own column's range.
+  const open = (row: Row, column: Column, i: number) => <Link to="/app/reports" search={{ ...search, line: row.id, column: column.id, record: undefined }} className="figure-link">{value(row.values[i], column)}</Link>
   const sections: Section[] = r.kind === 'profit-and-loss' ? ['Income', 'Expenses'] : ['Assets', 'Liabilities', 'Equity']
   const period = ['months', 'quarters', 'ytd'].includes(r.mode) ? [r.columns[0].from, r.columns[r.columns.length - 1].to] : [r.from, r.to]
   const render = (row: Row, total = false) => <tr role="row" key={row.id} className={total ? `total${grand(row) ? ' grand' : ''}` : undefined}>
     <td role="rowheader" aria-label={row.name}>{row.code ? `${row.code} · ` : ''}{row.name}</td>
-    {r.columns.map((column, i) => <td key={column.id} className="fig" title={row.values[i] === null ? 'Percentage change is undefined when the prior value is zero' : undefined}>{value(row.values[i], column)}</td>)}
+    {r.columns.map((column, i) => <td key={column.id} className="fig" title={row.values[i] === null ? 'Percentage change is undefined when the prior value is zero' : undefined}>{open(row, column, i)}</td>)}
   </tr>
   return <>
     <p className="hint">{day(period[0])} to {day(period[1])} · {COLUMN_MODES.find(([id]) => id === r.mode)?.[1]}{r.columns.some(c => c.unit === 'percent') && ' · — means the prior value is zero.'}</p>

@@ -31,7 +31,7 @@ import { moveInCommands, moveInView } from './cutover/commands'
 import { xeroRoutes } from './cutover/xero-attachments'
 import { ageing, balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports'
 import { basisOf, reportBasis, BASIS_LABEL } from './basis'
-import { figureDetail } from './drilldown'
+import { reportFigure, type FigureQuery } from './report-figures'
 import { cashFlow, cashFlowCommands, cashFlowCsv, cashFlowDetail } from './cash-flow'
 import { contactTotals } from './contact-totals'
 import { statementColumns } from './statement-columns'
@@ -172,10 +172,13 @@ api.get('/api/pantry/budgets/:id/report.csv', async c => {
   return new Response(budgetCsv(r), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="budget-actual.csv"', 'cache-control': 'no-store' } })
 })
 view('recognition', async (ctx, c) => recognitionView(ctx.db, day(c, 'to')))
+// A figure's address: its report and line, the range and basis, and the filters, columns, budget or tax year it was read under.
+const figureQuery = async (db: D1Database, c: C, from: string, to: string): Promise<FigureQuery> => ({ report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: await reportBasis(db, c.req.query('basis')),
+  account: c.req.query('account'), columns: c.req.query('columns'), column: c.req.query('column'), budget: c.req.query('budget'), year: c.req.query('year') })
 api.get('/api/pantry/reports/detail/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const entity = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
-  const detail = await figureDetail(ctx.db, { report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: await reportBasis(ctx.db, c.req.query('basis')), account: c.req.query('account') }, Number(entity?.fiscal_year_start ?? 1))
+  const detail = await reportFigure(ctx.db, await figureQuery(ctx.db, c, from, to), Number(entity?.fiscal_year_start ?? 1))
   return figureExport(detail, c.req.query())
 })
 api.get('/api/pantry/reports/record/:kind/:id/export', async c => {
@@ -185,7 +188,7 @@ api.get('/api/pantry/reports/record/:kind/:id/export', async c => {
 view('reports/detail', async (ctx, c) => {
   const to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
-  return figureDetail(ctx.db, { report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: await reportBasis(ctx.db, c.req.query('basis')), account: c.req.query('account') }, Number(e?.fiscal_year_start ?? 1))
+  return reportFigure(ctx.db, await figureQuery(ctx.db, c, from, to), Number(e?.fiscal_year_start ?? 1))
 })
 view('reports/record/:kind/:id', async (ctx, c) => recordView(ctx.db, c.req.param('kind')!, c.req.param('id')!))
 view('reports/adjusting-entries', async (ctx, c) => ({ ...await adjustingEntries(ctx.db, year(c)), basis: await reportBasis(ctx.db, c.req.query('basis')) }))

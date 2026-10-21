@@ -17,26 +17,41 @@ function RecordLink({ r }: { r: D }) {
 const Documents = ({ docs }: { docs: D[] }) => docs.length ? <>{docs.map(d => <a key={d.id} className="doc-link" href={`/api/pantry/documents/${d.id}`}>{d.name}</a>)}</> : <span className="sub">—</span>
 const Bank = ({ lines }: { lines: D[] }) => lines.length ? <>{lines.map(b => <span key={b.id} className="bank-line">{day(b.date)} · {b.description} · {usd(b.amount)} · {b.reconciled ? 'reconciled' : 'matched'}{b.statementDocumentId && <> · <a href={`/api/pantry/documents/${b.statementDocumentId}`}>statement</a></>}</span>)}</> : <span className="sub">Not matched</span>
 
+const percent = (n: number | null) => n === null ? 'Undefined' : `${n.toFixed(2)}%`
+
 export function FigureDetail({ report, line, from, to, basis, reportLabel }: { report: string; line: string; from: string; to: string; basis: 'cash' | 'accrual'; reportLabel: string }) {
   const search = useSearch({ from: '/app/reports' })
-  const { data: d, error } = useView<D>(`reports/detail?${new URLSearchParams({ report, line, from, to, basis, ...(search.account ? { account: search.account } : {}) })}`)
+  // The columns, column, budget and tax year a figure was read under travel with it.
+  const scope = Object.fromEntries((['account', 'columns', 'column', 'budget', 'year'] as const).filter(k => search[k]).map(k => [k, search[k]!]))
+  const { data: d, error } = useView<D>(`reports/detail?${new URLSearchParams({ report, line, from, to, basis, ...scope })}`)
   const exportQuery = new URLSearchParams(Object.entries({ ...search, report, line, from, to, basis }).filter(([, value]) => value !== undefined) as [string, string][]).toString()
-  const back = <Link to="/app/reports" search={{ ...search, line: undefined, record: undefined }}>{reportLabel}</Link>
+  const back = <Link to="/app/reports" search={{ ...search, line: undefined, record: undefined, column: undefined }}>{reportLabel}</Link>
   if (!d) return <><nav className="crumbs" aria-label="Report">{back}</nav><Loading error={error} what="the records behind this figure" /></>
-  const accounts = new Set(d.rows.map((r: D) => r.account.id)).size > 1
+  const chip = <Chip tone="info">{d.basisLabel ?? BASIS_NAME[d.basis as 'cash' | 'accrual'] ?? BASIS_NAME[basis]}</Chip>
+  if (d.unit === 'percent') return <>
+    <nav className="crumbs" aria-label="Report">{back} <span aria-hidden="true">›</span> <span>{d.label}</span></nav>
+    <Card title={<>{d.label} {chip}</>} actions={<strong className="figure-total">{percent(d.figure)}</strong>}>
+      <p>{d.expression} · {d.ties ? <Chip tone="good">Recalculates to the report figure</Chip> : <Chip tone="bad">Does not recalculate to the report figure</Chip>}</p>
+      <p><a href={`/api/pantry/reports/detail/export?${exportQuery}`}>Export figure explanation JSON</a></p>
+      <Table heads={['Operand', 'Amount']} figures={[1]}>
+        {d.operands.map((o: D) => <tr key={o.label}><td><Link to="/app/reports" search={{ ...search, line: o.line, ...(o.column ? { column: o.column } : {}), record: undefined }}>{o.label}</Link></td><td className="fig">{usd(o.value)}</td></tr>)}
+      </Table>
+    </Card>
+  </>
+  const accounts = new Set(d.rows.map((r: D) => r.account?.id ?? '')).size > 1
   return <>
     <nav className="crumbs" aria-label="Report">{back} <span aria-hidden="true">›</span> <span>{d.label}</span></nav>
-    <Card title={<>{d.label} <Chip tone="info">{BASIS_NAME[basis]}</Chip></>} actions={<strong className="figure-total">{usd(d.figure)}</strong>}>
+    <Card title={<>{d.label} {chip}</>} actions={<strong className="figure-total">{usd(d.figure)}</strong>}>
       <p>{d.scopeNote ? d.scopeNote : d.from ? <>{day(d.from)} to {day(d.to)}</> : <>All posted activity through {day(d.to)}</>} · {d.rows.length} line{d.rows.length === 1 ? '' : 's'} · {d.ties ? <Chip tone="good">Adds up to the report figure</Chip> : <Chip tone="bad">Does not add up to the report figure</Chip>}</p>
-      {basis === 'cash' && <p className="hint">On the cash basis an invoice, credit or bill counts as it is paid or credited: each line below is the share of a document its settlement covered, spread across the document's lines.</p>}
+      {d.basis === 'cash' && <p className="hint">On the cash basis an invoice, credit or bill counts as it is paid or credited: each line below is the share of a document its settlement covered, spread across the document's lines.</p>}
       <p><a href={`/api/pantry/reports/detail/export?${exportQuery}`}>Export source lines CSV</a></p>
       <AskAccountant key={JSON.stringify({ report, line, from, to, basis })} subjectKind="report-line" subjectId={JSON.stringify({ report, line, from, to, basis })} label={`${reportLabel} · ${d.label} · ${from || 'Beginning'} to ${to} · ${BASIS_NAME[basis]} · ${usd(d.figure)}`} />
       <Table heads={['Date', 'Record', 'What', ...(accounts ? ['Account'] : []), 'Documents', 'Bank', 'Amount']} figures={[accounts ? 6 : 5]} empty="No posted lines behind this figure.">
         {[...d.rows.map((r: D) => <tr key={r.key}>
           <td>{day(r.date)}</td>
-          <td><RecordLink r={r.record} />{r.entry?.number ? <small className="sub"> · entry {r.entry.number}</small> : null}<AskAccountant subjectKind={r.record.kind === 'entry' ? 'journal' : r.record.kind} subjectId={r.record.id} label={`${r.record.label} · ${r.date} · ${r.description}`} /></td>
+          <td>{r.record.href ? <a href={r.record.href}>{r.record.label}</a> : <RecordLink r={r.record} />}{r.entry?.number ? <small className="sub"> · entry {r.entry.number}</small> : null}{!r.record.href && <AskAccountant subjectKind={r.record.kind === 'entry' ? 'journal' : r.record.kind} subjectId={r.record.id} label={`${r.record.label} · ${r.date} · ${r.description}`} />}</td>
           <td>{r.description}{r.lineMemo && r.lineMemo !== r.description ? <small className="sub"> · {r.lineMemo}</small> : null}{r.settlement && <small className="sub"> · settled by <RecordLink r={r.settlement.by} /> ({r.settlement.share})</small>}</td>
-          {accounts && <td>{r.account.code} · {r.account.name}</td>}
+          {accounts && <td>{r.account ? `${r.account.code} · ${r.account.name}` : '—'}</td>}
           <td><Documents docs={r.documents} /></td>
           <td><Bank lines={r.bank} /></td>
           <td className="fig">{usd(r.amount)}</td></tr>),

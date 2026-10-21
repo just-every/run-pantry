@@ -20,7 +20,8 @@ function yearBefore(day: string) {
   const last = new Date(Date.UTC(y - 1, m, 0)).getUTCDate()
   return `${y - 1}-${String(m).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`
 }
-function changePercent(change: number, prior: number): number | null {
+/** Change over the absolute prior value, as a percentage rounded half away from zero to 2 places; undefined when prior is zero. */
+export function changePercent(change: number, prior: number): number | null {
   if (prior === 0) return null
   const numerator = BigInt(Math.abs(change)) * 10000n, denominator = BigInt(Math.abs(prior))
   const rounded = (2n * numerator + denominator) / (2n * denominator)
@@ -78,14 +79,23 @@ export async function statementColumns(db: D1Database, kind: Kind, mode: string,
   return { kind, mode, basis, from, to, columns, rows, totals }
 }
 
-async function customerColumns(db: D1Database, from: string, to: string, basis: Basis): Promise<StatementColumns> {
+/** The customer column a profit-and-loss line belongs to: the line's customer, else its invoice's customer. */
+export async function customerGrouping(db: D1Database) {
   const contacts = new Map((await all(db, "SELECT id, name FROM pt_contacts WHERE kind = 'customer'")).map(c => [c.id, c.name]))
   const sources = new Map((await all(db, `SELECT e.id, i.customer_id FROM pt_journal_entries e JOIN pt_invoices i ON i.journal_id = COALESCE(e.reverses_id, e.id)`)).map(e => [e.id, e.customer_id]))
+  return {
+    of: (l: Data) => { const contactId = l.contact_id || sources.get(l.entry_id); return contacts.has(contactId) ? contactId as string : 'unassigned' },
+    name: (id: string) => contacts.get(id) as string ?? 'Unassigned',
+  }
+}
+
+async function customerColumns(db: D1Database, from: string, to: string, basis: Basis): Promise<StatementColumns> {
+  const grouping = await customerGrouping(db)
   const groups = new Map<string, { name: string; rows: Line[] }>()
   const ledger = await generalLedger(db, from, to, undefined, basis)
   for (const account of ledger.accounts.filter(a => a.type === 'income' || a.type === 'expense')) for (const l of account.rows) {
-    const contactId = l.contact_id || sources.get(l.entry_id), id = contacts.has(contactId) ? contactId : 'unassigned'
-    const group: { name: string; rows: Line[] } = groups.get(id) ?? { name: contacts.get(id) ?? 'Unassigned', rows: [] }
+    const id = grouping.of(l)
+    const group: { name: string; rows: Line[] } = groups.get(id) ?? { name: grouping.name(id), rows: [] }
     let row = group.rows.find(r => r.id === account.id)
     if (!row) { row = { id: account.id, code: account.code, name: account.name, section: account.type === 'income' ? 'Income' : 'Expenses', amount: 0 }; group.rows.push(row) }
     row.amount += (l.debit_cents - l.credit_cents) * (account.type === 'income' ? -1 : 1)

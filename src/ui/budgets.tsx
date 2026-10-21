@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link, useSearch } from '@tanstack/react-router'
 import { Card, Chip, Field, Form, Loading, Table, amountText, command, monthName, usd, useShared, useView, type D } from './kit'
 
 type Cell = { accountId: string; month: string; amount: string }
@@ -45,7 +46,10 @@ function Detail({ id, from, to, basis, edit }: { id: string; from: string; to: s
   const valid = plan && from >= `${plan.start_month}-01` && to <= `${plan.months.at(-1)}-31`
   const path = `budgets/${id}/report?from=${from}&to=${to}&basis=${basis}`
   const { data: report, error } = useView<D>(valid ? path : null)
-  const { state } = useShared()
+  const { state } = useShared(), search = useSearch({ from: '/app/reports' })
+  // Every budget, actual, variance and percentage opens to the plan cells and posted lines behind it.
+  const open = (accountId: string, metric: string, text: string) => <Link to="/app/reports" search={{ ...search, line: JSON.stringify([accountId, metric]), budget: id, record: undefined }} className="figure-link">{text}</Link>
+  const pct = (p: number | null) => p === null ? 'Not comparable' : `${p.toFixed(2)}%`
   if (!plan) return <Loading error={planError} what="the budget" />
   return <Card title={<>{plan.name} <Chip tone="info">{basis === 'cash' ? 'Cash basis' : 'Accrual basis'}</Chip></>} actions={state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={() => edit(plan)}>Edit budget</button>}>
     <p>Annual plan: {monthName(plan.start_month)} to {monthName(plan.months.at(-1))}. Prepared on the {plan.basis} basis. Actuals use the report’s selected basis.</p>
@@ -53,7 +57,7 @@ function Detail({ id, from, to, basis, edit }: { id: string; from: string; to: s
     {!valid ? <p>Choose report dates within this budget year.</p> : !report ? <Loading error={error} what="budget versus actual" /> : <>
       <a className="btn btn-secondary" href={`/api/pantry/budgets/${id}/report.csv?from=${from}&to=${to}&basis=${basis}`} download>Download budget CSV · {basis}</a>
       <Table heads={['Account', 'Budget', 'Actual', 'Variance', 'Variance %']} figures={[1, 2, 3, 4]} empty="No planned or posted amounts in this range.">
-        {[...report.rows.map((r: D) => <tr key={r.id}><td>{r.code} · {r.name}</td><td className="fig">{usd(r.budget)}</td><td className="fig">{usd(r.actual)}</td><td className="fig">{usd(r.variance)}</td><td className="fig">{r.percent === null ? 'Not comparable' : `${r.percent.toFixed(2)}%`}</td></tr>), <tr key="total" className="total"><td>Net income</td><td className="fig">{usd(report.netIncome.budget)}</td><td className="fig">{usd(report.netIncome.actual)}</td><td className="fig">{usd(report.netIncome.variance)}</td><td className="fig">{report.netIncome.percent === null ? 'Not comparable' : `${report.netIncome.percent.toFixed(2)}%`}</td></tr>]}
+        {[...[...report.rows, { id: 'net-income', code: '', name: 'Net income', ...report.netIncome }].map((r: D) => <tr key={r.id} className={r.id === 'net-income' ? 'total' : undefined}><td>{r.code ? `${r.code} · ` : ''}{r.name}</td><td className="fig">{open(r.id, 'budget', usd(r.budget))}</td><td className="fig">{open(r.id, 'actual', usd(r.actual))}</td><td className="fig">{open(r.id, 'variance', usd(r.variance))}</td><td className="fig">{open(r.id, 'percent', pct(r.percent))}</td></tr>)]}
       </Table>
     </>}
   </Card>

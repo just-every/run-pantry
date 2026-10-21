@@ -5,6 +5,13 @@ import { generalLedger } from '../reports'
 import { budget, monthAt } from './commands'
 
 const rounded = (amount: number, n: number, d: number) => Math.sign(amount) * Number((BigInt(Math.abs(amount)) * BigInt(n) * 2n + BigInt(d)) / (2n * BigInt(d)))
+/** A budget cell's share of an inclusive range: its month's amount times the covered calendar days over the month's days, rounded half away from zero to cents. */
+export function plannedShare(c: Data, from: string, to: string) {
+  const bounds = monthBounds(c.month), start = from > bounds.start ? from : bounds.start, end = to < bounds.end ? to : bounds.end
+  if (start > end) return null
+  const days = Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1, monthDays = Number(bounds.end.slice(8))
+  return { start, end, days, monthDays, amount: rounded(c.amount_cents, days, monthDays) }
+}
 export async function budgetReport(db: D1Database, id: string, from: string, to: string, basis: Basis) {
   date(from); date(to); requireThat(from <= to, 'From date must be on or before To date')
   const plan = await budget(db, id)
@@ -13,11 +20,7 @@ export async function budgetReport(db: D1Database, id: string, from: string, to:
   const ledger = await generalLedger(db, from, to, undefined, basis)
   const rows = accounts.map(account => {
     const actual = ledger.accounts.find(a => a.id === account.id)?.rows.reduce((sum: number, l: any) => sum + (l.debit_cents - l.credit_cents) * (account.type === 'income' ? -1 : 1), 0) ?? 0
-    const planned = plan.cells.filter(c => c.account_id === account.id).reduce((sum, c) => {
-      const bounds = monthBounds(c.month), start = from > bounds.start ? from : bounds.start, end = to < bounds.end ? to : bounds.end
-      if (start > end) return sum
-      return sum + rounded(c.amount_cents, Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1, Number(bounds.end.slice(8)))
-    }, 0)
+    const planned = plan.cells.filter(c => c.account_id === account.id).reduce((sum, c) => sum + (plannedShare(c, from, to)?.amount ?? 0), 0)
     const variance = actual - planned
     return { ...account, budget: planned, actual, variance, percent: planned === 0 ? null : rounded(variance, 10000, Math.abs(planned)) / 100 } as Data & { name: string; type: string; budget: number; actual: number; variance: number; percent: number | null }
   }).filter(r => r.actual || r.budget)

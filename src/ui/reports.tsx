@@ -1,6 +1,6 @@
 // Reports, all from the same ledger, on the cash or accrual basis, and the
-// accountant package download. Every figure on the profit and loss and the
-// balance sheet opens to the records behind it (report-detail.tsx).
+// accountant package download. Every figure on the statements, ledgers, grouped,
+// comparison, budget and 1099 reports opens to the records behind it (report-detail.tsx).
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { Card, Chip, Field, Loading, PageHead, Table, Tabs, day, monthName, today, usd, useShared, useView, type D } from './kit'
 import { BASIS_NAME, FigureDetail, RecordView } from './report-detail'
@@ -13,7 +13,7 @@ import { AskAccountant } from './ask-accountant'
 import { ColumnPicker, StatementColumns, columnMode, type ColumnMode, type ColumnStatement } from './statement-columns'
 import { LIBRARY_REPORTS, ReportLibrary, hasLibraryFilters, isLibraryReport, libraryBasisLabel, libraryQuery } from './report-library'
 
-export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string; columns?: string; account?: string; payee?: string; customId?: string; row?: string; column?: string; node?: string; origin?: string }
+export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string; columns?: string; account?: string; payee?: string; customId?: string; row?: string; column?: string; node?: string; origin?: string; budget?: string }
 type Basis = 'cash' | 'accrual'
 
 // [tab, slug, reads on a basis, takes a date range]
@@ -55,10 +55,10 @@ function Statement({ sections, total }: { sections: [string, D[], number, string
 function Bridge({ b }: { b: D }) {
   return <div className="bridge"><h3>From accrual to cash net income</h3>
     <Table heads={['', 'Amount']} figures={[1]}>
-      <tr><td>Net income on the accrual basis</td><td className="fig">{usd(b.accrualNetIncome)}</td></tr>
-      <tr><td>Less invoices, credits and bills recorded in this period</td><td className="fig">{usd(-b.recordedInRange)}</td></tr>
-      <tr><td>Plus the shares of them paid or credited in this period</td><td className="fig">{usd(b.settledInRange)}</td></tr>
-      <tr className="total"><td>Net income on the cash basis {b.ties ? '' : '(does not tie)'}</td><td className="fig">{usd(b.cashNetIncome)}</td></tr>
+      <tr><td>Net income on the accrual basis</td><td className="fig"><Figure line="bridge:accrual">{usd(b.accrualNetIncome)}</Figure></td></tr>
+      <tr><td>Less invoices, credits and bills recorded in this period</td><td className="fig"><Figure line="bridge:recorded">{usd(-b.recordedInRange)}</Figure></td></tr>
+      <tr><td>Plus the shares of them paid or credited in this period</td><td className="fig"><Figure line="bridge:settled">{usd(b.settledInRange)}</Figure></td></tr>
+      <tr className="total"><td>Net income on the cash basis {b.ties ? '' : '(does not tie)'}</td><td className="fig"><Figure line="bridge:cash">{usd(b.cashNetIncome)}</Figure></td></tr>
     </Table></div>
 }
 
@@ -98,10 +98,10 @@ function Report({ slug, basis, from, to, columns }: { slug: string; basis: Basis
     {basis === 'cash' && <p className="hint">On the cash basis, unpaid invoices and bills stay off the balance sheet with the tax on them; money received or paid but not yet applied stays in receivables or payables.</p>}
     <Statement sections={[['Assets', r.assets, r.totalAssets, 'assets'], ['Liabilities', r.liabilities, r.totalLiabilities, 'liabilities'], ['Equity', r.equity, r.totalEquity, 'equity']]} total={['Liabilities and equity', r.totalLiabilities + r.totalEquity, 'liabilities-and-equity']} /></>
   if (slug === 'sales-by-customer' || slug === 'expenses-by-vendor') return <Table heads={[slug === 'sales-by-customer' ? 'Customer' : 'Vendor', 'Amount']} figures={[1]} empty="No posted activity in this range.">
-    {[...r.rows.map((x: D) => <tr key={x.id}><td>{x.name}</td><td className="fig">{usd(x.amount)}</td></tr>), <tr key="total" className="total"><td>Total</td><td className="fig">{usd(r.total)}</td></tr>]}
+    {[...r.rows.map((x: D) => <tr key={x.id}><td>{x.name}</td><td className="fig"><Figure line={x.id}>{usd(x.amount)}</Figure></td></tr>), <tr key="total" className="total"><td>Total</td><td className="fig"><Figure line="total">{usd(r.total)}</Figure></td></tr>]}
   </Table>
   if (slug === 'sales-by-item') return <><p className="hint">Income by the product or service each invoice and credit line was sold as. Income without an item stays in its own row, so the total ties to the profit and loss.</p><Table heads={['Product or service', 'SKU', 'Amount']} figures={[2]} empty="No posted income in this range.">
-    {[...r.rows.map((x: D) => <tr key={x.id}><td>{x.name}</td><td>{x.sku ?? ''}</td><td className="fig">{usd(x.amount)}</td></tr>), <tr key="total" className="total"><td>Total</td><td /><td className="fig">{usd(r.total)}</td></tr>]}
+    {[...r.rows.map((x: D) => <tr key={x.id}><td>{x.name}</td><td>{x.sku ?? ''}</td><td className="fig"><Figure line={x.id}>{usd(x.amount)}</Figure></td></tr>), <tr key="total" className="total"><td>Total</td><td /><td className="fig"><Figure line="total">{usd(r.total)}</Figure></td></tr>]}
   </Table></>
   if (slug === 'cash-flow') return <CashFlow from={from} to={to} />
   if (slug === 'sales-tax') return <SalesTax r={r} />
@@ -118,18 +118,20 @@ export function Reports() {
   const to = search.to && isDay(search.to) ? search.to : today(), from = search.from && isDay(search.from) ? search.from : to.slice(0, 8) + '01'
   // The package is for a closed month: the one the dates point at once someone chooses them, else the last month locked.
   const period = !search.to && state.overview?.lastLocked ? state.overview.lastLocked : periodOf(to), q = basis === 'cash' ? '?basis=cash' : ''
-  const detail = ['profit-and-loss', 'balance-sheet', 'cash-flow', 'trial-balance', 'general-ledger'].includes(slug) && search.line
+  const detail = ['profit-and-loss', 'balance-sheet', 'cash-flow', 'trial-balance', 'general-ledger', 'sales-by-customer', 'expenses-by-vendor', 'sales-by-item', 'budget-actual', 'contractors'].includes(slug) && search.line
+  // 1099 figures read a calendar tax year.
+  const taxYear = Number(search.year) || Number(today().slice(0, 4)), [figureFrom, figureTo] = slug === 'contractors' ? [`${taxYear}-01-01`, `${taxYear}-12-31`] : [from, to]
   const library = isLibraryReport(slug), filtered = hasLibraryFilters(slug)
   const exportQuery = library ? libraryQuery(slug, from, to, basis, search.account, search.payee) : `from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}${slug === 'general-ledger' && search.account ? `&account=${encodeURIComponent(search.account)}` : ''}`
   return <>
     <PageHead title="Reports" lead="Every report is calculated from the same posted ledger, on the cash or the accrual basis."
       actions={<><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv${q}`} download>General ledger CSV · {basis === 'cash' ? 'cash' : 'accrual'}</a><a className="btn btn-primary" href={`/api/pantry/package/${period}/accountant-package.zip${q}`} download title="A ZIP of CSV reports, the close checklist and a README">Accountant package · {monthName(period)}</a></>} />
     <Tabs tabs={KINDS.map(k => k[0])} current={label} onChange={t => set({ report: KINDS.find(k => k[0] === t)![1], line: undefined, record: undefined })} pick="Report" />
-    {search.record ? <RecordView record={search.record} reportLabel={label} /> : slug === 'custom' ? <CustomReports /> : slug === 'contractors' ? <Contractors year={Number(search.year) || Number(today().slice(0, 4))} onYear={y => set({ year: String(y) })} />
-      : detail && slug === 'cash-flow' ? <CashFlowDetail line={search.line!} from={from} to={to} />
-      : detail ? <FigureDetail report={slug} line={search.line!} from={from} to={to} basis={basis} reportLabel={label} />
+    {search.record ? <RecordView record={search.record} reportLabel={label} /> : detail && slug === 'cash-flow' ? <CashFlowDetail line={search.line!} from={from} to={to} />
+      : detail ? <FigureDetail report={slug} line={search.line!} from={figureFrom} to={figureTo} basis={basis} reportLabel={label} />
+      : slug === 'custom' ? <CustomReports /> : slug === 'contractors' ? <Contractors year={taxYear} onYear={y => set({ year: String(y) })} />
       : <Card className={library ? 'report-library' : undefined} title={<>{label} <Chip tone="info">{library ? libraryBasisLabel(slug, basis) : slug === 'cash-flow' ? 'Indirect method · accrual starting income' : based ? BASIS_NAME[basis] : 'Open items · accrual basis'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}
-          {statement && <ColumnPicker mode={columns} kind={slug} onChange={mode => set({ columns: mode, line: undefined, record: undefined })} />}
+          {statement && <ColumnPicker mode={columns} kind={slug} onChange={mode => set({ columns: mode, line: undefined, record: undefined, column: undefined })} />}
           {ranged && <div className="field inline"><label htmlFor="r-from">From</label><input id="r-from" type="date" value={from} onChange={e => isDay(e.target.value) && set({ from: e.target.value })} /></div>}
           <div className="field inline"><label htmlFor="r-to">{ranged ? 'To' : 'As of'}</label><input id="r-to" type="date" value={to} onChange={e => isDay(e.target.value) && set({ to: e.target.value })} /></div>
           {filtered && <><Field label="Account filter" name="account" value={search.account ?? ''} empty="All accounts" options={state.accounts.map((a: D) => ({ value: a.id, label: `${a.code} · ${a.name}` }))} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => set({ account: e.target.value || undefined })} />

@@ -737,3 +737,81 @@ test('REPORT-005 trial-balance balances/totals and every general-ledger cell tra
   await invalid('general-ledger', JSON.stringify([s.acct['6200'], 'arbitrary']))
   assert.deepEqual((await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results, before, 'tracing and exports do not alter the ledger')
 })
+
+test('REPORT-005 grouped sales/spend, comparison and customer columns, the cash bridge, budget and 1099 figures open to native sources and export with their filters', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const s = await october(h, true)
+  await h.command('contractor.save', { contactId: s.c['Brightline Software'].id, is1099: true })
+  const plan = await h.command('budget.save', { name: 'Juniper 2026', startMonth: '2026-01', basis: 'accrual', cells: [
+    { accountId: s.acct['4000'], month: '2026-10', amount: '3100.00' }, { accountId: s.acct['6200'], month: '2026-10', amount: '0.00' },
+    { accountId: s.acct['6100'], month: '2026-10', amount: '1240.00' }, { accountId: s.acct['6100'], month: '2026-09', amount: '1000.00' }] })
+  const viewer = await h.member('figure-source-viewer@example.test', 'viewer')
+  const before = (await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results
+  const parse = text => text.trim().split('\r\n').map(line => [...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m => m[1].replaceAll('""', '"')))
+  const records = new Set()
+  const open = async (params, expected, exported = true) => {
+    const query = new URLSearchParams(params), where = JSON.stringify(params)
+    const d = await h.view(`reports/detail?${query}`, viewer)
+    assert.equal(d.figure, expected, where); assert.equal(d.ties, true, where)
+    if (d.unit === 'percent') {
+      for (const o of d.operands) assert.equal((await h.view(`reports/detail?${new URLSearchParams({ ...params, line: o.line, ...(o.column ? { column: o.column } : {}) })}`, viewer)).figure, o.value, `${where} operand ${o.label}`)
+    } else {
+      assert.equal(d.total, expected, where); assert.equal(d.rows.reduce((n, r) => n + r.amount, 0), expected, where)
+      assert.equal(new Set(d.rows.map(r => r.key)).size, d.rows.length, where)
+      for (const r of d.rows) if (r.record.kind !== 'budget' && !records.has(`${r.record.kind}:${r.record.id}`)) {
+        assert.ok((await h.view(`reports/record/${r.record.kind}/${r.record.id}`, viewer)).title, where); records.add(`${r.record.kind}:${r.record.id}`)
+      }
+    }
+    if (!exported) return d
+    const file = await h.send(`/api/pantry/reports/detail/export?${query}`, undefined, { cookie: viewer })
+    assert.equal(file.status, 200, where)
+    if (d.unit === 'percent') { assert.equal(file.value.figure.figure, expected); assert.deepEqual(file.value.context, Object.fromEntries(query)); return d }
+    const csv = parse(file.value)
+    assert.equal(csv.slice(1).reduce((n, r) => n + Number(r[5]), 0), expected, where)
+    assert.deepEqual(JSON.parse(csv[1][11]), Object.fromEntries(query), 'the figure address and its filters travel with the export')
+    return d
+  }
+  for (const basis of ['accrual', 'cash']) {
+    const range = { from: '2026-10-01', to: '2026-10-31', basis }
+    for (const report of ['sales-by-customer', 'expenses-by-vendor', 'sales-by-item']) {
+      const r = await h.view(`reports/${report}?${OCT}&basis=${basis}`)
+      assert.ok(r.rows.length, report)
+      for (const row of r.rows) await open({ report, line: row.id, ...range }, row.amount)
+      await open({ report, line: 'total', ...range }, r.total)
+    }
+    for (const kind of ['profit-and-loss', 'balance-sheet']) for (const columns of ['prior-period', 'prior-year', 'months', 'quarters', 'ytd', ...(kind === 'profit-and-loss' ? ['customer'] : [])]) {
+      const r = await h.view(`reports/${kind}?${OCT}&basis=${basis}&columns=${columns}`)
+      for (const [i, column] of r.columns.entries()) {
+        // Period columns: the ones holding September and October activity.
+        if ((columns === 'months' || columns === 'quarters') && !(column.from <= '2026-10-31' && column.to >= '2026-09-30')) continue
+        for (const [k, row] of [...r.rows, ...r.totals].entries()) await open({ report: kind, line: row.id, ...range, columns, column: column.id }, row.values[i], k === 0 || ['net-income', 'liabilities-and-equity'].includes(row.id))
+      }
+    }
+  }
+  const cash = await h.view(`reports/profit-and-loss?${OCT}&basis=cash`)
+  for (const [line, value] of [['bridge:accrual', cash.bridge.accrualNetIncome], ['bridge:recorded', -cash.bridge.recordedInRange], ['bridge:settled', cash.bridge.settledInRange], ['bridge:cash', cash.bridge.cashNetIncome]])
+    await open({ report: 'profit-and-loss', line, from: '2026-10-01', to: '2026-10-31', basis: 'cash' }, value)
+  for (const [from, to] of [['2026-10-01', '2026-10-31'], ['2026-10-01', '2026-10-15']]) for (const basis of ['accrual', 'cash']) {
+    const r = await h.view(`budgets/${plan.id}/report?from=${from}&to=${to}&basis=${basis}`)
+    for (const row of [...r.rows, { id: 'net-income', ...r.netIncome }]) for (const metric of ['budget', 'actual', 'variance', 'percent'])
+      await open({ report: 'budget-actual', line: JSON.stringify([row.id, metric]), from, to, basis, budget: plan.id }, row[metric])
+  }
+  // A partial month carries 15 of October's 31 days of the rent plan; a zero plan is not comparable.
+  const rent = await h.view(`reports/detail?${new URLSearchParams({ report: 'budget-actual', line: JSON.stringify([s.acct['6100'], 'budget']), from: '2026-10-01', to: '2026-10-15', basis: 'accrual', budget: plan.id })}`)
+  assert.deepEqual(rent.rows.map(r => [r.amount, r.record.kind]), [[60000, 'budget']])
+  assert.equal((await h.view(`reports/detail?${new URLSearchParams({ report: 'budget-actual', line: JSON.stringify([s.acct['6200'], 'percent']), from: '2026-10-01', to: '2026-10-31', basis: 'accrual', budget: plan.id })}`)).figure, null)
+  const year = await h.view('reports/contractors?year=2026'), brightline = year.contractors.find(c => c.name === 'Brightline Software')
+  assert.equal(brightline.box1, 64000)
+  for (const metric of ['box1', 'excluded', 'unrecorded', 'reversed']) {
+    const d = await open({ report: 'contractors', line: JSON.stringify([brightline.id, metric]), from: '2026-01-01', to: '2026-12-31', basis: 'cash', year: '2026' }, brightline[metric])
+    assert.equal(d.basisLabel, 'Payment basis')
+    if (metric === 'box1') assert.deepEqual(d.rows.map(r => [r.record.kind, r.record.id]), [['payment', s.paid.x.id]])
+  }
+  const invalid = params => h.view(`reports/detail?${new URLSearchParams({ from: '2026-10-01', to: '2026-10-31', basis: 'accrual', ...params })}`, h.owner, 404)
+  await invalid({ report: 'sales-by-customer', line: 'nobody' })
+  await invalid({ report: 'profit-and-loss', line: s.acct['6200'], columns: 'prior-year', column: 'nope' })
+  await invalid({ report: 'budget-actual', line: JSON.stringify([s.acct['6200'], 'forecast']), budget: plan.id })
+  await invalid({ report: 'contractors', line: JSON.stringify(['nobody', 'box1']), year: '2026' })
+  await invalid({ report: 'profit-and-loss', line: 'bridge:recorded' })
+  assert.deepEqual((await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results, before, 'tracing and exports do not alter the ledger')
+})

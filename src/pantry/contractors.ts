@@ -27,12 +27,12 @@ export function threshold(year: number) {
 
 const masked = (tin: string, kind: string) => kind === 'ein' ? `••-•••${tin.slice(5)}` : `•••-••-${tin.slice(5)}`
 
-export async function contractors(db: D1Database, year: number) {
+/** Every vendor's payments in a calendar year with the 1099-NEC figures they make; the report and its drill-through share it. */
+export async function vendorYear(db: D1Database, year: number) {
   const from = `${year}-01-01`, to = `${year}-12-31`, limit = threshold(year)
   const vendors = await all(db, `SELECT c.id, c.name, c.is_1099, c.revision, t.legal_name, t.tin_kind, t.tin, t.address, t.city, t.state, t.zip FROM pt_contacts c LEFT JOIN pt_contractor_tax t ON t.contact_id = c.id WHERE c.kind = 'vendor' ORDER BY c.name`)
   const payments = await all(db, "SELECT id, contact_id, payment_date, amount_cents, method, reference, reversal_id FROM pt_payments WHERE direction = 'paid' AND payment_date BETWEEN ? AND ? ORDER BY payment_date, created_at, id", from, to)
-  const today = new Date().toISOString().slice(0, 10)
-  const list = vendors.map(v => {
+  return vendors.map(v => {
     const own = payments.filter(p => p.contact_id === v.id)
     const live = own.filter(p => !p.reversal_id), sum = (f: (p: Data) => boolean) => live.filter(f).reduce((s, p) => s + p.amount_cents, 0)
     const box1 = sum(p => COUNTED.has(p.method)), excluded = sum(p => EXCLUDED.has(p.method)), unrecorded = sum(p => p.method === 'unrecorded')
@@ -41,8 +41,13 @@ export async function contractors(db: D1Database, year: number) {
       tax: v.tin ? { legalName: v.legal_name, tinKind: v.tin_kind, tin: masked(v.tin, v.tin_kind), address: v.address, city: v.city, state: v.state, zip: v.zip } : null,
       box1, excluded, unrecorded, reversed: own.filter(p => p.reversal_id).reduce((s, p) => s + p.amount_cents, 0),
       overThreshold: box1 >= limit.cents, mayReach: box1 < limit.cents && box1 + unrecorded >= limit.cents, missing,
-      payments: own.map(p => ({ id: p.id, date: p.payment_date, amount: p.amount_cents, method: p.method, reference: p.reference, reversed: !!p.reversal_id, counts: !p.reversal_id && COUNTED.has(p.method) })) }
+      payments: own.map(p => ({ id: p.id, date: p.payment_date, amount: p.amount_cents, method: p.method, reference: p.reference, reversed: !!p.reversal_id, counts: !p.reversal_id && COUNTED.has(p.method), excluded: !p.reversal_id && EXCLUDED.has(p.method) })) }
   })
+}
+
+export async function contractors(db: D1Database, year: number) {
+  const to = `${year}-12-31`, limit = threshold(year), list = await vendorYear(db, year)
+  const today = new Date().toISOString().slice(0, 10)
   const marked = list.filter(v => v.is1099)
   return { basis: 'payment', year, threshold: limit.cents, thresholdNote: limit.note, yearEnded: today > to, dueBy: `${year + 1}-01-31`,
     contractors: marked, forms: marked.filter(v => v.overThreshold).map(v => ({ id: v.id, name: v.tax?.legalName ?? v.name, tin: v.tax?.tin ?? null, box1: v.box1, box4: 0, ready: !v.missing.length })),
