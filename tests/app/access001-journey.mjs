@@ -43,7 +43,7 @@ export async function access001Browser(t) {
         for (const label of ['Bill approval limit (USD)', 'Payment approval limit (USD)', 'Journal approval limit (USD)']) await people.getByLabel(label, { exact: true }).fill('5000')
       }
       await Promise.all([settings.waitForResponse(r => r.url().endsWith('/command/member.save') && r.status() === 200), people.getByRole('button', { name: 'Add person', exact: true }).click()])
-      await expect(people.getByRole('cell', { name: email, exact: true })).toBeVisible()
+      await expect(people.locator('td').filter({ hasText: email })).toBeVisible()
     }
     await people.screenshot({ path: `${evidence}/access001-people-${width}.png` })
     const privacy = settings.locator('section.card').filter({ has: settings.getByRole('heading', { name: 'Role privacy', exact: true }) })
@@ -56,10 +56,13 @@ export async function access001Browser(t) {
     }
     const sales = await signIn('sales'), salesPage = await sales.newPage()
     await salesPage.goto(`${origin}/app/bank`)
+    await expect(salesPage.getByRole('heading', { name: 'Access restricted', exact: true })).toBeVisible()
     await expect(salesPage.getByRole('navigation', { name: 'Work' }).getByRole('link', { name: 'Bank', exact: true })).toHaveCount(0)
     assert.equal((await sales.request.get(`${origin}/api/pantry/bank`)).status(), 403)
     await salesPage.screenshot({ path: `${evidence}/access001-sales-refused-${width}.png`, fullPage: true })
     await salesPage.goto(`${origin}/app/sales?tab=contacts`)
+    await expect(salesPage.getByRole('heading', { name: 'Sales & bills', exact: true })).toBeVisible()
+    await expect(salesPage.getByText('Cedar Workshop', { exact: true }).first()).toBeVisible()
     await expect(salesPage.getByRole('tab', { name: 'Bills', exact: true })).toHaveCount(0)
     await expect(salesPage.getByLabel('Kind', { exact: true })).toHaveCount(0)
     await salesPage.screenshot({ path: `${evidence}/access001-sales-${width}.png`, fullPage: true })
