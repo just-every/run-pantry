@@ -59,7 +59,7 @@ Writes: `POST /api/pantry/command/:action` with a JSON object.
 
 ## Sibling integrations: `/api/pantry/integration/v1/`
 
-The machine-readable OpenAPI 3.1 document is `GET /api/pantry/integration/v1/openapi.json`, using the same scoped bearer credential. It describes the currently implemented integration routes and their enforced 120-requests-per-credential fixed UTC-minute budget, response headers and `429`/`Retry-After` behavior. See the [request budget](docs/integrations.md#request-budget) for counting and retry semantics. The broader API-001 record surface and outbound webhook delivery remain partial.
+The machine-readable OpenAPI 3.1 document is `GET /api/pantry/integration/v1/openapi.json`, using the same scoped bearer credential. It describes the currently implemented integration routes and their enforced 120-requests-per-credential fixed UTC-minute budget, response headers and `429`/`Retry-After` behavior. See the [request budget](docs/integrations.md#request-budget) for counting and retry semantics. The broader API-001 record surface and outbound webhook delivery remain partial. Scoped invoice creates preserve native INVOICE-010 discounts, delivery charges, deposits and early-payment offers, including counting the issue-time deposit toward early settlement, and retain destination/exemption evidence with the native guards. See [invoice writes](docs/integrations.md#write-records) for input and retry semantics.
 
 See [Sibling integrations](docs/integrations.md) for owner-created scoped credentials, idempotent writes, record reads, bill readiness and a complete `curl` example. Integration credentials use this separate API and cannot sign in as people or use the proposal-only agent API.
 

@@ -360,3 +360,151 @@ test('API-001 / REPORT-002 scoped financial reports read native nonzero books, b
   assert.equal((await call('/reports/profit-and-loss?' + range)).status, 401)
   assert.equal((await call('/reports/transactions?' + range)).status, 401)
 })
+
+
+test('API-001 / INVOICE-010 scoped issuance counts the deposit toward the frozen early-payment offer and settles once like native invoices', async t => {
+  const h = await harness(); t.after(h.close)
+  const { acct } = await books(h)
+  const customer = await h.command('contact.save', { kind: 'customer', name: 'Magnolia Design' })
+  const bank = await h.command('bank-account.save', { name: 'Operating checking', institution: 'Community Bank', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-01-01', openingBalance: '0' })
+  const discounts = await h.command('account.save', { code: '4950', name: 'Sales discounts', type: 'income' })
+  await h.command('discount-settings.save', { discountAccountId: discounts.id })
+  const tax = await h.command('tax-code.save', { name: 'California 8.25%', rate: '8.25', accountId: acct['2200'], state: 'CA' })
+  await h.command('tax-code.early-treatment', { id: tax.id, revision: tax.revision, treatment: 'reduce' })
+  const credential = await h.command('integration.create', { name: 'Invoice terms import', scopes: ['invoices:write', 'payments:write', 'post'] })
+  const call = async (path, body, key) => {
+    const response = await h.send('/api/pantry/integration/v1/' + path, body, { headers: { authorization: `Bearer ${credential.token}`, ...(key ? { 'idempotency-key': key } : {}) } })
+    assert.equal(response.status, 200, JSON.stringify(response.value)); return response.value
+  }
+  const body = { customerId: customer.id, issueDate: '2026-10-17', dueDate: '2026-11-16', destinationState: 'CA',
+    lines: [{ description: 'Design services', quantity: '1', rate: '1000.00', accountId: acct['4000'], taxCode: tax.id },
+      { kind: 'delivery', description: 'Delivery', quantity: '1', rate: '40.00', accountId: acct['4000'], taxCode: tax.id }],
+    discounts: [{ type: 'percent', value: '10' }], deposit: { amount: '300.00', method: 'check', bankAccountId: bank.id, reference: '1042' }, earlyPayment: { percent: '2', days: 10 } }
+  const nativeDraft = await h.command('invoice.save-draft', { ...body, number: 'NATIVE-TERMS' })
+  await h.command('invoice.approve', { id: nativeDraft.id, revision: nativeDraft.revision })
+  const native = await h.command('invoice.issue', { id: nativeDraft.id })
+  const apiBody = { ...body, number: 'API-TERMS', post: true }
+  const [scoped, replay] = await Promise.all([call('invoices', apiBody, 'terms-invoice'), call('invoices', apiBody, 'terms-invoice')])
+  assert.equal(scoped.id, replay.id)
+  const deposits = await call('payments?invoiceId=' + scoped.id)
+  assert.equal(deposits.payments.length, 1)
+  assert.equal(deposits.payments[0].allocations[0].early_counted, 1, 'the issue-time deposit counts toward the early-payment offer')
+  for (const field of ['destination_state', 'discounts', 'discount_cents', 'tax_cents', 'total_cents', 'deposit', 'early_terms', 'early_offer', 'open_cents'])
+    assert.deepEqual(scoped[field], native[field], field)
+  assert.deepEqual([scoped.total_cents, scoped.open_cents, scoped.early_offer.discount, scoped.early_offer.reduction, scoped.early_offer.payBy], [101755, 71755, 1880, 155, 69720])
+  assert.deepEqual(scoped.lines.map(l => [l.line_kind, l.amount_cents, l.discount_cents, l.tax_cents]), [['item', 100000, 10000, 7425], ['delivery', 4000, 0, 330]])
+  const paymentBody = { direction: 'received', contactId: customer.id, date: '2026-10-27', amount: '697.20', bankAccountId: bank.id, reference: 'balance-1042', allocations: [{ targetId: scoped.id, amount: '697.20' }] }
+  const [paid, paidReplay] = await Promise.all([call('payments', paymentBody, 'terms-payment'), call('payments', paymentBody, 'terms-payment')])
+  assert.equal(paid.id, paidReplay.id)
+  await h.command('payment.record', { ...paymentBody, allocations: [{ targetId: native.id, amount: '697.20' }] })
+  const scopedAfter = (await call('invoices?id=' + scoped.id)).invoices[0]
+  assert.equal(scopedAfter.open_cents, 0, 'deposit plus the early amount settles the invoice')
+  assert.equal((await call('invoices', apiBody, 'terms-invoice')).open_cents, 0, 'replay returns the current settled record')
+  const scopedCredits = (await call('invoices')).invoices.filter(i => i.credit_for === scoped.id)
+  const nativeCredits = (await call('invoices')).invoices.filter(i => i.credit_for === native.id)
+  assert.equal(scopedCredits.length, 1); assert.equal(nativeCredits.length, 1)
+  for (const field of ['early_discount', 'total_cents', 'tax_cents', 'destination_state']) assert.deepEqual(scopedCredits[0][field], nativeCredits[0][field], field)
+  assert.deepEqual([scopedCredits[0].early_discount, scopedCredits[0].total_cents, scopedCredits[0].tax_cents], [1, 2035, 155])
+  assert.equal((await call('payments?invoiceId=' + scoped.id)).payments.length, 2, 'replays create no extra deposit or payment')
+  for (const basis of ['cash', 'accrual']) {
+    const report = await h.view(`reports/sales-tax?from=2026-10-01&to=2026-10-31&basis=${basis}`)
+    assert.equal(report.ledger.ties, true, `${basis} sales-tax ledger tie`)
+  }
+})
+
+test('API-001 scoped drafts and issued invoices retain the same destination and certificate snapshot as native invoices', async t => {
+  const h = await harness(); t.after(h.close)
+  const { acct } = await books(h)
+  const customer = await h.command('contact.save', { kind: 'customer', name: 'Resale Workshop' })
+  const tax = await h.command('tax-code.save', { name: 'California 8.25%', rate: '8.25', accountId: acct['2200'], state: 'CA' })
+  const certificate = await h.command('exemption.save', { customerId: customer.id, states: ['CA'], validFrom: '2026-01-01', expiresOn: '2099-12-31', certificateNumber: 'RESALE-1042', name: 'Resale certificate.txt', mediaType: 'text/plain', base64: Buffer.from('Synthetic resale certificate for public-door integration proof').toString('base64') })
+  const credential = await h.command('integration.create', { name: 'Resale invoices', scopes: ['invoices:write', 'post'] })
+  const send = (body, key) => h.send('/api/pantry/integration/v1/invoices', body, { headers: { authorization: `Bearer ${credential.token}`, 'idempotency-key': key } })
+  const body = { customerId: customer.id, issueDate: '2026-10-17', destinationState: 'CA', lines: [{ description: 'Design package', rate: '100.00', accountId: acct['4000'], taxCode: tax.id }] }
+  const native = await h.command('invoice.save-draft', { ...body, number: 'RESALE-NATIVE' })
+  let scopedDraft
+  for (const post of [false, true]) {
+    const response = await send({ ...body, number: 'RESALE-API-' + post, post }, 'resale-' + post)
+    assert.equal(response.status, 200, JSON.stringify(response.value))
+    const scoped = response.value
+    assert.equal(scoped.destination_state, 'CA')
+    assert.deepEqual(JSON.parse(scoped.exemption_evidence), JSON.parse(native.exemption_evidence))
+    assert.equal(JSON.parse(scoped.exemption_evidence).id, certificate.id)
+    assert.deepEqual([scoped.tax_cents, scoped.total_cents, scoped.lines[0].tax_code, scoped.lines[0].chosen_tax_code], [0, 10000, 'exempt', tax.id])
+    assert.equal(scoped.status, post ? 'issued' : 'draft')
+    if (!post) scopedDraft = scoped
+    assert.equal((await send({ ...body, number: 'RESALE-API-' + post, post }, 'resale-' + post)).value.id, scoped.id)
+  }
+  await h.command('exemption.retire', { id: certificate.id, reason: 'Customer withdrew this certificate' })
+  const after = await send({ ...body, number: 'RESALE-AFTER', post: true }, 'resale-after')
+  assert.equal(after.status, 200, JSON.stringify(after.value))
+  assert.equal(after.value.exemption_evidence, null)
+  assert.equal(after.value.tax_cents, 825, 'a retired certificate cannot exempt a new API invoice')
+  const nativeAfter = await h.command('invoice.save-draft', { ...body, number: 'RESALE-AFTER-NATIVE' })
+  assert.equal(after.value.tax_cents, nativeAfter.tax_cents)
+  await h.command('invoice.approve', { id: native.id, revision: native.revision }, h.owner, 409)
+  await h.command('invoice.approve', { id: scopedDraft.id, revision: scopedDraft.revision }, h.owner, 409)
+})
+
+
+test('API-001 / INVOICE-010 scoped discount, delivery, deposit and early-term refusals match native doors without reserving failed keys', async t => {
+  const h = await harness(); t.after(h.close)
+  const { acct } = await books(h)
+  const customer = await h.command('contact.save', { kind: 'customer', name: 'Cedar Consulting' })
+  const bank = await h.command('bank-account.save', { name: 'Checking', institution: 'Community Bank', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-01-01', openingBalance: '0' })
+  const credential = await h.command('integration.create', { name: 'Invoice import', scopes: ['invoices:write', 'post'] })
+  const preparer = await h.command('integration.create', { name: 'Draft import', scopes: ['invoices:write'] })
+  const send = (body, key, token = credential.token) => h.send('/api/pantry/integration/v1/invoices', body, { headers: { authorization: `Bearer ${token}`, 'idempotency-key': key } })
+  const body = { customerId: customer.id, issueDate: '2026-10-17', dueDate: '2026-11-16', lines: [{ description: 'Services', rate: '100.00', accountId: acct['4000'], taxCode: 'exempt' }] }
+  const before = await h.view('reports/trial-balance?to=2026-12-31&basis=accrual')
+  const failedBody = { ...body, post: true, discounts: [{ type: 'percent', value: '10' }] }
+  const missingAccount = await send(failedBody, 'repair-discount-account')
+  assert.equal(missingAccount.status, 409)
+  assert.match(missingAccount.value.error, /discounts account/i)
+  const nativeDraft = await h.command('invoice.save-draft', { ...failedBody, number: 'NATIVE-MISSING-ACCOUNT' })
+  await h.command('invoice.approve', { id: nativeDraft.id, revision: nativeDraft.revision }, h.owner, 409)
+  const discounts = await h.command('account.save', { code: '4950', name: 'Sales discounts', type: 'income' })
+  await h.command('discount-settings.save', { discountAccountId: discounts.id })
+  const cases = [
+    { discounts: [{ type: 'percent', value: '0' }] },
+    { discounts: [{ type: 'amount', value: '100.01' }] },
+    { discounts: [{ type: 'percent', value: '10', lines: [2] }] },
+    { deposit: { amount: '100.01', method: 'check', bankAccountId: bank.id } },
+    { deposit: { amount: '10.00', method: 'barter', bankAccountId: bank.id } },
+    { deposit: { amount: '10.00', method: 'check', bankAccountId: bank.id, date: '2026-10-18' } },
+    { earlyPayment: { percent: '0', days: 10 } },
+    { earlyPayment: { percent: '100', days: 10 } },
+    { earlyPayment: { percent: '2.0001', days: 10 } },
+    { earlyPayment: { percent: '2', days: 31 } },
+    { earlyPayment: { percent: '2', days: 1.5 } },
+    { earlyPayment: { percent: '2', days: 10 }, deposit: { amount: '98.00', method: 'check', bankAccountId: bank.id } },
+  ]
+  for (const [i, bad] of cases.entries()) {
+    const response = await send({ ...body, ...bad, post: true }, 'invalid-' + i)
+    assert.equal(response.status, 400, JSON.stringify(response.value))
+    const native = await h.send('/api/pantry/command/invoice.save-draft', { ...body, ...bad }, { cookie: h.owner })
+    assert.equal(native.status, response.status)
+    assert.equal(native.value.error, response.value.error)
+  }
+  const undecidedTax = await h.command('tax-code.save', { name: 'Texas 8.25%', rate: '8.25', accountId: acct['2200'], state: 'TX' })
+  const undecidedBody = { ...body, lines: [{ ...body.lines[0], taxCode: undecidedTax.id }], earlyPayment: { percent: '2', days: 10 } }
+  const undecided = await send({ ...undecidedBody, post: true }, 'undecided')
+  assert.equal(undecided.status, 409); assert.match(undecided.value.error, /treatment/i)
+  const undecidedDraft = await h.command('invoice.save-draft', undecidedBody)
+  await h.command('invoice.approve', { id: undecidedDraft.id, revision: undecidedDraft.revision }, h.owner, 409)
+  assert.equal((await send({ ...body, post: true }, 'no-post', preparer.token)).status, 403)
+  const prepared = await send({ ...body, earlyPayment: { percent: '2', days: 10 } }, 'draft-terms', preparer.token)
+  assert.equal(prepared.status, 200); assert.equal(prepared.value.status, 'draft')
+  assert.equal(prepared.value.early_offer.discount, 200)
+  await h.db.prepare("INSERT INTO pt_periods (id,start_date,end_date,status,revision) VALUES ('2026-11','2026-11-01','2026-11-30','locked','locked')").run()
+  for (const post of [false, true]) {
+    assert.equal((await send({ ...body, issueDate: '2026-11-01', post }, 'locked-' + post)).status, 409)
+  }
+  assert.deepEqual(await h.view('reports/trial-balance?to=2026-12-31&basis=accrual'), before, 'drafts and refused inputs post nothing')
+  const recovered = await send(failedBody, 'repair-discount-account')
+  assert.equal(recovered.status, 200, JSON.stringify(recovered.value))
+  assert.equal(recovered.value.total_cents, 9000)
+  assert.equal(recovered.value.status, 'issued', 'a failed create did not reserve the idempotency key')
+  const changed = await send({ ...failedBody, memo: 'different request' }, 'repair-discount-account')
+  assert.equal(changed.status, 409)
+})
