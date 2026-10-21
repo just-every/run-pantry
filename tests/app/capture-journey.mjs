@@ -63,12 +63,15 @@ export async function captureJourney(t) {
       else await page.getByLabel('Take a photo', { exact: true }).setInputFiles(image)
       const editor = page.getByRole('group', { name: 'Receipt photo region editor' })
       await editor.waitFor()
+      await editor.locator('img').evaluate(image => image.decode())
       await editor.scrollIntoViewIfNeeded()
       // Pointer selection on desktop; the same photo has fully accessible numeric selection on phone.
       if (width === 1440) {
         const bounds = await editor.boundingBox(); assert.ok(bounds)
         await page.mouse.move(bounds.x + bounds.width * .07, bounds.y + bounds.height * .0556)
+        assert.ok(bounds.height > 100)
         await page.mouse.down(); await page.mouse.move(bounds.x + bounds.width * .45, bounds.y + bounds.height * .9333); await page.mouse.up()
+        await page.getByLabel('Receipt 1 left (%)', { exact: true }).waitFor()
       } else await page.getByRole('button', { name: 'Add receipt region', exact: true }).click()
       if (width === 390) for (const [field, value] of [['left', '7'], ['top', '5.56'], ['width', '38'], ['height', '87.77']]) await page.getByLabel(`Receipt 1 ${field} (%)`, { exact: true }).fill(value)
       await page.getByRole('button', { name: 'Add receipt region', exact: true }).click()
