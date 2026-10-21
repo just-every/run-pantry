@@ -15,7 +15,7 @@ export async function dataFlows(c: Context) {
   await ownerSession(c)
   const [feeds, stripe, gusto, xero, model, inbox, hooks, integrations, agents] = await Promise.all([
     all(c.db, 'SELECT institution_name,status FROM pt_feed_items ORDER BY institution_name'),
-    one(c.db, 'SELECT account_name FROM pt_stripe WHERE id=1'),
+    one(c.db, 'SELECT account_name,country,settlement_currency FROM pt_stripe WHERE id=1'),
     one(c.db, 'SELECT company_name FROM pt_gusto WHERE id=1'),
     one(c.db, 'SELECT status,tenant_name FROM pt_xero_connection WHERE id=1'),
     readerState(c.db,c.env), inboxView(c), webhookSettings(c),
@@ -26,7 +26,7 @@ export async function dataFlows(c: Context) {
   const states: Record<string, { connected: boolean; detail: string; unavailable?: string }> = {
     hosting: {connected:c.env.AUTH_LOCAL!=='true',detail:c.env.AUTH_LOCAL==='true'?'Local Worker and database; no Cloudflare deployment connection':'Deployed Worker and database in the installation’s configured hosting account'},
     plaid: { connected: feeds.some(f=>f.status==='active'||f.status==='relink'), detail: feeds.map(f=>`${f.institution_name}: ${f.status}`).join('; ') || 'No bank connected', ...(!plaidAvailability(c.env).available ? {unavailable:'Application keys or this hosting path are unavailable; statement files still work.'}: {}) },
-    stripe: { connected: !!stripe, detail: stripe?.account_name ?? 'No Stripe account connected', ...(managedInstall(c.env)?{unavailable:'This hosting path cannot reach Stripe.'}:{}) },
+    stripe: { connected: !!stripe, detail: stripe?`${stripe.account_name} · ${stripe.country} account · settles ${String(stripe.settlement_currency).toUpperCase()}`:'No Stripe account connected', ...(managedInstall(c.env)?{unavailable:'This hosting path cannot reach Stripe.'}:{}) },
     gusto: { connected: !!gusto, detail: gusto?.company_name ?? 'No payroll company connected', ...(!gustoAvailability(c.env).available?{unavailable:'Application keys or this hosting path are unavailable.'}:{}) },
     xero: { connected: xero?.status==='connected', detail: xero?.tenant_name ?? 'No Xero organisation connected', ...(!xeroAvailability(c.env).available?{unavailable:'Application keys or this hosting path are unavailable; report files still work.'}:{}) },
     model: { connected:'config' in model, detail:'config' in model?`${model.config.provider} · ${model.config.model} · ${new URL(model.config.endpoint).host}`:'Manual capture; model reading and reasoning are off' },
