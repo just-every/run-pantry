@@ -37,7 +37,7 @@ export async function effectsJourney(t) {
     const effects = page.getByRole('region', { name: 'Effects before approval' })
     await expect(effects).toBeVisible()
     await expect(effects).toContainText('September 2026 is locked')
-    await expect(effects).toContainText('Net income before -$3,000.00 → after $0.00')
+    await expect(effects).toContainText('Net income before −$3,000.00 → after $0.00')
     await expect(effects).toContainText('Equipment')
     await expect(effects.getByRole('button', { name: 'Request reopening of September 2026' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Approve and post', exact: true })).toBeDisabled()
