@@ -174,7 +174,7 @@ api.get('/api/pantry/budgets/:id/report.csv', async c => {
 view('recognition', async (ctx, c) => recognitionView(ctx.db, day(c, 'to')))
 // A figure's address: its report and line, the range and basis, and the filters, columns, budget or tax year it was read under.
 const figureQuery = async (db: D1Database, c: C, from: string, to: string): Promise<FigureQuery> => ({ report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: await reportBasis(db, c.req.query('basis')),
-  account: c.req.query('account'), columns: c.req.query('columns'), column: c.req.query('column'), budget: c.req.query('budget'), year: c.req.query('year') })
+  account: c.req.query('account'), columns: c.req.query('columns'), column: c.req.query('column'), budget: c.req.query('budget'), year: c.req.query('year'), payee: c.req.query('payee') })
 api.get('/api/pantry/reports/detail/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const entity = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')

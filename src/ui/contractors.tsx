@@ -30,13 +30,13 @@ function Details({ c, onDone }: { c: D; onDone: () => Promise<void> }) {
 }
 
 function Payments({ c, onDone }: { c: D; onDone: () => Promise<void> }) {
-  const { state } = useShared()
+  const { state } = useShared(), search = useSearch({ from: '/app/reports' })
   return <Table heads={['Date', 'Reference', 'Paid by', 'Amount', 'In box 1']} figures={[3]} empty="No payments recorded in this year.">
     {c.payments.map((p: D) => <tr key={p.id} className={p.reversed ? 'muted' : ''}><td>{day(p.date)}</td><td className="nowrap">{p.reference || '—'}</td>
       <td>{p.method === 'unrecorded' && state.actor.can.record
         ? <select aria-label={`How the ${p.date} payment was made`} defaultValue="" onChange={async e => { if (e.target.value) { await command('payment.set-method', { id: p.id, method: e.target.value }); await onDone() } }}><option value="">Not recorded — choose…</option>{METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}</select>
         : METHOD[p.method]}</td>
-      <td className="fig">{usd(p.amount)}</td><td>{p.reversed ? 'Reversed' : p.counts ? 'Yes' : p.method === 'unrecorded' ? 'Not until the method is set' : 'No, reported on a 1099-K'}</td></tr>)}
+      <td className="fig"><Link to="/app/reports" search={{ ...search, record: `payment:${p.id}` }}>{usd(p.amount)}</Link></td><td>{p.reversed ? 'Reversed' : p.counts ? 'Yes' : p.method === 'unrecorded' ? 'Not until the method is set' : 'No, reported on a 1099-K'}</td></tr>)}
   </Table>
 }
 

@@ -48,16 +48,19 @@ export function ReportLibrary({ slug, from, to, basis }: { slug: string; from: s
   const search = useSearch({ from: '/app/reports' })
   const { data: report, error } = useView<LibraryReport>(`reports/${slug}?${libraryQuery(slug, from, to, basis, search.account, search.payee)}`)
   if (!report) return <Loading error={error} what="the report" />
+  // Money cells and totals open to the lines, payments, open items or statement behind them.
+  const drill = slug !== 'audit-log'
+  const figure = (id: string, index: number, amount: number) => drill ? <Link to="/app/reports" search={{ ...search, line: JSON.stringify([id, String(index)]), record: undefined }} className="figure-link">{usd(amount)}</Link> : usd(amount)
   const sources = report.rows.some(row => row.record || row.href), details = report.rows.some(row => row.details !== undefined && row.details !== null)
   return <>
     <p className="hint">{report.note}</p>
     <Table heads={[...report.columns, ...(sources ? ['Source'] : []), ...(details ? ['Details'] : [])]} figures={report.moneyColumns} caption={report.title} empty="No records in this range.">
       {report.rows.map(row => <tr key={row.id}>
-        {row.cells.map((cell, index) => <td key={index} className={report.moneyColumns.includes(index) ? 'fig' : undefined}>{report.moneyColumns.includes(index) && typeof cell === 'number' ? usd(cell) : cell}</td>)}
+        {row.cells.map((cell, index) => <td key={index} className={report.moneyColumns.includes(index) ? 'fig' : undefined}>{report.moneyColumns.includes(index) && typeof cell === 'number' ? figure(row.id, index, cell) : cell}</td>)}
         {sources && <td>{row.record ? <Link to="/app/reports" search={{ ...search, line: undefined, record: row.record }}>View record</Link> : row.href ? <a href={row.href}>View source</a> : '—'}</td>}
         {details && <td>{row.details !== undefined && row.details !== null && <details className="details"><summary>Details</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(row.details, null, 2)}</pre></details>}</td>}
       </tr>)}
     </Table>
-    {report.totals.length > 0 && <Table heads={['Total', 'Amount']} figures={[1]}>{report.totals.map((total, index) => <tr key={index} className="total"><td>{total.label}</td><td className="fig">{usd(total.amount)}</td></tr>)}</Table>}
+    {report.totals.length > 0 && <Table heads={['Total', 'Amount']} figures={[1]}>{report.totals.map((total, index) => <tr key={index} className="total"><td>{total.label}</td><td className="fig">{figure('total', index, total.amount)}</td></tr>)}</Table>}
   </>
 }

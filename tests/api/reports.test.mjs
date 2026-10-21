@@ -738,15 +738,9 @@ test('REPORT-005 trial-balance balances/totals and every general-ledger cell tra
   assert.deepEqual((await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results, before, 'tracing and exports do not alter the ledger')
 })
 
-test('REPORT-005 grouped sales/spend, comparison and customer columns, the cash bridge, budget and 1099 figures open to native sources and export with their filters', async t => {
-  const h = await harness(); t.after(() => h.close())
-  const s = await october(h, true)
-  await h.command('contractor.save', { contactId: s.c['Brightline Software'].id, is1099: true })
-  const plan = await h.command('budget.save', { name: 'Juniper 2026', startMonth: '2026-01', basis: 'accrual', cells: [
-    { accountId: s.acct['4000'], month: '2026-10', amount: '3100.00' }, { accountId: s.acct['6200'], month: '2026-10', amount: '0.00' },
-    { accountId: s.acct['6100'], month: '2026-10', amount: '1240.00' }, { accountId: s.acct['6100'], month: '2026-09', amount: '1000.00' }] })
-  const viewer = await h.member('figure-source-viewer@example.test', 'viewer')
-  const before = (await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results
+// Opens a report figure through the public door as a viewer and asserts it ties: its rows add up to it (or, for a derived
+// percentage, its operands open to their own values), each record opens once, and its export carries the figure's address.
+function figureOpener(h, viewer) {
   const parse = text => text.trim().split('\r\n').map(line => [...line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m => m[1].replaceAll('""', '"')))
   const records = new Set()
   const open = async (params, expected, exported = true) => {
@@ -758,7 +752,8 @@ test('REPORT-005 grouped sales/spend, comparison and customer columns, the cash 
     } else {
       assert.equal(d.total, expected, where); assert.equal(d.rows.reduce((n, r) => n + r.amount, 0), expected, where)
       assert.equal(new Set(d.rows.map(r => r.key)).size, d.rows.length, where)
-      for (const r of d.rows) if (r.record.kind !== 'budget' && !records.has(`${r.record.kind}:${r.record.id}`)) {
+      // Budget cells and statements open on their own screens (href); every other row opens its native record.
+      for (const r of d.rows) if (!r.record.href && !records.has(`${r.record.kind}:${r.record.id}`)) {
         assert.ok((await h.view(`reports/record/${r.record.kind}/${r.record.id}`, viewer)).title, where); records.add(`${r.record.kind}:${r.record.id}`)
       }
     }
@@ -771,6 +766,19 @@ test('REPORT-005 grouped sales/spend, comparison and customer columns, the cash 
     assert.deepEqual(JSON.parse(csv[1][11]), Object.fromEntries(query), 'the figure address and its filters travel with the export')
     return d
   }
+  return open
+}
+
+test('REPORT-005 grouped sales/spend, comparison and customer columns, the cash bridge, budget and 1099 figures open to native sources and export with their filters', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const s = await october(h, true)
+  await h.command('contractor.save', { contactId: s.c['Brightline Software'].id, is1099: true })
+  const plan = await h.command('budget.save', { name: 'Juniper 2026', startMonth: '2026-01', basis: 'accrual', cells: [
+    { accountId: s.acct['4000'], month: '2026-10', amount: '3100.00' }, { accountId: s.acct['6200'], month: '2026-10', amount: '0.00' },
+    { accountId: s.acct['6100'], month: '2026-10', amount: '1240.00' }, { accountId: s.acct['6100'], month: '2026-09', amount: '1000.00' }] })
+  const viewer = await h.member('figure-source-viewer@example.test', 'viewer')
+  const before = (await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results
+  const open = figureOpener(h, viewer)
   for (const basis of ['accrual', 'cash']) {
     const range = { from: '2026-10-01', to: '2026-10-31', basis }
     for (const report of ['sales-by-customer', 'expenses-by-vendor', 'sales-by-item']) {
@@ -814,4 +822,79 @@ test('REPORT-005 grouped sales/spend, comparison and customer columns, the cash 
   await invalid({ report: 'contractors', line: JSON.stringify(['nobody', 'box1']), year: '2026' })
   await invalid({ report: 'profit-and-loss', line: 'bridge:recorded' })
   assert.deepEqual((await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results, before, 'tracing and exports do not alter the ledger')
+})
+
+test('REPORT-005 ageing and everyday-library figures open to their open items, applications, payments and ledger lines with their filters and exports', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const s = await october(h, true)
+  await h.command('payment.record', { direction: 'received', contactId: s.c['Willow Services'].id, date: '2026-10-25', amount: '150.00', bankAccountId: s.bank.id, method: 'ach', reference: 'ACH ON ACCOUNT', allocations: [] })
+  await h.command('contractor.save', { contactId: s.c['Brightline Software'].id, is1099: true })
+  // October reconciles with the on-account receipt still outstanding.
+  const statement = await h.command('statement.import', { bankAccountId: s.bank.id, fileName: 'october.csv', content: 'Posting Date,Description,Amount\n10/15/2026,CHECK SOFTWARE,-640.00\n10/20/2026,CEDAR RECEIPT,500.00\n10/31/2026,SERVICE FEE,-12.00\n', opening: '10000.00', closing: '9848.00', start: '2026-10-01', end: '2026-10-31', confirmLast4: '4821' })
+  const reconcile = await h.view(`reconciliation/${statement.statement.id}`)
+  for (const [description, amount] of [['CHECK SOFTWARE', -64000], ['CEDAR RECEIPT', 50000], ['SERVICE FEE', -1200]]) {
+    const line = at(reconcile.lines, l => l.description === description)
+    if (!line.match_id) await h.command('match.approve', { bankLineIds: [line.id], journalLineIds: [at(reconcile.postings, p => Number(p.amount) === amount).id] })
+  }
+  assert.ok((await h.command('reconciliation.complete', { statementId: statement.statement.id })).completed)
+  const viewer = await h.member('ageing-source-viewer@example.test', 'viewer'), open = figureOpener(h, viewer)
+  const before = (await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results
+  for (const [report, asOf] of [['receivables', '2026-10-31'], ['payables', '2026-10-31'], ['receivables', '2026-11-30']]) {
+    const r = await h.view(`reports/${report}?to=${asOf}`), range = { from: `${asOf.slice(0, 8)}01`, to: asOf, basis: 'accrual' }
+    assert.equal(r.agrees, true)
+    for (const i of r.items) {
+      const d = await open({ report, line: JSON.stringify(['item', i.id]), ...range }, i.open)
+      assert.equal(d.rows[0].amount, i.total_cents, 'an open item starts from its original amount')
+    }
+    for (const [k, b] of r.buckets.entries()) await open({ report, line: JSON.stringify(['bucket', b]), ...range }, r.totals[k], k === 0)
+    for (const [part, value] of [['items', r.itemsTotal], ['unapplied', r.unapplied], ['subledger', r.subledger], ['control', r.control.balance]]) await open({ report, line: JSON.stringify([part]), ...range }, value)
+  }
+  const october31 = await h.view('reports/receivables?to=2026-10-31')
+  assert.equal(october31.unapplied, 15000)
+  // Each payment's receipt and its applications net to what is left unapplied: only the on-account payment remains.
+  const nets = new Map()
+  for (const r of (await h.view(`reports/detail?${new URLSearchParams({ report: 'receivables', line: JSON.stringify(['unapplied']), from: '2026-10-01', to: '2026-10-31', basis: 'accrual' })}`)).rows) nets.set(`${r.record.kind}:${r.record.label}`, (nets.get(`${r.record.kind}:${r.record.label}`) ?? 0) + r.amount)
+  assert.deepEqual([...nets].filter(([, n]) => n), [['payment:Payment from Willow Services', 15000]])
+  for (const kind of ['receivables-summary', 'payables-summary', 'open-invoices', 'unpaid-bills', 'customer-balances', 'vendor-balances', 'transactions', 'journal', 'deposits', 'check-detail', 'reconciliations', 'contractor-summary']) {
+    const ledger = kind === 'transactions' || kind === 'journal'
+    for (const basis of ledger ? ['accrual', 'cash'] : ['accrual']) for (const filters of ledger ? [{}, { account: s.acct['1000'] }, { payee: s.c['Cedar Studio'].id }] : [{}]) {
+      const params = { from: '2026-10-01', to: '2026-10-31', basis, ...filters }
+      const r = await h.view(`reports/${kind}?${new URLSearchParams(params)}`)
+      for (const [k, row] of r.rows.entries()) for (const index of r.moneyColumns) await open({ report: kind, line: JSON.stringify([row.id, String(index)]), ...params }, row.cells[index], k === 0)
+      for (const [index, total] of r.totals.entries()) await open({ report: kind, line: JSON.stringify(['total', String(index)]), ...params }, total.amount)
+    }
+  }
+  // The saved proof's outstanding figure opens to the on-account receipt no statement line cleared.
+  const outstanding = await h.view(`reports/detail?${new URLSearchParams({ report: 'reconciliations', line: JSON.stringify([statement.statement.id, '5']), from: '2026-10-01', to: '2026-10-31', basis: 'accrual' })}`)
+  assert.deepEqual(outstanding.rows.map(r => [r.record.label, r.amount]), [['Payment from Willow Services', 15000]])
+  const invalid = params => h.view(`reports/detail?${new URLSearchParams({ from: '2026-10-01', to: '2026-10-31', basis: 'accrual', ...params })}`, h.owner, 404)
+  await invalid({ report: 'receivables', line: JSON.stringify(['bucket', 'Someday']) })
+  await invalid({ report: 'payables', line: JSON.stringify(['item', 'nothing']) })
+  await invalid({ report: 'open-invoices', line: JSON.stringify(['total', '7']) })
+  await invalid({ report: 'audit-log', line: JSON.stringify(['total', '0']) })
+  assert.deepEqual((await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results, before, 'tracing and exports do not alter the ledger')
+})
+
+test('REPORT-005 sales tax figures by code, state and all states, exempt sales and the liability tie open to invoice lines, settled shares and postings on each basis', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const s = await october(h, true)
+  const viewer = await h.member('tax-source-viewer@example.test', 'viewer'), open = figureOpener(h, viewer)
+  const metrics = ['taxable', 'charged', 'collected', 'owed', 'kept', 'reduced', 'taxReduced']
+  for (const basis of ['accrual', 'cash']) {
+    const range = { from: '2026-10-01', to: '2026-10-31', basis }, r = await h.view(`reports/sales-tax?${OCT}&basis=${basis}`)
+    const tax = (line, expected, exported = true) => open({ report: 'sales-tax', line: JSON.stringify(line), ...range }, expected, exported)
+    for (const st of r.states) {
+      for (const c of st.codes) for (const m of metrics) await tax(['code', c.id, m], m in c ? c[m] : c.early[m], m === 'taxable')
+      for (const m of metrics) await tax(['state', st.state, m], m in st ? st[m] : st.early[m], m === 'owed')
+    }
+    for (const m of ['taxable', 'charged', 'collected', 'owed']) await tax(['total', m], r.totals[m])
+    await tax(['exempt', 'taxable'], r.exempt); await tax(['exempt', 'exempt'], r.earlyExempt)
+    for (const a of r.ledger.accounts) for (const part of ['opening', 'fromSales', 'other', 'closing', 'owed']) await tax(['account', a.id, part], a[part])
+    const nyc = r.states.find(x => x.state === 'NY').codes[0]
+    const taxable = await h.view(`reports/detail?${new URLSearchParams({ report: 'sales-tax', line: JSON.stringify(['code', nyc.id, 'taxable']), ...range })}`)
+    assert.deepEqual([...new Set(taxable.rows.map(x => x.record.id))], [s.inv.a.id], 'NYC taxable sales open to INV-0001')
+    if (basis === 'cash') assert.ok(taxable.rows.every(x => x.settlement.by.kind === 'payment' && x.bank !== undefined), 'cash shares name the payment that settled them')
+  }
+  const invalid = line => h.view(`reports/detail?${new URLSearchParams({ report: 'sales-tax', line: JSON.stringify(line), from: '2026-10-01', to: '2026-10-31', basis: 'accrual' })}`, h.owner, 404)
+  await invalid(['code', 'nope', 'taxable']); await invalid(['total', 'kept']); await invalid(['account', 'nope', 'opening']); await invalid(['exempt', 'owed'])
 })

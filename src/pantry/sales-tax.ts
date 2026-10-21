@@ -18,55 +18,71 @@ import { suggestionFor } from './early-payment-table'
 // discount on an exempt line is shown for information only.
 type Early = { reduced: number; taxReduced: number; kept: number; exempt: number }
 const noEarly = (): Early => ({ reduced: 0, taxReduced: 0, kept: 0, exempt: 0 })
-function addEarly(map: Map<string, Early>, key: string, treatment: string, amount: number, tax: number) {
-  const row = map.get(key) ?? noEarly()
-  if (treatment === 'reduce') { row.reduced += amount; row.taxReduced += tax } else if (treatment === 'retain') row.kept += amount; else row.exempt += amount
-  map.set(key, row)
-}
 
 type Row = { taxable: number; charged: number; collected: number; owed: number }
 const zero = (): Row => ({ taxable: 0, charged: 0, collected: 0, owed: 0 })
 const add = (a: Row, b: Partial<Row>) => { for (const k of ['taxable', 'charged', 'collected', 'owed'] as const) a[k] += b[k] ?? 0 }
 
-export async function salesTax(db: D1Database, from: string, to: string, basis: Basis) {
-  const codes = await all(db, 'SELECT t.*, a.code AS account_code, a.name AS account_name FROM pt_tax_codes t JOIN pt_accounts a ON a.id = t.account_id ORDER BY t.state, t.name')
-  const byCode = new Map<string, Row>([['exempt', zero()], ...codes.map(c => [c.id, zero()] as [string, Row])])
+/** One source line's share of one figure: invoiced (accrual), paid (settled shares) or an early-payment column. */
+export type Contribution = { set: 'accrual' | 'paid' | 'accrualEarly' | 'cashEarly'; key: string; metric: string; amount: number; source: Data }
+
+/** Every line the report adds up, so each figure and its drill-through read the same contributions. */
+export async function salesTaxContributions(db: D1Database, from: string, to: string): Promise<Contribution[]> {
+  const out: Contribution[] = []
+  const put = (set: Contribution['set'], key: string, metric: string, amount: number, source: Data) => { if (amount) out.push({ set, key, metric, amount, source }) }
+  const early = (set: 'accrualEarly' | 'cashEarly', key: string, treatment: string, amount: number, tax: number, source: Data) => {
+    if (treatment === 'reduce') { put(set, key, 'reduced', amount, source); put(set, key, 'taxReduced', tax, source) } else put(set, key, treatment === 'retain' ? 'kept' : 'exempt', amount, source)
+  }
   // Invoiced in the period (credits count against it): taxable sales and tax charged.
-  const invoiced = await all(db, `SELECT i.kind, i.early_discount, l.early_treatment, l.tax_code, l.amount_cents - l.discount_cents AS amount_cents, l.tax_cents FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
-    WHERE i.status = 'issued' AND i.journal_id IS NOT NULL AND i.write_off = 0 AND i.issue_date BETWEEN ? AND ?`, from, to)
+  const invoiced = await all(db, `SELECT i.id, i.number, i.kind, i.issue_date, i.credit_for, i.early_discount, l.id AS line_id, l.description, l.early_treatment, l.tax_code, l.amount_cents - l.discount_cents AS amount_cents, l.tax_cents FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
+    WHERE i.status = 'issued' AND i.journal_id IS NOT NULL AND i.write_off = 0 AND i.issue_date BETWEEN ? AND ? ORDER BY i.issue_date, i.number, l.line_no`, from, to)
   // A reversed early-payment discount gives back its reduction in the reversal's period.
-  const reversed = await all(db, `SELECT l.early_treatment, l.tax_code, l.amount_cents, l.tax_cents FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id JOIN pt_journal_entries r ON r.id = i.early_reversal_id
-    WHERE i.early_discount = 1 AND r.entry_date BETWEEN ? AND ?`, from, to)
-  const accrual = new Map<string, Row>(), accrualEarly = new Map<string, Early>(), cashEarly = new Map<string, Early>()
+  const reversed = await all(db, `SELECT i.id, i.number, i.kind, i.credit_for, r.id AS reversal_id, r.entry_date, l.id AS line_id, l.description, l.early_treatment, l.tax_code, l.amount_cents, l.tax_cents FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id JOIN pt_journal_entries r ON r.id = i.early_reversal_id
+    WHERE i.early_discount = 1 AND r.entry_date BETWEEN ? AND ? ORDER BY r.entry_date, i.number, l.line_no`, from, to)
   for (const l of reversed) {
-    const key = l.tax_code ?? 'exempt'
-    addEarly(accrualEarly, key, l.early_treatment, -l.amount_cents, -l.tax_cents)
-    if (l.early_treatment === 'reduce') { const row = accrual.get(key) ?? zero(); add(row, { taxable: l.amount_cents, charged: l.tax_cents }); accrual.set(key, row) }
+    const key = l.tax_code ?? 'exempt', source = { kind: 'reversal', ...l }
+    early('accrualEarly', key, l.early_treatment, -l.amount_cents, -l.tax_cents, source)
+    if (l.early_treatment === 'reduce') { put('accrual', key, 'taxable', l.amount_cents, source); put('accrual', key, 'charged', l.tax_cents, source) }
   }
   for (const l of invoiced) {
-    if (l.early_discount) { addEarly(accrualEarly, l.tax_code ?? 'exempt', l.early_treatment, l.amount_cents, l.tax_cents); if (l.early_treatment !== 'reduce') continue }
-    const s = l.kind === 'credit' ? -1 : 1, key = l.tax_code ?? 'exempt'
-    const row = accrual.get(key) ?? zero(); add(row, { taxable: s * l.amount_cents, charged: s * l.tax_cents }); accrual.set(key, row)
+    const key = l.tax_code ?? 'exempt', source = { kind: 'invoiced', ...l }
+    if (l.early_discount) { early('accrualEarly', key, l.early_treatment, l.amount_cents, l.tax_cents, source); if (l.early_treatment !== 'reduce') continue }
+    const sign = l.kind === 'credit' ? -1 : 1
+    put('accrual', key, 'taxable', sign * l.amount_cents, source); put('accrual', key, 'charged', sign * l.tax_cents, source)
   }
   // Paid in the period: the settled shares of each line and of its tax.
   const writeOffs = await writeOffCredits(db)
-  const paid = new Map<string, Row>()
-  for (const c of await cashLines(db, from, to)) {
+  for (const [index, c] of (await cashLines(db, from, to)).entries()) {
     if (c.docKind === 'bill' || (c.role !== 'sale' && c.role !== 'tax') || writtenOff(c, writeOffs)) continue
+    const key = c.taxCode ?? 'exempt', source = { kind: 'settled', index, line: c }
     if (c.early) {
-      addEarly(cashEarly, c.taxCode ?? 'exempt', c.early, c.role === 'sale' ? c.net : 0, c.role === 'tax' ? c.net : 0)
+      early('cashEarly', key, c.early, c.role === 'sale' ? c.net : 0, c.role === 'tax' ? c.net : 0, source)
       if (c.early !== 'reduce') continue
     }
-    const key = c.taxCode ?? 'exempt', row = paid.get(key) ?? zero()
-    add(row, c.role === 'sale' ? { taxable: -c.net } : { collected: -c.net }); paid.set(key, row)
+    put('paid', key, c.role === 'sale' ? 'taxable' : 'collected', -c.net, source)
   }
-  for (const [key, row] of byCode) {
-    const a = accrual.get(key) ?? zero(), p = paid.get(key) ?? zero()
-    Object.assign(row, { taxable: basis === 'cash' ? p.taxable : a.taxable, charged: a.charged, collected: p.collected, owed: basis === 'cash' ? p.collected : a.charged })
-  }
-  const earlyBy = basis === 'cash' ? cashEarly : accrualEarly
+  return out
+}
+
+/** Which contributions make a code's figure on a basis. */
+export function figureParts(metric: string, basis: Basis): [Contribution['set'], string] {
+  if (['reduced', 'taxReduced', 'kept', 'exempt'].includes(metric)) return [basis === 'cash' ? 'cashEarly' : 'accrualEarly', metric]
+  if (metric === 'charged') return ['accrual', 'charged']
+  if (metric === 'collected' || (metric === 'owed' && basis === 'cash')) return ['paid', 'collected']
+  if (metric === 'owed') return ['accrual', 'charged']
+  return [basis === 'cash' ? 'paid' : 'accrual', 'taxable']
+}
+
+export async function salesTax(db: D1Database, from: string, to: string, basis: Basis) {
+  const codes = await all(db, 'SELECT t.*, a.code AS account_code, a.name AS account_name FROM pt_tax_codes t JOIN pt_accounts a ON a.id = t.account_id ORDER BY t.state, t.name')
+  const contributions = await salesTaxContributions(db, from, to), sums = new Map<string, number>()
+  for (const c of contributions) sums.set(`${c.set}|${c.key}|${c.metric}`, (sums.get(`${c.set}|${c.key}|${c.metric}`) ?? 0) + c.amount)
+  const value = (key: string, metric: string) => { const [set, m] = figureParts(metric, basis); return sums.get(`${set}|${key}|${m}`) ?? 0 }
+  const row = (key: string): Row => ({ taxable: value(key, 'taxable'), charged: value(key, 'charged'), collected: value(key, 'collected'), owed: value(key, 'owed') })
+  const earlyOf = (key: string): Early => ({ reduced: value(key, 'reduced'), taxReduced: value(key, 'taxReduced'), kept: value(key, 'kept'), exempt: value(key, 'exempt') })
+  const byCode = new Map<string, Row>([['exempt', row('exempt')], ...codes.map(c => [c.id, row(c.id)] as [string, Row])])
   const codeRows = codes.map(c => ({ id: c.id, name: c.name, state: c.state, rate: c.rate_milli_percent, accountId: c.account_id, ...byCode.get(c.id)!,
-    early: earlyBy.get(c.id) ?? noEarly(), treatment: c.early_treatment, againstSuggestion: !!suggestionFor(c.state) && c.early_treatment !== 'undecided' && suggestionFor(c.state)!.suggested !== c.early_treatment }))
+    early: earlyOf(c.id), treatment: c.early_treatment, againstSuggestion: !!suggestionFor(c.state) && c.early_treatment !== 'undecided' && suggestionFor(c.state)!.suggested !== c.early_treatment }))
   const states = [...new Set(codes.map(c => c.state))].map(state => {
     const rows = codeRows.filter(r => r.state === state), total = zero(), early = noEarly()
     for (const r of rows) { add(total, r); for (const k of ['reduced', 'taxReduced', 'kept', 'exempt'] as const) early[k] += r.early[k] }
@@ -74,7 +90,7 @@ export async function salesTax(db: D1Database, from: string, to: string, basis: 
   })
   const totals = zero()
   for (const s of states) add(totals, s)
-  return { basis, from, to, states, exempt: byCode.get('exempt')!.taxable, totals, earlyExempt: (earlyBy.get('exempt') ?? noEarly()).exempt,
+  return { basis, from, to, states, exempt: byCode.get('exempt')!.taxable, totals, earlyExempt: earlyOf('exempt').exempt,
     earlyColumns: ['Early-payment discounts, tax kept', 'Early-payment discounts, tax reduced', 'Tax reduced'],
     againstSuggestion: codeRows.filter(r => r.againstSuggestion).map(r => ({ id: r.id, name: r.name, state: r.state, treatment: r.treatment })),
     earlyItems: await earlyItems(db, from, to), ledger: await ledgerTie(db, from, to, basis, codeRows) }
@@ -89,8 +105,11 @@ async function earlyItems(db: D1Database, from: string, to: string) {
     discount: r.amount_cents, taxReduced: r.tax_cents, reversed: !!r.early_reversal_id, earlierPeriod: r.invoice_date < from, label: r.invoice_date < from ? 'Sale in an earlier period' : '' }))
 }
 
-const writeOffCredits = async (db: D1Database) => new Set((await all(db, 'SELECT id FROM pt_invoices WHERE write_off = 1')).map(r => r.id))
-const writtenOff = (c: CashLine, ids: Set<string>) => ids.has(c.docId) || (c.settlement?.creditId ? ids.has(c.settlement.creditId) : false)
+/** Liability postings that come from invoices and credits, or from reversing an early-payment discount credit. */
+export const FROM_SALES = "(e.source_kind IN ('invoice', 'credit') OR (e.source_kind = 'reversal' AND EXISTS (SELECT 1 FROM pt_invoices d WHERE d.journal_id = e.reverses_id AND d.early_discount = 1)))"
+
+export const writeOffCredits = async (db: D1Database) => new Set((await all(db, 'SELECT id FROM pt_invoices WHERE write_off = 1')).map(r => r.id))
+export const writtenOff = (c: CashLine, ids: Set<string>) => ids.has(c.docId) || (c.settlement?.creditId ? ids.has(c.settlement.creditId) : false)
 
 /** Each liability account: opening, tax from invoices and credits, everything else (payments to the state), closing. */
 async function ledgerTie(db: D1Database, from: string, to: string, basis: Basis, codes: Data[]) {
@@ -105,8 +124,7 @@ async function ledgerTie(db: D1Database, from: string, to: string, basis: Basis,
     const fromSales = basis === 'cash'
       ? cash.filter(c => c.accountId === a.id && c.role === 'tax').reduce((s, c) => s - c.net, 0)
       : Number((await one(db, `SELECT COALESCE(SUM(l.credit_cents - l.debit_cents), 0) AS n FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id
-          WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? AND l.account_id = ? AND (e.source_kind IN ('invoice', 'credit')
-            OR (e.source_kind = 'reversal' AND EXISTS (SELECT 1 FROM pt_invoices d WHERE d.journal_id = e.reverses_id AND d.early_discount = 1)))`, from, to, a.id))?.n ?? 0)
+          WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? AND l.account_id = ? AND ${FROM_SALES}`, from, to, a.id))?.n ?? 0)
     const owed = codes.filter(c => c.accountId === a.id).reduce((s, c) => s + c.owed, 0)
     const open = opening.get(a.id) ?? 0, close = closing.get(a.id) ?? 0
     rows.push({ id: a.id, code: a.code, name: a.name, opening: open, fromSales, other: close - open - fromSales, closing: close, owed, ties: fromSales === owed })

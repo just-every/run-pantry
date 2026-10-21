@@ -4,6 +4,7 @@
 import { daysBetween, longDay, requireThat, type Data } from './core'
 import { all, one } from './db'
 import { cashLines, sameOnCash, type Basis } from './basis'
+import { appliedAsOf, unappliedRows } from './open-items'
 
 type Balance = { id: string; code: string; name: string; type: string; subtype: string; debit: number; credit: number; net: number }
 
@@ -98,7 +99,7 @@ export async function balanceSheet(db: D1Database, asOf: string, startMonth: num
   return { basis, asOf, fyStart, assets, liabilities, equity, totalAssets, totalLiabilities, totalEquity, balanced: totalAssets === totalLiabilities + totalEquity }
 }
 
-const BUCKETS = ['Current', '1–30 days', '31–60 days', '61–90 days', 'Over 90 days']
+export const BUCKETS = ['Current', '1–30 days', '31–60 days', '61–90 days', 'Over 90 days']
 const bucket = (overdue: number) => overdue <= 0 ? 0 : overdue <= 30 ? 1 : overdue <= 60 ? 2 : overdue <= 90 ? 3 : 4
 
 /** Open items as of a date and their tie-out to the control account. */
@@ -106,22 +107,12 @@ export async function ageing(db: D1Database, kind: 'receivable' | 'payable', asO
   const items = kind === 'receivable'
     ? await all(db, "SELECT i.id, i.number AS ref, i.issue_date AS doc_date, i.due_date, i.total_cents, c.name AS contact, c.id AS contact_id FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id WHERE i.kind = 'invoice' AND i.status = 'issued' AND i.issue_date <= ? ORDER BY i.due_date, i.number, i.id", asOf)
     : await all(db, "SELECT b.id, b.reference AS ref, b.bill_date AS doc_date, b.due_date, b.total_cents, c.name AS contact, c.id AS contact_id FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id WHERE (b.status = 'posted' OR (b.opening = 1 AND b.status <> 'void')) AND b.bill_date <= ? ORDER BY b.due_date, b.reference, b.id", asOf)
-  const applied = new Map((await all(db, `SELECT a.target_id, SUM(a.amount_cents) AS n FROM pt_allocations a LEFT JOIN pt_payments p ON a.source_kind = 'payment' AND p.id = a.source_id
-    WHERE a.target_kind = ? AND a.allocation_date <= ? AND (a.source_kind = 'credit' OR (p.reversal_id IS NULL OR EXISTS (SELECT 1 FROM pt_journal_entries r WHERE r.id = p.reversal_id AND r.entry_date > ?))) AND (a.voided_on IS NULL OR a.voided_on > ?) GROUP BY a.target_id`, kind === 'receivable' ? 'invoice' : 'bill', asOf, asOf, asOf)).map(r => [r.target_id, Number(r.n)]))
+  const applied = new Map<string, number>()
+  for (const a of await appliedAsOf(db, kind, asOf)) applied.set(a.target_id, (applied.get(a.target_id) ?? 0) + a.amount_cents)
   const open = items.map(i => ({ ...i, open: i.total_cents - (applied.get(i.id) ?? 0), overdue: daysBetween(i.due_date, asOf) })).filter(i => i.open !== 0)
   for (const i of open) (i as Data).bucket = BUCKETS[bucket(i.overdue)]
   // Money received or credited but not yet applied lowers what is owed overall.
-  const unapplied = kind === 'receivable'
-    ? Number((await one(db, `SELECT
-        COALESCE((SELECT SUM(p.amount_cents) FROM pt_payments p WHERE p.direction = 'received' AND p.payment_date <= ? AND (p.reversal_id IS NULL OR EXISTS (SELECT 1 FROM pt_journal_entries r WHERE r.id = p.reversal_id AND r.entry_date > ?))), 0)
-        - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a JOIN pt_payments p ON p.id = a.source_id WHERE a.source_kind = 'payment' AND p.direction = 'received' AND a.allocation_date <= ? AND (p.reversal_id IS NULL OR EXISTS (SELECT 1 FROM pt_journal_entries r WHERE r.id = p.reversal_id AND r.entry_date > ?))), 0)
-        + COALESCE((SELECT SUM(i.total_cents) FROM pt_invoices i WHERE i.kind = 'credit' AND i.status = 'issued' AND i.issue_date <= ? AND (i.early_reversal_id IS NULL OR (SELECT r.entry_date FROM pt_journal_entries r WHERE r.id = i.early_reversal_id) > ?)), 0)
-        - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a WHERE a.source_kind = 'credit' AND a.target_kind = 'invoice' AND a.allocation_date <= ? AND (a.voided_on IS NULL OR a.voided_on > ?)), 0) AS n`, asOf, asOf, asOf, asOf, asOf, asOf, asOf, asOf))?.n ?? 0)
-    : Number((await one(db, `SELECT
-        COALESCE((SELECT SUM(p.amount_cents) FROM pt_payments p WHERE p.direction = 'paid' AND p.payment_date <= ? AND (p.reversal_id IS NULL OR EXISTS (SELECT 1 FROM pt_journal_entries r WHERE r.id = p.reversal_id AND r.entry_date > ?))), 0)
-        - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a JOIN pt_payments p ON p.id = a.source_id WHERE a.source_kind = 'payment' AND p.direction = 'paid' AND a.allocation_date <= ? AND (p.reversal_id IS NULL OR EXISTS (SELECT 1 FROM pt_journal_entries r WHERE r.id = p.reversal_id AND r.entry_date > ?))), 0)
-        + COALESCE((SELECT SUM(v.amount_cents) FROM pt_vendor_credits v WHERE v.credit_date <= ?), 0)
-        - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a WHERE a.source_kind = 'credit' AND a.target_kind = 'bill' AND a.allocation_date <= ?), 0) AS n`, asOf, asOf, asOf, asOf, asOf, asOf))?.n ?? 0)
+  const unapplied = (await unappliedRows(db, kind, asOf)).reduce((n, r) => n + r.amount, 0)
   const totals = BUCKETS.map(name => open.filter(i => (i as Data).bucket === name).reduce((s, i) => s + i.open, 0))
   const itemsTotal = open.reduce((s, i) => s + i.open, 0)
   const control = (await balances(db, asOf)).find(b => b.subtype === kind)

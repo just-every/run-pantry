@@ -1,5 +1,5 @@
 // Everyday report variants share the seed's posted ledger and native evidence.
-import { addDays, requireThat } from '../core'
+import { addDays, requireThat, type Data } from '../core'
 import { all } from '../db'
 import type { Basis } from '../basis'
 import { reconciliationState } from '../reconcile'
@@ -7,6 +7,13 @@ import { openItems } from './open-items'
 import { ledgerActivity, paymentActivity } from './activity'
 import { LIBRARY, isLibrary, type LibraryReport } from './types'
 export { isLibrary, LIBRARY } from './types'
+
+/** Payments to marked 1099 vendors in the range, unreversed as of its end, with their summary group and method class. */
+export async function contractorPayments(db: D1Database, from: string, to: string): Promise<Data[]> {
+  return (await all(db, `SELECT p.*, c.name, substr(p.payment_date,1,4) AS year FROM pt_payments p JOIN pt_contacts c ON c.id=p.contact_id
+    LEFT JOIN pt_journal_entries r ON r.id=p.reversal_id WHERE p.direction='paid' AND c.is_1099=1 AND p.payment_date BETWEEN ? AND ? AND (p.reversal_id IS NULL OR r.entry_date > ?) ORDER BY year,c.name,p.payment_date,p.id`, from, to, to))
+    .map(p => ({ ...p, group: `${p.contact_id}:${p.year}`, class: ['check', 'ach', 'wire', 'cash'].includes(p.method) ? 'counted' : ['card', 'payment-network'].includes(p.method) ? 'excluded' : 'unknown' }))
+}
 
 export async function libraryReport(db: D1Database, kind: string, from: string, to: string, basis: Basis, account?: string, payee?: string): Promise<LibraryReport> {
   requireThat(isLibrary(kind), 'Unknown library report', 404)
@@ -30,16 +37,15 @@ export async function libraryReport(db: D1Database, kind: string, from: string, 
       columns: ['When (UTC)', 'Actor', 'Action', 'Record kind', 'Record'], moneyColumns: [],
       rows: rows.map(r => ({ id: r.id, cells: [r.at, r.actor_email, r.action, r.subject_kind, r.subject_id], details: { ...r, detail: JSON.parse(r.detail) } })), totals: [] }
   } else if (kind === 'contractor-summary') {
-    const payments = await all(db, `SELECT p.*, c.name, substr(p.payment_date,1,4) AS year FROM pt_payments p JOIN pt_contacts c ON c.id=p.contact_id
-      LEFT JOIN pt_journal_entries r ON r.id=p.reversal_id WHERE p.direction='paid' AND c.is_1099=1 AND p.payment_date BETWEEN ? AND ? AND (p.reversal_id IS NULL OR r.entry_date > ?) ORDER BY year,c.name,p.payment_date,p.id`, from, to, to)
+    const payments = await contractorPayments(db, from, to)
     const grouped = new Map<string, { name: string; year: string; counted: number; excluded: number; unknown: number }>()
     for (const p of payments) {
-      const key = `${p.contact_id}:${p.year}`, r = grouped.get(key) ?? { name: p.name, year: p.year, counted: 0, excluded: 0, unknown: 0 }
-      r[['check', 'ach', 'wire', 'cash'].includes(p.method) ? 'counted' : ['card', 'payment-network'].includes(p.method) ? 'excluded' : 'unknown'] += p.amount_cents; grouped.set(key, r)
+      const key = p.group, r = grouped.get(key) ?? { name: p.name, year: p.year, counted: 0, excluded: 0, unknown: 0 }
+      r[p.class as 'counted' | 'excluded' | 'unknown'] += p.amount_cents; grouped.set(key, r)
     }
     data = { basis: 'payment', basisLabel: 'Payment basis', note: 'Marked 1099 vendors, grouped by payment calendar year within the inclusive range; card/network payments and unknown methods remain separate. This is a payment summary, not a filing or threshold determination.',
       columns: ['Tax year', 'Vendor', '1099-NEC eligible methods', 'Card/network excluded', 'Method not recorded'], moneyColumns: [2, 3, 4],
-      rows: [...grouped].map(([id, r]) => ({ id, cells: [r.year, r.name, r.counted, r.excluded, r.unknown] })), totals: [{ label: 'Eligible-method payments', amount: payments.filter(p => ['check', 'ach', 'wire', 'cash'].includes(p.method)).reduce((n, p) => n + p.amount_cents, 0) }] }
+      rows: [...grouped].map(([id, r]) => ({ id, cells: [r.year, r.name, r.counted, r.excluded, r.unknown] })), totals: [{ label: 'Eligible-method payments', amount: payments.filter(p => p.class === 'counted').reduce((n, p) => n + p.amount_cents, 0) }] }
   } else data = await openItems(db, kind, from, to)
   return { kind, title: LIBRARY[kind], from, to, basis: 'accrual', basisLabel: 'Open items - accrual basis', ...data } as LibraryReport
 }

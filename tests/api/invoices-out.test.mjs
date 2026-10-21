@@ -515,7 +515,7 @@ test('INVOICE-010 discounts, delivery charges and deposits on the invoice: tax o
   assert.equal(settings.revision.length > 0, true)
 })
 
-test('INVOICE-010 early-payment terms (with SALESTAX-001/002/004, INVOICE-001/003/005, PAY-001/002/004): per-code treatment, the offer approved with the invoice, an all-or-nothing linked discount credit in the window, reversal, Stripe and PAY-004, sales-tax columns and refusals', async t => {
+test('INVOICE-010 early-payment terms (with SALESTAX-001/002/004, INVOICE-001/003/005, PAY-001/002/004) and REPORT-005: per-code treatment, the offer approved with the invoice, an all-or-nothing linked discount credit in the window, reversal, Stripe and PAY-004, sales-tax columns and refusals', async t => {
   const KEY = 'sk_test_' + 'A1b2C3d4E5f6G7h8I9j0K1l2', sessions = new Map()
   const outbound = async request => {
     const url = new URL(request.url)
@@ -632,6 +632,16 @@ test('INVOICE-010 early-payment terms (with SALESTAX-001/002/004, INVOICE-001/00
   const cashReport = await h.view(`reports/sales-tax?from=${d0}&to=${day}&basis=cash`)
   assert.deepEqual([row(cashReport, ca.id).taxable, row(cashReport, ca.id).collected, row(cashReport, ca.id).early.reduced, row(cashReport, ny.id).taxable, row(cashReport, ny.id).collected, row(cashReport, ny.id).early.kept, cashReport.ledger.ties], [98000, 8085, 2000, 35000, 2800, 3500, true])
   assert.deepEqual(report.againstSuggestion.map(x => x.id), [wa.id])
+  // REPORT-005: the early-payment columns open to their discount credits, each linked to the invoice it discounts.
+  for (const [basis, r] of [['accrual', report], ['cash', cashReport]]) for (const [code, metric, credit, invoice] of [[ca.id, 'reduced', a2Credit, a2], [ca.id, 'taxReduced', a2Credit, a2], [ny.id, 'kept', a4Credit, a4]]) {
+    const d = await h.view(`reports/detail?${new URLSearchParams({ report: 'sales-tax', line: JSON.stringify(['code', code, metric]), from: d0, to: day, basis })}`)
+    assert.equal(d.figure, row(r, code).early[metric]); assert.ok(d.figure); assert.equal(d.ties, true)
+    assert.ok(d.rows.length && d.rows.every(x => [credit.id, invoice.id].includes(x.record.id)), `${basis} ${metric} rows open the discount credit or its invoice`)
+    if (basis === 'accrual') assert.ok(d.rows.every(x => x.record.id === credit.id && x.invoice.id === invoice.id))
+    assert.ok((await h.view(`reports/record/invoice/${credit.id}`)).links.some(l => l.id === invoice.id && l.note === 'Invoice this credit is for'))
+    const file = await h.send(`/api/pantry/reports/detail/export?${new URLSearchParams({ report: 'sales-tax', line: JSON.stringify(['code', code, metric]), from: d0, to: day, basis })}`, undefined, { cookie: h.owner })
+    assert.equal(file.status, 200); assert.ok(file.value.includes(credit.id) || file.value.includes(invoice.id))
+  }
   // A12: the nexus watch keeps gross sales.
   assert.equal(at((await h.view('sales-tax/nexus')).states, s => s.state === 'CA').sales, nexusBefore + 100000)
 

@@ -64,10 +64,10 @@ function Bridge({ b }: { b: D }) {
 
 function Ageing({ r }: { r: D }) {
   return <>
-    <p className={r.agrees ? 'tone-good' : 'tone-bad'}>{r.kind === 'receivable' ? 'Receivables' : 'Payables'} {usd(r.subledger)} {r.agrees ? 'agree to' : 'do not agree to'} {r.control ? `${r.control.name} ${usd(r.control.balance)}` : 'a control account'}{r.unapplied ? ` (after ${usd(r.unapplied)} received or credited but not yet applied)` : ''}.</p>
+    <p className={r.agrees ? 'tone-good' : 'tone-bad'}>{r.kind === 'receivable' ? 'Receivables' : 'Payables'} <Figure line={JSON.stringify(['subledger'])}>{usd(r.subledger)}</Figure> {r.agrees ? 'agree to' : 'do not agree to'} {r.control ? <>{r.control.name} <Figure line={JSON.stringify(['control'])}>{usd(r.control.balance)}</Figure></> : 'a control account'}{r.unapplied ? <> (after <Figure line={JSON.stringify(['unapplied'])}>{usd(r.unapplied)}</Figure> received or credited but not yet applied)</> : ''}.</p>
     <Table heads={['Who', 'Reference', 'Due', 'Days overdue', 'Bucket', 'Open']} figures={[3, 5]} empty="Nothing open.">
-      {[...r.items.map((i: D) => <tr key={i.id}><td>{i.contact}</td><td>{i.ref}<AskAccountant subjectKind={r.kind === 'receivable' ? 'invoice' : 'bill'} subjectId={i.id} label={`${i.ref} · ${i.contact} · ${usd(i.open)} open`} /></td><td>{day(i.due_date)}</td><td className="fig">{Math.max(0, i.overdue)}</td><td>{i.bucket}</td><td className="fig">{usd(i.open)}</td></tr>),
-        <tr key="t" className="total"><td>Total</td><td /><td /><td /><td>{r.buckets.map((b: string, k: number) => `${b} ${usd(r.totals[k])}`).join(' · ')}</td><td className="fig">{usd(r.itemsTotal)}</td></tr>]}
+      {[...r.items.map((i: D) => <tr key={i.id}><td>{i.contact}</td><td>{i.ref}<AskAccountant subjectKind={r.kind === 'receivable' ? 'invoice' : 'bill'} subjectId={i.id} label={`${i.ref} · ${i.contact} · ${usd(i.open)} open`} /></td><td>{day(i.due_date)}</td><td className="fig">{Math.max(0, i.overdue)}</td><td>{i.bucket}</td><td className="fig"><Figure line={JSON.stringify(['item', i.id])}>{usd(i.open)}</Figure></td></tr>),
+        <tr key="t" className="total"><td>Total</td><td /><td /><td /><td>{r.buckets.map((b: string, k: number) => <span key={b}>{k ? ' · ' : ''}{b} <Figure line={JSON.stringify(['bucket', b])}>{usd(r.totals[k])}</Figure></span>)}</td><td className="fig"><Figure line={JSON.stringify(['items'])}>{usd(r.itemsTotal)}</Figure></td></tr>]}
     </Table>
   </>
 }
@@ -118,7 +118,7 @@ export function Reports() {
   const to = search.to && isDay(search.to) ? search.to : today(), from = search.from && isDay(search.from) ? search.from : to.slice(0, 8) + '01'
   // The package is for a closed month: the one the dates point at once someone chooses them, else the last month locked.
   const period = !search.to && state.overview?.lastLocked ? state.overview.lastLocked : periodOf(to), q = basis === 'cash' ? '?basis=cash' : ''
-  const detail = ['profit-and-loss', 'balance-sheet', 'cash-flow', 'trial-balance', 'general-ledger', 'sales-by-customer', 'expenses-by-vendor', 'sales-by-item', 'budget-actual', 'contractors'].includes(slug) && search.line
+  const detail = (['profit-and-loss', 'balance-sheet', 'cash-flow', 'trial-balance', 'general-ledger', 'sales-by-customer', 'expenses-by-vendor', 'sales-by-item', 'budget-actual', 'contractors', 'receivables', 'payables', 'sales-tax'].includes(slug) || isLibraryReport(slug) && slug !== 'audit-log') && search.line
   // 1099 figures read a calendar tax year.
   const taxYear = Number(search.year) || Number(today().slice(0, 4)), [figureFrom, figureTo] = slug === 'contractors' ? [`${taxYear}-01-01`, `${taxYear}-12-31`] : [from, to]
   const library = isLibraryReport(slug), filtered = hasLibraryFilters(slug)

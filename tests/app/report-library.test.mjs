@@ -102,6 +102,14 @@ test('REPORT-005 Software figure to approved bill, PDF, payment and bank; source
   const state = await view(`reconciliation/${imported.statement.id}`)
   const paymentEntry = (await view(`reports/record/payment/${payment.id}`)).entries[0]
   if (!state.lines[0].match_id) await command('match.approve', { bankLineIds: [state.lines[0].id], journalLineIds: [state.postings.find(p => p.number === paymentEntry.number).id] })
+  // A 1099 vendor, a budget and a taxed open invoice for the 1099, budget, ageing and sales tax doors.
+  await command('contractor.save', { contactId: vendor.id, is1099: true })
+  await command('budget.save', { name: 'Juniper 2026', startMonth: '2026-01', basis: 'accrual', cells: [{ accountId: acct['6200'], month: '2026-10', amount: '500.00' }] })
+  const customer = await command('contact.save', { kind: 'customer', name: 'Cedar Studio', termsDays: 30 })
+  const nyc = await command('tax-code.save', { name: 'New York City', rate: '8.875', accountId: acct['2200'], state: 'NY' })
+  const invoiceDraft = await command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-10-05', lines: [{ description: 'Website design', quantity: '1', rate: '600.00', accountId: acct['4000'], taxCode: nyc.id }] })
+  await command('invoice.approve', { id: invoiceDraft.id, revision: invoiceDraft.revision })
+  const invoice = await command('invoice.issue', { id: invoiceDraft.id })
   const storageState = await owner.storageState()
   for (const width of [1440, 390]) {
     const context = await browser.newContext({ storageState, viewport: { width, height: width === 390 ? 844 : 1000 } }), page = await context.newPage(), errors = []
@@ -224,6 +232,25 @@ test('REPORT-005 Software figure to approved bill, PDF, payment and bank; source
     await page.getByText('Recalculates to the report figure', { exact: true }).waitFor()
     await page.getByRole('link', { name: 'Prior', exact: true }).waitFor()
     await shot('comparison-percent')
+    // 1099, budget, ageing, sales tax and library figures open the same way.
+    const opens = async (address, line, name, expected) => {
+      await page.goto(`${app.origin}/app/reports?${address}`)
+      await page.locator('a.figure-link').first().waitFor()
+      // The router quotes JSON-shaped strings in the address; compare the decoded selection.
+      const found = await page.locator('a.figure-link').evaluateAll(nodes => nodes.map(a => { const value = new URL(a.href).searchParams.get('line'); try { const parsed = JSON.parse(value); return typeof parsed === 'string' ? parsed : JSON.stringify(parsed) } catch { return value } }))
+      assert.ok(found.includes(line), `${name} figure ${line}`)
+      await page.locator('a.figure-link').nth(found.indexOf(line)).click()
+      await page.getByText('Adds up to the report figure', { exact: true }).waitFor()
+      await page.locator('.figure-total').getByText(money(expected), { exact: true }).waitFor()
+      await shot(name)
+    }
+    await opens('report=contractors&year=2026', JSON.stringify([vendor.id, 'box1']), 'contractors-box1', 64000)
+    await page.getByRole('link', { name: 'Payment to Brightline Software', exact: true }).first().waitFor()
+    await opens('report=budget-actual&from=2026-10-01&to=2026-10-31&basis=accrual', JSON.stringify([acct['6200'], 'variance']), 'budget-variance', 14000)
+    await opens('report=receivables&to=2026-10-31', JSON.stringify(['item', invoice.id]), 'receivables-item', 65325)
+    await opens('report=sales-tax&from=2026-10-01&to=2026-10-31&basis=accrual', JSON.stringify(['code', nyc.id, 'charged']), 'sales-tax-charged', 5325)
+    await page.getByRole('link', { name: `Invoice ${invoice.number} · Cedar Studio`, exact: true }).first().waitFor()
+    await opens('report=check-detail&from=2026-10-01&to=2026-10-31&basis=accrual', JSON.stringify([payment.id, '6']), 'check-detail-amount', 64000)
     assert.deepEqual(errors, []); await context.close()
   }
 })
