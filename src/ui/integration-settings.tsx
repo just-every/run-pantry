@@ -14,6 +14,7 @@ function NewCredential({ scopes, onCreated }: { scopes: Scope[]; onCreated: (cre
     return command('integration.create', { name: String(b.name).trim(), scopes: selected })
   }} onDone={onCreated}>
     <Field label="Integration name" name="name" required hint="For example, Pier, Cabin or Coffer. Use a separate credential for each connection." />
+    <p className="hint field-wide">Choose each record type separately. Read grants allow business records without writing or posting. Saved report and management package definition grants delegate access to all definitions of that type, separately from sharing with people. Security settings, credentials and webhook history remain owner-only.</p>
     <fieldset className="checks field-wide"><legend>Allowed scopes</legend>
       {scopes.map(scope => <label key={scope.id}>
         <input type="checkbox" name={scope.id} checked={selected.includes(scope.id)} onChange={e => setSelected(current => e.target.checked ? [...current, scope.id] : current.filter(id => id !== scope.id))} />

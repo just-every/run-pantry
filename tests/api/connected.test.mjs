@@ -85,6 +85,15 @@ test('REPORT-005 / PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees
   assert.equal(at(clearing.items,i=>i.id==='txn_3TestCharge23').status,'adopted',invoiceFirst?'checkout-first receipt is adopted':'importer confirms checkout before recognizing the charge')
   assert.equal((await h.view('sales')).payments.filter(p=>p.reference==='pi_card').length,1)
   assert.equal(clearing.items.length,items.data.length)
+  const reader=await h.command('integration.create',{name:'Processor observation reader',scopes:['processor-payments:read','processor-payouts:read','processor-clearing:read','processor-balances:read']})
+  for(const path of ['processor-payments','processor-payouts','processor-clearing','processor-balances']) {
+    const response=await h.send('/api/pantry/integration/v1/'+path,undefined,{headers:{authorization:`Bearer ${reader.token}`}})
+    assert.equal(response.status,200);assert.ok(response.value.records.length,'populated '+path)
+    const serialized=JSON.stringify(response.value)
+    for(const privateField of ['sealed','payment_intent','checkout_url','last_error','source_json','token_hash'])assert.ok(!serialized.includes('"'+privateField+'"'))
+    assert.ok(!serialized.includes(KEY))
+  }
+
   assert.ok(clearing.items.every(i=>['posted','adopted'].includes(i.status)))
   const charge = clearing.items.find(i => i.status === 'posted' && i.entryId)
   const chargeSource = await h.view(`reports/record/entry/${charge.entryId}`)

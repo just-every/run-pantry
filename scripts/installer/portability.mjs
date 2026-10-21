@@ -9,6 +9,10 @@ export default {
  // Receipts travel with the books; Base's source-bound portability journal
  // carries the restore fence. Neither journal contains erased field values.
  includeTables: ['pt_erasure_journal'],
+ excludeTables: ['pt_webhook_secrets','pt_webhook_events','pt_webhook_deliveries','pt_webhook_attempts'],
+ exportRow: (table,row) => table==='pt_webhook_subscriptions'?{...row,enabled:0,owner_id:''}:row,
+ importSafety: {pt_webhook_subscriptions:{enabled:[0],owner_id:['']}},
+ importRow: (table,row) => table==='pt_webhook_subscriptions'?{...row,enabled:0,owner_id:''}:row,
  replaceableTables: ['pt_retention_settings', 'pt_sending', 'pt_due_work', 'pt_books_agent', 'pt_invoice_document_settings', 'pt_invoice_templates'],
  requiredConfiguration: ['OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN', 'AUTH_ORIGIN', 'MAIL_PROVIDER', 'MAIL_FROM'],
  validateStaged: async ({ read }) => {

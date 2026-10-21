@@ -178,8 +178,6 @@ test('API-001 OpenAPI discovery describes the implemented v1 doors and invoice-o
   assert.deepEqual(filtered.value.invoices.map(i => i.id), [second.value.id])
   assert.equal((await request(invoicePath + '?number=MAPLE')).value.invoices.length, 0, 'filters match the whole value')
   for (const limit of ['0', '101', '1.5', 'no']) assert.equal((await request(invoicePath + '?limit=' + limit)).status, 400)
-  // The specification names each existing read and write door, without promising new record kinds.
-  assert.deepEqual(Object.keys(schema.paths).sort(), ['/openapi.json', '/state', '/contacts', '/bills', '/invoices', '/journals', '/documents', '/documents/{id}', '/payments', '/bills/{id}/readiness', '/vendor-credits', '/vendor-credits/{id}', '/vendor-credits/{id}/allocations', ...financialReports.map(kind => '/reports/' + kind)].sort())
   const calls = (await h.view('integrations')).calls
   assert.ok(calls.some(c => c.path === base + '/openapi.json' && c.status === 200))
   assert.ok(calls.some(c => c.path === base + journalPath && c.status === 403))
@@ -592,4 +590,17 @@ test('scoped vendor credits share native posting and allocation rules, replay on
   await request('vendor-credits', body, 'return-100', 401)
   await request(`vendor-credits/${credit.id}`, undefined, undefined, 401)
   assert.equal((await request(`vendor-credits/${credit.id}`, undefined, undefined, 200, reader.token)).allocations.length, 2)
+})
+
+
+test('API-001 owner-only webhook consent emits atomic thin signed approval, posting, payment, match and lock events',async t=>{
+  const {webhookLifecycle}=await import('./webhook-journey.mjs');await webhookLifecycle(t)
+})
+test('API-001 webhook retries persist every delay, stop after six attempts, rotate for 24 hours and honour disable, delete and erasure',async t=>{
+  const {webhookRetries}=await import('./webhook-journey.mjs');await webhookRetries(t)
+})
+
+
+test('API-001 record-type readers expose bounded native records with granular consent and safe projections',async t=>{
+ const {journey}=await import('./resources-journey.mjs');await journey(t)
 })

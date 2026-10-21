@@ -2,6 +2,8 @@
 // Schemas describe wire values; native parsers still enforce accounting rules.
 import { FINANCIAL_REPORTS } from '../report-reader'
 import { INTEGRATION_REQUESTS_PER_MINUTE } from './rate-limit'
+import { recordResources } from './resources'
+import { resourceSchema } from './resources/schema'
 
 type Schema = Record<string, unknown>
 const string = { type: 'string' }
@@ -34,14 +36,14 @@ const paths: Record<string, unknown> = {
   '/state': { get: operation('getState', 'Read account and tax-code mappings', ['any record scope'], object({ accounts: array(object({})), taxCodes: array(object({})), bankAccounts: array(object({})), contacts: array(ref('Record')), nextCursor: { type: ['string', 'null'] } }), [...paging, query('id'), query('name')], undefined, 'Contacts and their cursor appear only with contacts:write. Bank-account mappings appear only with payments:read or payments:write. This route creates no accounts.') },
 }
 for (const spec of [
-  { path: 'contacts', scope: 'contacts:write', key: 'contacts', filters: ['id', 'name'], body: 'ContactInput' },
-  { path: 'bills', scope: 'bills:write', key: 'bills', filters: ['id', 'reference'], body: 'BillInput' },
-  { path: 'invoices', scope: 'invoices:write', key: 'invoices', filters: ['id', 'number'], body: 'InvoiceInput' },
-  { path: 'journals', scope: 'journals:write', key: 'entries', filters: ['id', 'memo'], body: 'JournalInput' },
+  { path: 'contacts', scope: 'contacts:write', key: 'contacts', filters: ['id', 'name', 'kind', 'active'], body: 'ContactInput' },
+  { path: 'bills', scope: 'bills:write', key: 'bills', filters: ['id', 'reference', 'vendorId', 'status', 'date'], body: 'BillInput' },
+  { path: 'invoices', scope: 'invoices:write', key: 'invoices', filters: ['id', 'number', 'customerId', 'status', 'date'], body: 'InvoiceInput' },
+  { path: 'journals', scope: 'journals:write', key: 'entries', filters: ['id', 'memo', 'status', 'date'], body: 'JournalInput' },
   { path: 'documents', scope: 'documents:write', key: 'documents', filters: ['id', 'name', 'linkedId'], body: 'DocumentInput' },
   { path: 'payments', scope: 'payments:write', key: 'payments', filters: ['id', 'reference', 'billId', 'invoiceId'], body: 'PaymentInput' },
 ]) paths[`/${spec.path}`] = {
-  get: operation(`list${spec.path}`, `Read ${spec.path}`, spec.path === 'payments' ? ['payments:read OR payments:write'] : [spec.scope], list(spec.key), [...paging, ...spec.filters.map(name => query(name, string, name === 'billId' || name === 'invoiceId' ? 'Exact allocation target. billId takes precedence if both are supplied.' : 'Exact whole-value match.'))]),
+  get: operation(`list${spec.path}`, `Read ${spec.path}`, [spec.path + ':read OR ' + spec.scope], list(spec.key), [...paging, ...spec.filters.map(name => query(name, string, name === 'billId' || name === 'invoiceId' ? 'Exact allocation target. billId takes precedence if both are supplied.' : 'Exact whole-value match.'))]),
   post: operation(`create${spec.path}`, `Create ${spec.path}`, [spec.scope], ref('Record'), [key], spec.body, spec.path === 'payments' ? 'Also requires post; records money already moved, never initiates a transfer. post:false is refused.' : 'Bills, invoices and journals stay drafts unless post:true is supplied with the separate post scope. Native approvals, current invoice terms and period-lock checks apply.'),
 }
 paths['/vendor-credits'] = {
@@ -50,7 +52,7 @@ paths['/vendor-credits'] = {
 }
 paths['/vendor-credits/{id}'] = { get: operation('getVendorCredit', 'Read an exact vendor credit', ['vendor-credits:read OR vendor-credits:write'], ref('VendorCredit'), [id], undefined, 'Returns the native credit itself, including all allocations and unallocated_cents. Unknown IDs return 404.') }
 paths['/vendor-credits/{id}/allocations'] = { post: operation('allocateVendorCredit', 'Apply remaining vendor credit to bills', ['vendor-credits:write', 'post'], ref('VendorCredit'), [id, key], 'VendorCreditAllocationInput', `${vendorCreditWriteDescription} Allocation date defaults to the credit date and cannot precede it. At least one allocation is required.`) }
-paths['/documents/{id}'] = { get: { ...operation('downloadDocument', 'Download original document bytes', ['documents:write'], {}, [id]), responses: { 200: { description: 'Original bytes with the stored media type and attachment filename.', headers: rateHeaders, content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } } }, ...errors } } }
+paths['/documents/{id}'] = { get: { ...operation('downloadDocument', 'Download original document bytes', ['documents:read OR documents:write'], {}, [id]), responses: { 200: { description: 'Original bytes with the stored media type and attachment filename.', headers: rateHeaders, content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } } }, ...errors } } }
 paths['/bills/{id}/readiness'] = { post: operation('setBillReadiness', 'Record receipt and readiness of a posted bill', ['bills:write'], ref('Record'), [id, key], 'ReadinessInput', 'Both booleans are required. Ready requires received. This creates no payment; native period locks apply.') }
 for (const kind of FINANCIAL_REPORTS) paths[`/reports/${kind}`] = { get: operation(kind === 'trial-balance' ? 'getTrialBalance' : `getReport_${kind.replaceAll('-', '_')}`, `Read ${kind}`, ['reports:read'], kind === 'trial-balance' ? object({ basis: { enum: ['cash', 'accrual'] }, rows: array(object({})) }) : object({}), [
   query('to', day, 'Inclusive end date; defaults to today in UTC.'),
@@ -61,9 +63,20 @@ for (const kind of FINANCIAL_REPORTS) paths[`/reports/${kind}`] = { get: operati
   query('columns', { enum: ['single', 'prior-period', 'prior-year', 'months', 'quarters', 'ytd', 'customer'] }, 'Statement column mode; customer columns apply to profit-and-loss only.'),
 ], undefined, 'Returns the same native report fields, integer-cent figures, basis labels, source links and date-range semantics as the corresponding session-authenticated report. Links target the native app and retain its session requirements. This scope does not expose audit history, full TIN exports, custom-report shares, close packages or other native routes. No pagination applies to calculated report results.') }
 
+// All newly delegated records use an explicit field schema and the same bounded envelope.
+for (const spec of recordResources) {
+  const schema = resourceSchema(spec)
+  paths['/' + spec.path] = { get: operation('list_' + spec.path.replaceAll('-', '_'), 'Read ' + spec.path, [spec.scope], list('records', schema), [...paging, ...Object.keys(spec.filters).map(name => query(name, string, 'Exact whole-value match; filters combine with AND.'))], undefined, spec.description) }
+  paths['/' + spec.path + '/{id}'] = { get: operation('get_' + spec.path.replaceAll('-', '_'), 'Read an exact ' + spec.path + ' record', [spec.scope], schema, [id], undefined, spec.description) }
+}
+for (const family of ['contacts', 'invoices', 'bills', 'journals', 'payments']) paths['/' + family + '/{id}'] = {
+  get: operation('get_' + family, 'Read an exact ' + family + ' record', [family + ':read OR ' + family + ':write'], ref('Record'), [id], undefined, 'Uses native record calculations with an explicit safe field projection. No hosted-link tokens, credentials or arbitrary snapshots.'),
+}
+paths['/year-end/{year}'] = { get: operation('getYearEndReadiness', 'Read native fiscal-year close readiness', ['year-end:read'], object({ year: { type: 'integer' }, start: day, end: day, periods: array(string), locked: bool, ready: bool, revision: string, months: array(object({ id: string, status: string, ready: bool, tasksOpen: { type: 'integer' }, hasTasks: bool })), checks: array(object({ key: string, title: string, ok: bool })) }), [{ name: 'year', in: 'path', required: true, schema: { type: 'integer', minimum: 2000, maximum: 9998 } }], undefined, 'Native year-end readiness only; excludes tax identities, payroll records and financial statement snapshots. Read financial reports with reports:read and native REPORT-002 basis selection.') }
+
 export const integrationOpenApi = {
   openapi: '3.1.0',
-  info: { title: 'Pantry scoped integration API', version: '1.0.0', description: 'Implemented API-001 subset. Record responses retain native fields, including integer cents. Wider record coverage and signed outbound event webhooks with retry/delivery history remain unimplemented. No OAuth, money-movement or production-provider acceptance is implied.' },
+  info: { title: 'Pantry scoped integration API', version: '1.0.0', description: 'Scoped business records with explicit projections, including integer cents. Owner/security records stay native-owner only. Financial calculations use the native report readers and basis rules. No OAuth, money-movement or production-provider acceptance is implied.' },
   servers: [{ url: '/api/pantry/integration/v1', description: 'This Pantry installation' }],
   security: [{ integrationBearer: [] }], paths,
   'x-pantry-rate-limit': { requests: INTEGRATION_REQUESTS_PER_MINUTE, windowSeconds: 60, scope: 'credential', window: 'fixed UTC minute', description: 'Every valid, non-revoked credential request counts, including discovery, replays, refused scopes, invalid bodies and unknown routes. Excess requests return 429 without domain work and do not extend the window. Missing, invalid and revoked credentials return 401 before quota admission.' },

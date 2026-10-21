@@ -155,10 +155,20 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
     const amount = (invoice.open_cents / 100).toFixed(2)
     await command('payment.record', { direction: 'received', contactId: customer.id, date: '2026-09-30', amount, bankAccountId: invoiceState.bankAccounts[0].id, allocations: [{ targetId: invoice.id, amount }] })
   }
+  const webhook=await command('webhook.create',{destination:'https://receiver.example.test/pantry',events:['created']})
+  await command('contact.save',{kind:'customer',name:'Synthetic Pantry webhook enquiry',email:'synthetic-pantry-webhook@example.test'})
   const before = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(before.bytes, pdf)
   await context.close(); await server.stop()
   await ok(first, ['export', '--output', 'exports/pantry-books.rer'])
+  const archivedSubscriptions=[]
+  for await(const record of fileRecords(join(first,'exports/pantry-books.rer')))if(record.kind==='part')for(const item of record.items)if(item.kind==='row') {
+    assert.ok(!['pt_webhook_secrets','pt_webhook_events','pt_webhook_deliveries','pt_webhook_attempts'].includes(item.table),'secrets and pending deliveries are absent from the archive')
+    assert.ok(!JSON.stringify(item.row).includes(webhook.secret),'plaintext signing secret is absent')
+    if(item.table==='pt_webhook_subscriptions')archivedSubscriptions.push(item.row)
+  }
+  assert.equal(archivedSubscriptions.find(row=>row.id===webhook.id).enabled,0)
+
 
   // Restore into a fresh install, as the docs say: import first, then set up the owner.
   const second = await fresh(), port2 = await freePort()
@@ -172,6 +182,15 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   const restored = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(restored.view, before.view, 'the fresh install holds the same books')
   assert.deepEqual(restored.bytes, pdf, 'the document comes back byte for byte')
+  const restoredWebhooks=await (await context.request.get(`${server.origin}/api/pantry/webhooks`)).json()
+  const restoredSubscription=restoredWebhooks.subscriptions.find(row=>row.id===webhook.id)
+  assert.equal(restoredSubscription.enabled,false);assert.deepEqual(restoredWebhooks.history,[])
+  const enable=await context.request.post(`${server.origin}/api/pantry/command/webhook.set-enabled`,{headers:{origin:server.origin},data:{id:restoredSubscription.id,revision:restoredSubscription.revision,enabled:true}})
+  assert.equal(enable.status(),200)
+  const freshSecret=(await enable.json()).secret
+  assert.ok(typeof freshSecret==='string'&&freshSecret!==webhook.secret,'restoring requires a fresh signing secret')
+  assert.ok(!JSON.stringify(await (await context.request.get(`${server.origin}/api/pantry/webhooks`)).json()).includes(freshSecret))
+
   await context.close(); await server.stop()
 
   // A restore into a folder that holds books changes nothing and says what to do instead.

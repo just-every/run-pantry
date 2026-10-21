@@ -3,8 +3,10 @@ import { authority, type Integration, who } from '../access'
 import type { Command, Context } from '../context'
 import { list, now, requireThat, sha256, text, uid } from '../core'
 import { all, audit, changed, one, q, run } from '../db'
+import { READ_SCOPES } from './resources'
 
 export const SCOPES = [
+  ...READ_SCOPES,
   { id: 'contacts:write', label: 'Contacts', help: 'Read and upsert customers and vendors.' },
   { id: 'invoices:write', label: 'Invoices', help: 'Read and create invoices and credits.' },
   { id: 'bills:write', label: 'Bills', help: 'Read and create bills; mark received and ready to pay.' },

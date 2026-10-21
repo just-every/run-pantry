@@ -24,9 +24,9 @@ The credential cannot sign in as a person. It keeps working after the owner sign
 | `reports:read` | Read the 23 financial reports listed below, with native basis, range, column and filter semantics. |
 | `post` | In addition to a record's write scope, post bills, journals, external payments or vendor credits, allocate vendor credits, or issue invoices and credits. |
 
-A `:write` scope includes reading that record type. It does not grant access to the other record types. The `post` scope alone grants no record access. Without `post`, created bills, invoices and journals stay drafts for a person to review and post or issue in Pantry.
+Read-only connections select the explicit record-type grants in [Record-type readers](#record-type-readers), including contacts:read, invoices:read, bills:read, journals:read and documents:read. A `:write` scope includes reading its existing record type. It does not grant access to the other record types. The `post` scope alone grants no record access. Without `post`, created bills, invoices and journals stay drafts for a person to review and post or issue in Pantry.
 
-Payment recording needs both `payments:write` and `post`: it records money that already moved outside Pantry. Payments have no draft state. These credentials cannot move money, sign in, manage users, lock a period or reopen one. A sibling book still needs to map its records to Pantry's accounts, bank accounts, tax codes and contact IDs; this API does not supply an item catalogue or match suppliers for it.
+Payment recording needs both `payments:write` and `post`: it records money that already moved outside Pantry. Payments have no draft state. These credentials cannot move money, sign in, manage users, lock a period or reopen one. A sibling book still needs to map its records to Pantry's accounts, bank accounts, tax codes and contact IDs; the item catalogue is available with items:read, while contact matching remains governed by the existing native write rules.
 
 Recording or allocating vendor credits needs both `vendor-credits:write` and `post`. Vendor credits have no draft state. A read-only vendor-credit credential can read credits without the `post` grant.
 
@@ -53,12 +53,12 @@ All paths below follow `/api/pantry/integration/v1/`. List responses contain the
 | GET path | Scope | Response |
 | --- | --- | --- |
 | `state` | A granted record scope | `accounts`, `taxCodes`; also `contacts` when `contacts:write` is granted and `bankAccounts` when `payments:read` or `payments:write` is granted. |
-| `contacts?name=…` or `contacts?id=…` | `contacts:write` | `{ "contacts": […], "nextCursor": … }` |
-| `bills?reference=…` or `bills?id=…` | `bills:write` | `{ "bills": […], "nextCursor": … }` |
-| `invoices?number=…` or `invoices?id=…` | `invoices:write` | `{ "invoices": […], "nextCursor": … }` |
-| `journals?memo=…` or `journals?id=…` | `journals:write` | `{ "entries": […], "nextCursor": … }` |
-| `documents?name=…` | `documents:write` | `{ "documents": […], "nextCursor": … }` |
-| `documents/:id` | `documents:write` | The original document bytes, as a download. |
+| `contacts?name=…` or `contacts?id=…` | `contacts:read` or `contacts:write` | `{ "contacts": […], "nextCursor": … }` |
+| `bills?reference=…` or `bills?id=…` | `bills:read` or `bills:write` | `{ "bills": […], "nextCursor": … }` |
+| `invoices?number=…` or `invoices?id=…` | `invoices:read` or `invoices:write` | `{ "invoices": […], "nextCursor": … }` |
+| `journals?memo=…` or `journals?id=…` | `journals:read` or `journals:write` | `{ "entries": […], "nextCursor": … }` |
+| `documents?name=…` | `documents:read` or `documents:write` | `{ "documents": […], "nextCursor": … }` |
+| `documents/:id` | `documents:read` or `documents:write` | The original document bytes, as a download. |
 | `payments?billId=…`, `payments?invoiceId=…`, `payments?id=…` or `payments?reference=…` | `payments:read` or `payments:write` | `{ "payments": […], "nextCursor": … }`, including allocations and `reversal_id`. |
 | `vendor-credits?id=…`, `vendor-credits?vendorId=…` or `vendor-credits?reference=…` | `vendor-credits:read` or `vendor-credits:write` | `{ "vendorCredits": […], "nextCursor": … }`, including allocations and `unallocated_cents`. |
 | `vendor-credits/:id` | `vendor-credits:read` or `vendor-credits:write` | The exact native credit, including allocations and `unallocated_cents`; an unknown ID returns `404`. |
@@ -85,7 +85,7 @@ Each `bankAccounts` row contains `id`, `name`, `account_id`, `institution`, `num
 
 For example, read `reports/profit-and-loss?from=2026-10-01&to=2026-10-31&basis=cash&columns=prior-period`. The OpenAPI document names every supported report path and its parameters. Reads use the same credential budget and call history as the other v1 routes. They create no journal or idempotency claim.
 
-This transport does not expose the native audit-history report, full-TIN filing CSV, custom-report shares, close packages or native export routes. A report credential cannot use the people API or write records. Wider record coverage and signed outbound webhooks with retries and delivery history remain API-001 gaps.
+This transport does not expose the native audit-history report, full-TIN filing CSV, custom-report shares, close packages or native export routes. A report credential cannot use the people API or write records. Record-type read grants and their projections are documented below; outbound webhook delivery has its own owner configuration.
 
 ## Write records
 
@@ -131,7 +131,7 @@ Each write needs its own `Idempotency-Key`, including later allocations on the s
 
 Read credits through `GET vendor-credits` with exact `id`, `vendorId` and `reference` filters, which can be combined. Lists use the same exclusive stable record-ID `cursor` and `limit` (default and maximum `100`) as other record lists. The response is `{ "vendorCredits": […], "nextCursor": … }`; `GET vendor-credits/:id` returns the native credit itself. Both accept `vendor-credits:read` or `vendor-credits:write`.
 
-Credit responses use native field names such as `vendor_id`, `credit_date`, `account_id`, `journal_id`, integer `amount_cents` and `unallocated_cents`, and `allocations`. Each allocation contains `id`, `source_kind: "credit"`, `source_id`, `target_kind: "bill"`, `target_id`, integer `amount_cents`, `allocation_date`, `created_by` and `created_at`. Reads and writes use the existing credential budget and call log. Vendor-credit support does not complete the wider API-001 record surface or outbound webhooks.
+Credit responses use native field names such as `vendor_id`, `credit_date`, `account_id`, `journal_id`, integer `amount_cents` and `unallocated_cents`, and `allocations`. Each allocation contains `id`, `source_kind: "credit"`, `source_id`, `target_kind: "bill"`, `target_id`, integer `amount_cents`, `allocation_date`, `created_by` and `created_at`. Reads and writes use the existing credential budget and call log. Vendor-credit writes remain limited to their existing native posting and allocation pipeline.
 
 ## Example: send a bill, mark it ready and read payments
 
@@ -223,7 +223,7 @@ The inbound integration API does not need Pantry to make an outbound provider ca
 
 RER Managed has no outbound provider connection for seed integrations and no relay. Provider calls there say plainly that they are not available yet. On a self-hosted Pantry, configured provider connections can make those calls. This is separate from access to the inbound integration API.
 
-This page covers these scoped endpoints. It does not promise webhooks or the wider API-001 surface. People and proposal-only agent access are described separately in the repository's `API.md`.
+This page covers the versioned scoped business-record surface. People and proposal-only agent access are described separately in the repository's `API.md`.
 
 ## Machine-readable API description (API-001)
 
@@ -237,4 +237,79 @@ Every valid, non-revoked integration credential has **120 requests per fixed UTC
 
 Admitted responses carry `X-RateLimit-Limit` (120), `X-RateLimit-Remaining` (the balance after admission) and `X-RateLimit-Reset` (Unix seconds at the next minute boundary), including domain refusals. Concurrent responses can arrive out of admission order. An exhausted credential gets `429` with the same headers, zero remaining, a JSON error and `Retry-After` in whole seconds (at least 1). Excess requests do no domain work, reserve no idempotency key and never extend the window. Wait for `Retry-After`, then retry a write with its original key and unchanged body. Missing, unknown and revoked credentials return `401` before admission. Host/provider capacity limits can also apply.
 
-API-001 remains partial for record types beyond this surface and signed created/approved/posted/paid/matched/locked outbound webhooks with retries and a delivery log. The integration call audit includes throttled requests; it is a request log, not webhook-delivery evidence.
+The integration call audit includes throttled requests and remains an owner-only request log. Business event metadata is a separate scoped resource; neither record-read grant exposes webhook subscriptions or delivery history.
+
+
+## Record-type readers
+
+Every scope below is an independent, unchecked owner selection. Granting one does not grant another. Child occurrences and safe child references belong to their listed parent record scope. These new record readers are GET-only; there is no command proxy, security action, report-share mutation or new write/post grant.
+
+| Explicit scope | GET collection paths |
+| --- | --- |
+| `business:read` | `business` |
+| `accounts:read` | `accounts` |
+| `tax-codes:read` | `tax-codes` |
+| `items:read` | `items` |
+| `contacts:read` | `contact-deliveries`, `contact-aliases`, `contact-history` |
+| `exemptions:read` | `exemptions` |
+| `contractors:read` | `contractors` |
+| `nexus-alerts:read` | `nexus-alerts` |
+| `nexus-decisions:read` | `nexus-decisions` |
+| `receipts:read` | `receipts`, `capture-drafts` |
+| `receipt-rules:read` | `receipt-rules` |
+| `cutovers:read` | `cutovers`, `historical-lines` |
+| `bank-accounts:read` | `bank-accounts` |
+| `statements:read` | `statements` |
+| `bank-lines:read` | `bank-lines`, `line-decisions` |
+| `matches:read` | `matches` |
+| `transfers:read` | `transfers`, `transfer-halves` |
+| `reconciliations:read` | `reconciliations`, `reconciliation-undos` |
+| `bank-rules:read` | `bank-rules` |
+| `recurring-invoices:read` | `recurring-invoices`, `recurring-invoice-runs`, `recurring-prices` |
+| `recurring-bills:read` | `recurring-bills`, `recurring-bill-runs` |
+| `recurring-journals:read` | `recurring-journals`, `recurring-journal-runs` |
+| `recognition:read` | `recognition-schedules`, `recognition-runs`, `recognition-milestones` |
+| `budgets:read` | `budgets` |
+| `checks:read` | `checks`, `check-batches` |
+| `periods:read` | `periods`, `reopen-requests` |
+| `close-tasks:read` | `close-tasks` |
+| `findings:read` | `findings` |
+| `questions:read` | `questions` |
+| `proposals:read` | `proposals`, `management-notes` |
+| `journals:read` | `review-notes`, `reclassifications` |
+| `custom-reports:read` | `custom-reports` |
+| `management-packages:read` | `management-packages` |
+| `audit-events:read` | `audit-events` |
+| `approvals:read` | `approvals` |
+| `feed-balances:read` | `feed-balances` |
+| `feed-history:read` | `feed-history` |
+| `feed-exceptions:read` | `feed-exceptions` |
+| `processor-payments:read` | `processor-payments` |
+| `processor-payouts:read` | `processor-payouts` |
+| `processor-clearing:read` | `processor-clearing` |
+| `processor-balances:read` | `processor-balances` |
+| `payrolls:read` | `payrolls` |
+
+All these collections return `{ "records": [...], "nextCursor": null | "..." }`. Each also supports `GET path/:id`, returning one projected record or `404`. Use `limit=1..100` (default 100) and the exclusive ID `cursor` for stable pages, including composed IDs on schedule occurrences. Keep filters unchanged when following a cursor. All accept exact `id`; OpenAPI lists each type's additional exact filters, such as `bankAccountId`, `statementId`, `customerId`, `vendorId`, `period`, `status`, `recurringId` or `scheduleId`. Supplied filters combine with AND. Unknown filters on these new collections return `400`.
+
+The established contacts, invoices, bills, journals and payments readers also have `GET path/:id`; documents/:id remains an original-byte download. Their list envelope names stay contacts, invoices, bills, entries, documents, payments and vendorCredits. Contacts accept kind/active, invoices accept customerId/status/date, bills accept vendorId/status/date, and journals accept status/date, in addition to their existing exact filters. Their new read grants cannot POST, including when a caller supplies post:true or an idempotency key. Existing writes continue through the same native Prepared pipeline with its approval, posting and period-lock guards.
+
+`GET year-end/:year` separately requires `year-end:read` and calls the native fiscal-year reader. It projects fiscal dates, monthly lock/readiness and task counts, and named readiness checks. It excludes tax identities, payroll records and opening/closing financial statement snapshots. Calculated financial statements and report-library results remain exclusively on `reports/:kind` under `reports:read`, using the existing REPORT-002 basis choice and labels. Budgets, saved definitions and provider observations are records, not replacement calculations.
+
+### Read consent and projections
+
+An owner-issued record scope delegates business read consent for that named type. In particular custom-reports:read and management-packages:read let the connection read all saved definitions of that type. This delegation is separate from native-person ownership and role sharing: the person's existing share, export, edit and figure routes still enforce their native session rules. The integration response contains no shared-role configuration or creator identity. Package definitions contain report IDs, cover and commentary; reading a referenced report definition still needs custom-reports:read. Calculated package exports stay native.
+
+OpenAPI enumerates the explicit projected fields for each new record. Banking reads expose only last-four account digits; routing and full account numbers, print/positive-pay exports and reconciliation proof snapshots stay native. Match child rows contain line IDs and active state. Recurring and recognition runs retain their occurrence, revision, status and result references without historical execution snapshots. Budgets include account/month/cents child cells. Recognition definitions include the native installment plan, without inventing calculated remaining balances.
+
+Contacts include business profile, billing contacts/roles, addresses, payment offerings and internal business notes under contacts:read. Contact history lists invoice/credit/bill/payment activity and email/certificate metadata; contact-deliveries includes recipient, subject, time and outcome, with no provider detail or hosted links. Full sibling financial records and certificate document bytes still require their respective record/document grants. Contractor reads include filing identity/address and tin_masked, never the full TIN or filing CSV.
+
+Questions expose the discussion and answers but omit reply tokens, mail detail, model facts/choices and pending actions. Proposals expose decision/result metadata, with payloads and cited snapshots omitted. Business audit and approval readers expose subject references, revision, event/decision and time; they omit actor identities, authority credentials, before/detail snapshots and owner/security/credential/erasure/retention/subscription events. Receipt reads expose accounting and duplicate metadata, with raw model and mail snapshots omitted.
+
+Provider read grants select financial observation types independently: feed balances/history/change notices, processor payment/payout/clearing/balance observations and summarized payrolls. They omit source connections, source credentials, sealed values, routing/account numbers, hosted-link or payment tokens, raw source snapshots and provider errors. A record reference never grants access to its target.
+
+Owner/member/auth/session/passkey/agent/integration/provider credentials, erasure and retention records/settings, security and approval policies, and webhook subscriptions/history remain native-owner only. The compatibility state route retains its existing limited chart/tax mapping behavior; it does not confer access to these new collections. Revocation, durable rate limits and owner call history apply to every route here, including exact lookups and discovery.
+
+## Webhook receivers
+
+The native owner manages webhooks in Settings, independently of integration credentials. [API.md](../API.md) documents exact payload bytes, HMAC verification, the five-minute timestamp limit, 24-hour rotation overlap, retry schedule, consent cancellation and safe restore behavior. The settings data declaration lists only destination hosts, selected event types and the thin payload fields. Record details require their own granular read grant.

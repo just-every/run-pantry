@@ -13,6 +13,7 @@ import { runErasure } from './custody'
 import { unpostedDependents } from './unposted'
 import { ownerSession } from './owner'
 import { retainStatements, retentionCommands, erasureView } from './retention'
+import { cancelErased } from '../webhooks/erasure'
 
 const preview: Command = {need:'owner',async run(c,b) { await ownerSession(c); return publicPreview(await erasurePreview(c,b)) }}
 const execute: Command = {need:'owner',async run(c,b) {
@@ -59,7 +60,7 @@ const execute: Command = {need:'owner',async run(c,b) {
   }
   const receipt = {id,at,subject:await sha256(`${p.kind}:${p.id}:${p.personIndex??''}`),request:{requesterDigest:await sha256(requester),channel,reason:scrub(reason,values,label)},counts,retained:p.retained,
     limitations:['Posted-entry free text','Connected services that already received data (DATA-001)','Downloaded files','Earlier backups'],marker:member?label:MARKER}
-  await runErasure(c,[...authority,guard('(SELECT count(*) FROM pt_audit)=?',p.auditCount),
+  await runErasure(c,[...authority,guard('(SELECT count(*) FROM pt_audit)=?',p.auditCount),...cancelErased(p.id),
     q('INSERT INTO pt_erasure_journal VALUES (?,?,?,?)',id,receipt.subject,at,JSON.stringify(receipt)),...(!member&&p.posted?await retainStatements(c.db,p.id,id):[]),...copies.statements,...writes,...immutable.statements,...history.statements,...await fenceStatements(c.db,[...removed,...copies.removed]),
     q('DELETE FROM pt_erasure_scope WHERE erasure_id=?',id),audit(who(c.actor),'erasure.complete','erasure',id,{receipt})],{id:p.id,member:member||person,values})
   return receipt

@@ -11,6 +11,7 @@ import { api } from './pantry/api'
 import { runDue } from './pantry/feeds/sync'
 import { emailHandler } from './pantry/receipts/mail'
 import { runDueWork } from './pantry/due'
+import { runWebhooks } from './pantry/webhooks/deliver'
 import { runAgent } from './pantry/questions/run'
 
 // Start documents keep their own cache policy and add no-transform, so no proxy
@@ -41,7 +42,9 @@ export default withDemo({
   // Cron: bank and card feed pulls (each connection is due every few hours, sooner after a webhook),
   // then invoices' due work: reminders, recurring invoices and Stripe follow-up, and about hourly
   // the books agent's look for what doesn't add up.
-  async scheduled(_controller, env, execution) {
+  async scheduled(controller, env, execution) {
+    execution.waitUntil(runWebhooks(runtimeBindings(env),controller.scheduledTime))
+    if(new Date(controller.scheduledTime).getUTCMinutes()%30!==0)return
     await runDue(runtimeBindings(env), 10)
     execution.waitUntil(runDueWork(env, { scheduled: true }))
     execution.waitUntil(runAgent(runtimeBindings(env), { scheduled: true }))

@@ -1,0 +1,16 @@
+import { resource } from './model'
+
+// These deliberately do not serialize question facts/choices, proposal payload/refs,
+// audit detail/before-state, reconciliation proof or any arbitrary cited-record snapshot.
+export const workflowResources = [
+  resource('periods', 'periods:read', 'pt_periods', 'id,start_date,end_date,status,locked_at,revision', { status: 'status', startDate: 'start_date', endDate: 'end_date' }, 'Bookkeeping period lock state; no locking/reopening action.'),
+  resource('close-tasks', 'close-tasks:read', 'pt_close_tasks', 'id,period,title,status,note,done_at,revision,assignee,due_date', { period: 'period', status: 'status', assignee: 'assignee' }, 'Custom and year-end close checklist tasks and assignments. Assignment confers no permission.'),
+  resource('reopen-requests', 'periods:read', 'pt_reopen_requests', 'id,period,reason,requested_at,status,decided_at,period_revision', { period: 'period', status: 'status' }, 'Bookkeeping reopening decisions; native-only reopening authority remains unchanged.'),
+  resource('findings', 'findings:read', 'pt_check_flags', 'id,rule,subject,status,title,detail,first_flagged_on,last_seen_on,cleared_on,dismissed_at,dismissed_reason,revision', { rule: 'rule', status: 'status', subject: 'subject' }, 'Continuous-check findings; excludes rule settings and cited record snapshots.'),
+  resource('questions', 'questions:read', 'pt_questions', `id,kind,subject_kind,CASE WHEN subject_kind='report-line' THEN NULL ELSE subject_id END AS subject_id,period,record_date,amount_cents,title,question,why,status,asked_at,answer,answered_via,answered_at,result_kind,result_id,rule_id,revision,assignee,
+    (SELECT json_group_array(json_object('id',id,'at',at,'via',via,'body',body)) FROM pt_question_messages m WHERE m.question_id=pt_questions.id) AS messages`, { period: 'period', status: 'status', subjectKind: 'subject_kind', subjectId: 'subject_id', assignee: 'assignee' }, 'Business question thread and answers; excludes reply refs/tokens, mail details, model facts, choices and pending actions.', { project: row => { row.messages = JSON.parse(row.messages); return row } }),
+  resource('proposals', 'proposals:read', 'pt_proposals', 'id,kind,summary,status,decided_at,decision_note,result_kind,result_id,created_at,revision', { kind: 'kind', status: 'status', resultId: 'result_id' }, 'Proposal decision metadata and result references; payload, evidence snapshots and agent credentials remain native.'),
+  resource('management-notes', 'proposals:read', 'pt_notes', 'id,kind,period,body,proposal_id,approved_at', { kind: 'kind', period: 'period', proposalId: 'proposal_id' }, 'Approved close-packet and variance narratives; evidence snapshots stay native.'),
+  resource('review-notes', 'journals:read', 'pt_review_notes', 'id,entry_id,note,created_at', { entryId: 'entry_id' }, 'Accountant notes on journal entries.'),
+  resource('reclassifications', 'journals:read', 'pt_reclassifications', 'id,batch_id,original_entry_id,original_line_id,correcting_entry_id,from_account_id,to_account_id,amount_cents,created_at', { batchId: 'batch_id', entryId: 'original_entry_id', accountId: 'to_account_id' }, 'Posted reclassification lineage.'),
+]

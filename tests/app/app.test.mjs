@@ -433,3 +433,8 @@ test('ERASURE-001 owner preview, receipt, retention confirmation and Activity at
   const {erasureJourney}=await import('./erasure-journey.mjs')
   await erasureJourney(t)
 })
+
+
+test('API-001 owner webhook lifecycle, data declaration and delivery history at 1440 and 390', async t => {
+  const {webhookJourney}=await import('./webhook-journey.mjs'); await webhookJourney(t)
+})

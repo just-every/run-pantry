@@ -88,9 +88,11 @@ import { customReportCommands } from './custom-reports/commands'
 import { registerCustomReportRoutes } from './custom-reports/routes'
 import { erasureCommands, erasureSettings } from './erasure/commands'
 import { ownerSession } from './erasure/owner'
+import { webhookCommands, webhookSettings } from './webhooks/commands'
+import { runWebhooks } from './webhooks/deliver'
 
 const commands: Record<string, Command> = {
-  ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -102,6 +104,7 @@ export const api = new Hono<{ Bindings: Bindings }>()
 // Ordinary requests also run due work (reminders, recurring invoices, Stripe follow-up) after they answer.
 api.use('*', async (c, next) => {
   await next()
+  if(c.req.method!=='GET')c.executionCtx.waitUntil(runWebhooks(c.env).catch(()=>console.error('Webhook dispatch failed')))
   c.executionCtx.waitUntil(runDueWork(c.env).catch(error => console.error('Pantry due work failed:', error)))
 })
 api.get('/health', c => c.json({ status: 'ok', ...deploymentHealth(c.env) }))
@@ -119,6 +122,7 @@ async function reader(c: C): Promise<Context> {
 
 const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => c.json(await build(await reader(c), c)))
 api.route('/api/pantry/integration/v1', integrations)
+view('webhooks', async ctx => webhookSettings(ctx))
 view('erasure', async ctx => { await ownerSession(ctx); return erasureSettings(ctx.db) })
 view('integrations', async (ctx, c) => { must(ctx.actor, 'owner'); return integrationSettings(ctx, c.req.query('cursor')) })
 const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10)) => date(c.req.query(name) ?? fallback, name)

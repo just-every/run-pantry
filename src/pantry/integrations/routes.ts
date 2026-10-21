@@ -1,7 +1,6 @@
 import { Hono, type Context as HonoContext } from 'hono'
 import type { Bindings } from '../../auth.server'
 import { authority, type Integration } from '../access'
-import { contact } from '../contacts'
 import type { Context } from '../context'
 import { date, Fault, now, requireThat, uid, type Data } from '../core'
 import { all, one, run } from '../db'
@@ -14,6 +13,8 @@ import { FINANCIAL_REPORTS, readReport } from '../report-reader'
 import { reportBasis } from '../basis'
 import { identify } from './credentials'
 import { integrationOpenApi } from './openapi'
+import { registerRecordReads } from './resources'
+import { integrationContact as contact, nativeRecord } from './resources/native'
 import { integrationBudget } from './rate-limit'
 import { idempotent, type Prepared } from './idempotency'
 import { payment } from './payments'
@@ -57,6 +58,11 @@ integrations.use('*', async (c, next) => {
 
 // Keep schema discovery behind the transport's existing credential and audit middleware.
 integrations.get('/openapi.json', c => c.json(integrationOpenApi))
+registerRecordReads(integrations)
+
+function readScope(c: C, family: string) {
+  return c.get('integration').scopes.includes(family + ':read') ? family + ':read' : family + ':write'
+}
 
 function context(c: C, scope: string): Context & { actor: Integration } {
   const credential = c.get('integration')
@@ -88,27 +94,37 @@ integrations.get('/state', async c => {
   return c.json({ accounts: await all(ctx.db, 'SELECT id,code,name,type,subtype,active FROM pt_accounts ORDER BY code'),
     taxCodes: await all(ctx.db, 'SELECT id,name,rate_milli_percent FROM pt_tax_codes WHERE active = 1 ORDER BY name'),
     ...(bankAccounts ? { bankAccounts } : {}),
-    ...(contacts ? { contacts: contacts.rows, nextCursor: contacts.nextCursor } : {}) })
+    ...(contacts ? { contacts: contacts.rows.map(row => nativeRecord('contacts', row)), nextCursor: contacts.nextCursor } : {}) })
 })
 
 for (const spec of [
-  { path: '/contacts', scope: 'contacts:write', table: 'pt_contacts', key: 'contacts', filters: { id: 'id', name: 'name' }, read: contact },
-  { path: '/bills', scope: 'bills:write', table: 'pt_bills', key: 'bills', filters: { id: 'id', reference: 'reference' }, read: bill },
-  { path: '/invoices', scope: 'invoices:write', table: 'pt_invoices', key: 'invoices', filters: { id: 'id', number: 'number' }, read: invoice },
-  { path: '/journals', scope: 'journals:write', table: 'pt_journal_entries', key: 'entries', filters: { id: 'id', memo: 'memo' }, read: entry },
+  { path: '/contacts', scope: 'contacts:write', table: 'pt_contacts', key: 'contacts', filters: { id: 'id', name: 'name', kind: 'kind', active: 'active' }, read: contact },
+  { path: '/bills', scope: 'bills:write', table: 'pt_bills', key: 'bills', filters: { id: 'id', reference: 'reference', vendorId: 'vendor_id', status: 'status', date: 'bill_date' }, read: bill },
+  { path: '/invoices', scope: 'invoices:write', table: 'pt_invoices', key: 'invoices', filters: { id: 'id', number: 'number', customerId: 'customer_id', status: 'status', date: 'issue_date' }, read: invoice },
+  { path: '/journals', scope: 'journals:write', table: 'pt_journal_entries', key: 'entries', filters: { id: 'id', memo: 'memo', status: 'status', date: 'entry_date' }, read: entry },
 ]) integrations.get(spec.path, async c => {
-  const ctx = context(c, spec.scope), p = await page(c, spec.table, spec.filters)
+  const ctx = context(c, readScope(c, spec.path.slice(1))), p = await page(c, spec.table, spec.filters)
   await run(ctx.db, [authority(ctx.actor, 'read')])
-  return c.json({ [spec.key]: await Promise.all(p.rows.map(r => spec.read(ctx.db, r.id))), nextCursor: p.nextCursor })
+  return c.json({ [spec.key]: await Promise.all(p.rows.map(async r => nativeRecord(spec.path.slice(1), await spec.read(ctx.db, r.id)))), nextCursor: p.nextCursor })
+})
+
+for (const spec of [
+  { path: 'contacts', read: contact }, { path: 'bills', read: bill },
+  { path: 'invoices', read: invoice }, { path: 'journals', read: entry },
+  { path: 'payments', read: payment },
+]) integrations.get('/' + spec.path + '/:id', async c => {
+  const ctx = context(c, readScope(c, spec.path))
+  await run(ctx.db, [authority(ctx.actor, 'read')])
+  return c.json(nativeRecord(spec.path, await spec.read(ctx.db, c.req.param('id'))))
 })
 
 integrations.get('/documents', async c => {
-  const ctx = context(c, 'documents:write'), p = await page(c, 'pt_documents', { id: 'id', name: 'name', linkedId: 'linked_id' })
+  const ctx = context(c, readScope(c, 'documents')), p = await page(c, 'pt_documents', { id: 'id', name: 'name', linkedId: 'linked_id' })
   await run(ctx.db, [authority(ctx.actor, 'read')])
-  return c.json({ documents: p.rows.map(({ content, ...row }) => row), nextCursor: p.nextCursor })
+  return c.json({ documents: p.rows.map(row => nativeRecord('documents', row)), nextCursor: p.nextCursor })
 })
 integrations.get('/documents/:id', async c => {
-  const ctx = context(c, 'documents:write'), doc = await documentFile(ctx.db, c.req.param('id'))
+  const ctx = context(c, readScope(c, 'documents')), doc = await documentFile(ctx.db, c.req.param('id'))
   requireThat(doc, 'Document not found', 404)
   await run(ctx.db, [authority(ctx.actor, 'read')])
   return new Response(doc.bytes, { headers: { 'content-type': doc.mediaType, 'content-disposition': `attachment; filename="${doc.name.replace(/[^\w.-]+/g, '_')}"`, 'content-security-policy': "default-src 'none'; sandbox" } })
@@ -118,19 +134,19 @@ integrations.get('/payments', async c => {
   const kind = c.req.query('billId') ? 'bill' : 'invoice'
   const p = await page(c, 'pt_payments', { id: 'id', reference: 'reference' }, target ? "EXISTS (SELECT 1 FROM pt_allocations a WHERE a.source_kind = 'payment' AND a.source_id = pt_payments.id AND a.target_kind = ? AND a.target_id = ?)" : '', target ? [kind, target] : [])
   await run(ctx.db, [authority(ctx.actor, 'read')])
-  return c.json({ payments: await Promise.all(p.rows.map(p => payment(ctx.db, p.id))), nextCursor: p.nextCursor })
+  return c.json({ payments: await Promise.all(p.rows.map(async p => nativeRecord('payments', await payment(ctx.db, p.id)))), nextCursor: p.nextCursor })
 })
 const vendorCreditScope = (c: C) => c.get('integration').scopes.includes('vendor-credits:write') ? 'vendor-credits:write' : 'vendor-credits:read'
 integrations.get('/vendor-credits', async c => {
   const ctx = context(c, vendorCreditScope(c))
   await run(ctx.db, [authority(ctx.actor, 'read')])
   const p = await page(c, 'pt_vendor_credits', { id: 'id', vendorId: 'vendor_id', reference: 'reference' })
-  return c.json({ vendorCredits: await Promise.all(p.rows.map(r => vendorCredit(ctx.db, r.id))), nextCursor: p.nextCursor })
+  return c.json({ vendorCredits: await Promise.all(p.rows.map(async r => nativeRecord('vendor-credits', await vendorCredit(ctx.db, r.id)))), nextCursor: p.nextCursor })
 })
 integrations.get('/vendor-credits/:id', async c => {
   const ctx = context(c, vendorCreditScope(c))
   await run(ctx.db, [authority(ctx.actor, 'read')])
-  return c.json(await vendorCredit(ctx.db, c.req.param('id')))
+  return c.json(nativeRecord('vendor-credits', await vendorCredit(ctx.db, c.req.param('id'))))
 })
 
 integrations.get('/reports/:kind', async c => {
@@ -171,5 +187,5 @@ for (const spec of [
     const p: Prepared = await spec.prepare(ctx, body, c)
     if (postsPayment || postsCredit || body.post === true) p.statements.unshift(authority(ctx.actor, 'post'))
     return p
-  }, id => spec.read(ctx.db, id)))
+  }, async id => nativeRecord(spec.path.split('/')[1], await spec.read(ctx.db, id))))
 })
