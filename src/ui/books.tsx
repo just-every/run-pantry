@@ -24,7 +24,7 @@ function Chart({ balances, onPick }: { balances: Map<string, number>; onPick?: (
   </Card>
   return <Card title="Chart of accounts">
     <Table heads={['Code', 'Account name', 'Type', 'Balance']} figures={[3]}>
-      {state.accounts.map((a: D) => <tr key={a.id} className={a.active ? '' : 'muted'} onClick={() => onPick?.(a)}><td>{a.code}</td><td><span>{a.name}{ROLE[a.subtype] && <small className="sub"> · {ROLE[a.subtype]}</small>}</span></td><td>{TYPE[a.type]}</td><td className="fig">{usd((CREDIT_NORMAL.has(a.type) ? -1 : 1) * (balances.get(a.id) ?? 0))}</td></tr>)}
+      {state.accounts.map((a: D) => <tr key={a.id} className={a.active ? '' : 'muted'} onClick={() => onPick?.(a)}><td>{a.code}</td><td><span>{a.name}{ROLE[a.subtype] && <small className="sub"> · {ROLE[a.subtype]}</small>}{a.suspense ? <small className="sub"> · suspense</small> : null}</span></td><td>{TYPE[a.type]}</td><td className="fig">{usd((CREDIT_NORMAL.has(a.type) ? -1 : 1) * (balances.get(a.id) ?? 0))}</td></tr>)}
     </Table>
   </Card>
 }
@@ -35,6 +35,7 @@ function NewAccount() {
     <Field label="Code" name="code" required /><Field label="Name" name="name" required />
     <Field label="Type" name="type" required options={Object.entries(TYPE).map(([value, label]) => ({ value, label }))} />
     <Field label="Role" name="subtype" defaultValue="other" options={Object.entries(ROLE).map(([value, label]) => ({ value, label: label || 'Ordinary account' }))} />
+    <Field label="Suspense or “ask my accountant”" name="suspense" defaultValue="" options={[{ value: 'true', label: 'Yes: flag a balance older than the daily check’s limit' }]} empty="No" />
   </Form></Card>
 }
 

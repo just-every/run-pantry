@@ -26,6 +26,7 @@ import { reconcileCommands, reconciliationState } from './reconcile'
 import { yearEndCommands, yearEndState, adjustingEntries } from './year-end'
 import { reportPdf } from './report-pdf'
 import { closeCommands, closeState } from './close'
+import { continuousCheckCommands, continuousChecksView } from './continuous/run'
 import { proposalCommands, proposalsView, agentContext, fileProposal, proposal } from './proposals'
 import { moveInCommands, moveInView } from './cutover/commands'
 import { xeroRoutes } from './cutover/xero-attachments'
@@ -90,7 +91,7 @@ import { registerCustomReportRoutes } from './custom-reports/routes'
 
 const commands: Record<string, Command> = {
   ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
-  ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
+  ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
 }
@@ -152,6 +153,7 @@ api.get('/api/pantry/year-end/:year/adjusting-entries.pdf', async c => {
     totals: [{ description: 'Total debits', amount: r.debit }, { description: 'Total credits', amount: r.credit }] }),
     { headers: { 'content-type': 'application/pdf', 'content-disposition': `attachment; filename="adjusting-entries-${r.year}.pdf"`, 'cache-control': 'no-store' } })
 })
+view('continuous-checks', async ctx => continuousChecksView(ctx.db))
 view('close/:period', async (ctx, c) => closeState(ctx.db, c.req.param('period')!))
 view('proposals', async ctx => ({ proposals: await proposalsView(ctx.db) }))
 view('questions/record', async (ctx, c) => ({ questions: await questionThreads(ctx.db, (await all(ctx.db, 'SELECT * FROM pt_questions WHERE subject_kind = ? AND subject_id = ? ORDER BY asked_at', c.req.query('kind') ?? '', c.req.query('id') ?? '')).map(parseQuestion)) }))

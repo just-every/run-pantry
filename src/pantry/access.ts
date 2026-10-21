@@ -82,7 +82,7 @@ export function authority(actor: Actor, need: Need): Sql {
 export const who = (actor: Actor | AuditActor): AuditActor => ({ email: actor.email, kind: actor.kind })
 
 /** Pantry itself, acting in due work or on a provider's confirmation; `role` names the job. */
-export const pantry = (role: 'reminders' | 'recurring' | 'auto-match' | 'stripe' | 'gusto' | 'customer'): AuditActor => ({ email: `pantry:${role}`, kind: 'system' })
+export const pantry = (role: 'checks' | 'reminders' | 'recurring' | 'auto-match' | 'stripe' | 'gusto' | 'customer'): AuditActor => ({ email: `pantry:${role}`, kind: 'system' })
 
 /** Who the owner is now: the active owner operator, else the install's configured owner email. */
 export async function ownerEmail(db: D1Database, env: Bindings) {

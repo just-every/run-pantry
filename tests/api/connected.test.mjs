@@ -119,7 +119,7 @@ test('REPORT-005 / PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees
   }
 })
 
-test('REPORT-005 / CLOSE-005 / PAYROLL-001 a Gusto payroll posts as one balanced entry (wages, employer taxes, withholdings, net pay) matched to its bank debits, once', async t => {
+test('REPORT-005 / CLOSE-005 / CLOSE-004 / PAYROLL-001 a Gusto payroll posts as one balanced entry (wages, employer taxes, withholdings, net pay) matched to its bank debits, once', async t => {
   const [token, info, company, payrolls] = await Promise.all(['gusto/oauth-token.json', 'gusto/token-info.json', 'gusto/company.json', 'gusto/payrolls.json'].map(json))
   const GUSTO = { GUSTO_CLIENT_ID: 'demo-client-id', GUSTO_CLIENT_SECRET: 'demo-client-secret', GUSTO_ENV: 'demo' }
   const refreshes = [], live = new Set([token.access_token])
@@ -172,6 +172,10 @@ test('REPORT-005 / CLOSE-005 / PAYROLL-001 a Gusto payroll posts as one balanced
   assert.equal(g.payrolls.length, 3, 'the external payroll is not posted')
   assert.deepEqual([p1.status, p1.gross_cents, p1.employer_tax_cents, p1.withheld_cents, p1.net_cents, p1.debit_cents], ['booked', 945000, 77843, 232342, 712658, 1000343])
   assert.equal(p3.status, 'held'); assert.match(p3.reason, /tax debit of \$300\.00/)
+  // CLOSE-004: the daily run flags the payroll the books could not tie, citing it and the reason.
+  await h.command('continuous-check.run', {})
+  const payrollFlag = (await h.view('continuous-checks')).flags.find(f => f.rule === 'payroll' && f.status === 'open')
+  assert.deepEqual([payrollFlag.lines.map(l => [l.kind, l.id]), payrollFlag.subject], [[['payroll', p3.uuid]], p3.uuid]); assert.match(payrollFlag.detail, /tax debit of \$300\.00/)
 
   // One balanced entry on the check date, matched to the four debits by itself.
   const [entry] = await entriesFor(h, p1.uuid)
@@ -226,7 +230,7 @@ test('REPORT-005 / CLOSE-005 / PAYROLL-001 a Gusto payroll posts as one balanced
 })
 
 
-test('PROC-003 omitted refund remains a named dashboard and close exception until event sync is repaired, without a balancing adjustment', async t => {
+test('PROC-003 / CLOSE-004 omitted refund remains a named dashboard and close exception until event sync is repaired, without a balancing adjustment', async t => {
   const provider=clearingProvider(), h=await harness({outbound:provider.outbound});t.after(()=>h.close())
   const {acct}=await books(h)
   const bank=await h.command('bank-account.save',{name:'Operating checking',institution:'Chase',accountId:acct['1000'],numberLast4:'4821',openingDate:'2026-01-01',openingBalance:'0.00'})
@@ -241,11 +245,20 @@ test('PROC-003 omitted refund remains a named dashboard and close exception unti
   assert.equal(close.ok,false);assert.ok(close.detail.includes('txn_refund'));assert.ok(close.items.some(i=>i.id==='txn_refund'))
   const dashboard=await h.view('dashboard?to=2026-09-30')
   assert.equal(dashboard.clearing.differenceCents,10000);assert.equal(dashboard.clearing.ok,false)
+  // CLOSE-004: a difference first seen today is not flagged; the same difference standing for six days is, citing the account and the missing item, then clears once repaired.
+  await h.command('continuous-check.run',{})
+  assert.deepEqual((await h.view('continuous-checks')).flags.filter(f=>f.rule==='clearing'),[])
+  await h.db.prepare("UPDATE pt_check_watch SET since = ? WHERE key LIKE 'clearing:%'").bind(new Date(Date.now()-6*864e5).toISOString().slice(0,10)).run()
+  await h.command('continuous-check.run',{})
+  const clearingFlag=(await h.view('continuous-checks')).flags.find(f=>f.rule==='clearing'&&f.status==='open')
+  assert.ok(clearingFlag.lines.some(l=>l.kind==='account'&&l.amountCents===10000)&&clearingFlag.lines.some(l=>l.id==='txn_refund')); assert.deepEqual(clearingFlag.setting,{clearingDays:3}); assert.match(clearingFlag.detail,/\$100\.00/)
   const before=(await h.view('journal')).entries.filter(e=>e.status==='posted')
   assert.ok(before.every(e=>e.source_id!=='txn_refund'),'the omitted event has not been replaced by a made-up balancing entry')
   provider.repair();await h.command('stripe.payouts-sync',{})
   const repaired=await h.view('stripe/clearing')
   assert.equal(repaired.differenceCents,0);assert.equal(repaired.ok,true);assert.equal(at(repaired.items,i=>i.id==='txn_refund').status,'posted')
+  await h.command('continuous-check.run',{})
+  assert.deepEqual((await h.view('continuous-checks')).flags.filter(f=>f.rule==='clearing'),[])
   assert.equal(at((await h.view('close/2026-09')).checks,c=>c.key==='stripe-clearing').ok,true)
   assert.equal((await h.view('dashboard?to=2026-09-30')).clearing.ok,true)
   const after=(await h.view('journal')).entries.filter(e=>e.status==='posted')

@@ -68,7 +68,7 @@ const AUDIT_RECORDS: Record<string, [string, string?]> = {
   match: ['pt_matches'], 'bank-account': ['pt_bank_accounts'], 'bank-rule': ['pt_bank_rules'], 'receipt-rule': ['pt_receipt_rules'],
   recurring: ['pt_recurring'], receipt: ['pt_receipts'], 'vendor-credit': ['pt_vendor_credits'], 'tax-code': ['pt_tax_codes'],
   exemption: ['pt_exemption_certificates'], integration: ['pt_integrations'], feed: ['pt_feed_items'], stripe: ['pt_stripe'],
-  cutover: ['pt_cutovers'], owner: ['oa_operators'], gusto: ['pt_gusto'], question: ['pt_questions'], sending: ['pt_sending'], 'books-agent': ['pt_books_agent'], 'capture-draft': ['pt_capture_drafts'], 'capture-approval-rule': ['pt_capture_approval_rules'], 'discount-settings': ['pt_discount_settings'],
+  cutover: ['pt_cutovers'], owner: ['oa_operators'], gusto: ['pt_gusto'], question: ['pt_questions'], sending: ['pt_sending'], 'books-agent': ['pt_books_agent'], 'capture-draft': ['pt_capture_drafts'], 'capture-approval-rule': ['pt_capture_approval_rules'], 'discount-settings': ['pt_discount_settings'], 'check-flag': ['pt_check_flags'], 'check-settings': ['pt_check_settings'],
 }
 const auditColumns = new WeakMap<D1Database, Map<string, Promise<string[]>>>()
 function columnsFor(db: D1Database, table: string) {
@@ -106,7 +106,7 @@ async function auditStatement(db: D1Database, e: AuditEvent): Promise<Sql> {
   const approvalId = !reliesOnApproval ? q('NULL') : e.subjectKind === 'capture-draft'
     ? q("(SELECT a.id FROM pt_approvals a JOIN pt_capture_drafts d ON a.subject_kind = d.kind AND a.subject_id = COALESCE(d.bill_id, d.id) AND a.subject_revision = d.revision WHERE d.id = ? AND a.decision = 'approved' ORDER BY a.at DESC, a.rowid DESC LIMIT 1)", e.subjectId)
     : q("(SELECT id FROM pt_approvals WHERE subject_kind = ? AND subject_id = ? AND decision = 'approved' ORDER BY at DESC, rowid DESC LIMIT 1)", approvedKind, approvedId)
-  const origin = rule ? 'rule' : e.actor.email === 'pantry:recurring' || e.actor.email === 'pantry:recurring-journals' || e.actor.email === 'pantry:reminders' ? 'schedule' : e.actor.kind === 'integration' || /^pantry:(stripe|gusto|auto-match)$/.test(e.actor.email) ? 'connection' : e.actor.kind
+  const origin = rule ? 'rule' : e.actor.email === 'pantry:recurring' || e.actor.email === 'pantry:recurring-journals' || e.actor.email === 'pantry:reminders' || e.actor.email === 'pantry:checks' ? 'schedule' : e.actor.kind === 'integration' || /^pantry:(stripe|gusto|auto-match)$/.test(e.actor.email) ? 'connection' : e.actor.kind
   const snapshot = !('before' in d || 'after' in d) ? await snapshotExpression(db, e.subjectKind, e.subjectId) : null
   const detailSql = snapshot ? `json_set(?, '$.before', json((SELECT state FROM pt_audit_before WHERE event_id = ?)), '$.after', json(${snapshot.sql}))` : '?'
   const result = q(`INSERT INTO pt_audit (id, at, actor_email, actor_kind, action, subject_kind, subject_id, detail, subject_revision, approval_id, origin_kind, authority_kind, authority_id, authority_revision)

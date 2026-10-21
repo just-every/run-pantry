@@ -39,7 +39,7 @@ export function accountRow(b: Data) {
   // A bank role is an asset (checking, savings) or a liability (a business credit card).
   requireThat(subtype !== 'bank' || type === 'asset' || type === 'liability', 'A bank or card account must be an asset or liability account')
   requireThat(!SUBTYPE_TYPE[subtype] || SUBTYPE_TYPE[subtype] === type, `A ${subtype} account must be a${SUBTYPE_TYPE[subtype] === 'asset' ? 'n' : ''} ${SUBTYPE_TYPE[subtype]} account`)
-  return { code, name: text(b.name, 'Account name', 200), type, subtype, description: optionalText(b.description, 'Description', 500) }
+  return { code, name: text(b.name, 'Account name', 200), type, subtype, description: optionalText(b.description, 'Description', 500), suspense: b.suspense === undefined ? undefined : b.suspense === true || b.suspense === 'true' || b.suspense === 1 ? 1 : 0 }
 }
 
 export async function account(db: D1Database, id: string) {
@@ -54,8 +54,8 @@ export async function controlAccount(db: D1Database, subtype: 'receivable' | 'pa
   return row
 }
 
-export const accountInsert = (id: string, a: ReturnType<typeof accountRow>): Sql =>
-  q('INSERT INTO pt_accounts (id, code, name, type, subtype, description, active, revision) VALUES (?, ?, ?, ?, ?, ?, 1, ?)', id, a.code, a.name, a.type, a.subtype, a.description, uid())
+export const accountInsert = (id: string, a: Omit<ReturnType<typeof accountRow>, 'suspense'> & { suspense?: number }): Sql =>
+  q('INSERT INTO pt_accounts (id, code, name, type, subtype, description, suspense, active, revision) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)', id, a.code, a.name, a.type, a.subtype, a.description, a.suspense ?? 0, uid())
 
 const saveAccount: Command = { need: 'record', async run(c, b) {
   const a = accountRow(b), id = b.id ? text(b.id, 'Account') : uid()
@@ -66,7 +66,7 @@ const saveAccount: Command = { need: 'record', async run(c, b) {
     const used = await one(c.db, 'SELECT 1 FROM pt_journal_lines WHERE account_id = ? LIMIT 1', id)
     requireThat(!used || (current.type === a.type && current.subtype === a.subtype), 'An account with postings keeps its type and role; add a new account instead', 409)
     const active = b.active === false || b.active === 'false' ? 0 : 1
-    statements.push(q('UPDATE pt_accounts SET code = ?, name = ?, type = ?, subtype = ?, description = ?, active = ?, revision = ? WHERE id = ? AND revision = ?', a.code, a.name, a.type, a.subtype, a.description, active, uid(), id, b.revision), changed())
+    statements.push(q('UPDATE pt_accounts SET code = ?, name = ?, type = ?, subtype = ?, description = ?, suspense = ?, active = ?, revision = ? WHERE id = ? AND revision = ?', a.code, a.name, a.type, a.subtype, a.description, a.suspense ?? current.suspense, active, uid(), id, b.revision), changed())
   } else statements.push(accountInsert(id, a))
   statements.push(audit(who(c.actor), b.id ? 'account.update' : 'account.create', 'account', id, a))
   await run(c.db, statements)

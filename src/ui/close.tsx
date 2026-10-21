@@ -8,6 +8,7 @@ import { YearEnd } from './year-end'
 import { RecognitionSchedules } from './recognition-schedules'
 import { RecurringJournals } from './recurring-journals'
 import { MonthQuestions } from './questions'
+import { ContinuousChecks } from './continuous-checks'
 
 /** Every entry keeps its receipt: spending and bills without one, each with "add receipt" right here. */
 function ReceiptsCard({ s, onChange }: { s: D; onChange: () => Promise<void> }) {
@@ -46,6 +47,7 @@ export function Close() {
             {s.checks.map((c: D) => <tr key={c.key}><td><strong>{c.title}</strong></td><td>{c.ok ? <Chip tone="good">Passed</Chip> : <Chip tone="bad">Not yet</Chip>}</td><td>{c.detail} {!c.ok && (c.key === 'recognition' ? <a href="#recognition">Open</a> : <Link to={LINK[c.key]}>Open</Link>)}</td></tr>)}
           </Table>
         </Card>
+        <ContinuousChecks />
         <RecurringJournals />
         <div id="recognition"><RecognitionSchedules to={s.end} onChange={refresh} /></div>
         <MonthQuestions questions={s.questions} month={monthName(period)} onDone={refresh} />
