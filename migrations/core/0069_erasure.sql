@@ -2,6 +2,7 @@
 CREATE TABLE pt_erasure_journal (id TEXT PRIMARY KEY, subject_digest TEXT NOT NULL, at TEXT NOT NULL, receipt TEXT NOT NULL CHECK(json_valid(receipt)));
 CREATE TABLE pt_erasure_scope (erasure_id TEXT NOT NULL REFERENCES pt_erasure_journal(id), table_name TEXT NOT NULL, row_id TEXT NOT NULL, operation TEXT NOT NULL CHECK(operation IN ('redact','expire')), PRIMARY KEY(table_name,row_id));
 ALTER TABLE pt_contacts ADD COLUMN erased_at TEXT;
+ALTER TABLE pt_members ADD COLUMN erased_at TEXT;
 DROP TRIGGER pt_audit_no_update;
 CREATE TRIGGER pt_audit_no_update BEFORE UPDATE ON pt_audit
  WHEN NOT EXISTS (SELECT 1 FROM pt_erasure_scope s JOIN pt_erasure_journal j ON j.id=s.erasure_id WHERE s.table_name='pt_audit' AND s.row_id=OLD.id AND s.operation='redact')

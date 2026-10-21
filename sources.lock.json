@@ -628,7 +628,7 @@
       "executable": false
     },
     "migrations/core/0069_erasure.sql": {
-      "sha256": "824f725fc54314785dfd8c7a03fc3276903b766221d8d42b1e8414047f327a5e",
+      "sha256": "17a5e980230739aebfa9184a8c948ef71b119dd2ab9ba82b6412c186d9e47356",
       "executable": false
     },
     "migrations/core/0070_erasure_retention.sql": {
@@ -3092,7 +3092,7 @@
       "executable": false
     },
     "src/pantry/erasure/commands.ts": {
-      "sha256": "7e6c97ce82d31af622b364151f40b45b417ce0ba3f4647c692a4f1708a5e676d",
+      "sha256": "3b7591410a12e2462f979da87339dc3f0f4e9ad300e1777facd2db6798747b60",
       "executable": false
     },
     "src/pantry/erasure/copies.ts": {
@@ -3116,7 +3116,7 @@
       "executable": false
     },
     "src/pantry/erasure/member.ts": {
-      "sha256": "adececdd30da48082a659cd9bf1ce94e54ca03fe2d39a59c69b55c835a172ba5",
+      "sha256": "214edd942ca69a6e3ef2b2352018725dfaacbd3f28c9792fc7f848f71bee57fd",
       "executable": false
     },
     "src/pantry/erasure/owner.ts": {

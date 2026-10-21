@@ -38,7 +38,7 @@ const execute: Command = {need:'owner',async run(c,b) {
     counts.pt_contacts={fieldsReplaced:1,contactPeopleRemoved:1}
   } else if (member) {
     const result = await memberStatements(c.db,p.subject,label)
-    writes.push(...result.statements); counts.pt_members={fieldsReplaced:2}; counts.oa_operators={identitiesRemoved:result.operators}
+    writes.push(...result.statements);Object.assign(counts,result.counts); counts.pt_members={fieldsReplaced:2}; counts.oa_operators={identitiesRemoved:result.operators}
   } else {
     writes.push(guard('EXISTS (SELECT 1 FROM pt_contacts WHERE id=? AND revision=?)',p.id,p.subject.revision))
     if (p.posted) {
