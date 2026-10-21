@@ -1,4 +1,5 @@
 import { who } from '../access'
+import { narrow, projectAccess } from '../access-policy/doors'
 import { reportBasis } from '../basis'
 import { recordReportIssue } from '../effects/issues'
 import { FIRST_DAY } from '../report-sources'
@@ -77,10 +78,23 @@ async function issuedPackage(ctx: Context, rendered: Awaited<ReturnType<typeof r
   return response
 }
 
+/** A permitted customer/vendor total does not grant its bank, payment or
+ * journal evidence. Keep complete source totals; refuse a figure rather than
+ * returning a subset when an underlying business record is outside the role. */
+async function figureForReader(ctx: Context, detail: Awaited<ReturnType<typeof customReportFigure>>) {
+  if (!narrow(ctx.actor) || !detail.rows) return projectAccess(ctx, detail)
+  const recordKind = ctx.actor.kind === 'person' && ctx.actor.role === 'sales' ? 'invoice' : 'bill'
+  requireThat(detail.rows.every(row => row.record?.kind === recordKind), 'Figure not found', 404)
+  return projectAccess(ctx, { ...detail, rows: detail.rows.map(row => ({
+    key: row.key, date: row.date, account: row.account, amount: row.amount, debit: row.debit, credit: row.credit,
+    description: row.description, lineMemo: row.lineMemo, record: row.record, bank: [], documents: [],
+  })) }) as Promise<typeof detail>
+}
+
 export function registerCustomReportRoutes(api: Hono<{ Bindings: Bindings }>, reader: (c: C) => Promise<Context>) {
   api.get('/api/pantry/custom-reports', async c => c.json({ reports: await savedReportList(await reader(c)) }))
   api.get('/api/pantry/custom-reports/:id/figures/export', async c => {
-    const ctx = await reader(c), detail = await customReportFigure(ctx, c.req.param('id'), { row: c.req.query('row'), column: c.req.query('column'), node: c.req.query('node') })
+    const ctx = await reader(c), detail = await figureForReader(ctx, await customReportFigure(ctx, c.req.param('id'), { row: c.req.query('row'), column: c.req.query('column'), node: c.req.query('node') }))
     const format = c.req.query('format') ?? 'json'
     requireThat(format === 'json' || format === 'csv', 'Choose JSON or source CSV')
     requireThat(format === 'json' || detail.rows !== undefined, 'This derived figure exports as JSON with its operands; open an operand for source CSV')
@@ -90,7 +104,10 @@ export function registerCustomReportRoutes(api: Hono<{ Bindings: Bindings }>, re
     return issuedReport(ctx, saved, response, { ...detail.context, from: detail.from ?? FIRST_DAY, to: detail.to, basis: detail.basis,
       customFigure: { row: detail.context.row, column: detail.context.column, node: detail.context.node } })
   })
-  api.get('/api/pantry/custom-reports/:id/figures', async c => c.json(await customReportFigure(await reader(c), c.req.param('id'), { row: c.req.query('row'), column: c.req.query('column'), node: c.req.query('node') })))
+  api.get('/api/pantry/custom-reports/:id/figures', async c => {
+    const ctx = await reader(c)
+    return c.json(await figureForReader(ctx, await customReportFigure(ctx, c.req.param('id'), { row: c.req.query('row'), column: c.req.query('column'), node: c.req.query('node') })))
+  })
   api.get('/api/pantry/custom-reports/:id/render', async c => c.json(await renderSavedReport(await reader(c), c.req.param('id'))))
   api.get('/api/pantry/custom-reports/:id/export.json', async c => {
     const ctx = await reader(c), saved = await savedReport(ctx, c.req.param('id'))

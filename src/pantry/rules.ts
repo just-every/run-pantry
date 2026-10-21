@@ -4,6 +4,7 @@
 // contact, a tax code, a memo). Filing posts a balanced bank entry and matches
 // the line to it, marked with the rule; undo reverses that entry. Rules never
 // file a line in a locked month or inside a reconciled statement period.
+import { bankAuthority, standingAuthority, standingFence } from './access-policy/banks'
 import { recordedPaymentCandidates } from './recorded-payments'
 import { depositProposals } from './automatch'
 import { authority, who } from './access'
@@ -142,7 +143,7 @@ export async function fileStatements(db: D1Database, rule: Rule, line: Data, fil
     { accountId: bank.account_id, debit: out ? 0 : abs, credit: out ? abs : 0, memo },
   ]
   const entryId = uid(), matchId = uid()
-  return [filer.authority, periodOpen(line.posted_date), notReconciled(line),
+  return [filer.authority, standingFence(standingAuthority(filer.actor.email, 'bank', [bank.id])), periodOpen(line.posted_date), notReconciled(line),
     guard('NOT EXISTS (SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = ? AND active = 1)', line.id),
     guard("NOT EXISTS (SELECT 1 FROM pt_transfer_halves WHERE bank_line_id = ? AND status IN ('pending', 'exception'))", line.id),
     guard('EXISTS (SELECT 1 FROM pt_bank_rules WHERE id = ? AND revision = ? AND active = 1)', rule.id, rule.revision),
@@ -179,7 +180,7 @@ export async function applyRules(db: D1Database, lineIds: string[], filer: (rule
 /** A rule's author still holding the record capability, for filing with no one signed in. */
 export const authorFiler = (rule: Rule): Filer => ({
   actor: { email: rule.created_by, kind: 'person' },
-  authority: guard("EXISTS (SELECT 1 FROM oa_operators WHERE lower(email) = ? AND role = 'owner' AND status = 'active') OR EXISTS (SELECT 1 FROM pt_members WHERE email = ? AND active = 1 AND role <> 'viewer')", rule.created_by, rule.created_by),
+  authority: standingFence(standingAuthority(rule.created_by, 'bank', rule.bank_account_id ? [rule.bank_account_id] : [])),
 })
 const personFiler = (c: Context) => (): Filer => ({ actor: who(c.actor), authority: authority(c.actor, 'record') })
 
@@ -214,7 +215,7 @@ const ruleInsert = (id: string, fields: unknown[], by: string, priority: number 
 /** A new rule from rule input (the same checks as a saved one), for a write the caller authorises. */
 export async function newRuleStatements(db: D1Database, b: Data, by: AuditActor) {
   const input = await ruleInput(db, b), id = uid()
-  return { id, statements: [ruleInsert(id, ruleFields(input), by.email, input.priority), audit(by, 'bank-rule.create', 'bank-rule', id, { name: input.name })] }
+  return { id, statements: [...bankAuthority(by, input.bankAccountId ? [input.bankAccountId] : []), ruleInsert(id, ruleFields(input), by.email, input.priority), audit(by, 'bank-rule.create', 'bank-rule', id, { name: input.name })] }
 }
 
 const saveRule: Command = { need: 'record', async run(c, b) {
@@ -226,12 +227,12 @@ const saveRule: Command = { need: 'record', async run(c, b) {
     requireThat(current && current.active, 'Active rule not found', 404)
     requireThat(current.revision === b.revision, 'This rule changed since you opened it; reload', 409)
     id = current.id
-    await run(c.db, [authority(c.actor, 'record'),
+    await run(c.db, [authority(c.actor, 'record'), ...bankAuthority(c.actor, input.bankAccountId ? [input.bankAccountId] : []),
       q('UPDATE pt_bank_rules SET name = ?, bank_account_id = ?, direction = ?, payee = ?, description_contains = ?, amount_min_cents = ?, amount_max_cents = ?, splits = ?, contact_id = ?, tax_code_id = ?, memo = ?, mode = ?, description_mode = ?, split_mode = ?, priority = COALESCE(?, priority), revision = ? WHERE id = ? AND revision = ?', ...fields, input.priority, uid(), id, b.revision), changed(),
       audit(who(c.actor), 'bank-rule.edit', 'bank-rule', id, { name: input.name })])
   } else {
     id = uid()
-    await run(c.db, [authority(c.actor, 'record'), ruleInsert(id, fields, c.actor.email, input.priority), audit(who(c.actor), 'bank-rule.create', 'bank-rule', id, { name: input.name })])
+    await run(c.db, [authority(c.actor, 'record'), ...bankAuthority(c.actor, input.bankAccountId ? [input.bankAccountId] : []), ruleInsert(id, fields, c.actor.email, input.priority), audit(who(c.actor), 'bank-rule.create', 'bank-rule', id, { name: input.name })])
   }
   // Filing what the preview showed is the person's choice, made with the save.
   let filed = { filed: 0, skipped: 0 }
@@ -246,7 +247,7 @@ const saveRule: Command = { need: 'record', async run(c, b) {
 const retireRule: Command = { need: 'record', async run(c, b) {
   const current = await one(c.db, 'SELECT * FROM pt_bank_rules WHERE id = ? AND active = 1', text(b.id, 'Rule'))
   requireThat(current, 'Rule not found', 404)
-  await run(c.db, [authority(c.actor, 'record'), q('UPDATE pt_bank_rules SET active = 0, revision = ? WHERE id = ? AND revision = ?', uid(), current.id, b.revision), changed(),
+  await run(c.db, [authority(c.actor, 'record'), ...bankAuthority(c.actor, current.bank_account_id ? [current.bank_account_id] : []), q('UPDATE pt_bank_rules SET active = 0, revision = ? WHERE id = ? AND revision = ?', uid(), current.id, b.revision), changed(),
     audit(who(c.actor), 'bank-rule.retire', 'bank-rule', current.id, { name: current.name })])
   return { id: current.id }
 } }
@@ -261,7 +262,7 @@ const undoFiling: Command = { need: 'record', async run(c, b) {
   requireThat(created, 'The filed entry was already reversed', 409)
   const original = await entry(c.db, created.id)
   const reversal = await reversalStatements(c.db, c.actor, original, original.entry_date, `Undo filing by rule — ${line.description}`, { unmatching: true })
-  await run(c.db, [authority(c.actor, 'record'),
+  await run(c.db, [authority(c.actor, 'record'), ...bankAuthority(c.actor, [match.bank_account_id]),
     q("UPDATE pt_matches SET status = 'undone', revision = ? WHERE id = ? AND status = 'approved' AND reconciliation_id IS NULL", uid(), match.id), changed(),
     q('UPDATE pt_match_bank_lines SET active = 0 WHERE match_id = ?', match.id), q('UPDATE pt_match_postings SET active = 0 WHERE match_id = ?', match.id),
     ...reversal.statements,

@@ -1,15 +1,13 @@
+import { standingAuthority, standingFence } from '../access-policy/banks'
 import { Fault, now, requireThat, uid, type Data } from '../core'
 import { all, approval, audit, changed, guard, one, periodOpen, q, run, type AuditActor, type Sql } from '../db'
 import { entryStatements, parseLines, postStatements } from '../journal'
 import { accountFences, inputLines, linesFor, schedule, snapshot, sourceFence, validateAccounts, type Installment, type Schedule } from './plan'
 
 const actor: AuditActor = { email: 'pantry:recognition', kind: 'system' }
-export const approverCondition = `EXISTS (SELECT 1 FROM oa_operators o LEFT JOIN pt_members m ON lower(m.email) = lower(o.email)
- WHERE lower(o.email) = lower(?) AND o.status = 'active' AND (o.role = 'owner' OR (m.active = 1 AND m.can_post = 1 AND m.role <> 'viewer')))`
-
 /** Approval is rechecked at preparation and in the final posting transaction. */
 export function approvalFences(s: Schedule): Sql[] {
-  return [guard("EXISTS (SELECT 1 FROM pt_recognition_schedules WHERE id = ? AND revision = ? AND approved_revision = ? AND approved_by = ? AND approved_snapshot = ? AND status IN ('active', 'ended'))", s.id, s.revision, s.revision, s.approved_by, snapshot(s)), guard(approverCondition, s.approved_by)]
+  return [guard("EXISTS (SELECT 1 FROM pt_recognition_schedules WHERE id = ? AND revision = ? AND approved_revision = ? AND approved_by = ? AND approved_snapshot = ? AND status IN ('active', 'ended'))", s.id, s.revision, s.revision, s.approved_by, snapshot(s)), standingFence(standingAuthority(s.approved_by ?? '', 'journal', [], [s.balance_account_id, s.recognition_account_id]))]
 }
 
 export async function generateRecognition(db: D1Database, s: Schedule, p: Installment, today: string, options: { retry?: boolean; authority?: Sql } = {}) {
@@ -49,7 +47,8 @@ export async function generateRecognition(db: D1Database, s: Schedule, p: Instal
     const locked = await one(db, "SELECT id FROM pt_periods WHERE status = 'locked' AND ? BETWEEN start_date AND end_date", day)
     requireThat(!locked, `${day} is in locked period ${locked?.id}; reopen it before retrying`, 409)
     requireThat(s.approved_revision === s.revision && s.approved_snapshot === snapshot(s), 'Approve this exact schedule revision before posting', 409)
-    requireThat(s.approved_by && await one(db, `SELECT 1 AS ok WHERE ${approverCondition}`, s.approved_by), 'The schedule approver no longer holds the posting grant; approve this revision again', 409)
+    const approver = standingAuthority(s.approved_by ?? '', 'journal', [], [s.balance_account_id, s.recognition_account_id])
+    requireThat(s.approved_by && await one(db, `SELECT 1 AS ok WHERE ${approver.sql}`, ...approver.params), 'The schedule approver no longer holds the posting grant; approve this revision again', 409)
     await validateAccounts(db, s)
     if (s.kind !== 'accrual') {
       const source = await one(db, "SELECT 1 AS ok FROM pt_journal_entries WHERE id = ? AND status = 'posted' AND reversed_by_id IS NULL", s.source_journal_id)

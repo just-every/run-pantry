@@ -1,6 +1,8 @@
 // Receivables: draft → approved → issued invoices, and credits that reduce them.
 // A line without a decided tax treatment stops the invoice at review; Pantry
 // never assumes zero tax.
+import { bankAuthority } from './access-policy/banks'
+import { invoiceTime } from './time/invoicing'
 import { withinLimit } from './issuing-limits'
 import { authority, who } from './access'
 import { addDays, date, list, now, optionalText, quantity, requireThat, scale, text, uid, cents, type Data } from './core'
@@ -111,7 +113,9 @@ export async function nextNumber(db: D1Database, kind: 'invoice' | 'credit') {
 const saveDraft: Command = { need: 'record', async run(c, b) {
   const kind = b.kind === 'credit' ? 'credit' : 'invoice'
   const previous = b.id ? await invoice(c.db, text(b.id, 'Invoice')) : null
-  const p = await parseInvoice(c.db, { ...b, templateId: b.templateId ?? previous?.document_template_id, customFields: b.customFields ?? (previous ? JSON.parse(previous.document_values) : undefined) })
+  const time = await invoiceTime(c.db, b)
+  const p = await parseInvoice(c.db, { ...time.body, templateId: b.templateId ?? previous?.document_template_id, customFields: b.customFields ?? (previous ? JSON.parse(previous.document_values) : undefined) })
+  const depositScope = p.deposit ? bankAuthority(c.actor, [p.deposit.bankAccountId]) : []
   const certificateGuards = exemptionFence(p.exemption, p.customer.id, p.destination, p.issueDate, await exemptionDay(c.db))
   // A locked month refuses drafts dated in it, as journals do (PAN-13).
   await assertOpen(c.db, p.issueDate)
@@ -128,7 +132,7 @@ const saveDraft: Command = { need: 'record', async run(c, b) {
     await assertOpen(c.db, current.issue_date)
     // Editing an approved invoice returns it to draft: approval covered the earlier revision.
     // The editor becomes the preparer, so whoever last changed it cannot approve it.
-    await run(c.db, [authority(c.actor, 'record'), ...certificateGuards, periodOpen(current.issue_date), periodOpen(p.issueDate),
+    await run(c.db, [authority(c.actor, 'record'), ...depositScope, ...certificateGuards, periodOpen(current.issue_date), periodOpen(p.issueDate),
       q("UPDATE pt_invoices SET customer_id = ?, destination_state = ?, exemption_evidence = ?, issue_date = ?, due_date = ?, status = 'draft', memo = ?, credit_for = ?, subtotal_cents = ?, tax_cents = ?, total_cents = ?, discounts = ?, discount_cents = ?, after_tax_discount_cents = ?, discount_account_id = ?, deposit = ?, early_terms = ?, early_offer = ?, approved_by = NULL, approved_revision = NULL, prepared_by = ?, revision = ? WHERE id = ? AND revision = ? AND status <> 'issued'",
         p.customer.id, p.destination, p.exemption ? JSON.stringify(p.exemption) : null, p.issueDate, p.dueDate, p.memo, creditFor, p.subtotal, p.tax, p.total, ...discountColumns(p), c.actor.email, uid(), current.id, b.revision), changed(),
       ...documentSelectionStatements(current.id, p), q('DELETE FROM pt_invoice_lines WHERE invoice_id = ?', current.id), ...lineStatements(current.id, p.lines),
@@ -136,10 +140,10 @@ const saveDraft: Command = { need: 'record', async run(c, b) {
     return invoice(c.db, current.id)
   }
   const id = uid(), number = b.number ? text(b.number, 'Number', 40) : await nextNumber(c.db, kind)
-  await run(c.db, [authority(c.actor, 'record'), ...certificateGuards, periodOpen(p.issueDate),
+  await run(c.db, [authority(c.actor, 'record'), ...depositScope, ...certificateGuards, periodOpen(p.issueDate),
     q("INSERT INTO pt_invoices (id, kind, number, customer_id, destination_state, exemption_evidence, issue_date, due_date, status, memo, credit_for, subtotal_cents, tax_cents, total_cents, discounts, discount_cents, after_tax_discount_cents, discount_account_id, deposit, early_terms, early_offer, opening, prepared_by, revision, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
       id, kind, number, p.customer.id, p.destination, p.exemption ? JSON.stringify(p.exemption) : null, p.issueDate, p.dueDate, p.memo, creditFor, p.subtotal, p.tax, p.total, ...discountColumns(p), c.actor.email, uid(), now()),
-    ...documentSelectionStatements(id, p), ...lineStatements(id, p.lines), audit(who(c.actor), `${kind}.draft`, kind, id, { number, total: p.total, earlyOffer: p.offer })])
+    ...documentSelectionStatements(id, p), ...lineStatements(id, p.lines), ...time.claims(id), audit(who(c.actor), `${kind}.draft`, kind, id, { number, total: p.total, earlyOffer: p.offer })])
   return invoice(c.db, id)
 } }
 
@@ -165,7 +169,7 @@ const approve: Command = { need: 'post', async run(c, b) {
   }
   const certificateGuards = await approvalChecks(c.db, current)
   const revision = uid()
-  await run(c.db, [authority(c.actor, 'post'), ...certificateGuards, ...treatmentFence(current.early_offer), periodOpen(current.issue_date), approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
+  await run(c.db, [authority(c.actor, 'post'), ...(current.deposit ? bankAuthority(c.actor, [current.deposit.bankAccountId]) : []), ...certificateGuards, ...treatmentFence(current.early_offer), periodOpen(current.issue_date), approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
     q("UPDATE pt_invoices SET status = 'approved', approved_by = ?, approved_revision = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'draft'", c.actor.email, revision, revision, current.id, b.revision), changed(),
     audit(who(c.actor), `${current.kind}.approve`, current.kind, current.id, current.early_offer ? { earlyOffer: current.early_offer } : {})])
   return invoice(c.db, current.id)
@@ -220,7 +224,7 @@ const issue: Command = { need: 'record', async run(c, b) {
   const current = await invoice(c.db, text(b.id, 'Invoice'))
   requireThat(current.status === 'approved' && current.approved_revision === current.revision, 'Approve the current version before issuing', 409)
   await assertOpen(c.db, current.issue_date)
-  const issued = await issueStatements(c.db, current as Issuable, who(c.actor))
+  const issued = await issueStatements(c.db, current as Issuable, c.actor)
   await run(c.db, [authority(c.actor, 'record'), ...issued.statements])
   return invoice(c.db, current.id)
 } }
@@ -231,7 +235,7 @@ const approveIssue: Command = { need: 'post', async run(c, b) {
   const self = await withinLimit(c.db, c.actor, current, b.limitRevision)
   const certificates = await approvalChecks(c.db, current)
   const approvedRevision = uid()
-  const issued = await issueStatements(c.db, { ...current, revision: approvedRevision } as Issuable, who(c.actor), current.prepared_by)
+  const issued = await issueStatements(c.db, { ...current, revision: approvedRevision } as Issuable, c.actor, current.prepared_by)
   await run(c.db, [...self.fences, ...certificates, ...treatmentFence(current.early_offer), periodOpen(current.issue_date),
     approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', self.note),
     q("UPDATE pt_invoices SET status = 'approved', approved_by = ?, approved_revision = ?, revision = ?, self_approval = ? WHERE id = ? AND revision = ? AND status = 'draft'", c.actor.email, approvedRevision, approvedRevision, JSON.stringify(self.detail), current.id, b.revision), changed(),

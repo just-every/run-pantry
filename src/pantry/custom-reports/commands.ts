@@ -3,7 +3,7 @@ import type { Command, Context } from '../context'
 import { now, optionalText, requireThat, text, uid, type Data } from '../core'
 import { audit, changed, guard, q, run } from '../db'
 import { calculateCustomReport, validateCustomReportDefinition } from './calculate'
-import { reportFence, reportPerson, reportTables, savedReport, SHARE_ROLES, type SavedKind } from './store'
+import { assertDefinitionRead, reportFence, reportPerson, reportTables, savedReport, SHARE_ROLES, type SavedKind } from './store'
 
 function shares(value: unknown) {
   if (value === undefined) return []
@@ -33,6 +33,7 @@ async function save(c: Context, b: Data, kind: SavedKind, definition: Data, refe
 const saveReport: Command = { need: 'record', async run(c, b) {
   reportPerson(c, 'record')
   const { id: _id, ...definition } = validateCustomReportDefinition(b.definition ?? b)
+  assertDefinitionRead(c, definition)
   await calculateCustomReport(c.db, definition)
   return save(c, b, 'report', definition)
 } }

@@ -16,6 +16,6 @@ export async function memberStatements(db: D1Database, subject: Data, label: str
       q("UPDATE oa_operators SET email=?,display_name=?,status='inactive',version=version+1 WHERE id=? AND role<>'owner'",label,label,op.id),changed())
   }
   if(tables.has('oa_auth_audit'))for(const row of await all(db,'SELECT id,value FROM oa_auth_audit')){const value=scrub(row.value,[subject.email,subject.name],label);if(value!==row.value){statements.push(q('UPDATE oa_auth_audit SET value=? WHERE id=? AND value=?',value,row.id,row.value),changed());counts.oa_auth_audit={fieldsReplaced:(counts.oa_auth_audit?.fieldsReplaced??0)+1}}}
-  statements.push(q("UPDATE pt_members SET email=?,name=?,revision=?,erased_at=? WHERE email=? AND active=0",label,label,crypto.randomUUID(),now(),subject.email),changed())
+  statements.push(q("UPDATE pt_members SET email=?,name=?,time_people='[]',revision=?,erased_at=? WHERE email=? AND active=0",label,label,crypto.randomUUID(),now(),subject.email),changed())
   return {statements,operators:operators.length,counts}
 }

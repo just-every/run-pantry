@@ -65,7 +65,7 @@ async function names(db: D1Database) {
 }
 
 export function actorView(actor: Person): Data {
-  return { email: actor.email, name: actor.name, role: actor.role, can: { record: allowed(actor, 'record'), post: allowed(actor, 'post'), lock: allowed(actor, 'lock'), reopen: allowed(actor, 'reopen'), owner: allowed(actor, 'owner') } }
+  return { email: actor.email, name: actor.name, role: actor.role, policy: actor.policy, can: { record: allowed(actor, 'record'), post: allowed(actor, 'post'), lock: allowed(actor, 'lock'), reopen: allowed(actor, 'reopen'), owner: allowed(actor, 'owner') } }
 }
 
 export { activity } from './activity'

@@ -1,3 +1,5 @@
+import { nativeApprovalAuthority } from './access-policy/approvals'
+import { bankAuthority } from './access-policy/banks'
 import { suggestionDecisions } from './line-suggestions'
 // Matching statement lines to ledger postings. A match links what the bank
 // recorded to what the books already hold; it posts only the new items a person
@@ -46,7 +48,7 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
   requireThat(!usedPostings.length, 'A ledger posting is already matched', 409)
 
   const day = lines.map(l => l.posted_date).sort().at(-1)!
-  const statements: Sql[] = [], created: { entryId: string; signed: number; kind: string; paymentId?: string }[] = []
+  const statements: Sql[] = [...bankAuthority(actor, [bankId])], created: { entryId: string; signed: number; kind: string; paymentId?: string }[] = []
   for (const [i, item] of input.create.entries()) {
     const label = `New item ${i + 1}`, type = text(item.type, `${label} type`)
     const amount = cents(item.amount, `${label} amount`), memo = optionalText(item.memo, `${label} memo`, 300)
@@ -61,6 +63,7 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
       if (type === 'transfer') {
         const to = await one(db, 'SELECT * FROM pt_bank_accounts WHERE id = ?', text(item.otherBankAccountId, `${label} other bank account`))
         requireThat(to && to.id !== bank.id, `${label}: choose the other bank account`)
+        statements.push(...bankAuthority(actor, [to.id]))
         other = { id: to.account_id }
       } else {
         other = await account(db, text(item.accountId, `${label} account`))
@@ -69,7 +72,7 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
       const contactId = item.contactId ? text(item.contactId, `${label} payee`) : null
       if (contactId) requireThat(await one(db, 'SELECT 1 FROM pt_contacts WHERE id = ? AND active = 1 AND kind = ?', contactId, direction === 'in' ? 'customer' : 'vendor'), 'Choose an active payee')
       const entryId = uid(), into = direction === 'in'
-      statements.push(...entryStatements({ id: entryId, date: item.date ?? day, memo: memo || `${type === 'transfer' ? 'Transfer' : other.name} — ${lines[0].description}`, sourceKind: 'bank', documentId: item.documentId ?? null, preparedBy: actor.email, preparedKind: 'person', lines: [
+      statements.push(...nativeApprovalAuthority(actor, 'journal', amount, 'record'), ...entryStatements({ id: entryId, date: item.date ?? day, memo: memo || `${type === 'transfer' ? 'Transfer' : other.name} — ${lines[0].description}`, sourceKind: 'bank', documentId: item.documentId ?? null, preparedBy: actor.email, preparedKind: 'person', lines: [
         { accountId: into ? bank.account_id : other.id, debit: amount, credit: 0, memo, contactId: into ? null : contactId },
         { accountId: into ? other.id : bank.account_id, debit: 0, credit: amount, memo, contactId: into ? contactId : null },
       ] }, actor.email))
@@ -118,11 +121,11 @@ const undoMatch: Command = { need: 'record', async run(c, b) {
   if (match.payment_id) {
     const payment = (await one(c.db, 'SELECT * FROM pt_payments WHERE id = ?', match.payment_id))!
     const original = await entry(c.db, payment.journal_id)
-    const r = await reversalStatements(c.db, who(c.actor), original, original.entry_date, `Undo of a bank match: ${original.memo}`, { unmatching: true })
+    const r = await reversalStatements(c.db, c.actor, original, original.entry_date, `Undo of a bank match: ${original.memo}`, { unmatching: true })
     reversal.push(...r.statements, q('UPDATE pt_payments SET reversal_id = ? WHERE id = ? AND reversal_id IS NULL', r.id, payment.id), changed(),
       ...await reverseEarlyDiscounts(c.db, who(c.actor), payment.id, original.entry_date, 'the bank match that recorded its payment was undone'))
   }
-  await run(c.db, [authority(c.actor, 'record'),
+  await run(c.db, [authority(c.actor, 'record'), ...bankAuthority(c.actor, [match.bank_account_id]),
     q("UPDATE pt_matches SET status = 'undone', revision = ? WHERE id = ? AND status = 'approved' AND reconciliation_id IS NULL", uid(), match.id), changed(),
     q('UPDATE pt_match_bank_lines SET active = 0 WHERE match_id = ?', match.id), q('UPDATE pt_match_postings SET active = 0 WHERE match_id = ?', match.id),
     ...reversal,

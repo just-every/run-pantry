@@ -2,6 +2,7 @@
 import { operatorAuth, runtimeBindings } from '../auth.server'
 import { authority, who } from './access'
 import { limitsView } from './issuing-limits'
+import { memberRoles, memberPolicy, privacyView } from './access-policy/settings'
 import { date, now, optionalText, requireThat, sha256, text, uid, Fault, type Data } from './core'
 import { all, audit, changed, one, q, run } from './db'
 import type { Command, Context } from './context'
@@ -50,18 +51,20 @@ const saveMember: Command = { need: 'owner', async run(c, b) {
   const email = text(b.email, 'Email', 254).toLowerCase()
   requireThat(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email), 'Enter a valid email')
   const role = text(b.role, 'Role')
-  requireThat(['bookkeeper', 'accountant', 'viewer'].includes(role), 'Role is bookkeeper, accountant or viewer')
-  const flag = (v: unknown) => (v === true || v === 'on' || v === 'true' || v === 1) && role !== 'viewer' ? 1 : 0
-  const row = { name: text(b.name, 'Name', 200), post: flag(b.canPost), lock: flag(b.canLock), reopen: flag(b.canReopen), active: b.active === false || b.active === 'false' ? 0 : 1 }
+  requireThat(memberRoles.includes(role as any), 'Choose a current role')
+  const flag = (v: unknown) => (v === true || v === 'on' || v === 'true' || v === 1) && !['viewer', 'time-only'].includes(role) ? 1 : 0
+  const row = { name: text(b.name, 'Name', 200), post: flag(b.canPost), lock: ['bookkeeper', 'accountant'].includes(role) ? flag(b.canLock) : 0, reopen: ['bookkeeper', 'accountant'].includes(role) ? flag(b.canReopen) : 0, active: b.active === false || b.active === 'false' ? 0 : 1 }
   // Editing someone's email moves that person to the new address: the old one no longer signs in to these books.
   const previous = b.previousEmail ? text(b.previousEmail, 'Previous email', 254).toLowerCase() : email
   const before = await one(c.db, 'SELECT * FROM pt_members WHERE email = ?', previous)
-  const revision = uid(), after = { email, name: row.name, role, can_post: row.post, can_lock: row.lock, can_reopen: row.reopen, active: row.active, revision }
+  const policy = await memberPolicy(c.db, b, before, role)
+  const revision = uid(), after = { bank_accounts: policy.banks, time_people: policy.people, bill_limit_cents: policy.bill, payment_limit_cents: policy.payment, journal_limit_cents: policy.journal, email, name: row.name, role, can_post: row.post, can_lock: row.lock, can_reopen: row.reopen, active: row.active, revision }
   if (previous !== email) {
     requireThat(await one(c.db, 'SELECT 1 FROM pt_members WHERE email = ?', previous), 'That person is no longer in People; reload', 404)
     requireThat(!(await one(c.db, 'SELECT 1 FROM pt_members WHERE email = ?', email)), `${email} is already in People`, 409)
     await run(c.db, [authority(c.actor, 'owner'),
       q('UPDATE pt_members SET email = ?, name = ?, role = ?, can_post = ?, can_lock = ?, can_reopen = ?, active = ?, revision = ? WHERE email = ?', email, row.name, role, row.post, row.lock, row.reopen, row.active, revision, previous), changed(),
+      q('UPDATE pt_members SET bank_accounts = ?, time_people = ?, bill_limit_cents = ?, payment_limit_cents = ?, journal_limit_cents = ? WHERE email = ?', policy.banks, policy.people, policy.bill, policy.payment, policy.journal, email),
       audit(who(c.actor), 'member.save', 'member', email, { previousEmail: previous, role, canPost: !!row.post, canLock: !!row.lock, canReopen: !!row.reopen, active: !!row.active, before, after })])
     return (await one(c.db, 'SELECT * FROM pt_members WHERE email = ?', email))!
   }
@@ -69,7 +72,8 @@ const saveMember: Command = { need: 'owner', async run(c, b) {
   await run(c.db, [authority(c.actor, 'owner'),
     q('INSERT INTO pt_members (email, name, role, can_post, can_lock, can_reopen, active, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(email) DO UPDATE SET name = excluded.name, role = excluded.role, can_post = excluded.can_post, can_lock = excluded.can_lock, can_reopen = excluded.can_reopen, active = excluded.active, revision = excluded.revision',
       email, row.name, role, row.post, row.lock, row.reopen, row.active, revision),
-    audit(who(c.actor), 'member.save', 'member', email, { role, canPost: !!row.post, canLock: !!row.lock, canReopen: !!row.reopen, active: !!row.active, before, after })])
+    q('UPDATE pt_members SET bank_accounts = ?, time_people = ?, bill_limit_cents = ?, payment_limit_cents = ?, journal_limit_cents = ? WHERE email = ?', policy.banks, policy.people, policy.bill, policy.payment, policy.journal, email),
+      audit(who(c.actor), 'member.save', 'member', email, { role, canPost: !!row.post, canLock: !!row.lock, canReopen: !!row.reopen, active: !!row.active, before, after })])
   const member = (await one(c.db, 'SELECT * FROM pt_members WHERE email = ?', email))!
   // Someone new gets their sign-in invitation in the same step, so they can sign in (and, on this computer,
   // Sign in as or rer dev --as works for them) without a second action. Someone who already signs in needs none.
@@ -155,8 +159,9 @@ export async function settingsView(c: Context): Promise<Data> {
   const owner = c.actor.kind === 'person' && c.actor.role === 'owner'
   return {
     issuingLimits: await limitsView(c.db, c.actor),
+    rolePrivacy: owner ? await privacyView(c.db) : [],
     entity: await entity(c.db),
-    members: owner ? await all(c.db, 'SELECT email, name, role, can_post, can_lock, can_reopen, active FROM pt_members ORDER BY email') : [],
+    members: owner ? await all(c.db, 'SELECT * FROM pt_members ORDER BY email') : [],
     agents: owner ? await all(c.db, 'SELECT id, name, created_by, created_at, active FROM pt_agents ORDER BY created_at') : [],
     choices: { entityTypes: ENTITY_TYPES, states: STATES },
     // The owner address this install was set up with, which rer deploy gives a hosted Pantry unless .env.pantry names one.

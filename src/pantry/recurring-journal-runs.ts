@@ -1,15 +1,14 @@
 // Atomic occurrence generation. A failed date remains explicit evidence;
 // only a person retries it, and successful occurrence keys never run again.
+import { standingAuthority, standingFence } from './access-policy/banks'
 import { Fault, now, requireThat, uid, type Data } from './core'
 import { all, approval, audit, changed, guard, one, periodOpen, q, run, type AuditActor, type Sql } from './db'
 import { entryStatements, parseLines } from './journal'
 import { journalInputLines, recurringJournalDate } from './recurring-journals'
 
 const actor: AuditActor = { email: 'pantry:recurring-journals', kind: 'system' }
-const approverCondition = `EXISTS (SELECT 1 FROM oa_operators o LEFT JOIN pt_members m ON lower(m.email) = lower(o.email)
-  WHERE lower(o.email) = lower(?) AND o.status = 'active' AND (o.role = 'owner' OR (m.active = 1 AND m.can_post = 1 AND m.role <> 'viewer')))`
-
 export async function generateJournalOccurrence(db: D1Database, t: Data, day: string, today: string, options: { retry?: boolean; authority?: Sql } = {}) {
+  const approver = standingAuthority(t.approved_by ?? '', 'journal', [], t.lines.map((l: Data) => l.accountId))
   const revision = t.revision, snapshot = JSON.stringify({ revision, name: t.name, memo: t.memo, lines: t.lines, mode: t.mode, cadence: t.cadence, every: t.every, start_date: t.start_date, end_date: t.end_date, approved_by: t.approved_by, approved_revision: t.approved_revision })
   const next = recurringJournalDate(t.start_date, t.every, t.runs + 1, t.cadence), ended = !!t.end_date && next > t.end_date
   const fence = () => [
@@ -34,7 +33,7 @@ export async function generateJournalOccurrence(db: D1Database, t: Data, day: st
     lines = await parseLines(db, journalInputLines(t.lines))
     if (t.mode === 'post') {
       requireThat(t.approved_revision === revision && t.approved_snapshot === JSON.stringify(lines), 'Template amounts or coding do not match the approved revision; edit and approve it again', 409)
-      requireThat(t.approved_by && await one(db, `SELECT 1 AS ok WHERE ${approverCondition}`, t.approved_by), 'The template approver no longer holds the posting grant; review the template again', 409)
+      requireThat(t.approved_by && await one(db, `SELECT 1 AS ok WHERE ${approver.sql}`, ...approver.params), 'The template approver no longer holds the posting grant; review the template again', 409)
     }
   } catch (error) {
     if (!(error instanceof Fault)) console.error('Recurring journal preparation failed', error)
@@ -45,7 +44,7 @@ export async function generateJournalOccurrence(db: D1Database, t: Data, day: st
     preparedBy: t.prepared_by, preparedKind: 'person' as const, lines }
   const statements: Sql[] = [...fence(), periodOpen(day),
     ...lines.map(l => guard("EXISTS (SELECT 1 FROM pt_accounts WHERE id = ? AND active = 1 AND subtype NOT IN ('receivable', 'payable'))", l.accountId)),
-    ...(automatic ? [guard('EXISTS (SELECT 1 FROM pt_recurring_journals WHERE id = ? AND approved_revision = ? AND approved_snapshot = ? AND approved_by = ?)', t.id, revision, JSON.stringify(lines), t.approved_by), guard(approverCondition, t.approved_by)] : []),
+    ...(automatic ? [guard('EXISTS (SELECT 1 FROM pt_recurring_journals WHERE id = ? AND approved_revision = ? AND approved_snapshot = ? AND approved_by = ?)', t.id, revision, JSON.stringify(lines), t.approved_by), standingFence(approver)] : []),
     ...entryStatements(statement, automatic ? actor.email : undefined),
     ...(automatic ? [approval({ email: t.approved_by, kind: 'person' }, 'journal', id, journalRevision, 'post', 'approved', `Recurring journal ${t.name}; approved template revision ${revision}; occurrence ${day}`)] : []),
     ...claim(id, automatic ? 'posted' : 'drafted', automatic ? 'Posted under this exact approved template revision' : 'Draft created; a person must review and post its exact journal revision'), ...advance(),

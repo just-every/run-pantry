@@ -1,3 +1,4 @@
+import { standingAuthority, standingFence } from './access-policy/banks'
 import { withinLimit } from './issuing-limits'
 // Recurring invoices. A template names the customer, lines, schedule and what
 // each occurrence becomes: a draft that waits for approval as any invoice does,
@@ -127,8 +128,6 @@ export const recurringCommands: Record<string, Command> = {
   'recurring.status': setStatus,
 }
 
-const approverStillPosts = (email: string) => guard("EXISTS (SELECT 1 FROM oa_operators WHERE lower(email) = ? AND role = 'owner' AND status = 'active') OR EXISTS (SELECT 1 FROM pt_members WHERE email = ? AND active = 1 AND can_post = 1 AND role <> 'viewer')", email, email)
-
 const claimed = (error: unknown) => String((error as Error)?.message ?? error).includes('pt_recurring_runs')
 
 /** Create (and for an approved sending template, issue and send) one occurrence. */
@@ -149,7 +148,8 @@ async function runOccurrence(env: Bindings, db: D1Database, t: Data) {
   } catch (error) { if (error instanceof Fault) return fail(error.message); throw error }
   const locked = await one(db, "SELECT id FROM pt_periods WHERE status = 'locked' AND ? BETWEEN start_date AND end_date", occ)
   if (locked) return fail(`${longDay(occ)} is in ${monthName(locked.id)}, which is locked`)
-  const approverPosts = approvedBy && await one(db, "SELECT 1 AS ok WHERE EXISTS (SELECT 1 FROM oa_operators WHERE lower(email) = ? AND role = 'owner' AND status = 'active') OR EXISTS (SELECT 1 FROM pt_members WHERE email = ? AND active = 1 AND can_post = 1 AND role <> 'viewer')", approvedBy, approvedBy)
+  const approver = standingAuthority(approvedBy ?? '', 'invoice', p.deposit ? [p.deposit.bankAccountId] : [])
+  const approverPosts = approvedBy && await one(db, `SELECT 1 AS ok WHERE ${approver.sql}`, ...approver.params)
   const sameAmounts = p.total === amounts.total_cents && p.tax === amounts.tax_cents && amountSnapshot(p) === amounts.amount_snapshot
   const discountAccount = !p.discounts.length || !!p.discountAccountId
   // The approval covered the template's early-payment term with the treatment revisions it relied on (INVOICE-010).
@@ -172,7 +172,7 @@ async function runOccurrence(env: Bindings, db: D1Database, t: Data) {
       const issued = await issueStatements(db, { id, kind: 'invoice', number, customer_id: p.customer.id, customer_name: p.customer.name, issue_date: occ, total_cents: p.total, revision,
         discount_cents: p.discount, after_tax_discount_cents: p.afterTax, discount_account_id: p.discountAccountId, deposit: p.deposit,
         lines: p.lines.map(l => ({ account_id: l.accountId, amount_cents: l.amount, description: l.description, tax_code: l.taxCode, tax_cents: l.tax })) }, pantry('recurring'), amounts.prepared_by, p)
-      statements.push(approverStillPosts(approvedBy), approval({ email: approvedBy, kind: 'person' }, 'invoice', id, revision, 'approve', 'approved', `Approved through recurring invoice ${t.number}, revision ${t.approved_revision}${price ? ', price revision ' + price.approved_revision : ''}`), ...issued.statements)
+      statements.push(standingFence(approver), approval({ email: approvedBy, kind: 'person' }, 'invoice', id, revision, 'approve', 'approved', `Approved through recurring invoice ${t.number}, revision ${t.approved_revision}${price ? ', price revision ' + price.approved_revision : ''}`), ...issued.statements)
     } catch (error) { if (error instanceof Fault) return fail(error.message); throw error }
   }
   statements.push(audit(pantry('recurring'), 'recurring.run', 'recurring', t.id, { occurrence: occ, invoice: number, issued: automatic }))

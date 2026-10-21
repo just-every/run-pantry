@@ -26,7 +26,7 @@ const execute: Command = {need:'owner',async run(c,b) {
   const id = uid(), at = now(), member = p.kind==='member', person=p.kind==='contact-person', label = member ? `Former member ${crypto.randomUUID().replaceAll('-','').slice(0,8)}` : MARKER
   const values = person?[p.subject.name,p.subject.email,p.subject.phone].filter(Boolean):await erasureValues(c.db,p.subject,member,p.posted)
   const history = await historyStatements(c.db,values,id,at,member?{email:p.id,label}:undefined)
-  const copies = await eraseCopies(c.db,{id:p.id,member:member||person,posted:p.posted,values,marker:label,erasureId:id,at})
+  const copies = await eraseCopies(c.db,{id:p.id,member:member||person,memberEmail:member?p.id:undefined,posted:p.posted,values,marker:label,erasureId:id,at})
   const cancelled=await cancelErased(c.db,p.id,copies.affectedRecordIds)
   const counts: Record<string,Data> = {pt_webhook_deliveries:{attemptsCancelled:cancelled.count},pt_audit:{valuesReplaced:history.counts.pt_audit},pt_approvals:{valuesReplaced:history.counts.pt_approvals}}
   const immutable = await immutableCopies(c.db,{values,marker:label,member,erasureId:id})
@@ -41,7 +41,7 @@ const execute: Command = {need:'owner',async run(c,b) {
     counts.pt_contacts={fieldsReplaced:1,contactPeopleRemoved:1}
   } else if (member) {
     const result = await memberStatements(c.db,p.subject,label)
-    writes.push(...result.statements);Object.assign(counts,result.counts); counts.pt_members={fieldsReplaced:2}; counts.oa_operators={identitiesRemoved:result.operators}
+    writes.push(...result.statements);Object.assign(counts,result.counts); counts.pt_members={...counts.pt_members,fieldsReplaced:(counts.pt_members?.fieldsReplaced??0)+2+(p.subject.time_people!=='[]'?1:0),delegationsRemoved:(counts.pt_members?.delegationsRemoved??0)+JSON.parse(p.subject.time_people).length}; counts.oa_operators={identitiesRemoved:result.operators}
   } else {
     writes.push(guard('EXISTS (SELECT 1 FROM pt_contacts WHERE id=? AND revision=?)',p.id,p.subject.revision))
     if (p.posted) {

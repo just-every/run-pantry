@@ -31,7 +31,7 @@ function BillForm({ bill, onDone, onCancel }: { bill?: D; onDone: () => Promise<
 export function Bills({ data, reload, initialBillId }: { data: D; reload: () => Promise<void>; initialBillId?: string }) {
   const { state } = useShared(), file = useRef<HTMLInputElement>(null), [selected, setSelected] = useState<string | null>(() => initialBillId ?? (typeof window !== 'undefined' && window.location.hash.startsWith('#bill-') ? window.location.hash.slice(6) : null)), [editing, setEditing] = useState(false)
   const current = (data.bills as D[]).find(b => b.id === selected)
-  return <><CapturedBills documents={data.capturedBills ?? []} /><CaptureApprovalRules rules={data.approvalRules ?? []} accounts={state.accounts} onChange={reload} /><div className="split split-wide-left">
+  return <>{state.actor.role !== 'payables-clerk' && <CapturedBills documents={data.capturedBills ?? []} />}<CaptureApprovalRules rules={data.approvalRules ?? []} accounts={state.accounts} onChange={reload} /><div className="split split-wide-left">
     <div className="stack"><Card title="Bills">
       <Table caption="Bill inbox" heads={['Vendor', 'Reference / evidence', 'Due', 'Amount', 'Open', 'State / next actor']} figures={[3, 4]} empty="No bills yet.">
         {(data.bills as D[]).map(b => <tr key={b.id} className={selected === b.id ? 'selected' : ''} tabIndex={0} onClick={() => { setSelected(b.id); setEditing(false) }} onKeyDown={k => { if (k.key === 'Enter') setSelected(b.id) }}>
@@ -42,6 +42,7 @@ export function Bills({ data, reload, initialBillId }: { data: D; reload: () => 
     {current && <VendorHistory key={current.vendor_id + current.revision} vendorId={current.vendor_id} />}
     </div><div className="stack">
       {current && <Card title={`${current.vendor_name} ${current.reference}`}>
+        {current.ownerApprovalRequired && <p className="callout callout-warn">This amount exceeds your bill approval limit. The owner must approve it.</p>}
         <BillWorkflow bill={current} reload={reload} />
         <p>{usd(current.total_cents)} due {day(current.due_date)}; {usd(current.open_cents)} open.</p>
         {!!current.received && <p><Chip tone="good">Received</Chip> {current.ready_to_pay ? <Chip tone="good">Ready to pay</Chip> : <Chip>Not ready to pay</Chip>}</p>}
@@ -52,8 +53,8 @@ export function Bills({ data, reload, initialBillId }: { data: D; reload: () => 
           <p>{current.approved_revision === current.revision ? `This revision was approved by ${current.approved_by}.` : current.owner_required ? 'Owner approval required before posting this revision.' : 'No owner-only rule matches this revision.'}</p>
           {editing ? <BillForm key={current.revision} bill={current} onCancel={() => setEditing(false)} onDone={async () => { setEditing(false); await reload() }} /> : <div className="row-actions">
             {state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={() => setEditing(true)}>Edit bill</button>}
-            {current.approved_revision !== current.revision && state.actor.can.post && (state.actor.role === 'owner' || (!current.owner_required && current.prepared_by !== state.actor.email)) && <Action run={async () => { await command('bill.approve', { id: current.id, revision: current.revision }); await reload() }}>Approve bill revision</Action>}
-            {state.actor.can.record && (!current.owner_required || current.approved_revision === current.revision) && <Action tone="primary" run={async () => { await command('bill.record', { id: current.id, revision: current.revision }); await reload() }}>Record bill</Action>}
+            {!current.ownerApprovalRequired && current.approved_revision !== current.revision && state.actor.can.post && (state.actor.role === 'owner' || (!current.owner_required && current.prepared_by !== state.actor.email)) && <Action run={async () => { await command('bill.approve', { id: current.id, revision: current.revision }); await reload() }}>Approve bill revision</Action>}
+            {!current.ownerApprovalRequired && state.actor.can.record && (!current.owner_required || current.approved_revision === current.revision) && <Action tone="primary" run={async () => { await command('bill.record', { id: current.id, revision: current.revision }); await reload() }}>Record bill</Action>}
           </div>}
         </>}
         {current.documents.map((d: D) => <p key={d.id}><a href={`/api/pantry/documents/${d.id}`}>{d.name}</a></p>)}

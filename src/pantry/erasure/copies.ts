@@ -4,9 +4,10 @@ import { all, changed, guard, q, type Sql } from '../db'
 import type { Data } from '../core'
 import { scrub } from './personal'
 import { retentionItems } from './retention-items'
+import { timeCopies } from './time'
 import { supportingBooks } from './retention-clock'
 
-type Input = { id: string; member: boolean; posted: boolean; values: string[]; marker: string; erasureId: string; at: string }
+type Input = { id: string; member: boolean; memberEmail?: string; posted: boolean; values: string[]; marker: string; erasureId: string; at: string }
 type Column = { name: string; pk: number }
 const quote = (s: string) => `"${s.replaceAll('"', '""')}"`
 const FIELDS: Record<string, string[]> = {
@@ -50,7 +51,7 @@ const FIELDS: Record<string, string[]> = {
 const JSON_FIELDS = new Set(['facts', 'choices', 'pending', 'read_vendor_details', 'read_draft_fields', 'read_match_fields', 'payload', 'refs', 'evidence', 'document_template', 'document_values', 'self_approval', 'lines', 'splits', 'feed_snapshot', 'details', 'candidates', 'snapshot', 'left_out', 'definition', 'settings', 'recipients', 'setting'])
 // Their scoped trigger exceptions and metadata are owned by the caller. Never
 // attempt a generic update through an immutable accounting/history door.
-const CALLER_OWNED = new Set(['pt_contacts', 'pt_members', 'pt_audit', 'pt_approvals', 'pt_journal_entries', 'pt_journal_lines', 'pt_invoice_documents', 'pt_documents', 'pt_document_parts', 'pt_voided_reconciliations', 'pt_reconciliation_undos', 'pt_line_suggestion_decisions'])
+const CALLER_OWNED = new Set(['pt_contacts', 'pt_members', 'pt_audit', 'pt_approvals', 'pt_journal_entries', 'pt_journal_lines', 'pt_invoice_documents', 'pt_documents', 'pt_document_parts', 'pt_voided_reconciliations', 'pt_reconciliation_undos', 'pt_line_suggestion_decisions', 'pt_time_entries', 'pt_time_projects'])
 
 function replacement(value: unknown, column: string, input: Input): unknown {
   if (typeof value !== 'string') return value
@@ -168,5 +169,9 @@ export async function eraseCopies(db: D1Database, input: Input) {
     note('pt_document_parts', 'rowsRemoved', parts.length)
     for (const part of parts) removed.push({ table: 'pt_document_parts', key: { document_id: row.id, seq: part.seq } })
   }
+  const time = await timeCopies(db, input)
+  statements.push(...time.statements)
+  for (const [table, values] of Object.entries(time.counts)) counts[table] = { ...counts[table], ...values }
+  for (const id of time.affectedRecordIds) affectedRecordIds.add(id)
   return { statements, counts, removed, affectedRecordIds: [...affectedRecordIds] }
 }

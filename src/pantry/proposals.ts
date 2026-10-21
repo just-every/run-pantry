@@ -1,3 +1,5 @@
+import { approvalAuthority } from './access-policy/approvals'
+import { ledgerBankAuthority } from './access-policy/banks'
 // Agent work: an agent reads the books it is allowed to see and files typed
 // proposals citing the exact records it used. A person approves or rejects;
 // approval re-checks every cited record, the period lock and the approver's
@@ -112,8 +114,9 @@ async function correctionPlan(db: D1Database, actor: Actor, p: Data, selectedDat
     const day = date(selectedDate ?? p.payload.date, 'Correction date')
     if (!preview) await assertOpen(db, day)
     const lines = await parseLines(db, p.payload.lines), id = uid()
-    return { id, day, dates: [day], statements: entryStatements({ id, date: day, memo: text(p.payload.memo, 'Description', 500), sourceKind: 'manual', sourceId: p.payload.correctsEntryId ?? null,
-      preparedBy: `agent:${p.agent_name}`, preparedKind: 'agent', proposalId: p.id, documentId: p.payload.documentId, lines }, actor.email) }
+    const approvalGuards = preview ? [] : [...approvalAuthority(actor, 'journal', lines.reduce((n, l) => n + l.debit, 0)), ...await ledgerBankAuthority(db, actor, lines.map(l => l.accountId), 'post')]
+    return { id, day, dates: [day], statements: [...approvalGuards, ...entryStatements({ id, date: day, memo: text(p.payload.memo, 'Description', 500), sourceKind: 'manual', sourceId: p.payload.correctsEntryId ?? null,
+      preparedBy: `agent:${p.agent_name}`, preparedKind: 'agent', proposalId: p.id, documentId: p.payload.documentId, lines }, actor.email)] }
   }
   const input = matchInput(p.payload)
   const bankLines = await all(db, `SELECT posted_date FROM pt_bank_lines WHERE id IN (${input.bankLineIds.map(() => '?').join(',')})`, ...input.bankLineIds)

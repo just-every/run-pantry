@@ -93,9 +93,12 @@ import { runWebhooks } from './webhooks/deliver'
 import { dataFlows } from './data-flows'
 import { recordReportIssue } from './effects/issues'
 import { FIRST_DAY } from './report-sources'
+import { assertDoor, projectAccess } from './access-policy/doors'
+import { accessPolicyCommands } from './access-policy/settings'
+import { timeCommands, timeView } from './time/commands'
 
 const commands: Record<string, Command> = {
-  ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -115,15 +118,26 @@ api.route('/', customer)
 api.use('/api/pantry/*', async (c, next) => { await next(); c.header('cache-control', 'no-store'); c.header('x-content-type-options', 'nosniff') })
 // Feed syncs that have come due run after an ordinary read answers, as well as on the Cron trigger.
 api.use('/api/pantry/*', async (c, next) => { await next(); if (c.req.method === 'GET' && await anyDue(c.env)) c.executionCtx.waitUntil(runDue(c.env, 2).catch(e => console.error(e))) })
+api.use('/api/pantry/*', async (c, next) => {
+  const path = new URL(c.req.url).pathname
+  if (!/^\/api\/pantry\/(?:command\/|agent\/|integration\/v1(?:\/|$)|feeds\/plaid\/webhook$|stripe\/webhook$)/.test(path)) {
+    const actor = await person(c.req.raw, c.env)
+    await assertDoor({ db: c.env.DB, env: c.env, request: c.req.raw, actor }, path)
+  }
+  await next()
+})
 api.onError((e, c) => e instanceof Fault ? c.json({ error: e.message }, e.status as 400) : (console.error(e), c.json({ error: 'Unexpected error; check the server log' }, 500)))
 
 async function reader(c: C): Promise<Context> {
   const actor = await person(c.req.raw, c.env)
   must(actor, 'read')
-  return { db: c.env.DB, env: c.env, request: c.req.raw, actor }
+  const ctx = { db: c.env.DB, env: c.env, request: c.req.raw, actor }
+  await assertDoor(ctx, c.req.url)
+  return ctx
 }
 
-const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => c.json(await build(await reader(c), c)))
+const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => { const ctx = await reader(c); return c.json(await projectAccess(ctx, await build(ctx, c))) })
+view('time', async ctx => timeView(ctx))
 api.route('/api/pantry/integration/v1', integrations)
 view('webhooks', async ctx => webhookSettings(ctx))
 view('data-flows', async ctx => dataFlows(ctx))
@@ -297,7 +311,9 @@ api.post('/api/pantry/command/:op', async c => {
   requireThat(Number(c.req.header('content-length') ?? 0) <= 8_000_000, 'Request too large', 413)
   const body = await c.req.json().catch(() => { throw new Fault(400, 'Send a JSON object') })
   requireThat(body && typeof body === 'object' && !Array.isArray(body), 'Send a JSON object')
-  return c.json(await command.run({ db: c.env.DB, env: c.env, request: c.req.raw, actor }, body as Data))
+  const ctx = { db: c.env.DB, env: c.env, request: c.req.raw, actor }
+  await assertDoor(ctx, c.req.url, body as Data)
+  return c.json(await projectAccess(ctx, await command.run(ctx, body as Data)))
 })
 
 // Plaid's webhook: verified by its signature, never by a session. It marks work due; the sync runs after the answer.

@@ -1,3 +1,5 @@
+import { nativeApprovalAuthority } from '../access-policy/approvals'
+import { ledgerBankAuthority } from '../access-policy/banks'
 import { authority, who } from '../access'
 import { businessDay, sendingSettings } from '../delivery'
 import { date, now, optionalText, requireThat, text, uid } from '../core'
@@ -16,7 +18,7 @@ const save: Command = { need: 'record', async run(c, b) {
   }
   const s: Schedule = { ...p, id: before?.id ?? uid(), revision: uid(), prepared_by: c.actor.email, status: 'awaiting-approval' }
   const fields = [s.kind, s.name, s.balance_account_id, s.recognition_account_id, s.amount_cents, s.start_date, s.months, JSON.stringify(s.plan), s.source_journal_id, s.source_line_id, s.source_date, s.prepared_by, s.revision, now()]
-  await run(c.db, [authority(c.actor, 'record'), ...accountFences(s), ...sourceFence(s),
+  await run(c.db, [authority(c.actor, 'record'), ...await ledgerBankAuthority(c.db, c.actor, [s.balance_account_id, s.recognition_account_id]), ...accountFences(s), ...sourceFence(s),
     ...(before ? [guard("NOT EXISTS (SELECT 1 FROM pt_recognition_runs WHERE schedule_id = ? AND status = 'posted')", s.id),
       q("UPDATE pt_recognition_schedules SET kind = ?, name = ?, balance_account_id = ?, recognition_account_id = ?, amount_cents = ?, start_date = ?, months = ?, plan = ?, source_journal_id = ?, source_line_id = ?, source_date = ?, prepared_by = ?, revision = ?, updated_at = ?, status = 'awaiting-approval', approved_by = NULL, approved_revision = NULL, approved_snapshot = NULL WHERE id = ? AND revision = ?", ...fields, s.id, b.revision), changed()]
       : [q("INSERT INTO pt_recognition_schedules (kind, name, balance_account_id, recognition_account_id, amount_cents, start_date, months, plan, source_journal_id, source_line_id, source_date, prepared_by, revision, updated_at, id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'awaiting-approval', ?)", ...fields, s.id, now())]),
@@ -30,7 +32,7 @@ const approve: Command = { need: 'post', async run(c, b) {
   requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || c.actor.email !== s.prepared_by), 'Someone other than the preparer approves this schedule', 403)
   await validateAccounts(c.db, s)
   const value = snapshot(s)
-  await run(c.db, [authority(c.actor, 'post'), ...accountFences(s), ...sourceFence(s),
+  await run(c.db, [authority(c.actor, 'post'), ...nativeApprovalAuthority(c.actor, 'journal', Math.max(...s.plan.map(p => p.amount_cents))), ...await ledgerBankAuthority(c.db, c.actor, [s.balance_account_id, s.recognition_account_id], 'post'), ...accountFences(s), ...sourceFence(s),
     q("UPDATE pt_recognition_schedules SET status = CASE WHEN status = 'ended' THEN 'ended' ELSE 'active' END, approved_by = ?, approved_revision = revision, approved_snapshot = ?, updated_at = ? WHERE id = ? AND revision = ?", c.actor.email, value, now(), s.id, b.revision), changed(),
     approval(who(c.actor), 'recognition', s.id, s.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
     audit(who(c.actor), 'recognition.approve', 'recognition', s.id, { revision: s.revision, before: { status: s.status, approved_by: s.approved_by }, after: { approved_by: c.actor.email, approved_revision: s.revision, snapshot: JSON.parse(value) } })])

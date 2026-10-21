@@ -1,5 +1,6 @@
 // Approval rules are shared by captured and manually entered bills. The rule
 // snapshot and exact bill revision are guarded again in the posting batch.
+import { nativeApprovalAuthority } from './access-policy/approvals'
 import { authority, who } from './access'
 import type { Command } from './context'
 import { now, optionalText, requireThat, text, uid, type Data } from './core'
@@ -26,7 +27,7 @@ const approve: Command = { need: 'post', async run(c, b) {
   const rules = await billRules(c.db, billRulePayload(current))
   requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || (!rules.ownerRequired && c.actor.email !== current.prepared_by)), rules.ownerRequired ? 'This bill needs the owner' : 'Someone other than the preparer approves this bill', 403)
   await assertOpen(c.db, current.bill_date)
-  await run(c.db, [authority(c.actor, 'post'), periodOpen(current.bill_date), ...rules.guards,
+  await run(c.db, [authority(c.actor, 'post'), ...nativeApprovalAuthority(c.actor, 'bill', current.total_cents), periodOpen(current.bill_date), ...rules.guards,
     q("UPDATE pt_bills SET approved_by = ?, approved_revision = revision WHERE id = ? AND revision = ? AND status = 'draft'", c.actor.email, current.id, current.revision), changed(),
     approval(who(c.actor), 'bill', current.id, current.revision, 'bill.approve', 'approved', optionalText(b.note, 'Note', 500)),
     audit(who(c.actor), 'bill.approve', 'bill', current.id, { revision: current.revision, ownerRequired: rules.ownerRequired })])

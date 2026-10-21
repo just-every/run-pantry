@@ -1,3 +1,4 @@
+import { invoiceTime } from '../time/invoicing'
 // Sibling postings share Pantry's parsers, accounting batches and period guards.
 import { authority, who } from '../access'
 import { contact, documentStatements } from '../contacts'
@@ -45,7 +46,8 @@ export async function preparePayment(c: Context, b: Data): Promise<Prepared> {
 }
 
 export async function prepareInvoice(c: Context, b: Data): Promise<Prepared> {
-  const p = await parseInvoice(c.db, b), kind = b.kind === 'credit' ? 'credit' : 'invoice'
+  const time = await invoiceTime(c.db, b)
+  const p = await parseInvoice(c.db, time.body), kind = b.kind === 'credit' ? 'credit' : 'invoice'
   await assertOpen(c.db, p.issueDate)
   const id = uid(), revision = uid(), number = b.number ? text(b.number, 'Number', 40) : await nextNumber(c.db, kind)
   let creditFor = null
@@ -62,7 +64,7 @@ export async function prepareInvoice(c: Context, b: Data): Promise<Prepared> {
   const exemptionEvidence = p.exemption ? JSON.stringify(p.exemption) : null
   const statements = [periodOpen(p.issueDate), ...exemptionFence(p.exemption, p.customer.id, p.destination, p.issueDate, await exemptionDay(c.db)),
     q("INSERT INTO pt_invoices (id,kind,number,customer_id,destination_state,exemption_evidence,issue_date,due_date,status,memo,credit_for,subtotal_cents,tax_cents,total_cents,discounts,discount_cents,after_tax_discount_cents,discount_account_id,deposit,early_terms,early_offer,opening,prepared_by,revision,created_at,approved_by,approved_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?)", id, kind, number, p.customer.id, p.destination, exemptionEvidence, p.issueDate, p.dueDate, post ? 'approved' : 'draft', p.memo, creditFor, p.subtotal, p.tax, p.total, ...discountColumns(p), c.actor.email, revision, now(), post ? c.actor.email : null, post ? revision : null),
-    ...documentSelectionStatements(id, p), ...lineStatements(id, p.lines)]
+    ...documentSelectionStatements(id, p), ...lineStatements(id, p.lines), ...time.claims(id)]
   if (post) {
     const current = { id, kind, number, customer_id: p.customer.id, customer_name: p.customer.name, issue_date: p.issueDate, total_cents: p.total, credit_for: creditFor, revision,
       discount_cents: p.discount, after_tax_discount_cents: p.afterTax, discount_account_id: p.discountAccountId, deposit: p.deposit, early_offer: p.offer,

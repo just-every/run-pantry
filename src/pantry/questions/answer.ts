@@ -32,13 +32,31 @@ export const ownerByEmail = (email: string): Answerer => ({
 
 /** Email answers retain the invited member's current grants, checked again in the write. */
 export async function memberByEmail(db: D1Database, email: string): Promise<Answerer | null> {
-  const m = await one(db, "SELECT m.* FROM pt_members m JOIN oa_operators o ON lower(o.email) = m.email AND o.status = 'active' WHERE m.email = ? AND m.active = 1 AND m.role = 'accountant'", email)
+  const m = await one(db, "SELECT m.*, p.mask_tin, p.mask_bank, p.revision AS privacy_revision FROM pt_members m JOIN pt_role_privacy p ON p.role = m.role JOIN oa_operators o ON lower(o.email) = m.email AND o.status = 'active' WHERE m.email = ? AND m.active = 1 AND m.role = 'accountant'", email)
   if (!m) return null
-  const person: Person = { kind: 'person', id: '', email, name: m.name, session: '', role: m.role, grants: { post: !!m.can_post, lock: !!m.can_lock, reopen: !!m.can_reopen } }
+  const person: Person = { kind: 'person', id: '', email, name: m.name, session: '', role: m.role, revision: m.revision, grants: { post: !!m.can_post, lock: !!m.can_lock, reopen: !!m.can_reopen }, policy: { bankAccounts: m.bank_accounts === null ? null : JSON.parse(m.bank_accounts), timePeople: JSON.parse(m.time_people), billLimit: m.bill_limit_cents, paymentLimit: m.payment_limit_cents, journalLimit: m.journal_limit_cents, maskTin: !!m.mask_tin, maskBank: !!m.mask_bank, privacyRevision: m.privacy_revision } }
   return { person, audit: { email, kind: 'person' }, via: 'email', authority: need => {
     requireThat(allowed(person, need), 'This answer needs the posting grant', 403)
-    return guard(`EXISTS (SELECT 1 FROM pt_members WHERE email = ? AND active = 1 AND role = 'accountant' AND EXISTS (SELECT 1 FROM oa_operators o WHERE lower(o.email) = pt_members.email AND o.status = 'active')${need === 'post' ? ' AND can_post = 1' : ''})`, email)
+    return guard(`EXISTS (SELECT 1 FROM pt_members m JOIN pt_role_privacy p ON p.role = m.role WHERE m.email = ? AND m.active = 1 AND m.role = 'accountant' AND m.revision = ? AND p.revision = ? AND m.bank_accounts IS ? AND m.bill_limit_cents IS ? AND m.payment_limit_cents IS ? AND m.journal_limit_cents IS ? AND EXISTS (SELECT 1 FROM oa_operators o WHERE lower(o.email) = m.email AND o.status = 'active')${need === 'post' ? ' AND m.can_post = 1' : ''})`, email, m.revision, m.privacy_revision, m.bank_accounts, m.bill_limit_cents, m.payment_limit_cents, m.journal_limit_cents)
   } }
+}
+
+/** The email transport carries the same full-book scope as the app. Its
+ * authority is native email membership, never an invented browser session. */
+export function financialQuestionAllowed(by: Answerer) {
+  const p = by.person
+  return p.role === 'owner' || (['bookkeeper', 'accountant'].includes(p.role) && p.policy?.bankAccounts == null && !p.policy?.maskBank && !p.policy?.maskTin)
+}
+function questionScope(by: Answerer) {
+  requireThat(financialQuestionAllowed(by), 'This question requires unmasked access to all the books; ask the owner to answer', 403)
+}
+function answerAmountFence(by: Answerer, qn: Question, c: Choice): Sql[] {
+  questionScope(by)
+  if (by.person.role === 'owner' || c.action.type === 'posting') return []
+  const kind = c.action.type === 'invoice' || c.action.type === 'bill' ? 'payment' : 'journal'
+  const amount = Math.abs(qn.amount_cents), limit = by.person.policy?.[`${kind}Limit`]
+  requireThat(limit == null || amount <= limit, 'This answer exceeds your approval limit; route it to the owner', 403)
+  return [guard(`EXISTS (SELECT 1 FROM pt_members WHERE email = ? AND active = 1 AND revision = ? AND (${kind}_limit_cents IS NULL OR ${kind}_limit_cents >= ?))`, by.person.email, by.person.revision ?? '', amount)]
 }
 
 export type Answer = { choice?: string | null; accountId?: string | null; remember?: boolean; note?: string; date?: string; previewToken?: string; document?: { name: string; mediaType: string; bytes: Uint8Array } | null; words?: string }
@@ -79,10 +97,12 @@ async function fileLine(db: D1Database, qn: Question, c: Choice, by: Answerer, s
 }
 
 export async function questionEffects(db: D1Database, id: string, a: Answer, by: Answerer) {
+  questionScope(by)
   const qn = await question(db, id)
   requireThat(OPEN.includes(qn.status), 'This question is already answered', 409)
   const c = await chosen(db, qn, a)
   requireThat(filesBooks(c), 'This answer changes no financial report')
+  answerAmountFence(by, qn, c)
   const plan = await fileLine(db, qn, c, by, a.date, true)
   return previewEffects(db, { question: qn.id, revision: qn.revision, choice: c.id, remember: !!a.remember, note: optionalText(a.note, 'Note', 500) }, plan, plan.day)
 }
@@ -124,6 +144,7 @@ async function learn(db: D1Database, qn: Question, accountId: string, by: Answer
 
 /** Apply a definite answer. Returns the question as it now stands. */
 export async function answer(env: Bindings, db: D1Database, id: string, a: Answer, by: Answerer): Promise<Question> {
+  questionScope(by)
   const qn = await question(db, id)
   requireThat(OPEN.includes(qn.status), qn.status === 'resolved' ? 'This no longer needs an answer' : 'This question is already answered', 409)
   const note = optionalText(a.note, 'Note', 500)
@@ -141,12 +162,13 @@ export async function answer(env: Bindings, db: D1Database, id: string, a: Answe
   const base = (status: string, result: { kind?: string; id?: string } = {}) => [...settle(qn, status, by, said, result), say(qn.id, by.audit.email, by.via, a.words ? `${a.words}` : said)]
   switch (c.action.type) {
     case 'category': case 'invoice': case 'bill': case 'transfer': case 'posting': {
+      const amountFences = answerAmountFence(by, qn, c)
       if (by.via === 'email' && !a.previewToken) return (await awaitYes(db, qn, a.words || said, { choice: c.id, accountId: null, remember: !!a.remember, note }, by)).question
       const effects = await questionEffects(db, id, a, by)
       requireThat(a.previewToken === effects.token, 'The books, locks, issued reports or correction date changed; review the effects again before filing', 409)
       requireThat(!effects.locks.length, `Reopen ${effects.locks.map(l => l.name).join(', ')} before filing`, 409)
       const plan = await fileLine(db, qn, c, by, effects.date)
-      await run(db, [by.authority('record'), effectsGuard(effects.auditCount), ...plan.statements, ...base('filed', { kind: 'match', id: plan.id }), say(qn.id, AGENT.email, 'agent', `Filed: ${c.label}.${effectMessage(effects)}`),
+      await run(db, [by.authority('record'), ...amountFences, effectsGuard(effects.auditCount), ...plan.statements, ...base('filed', { kind: 'match', id: plan.id }), say(qn.id, AGENT.email, 'agent', `Filed: ${c.label}.${effectMessage(effects)}`),
         audit(by.audit, 'question.answer', 'question', qn.id, { kind: qn.kind, via: by.via, answer: c.label, match: plan.id })])
       if (a.remember && c.action.type === 'category' && c.learn) await learn(db, qn, c.action.accountId, by)
       break
@@ -177,6 +199,7 @@ export type Heard = { result: 'filed' | 'answered' | 'confirm' | 'unclear'; ques
  * open for the owner to choose.
  */
 export async function hear(env: Bindings, db: D1Database, id: string, words: string, by: Answerer): Promise<Heard> {
+  questionScope(by)
   const qn = await question(db, id), said = text(words, 'Your answer', 4000)
   requireThat(OPEN.includes(qn.status), 'This question is already answered', 409)
   if (qn.kind === 'accountant') {

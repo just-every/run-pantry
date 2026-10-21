@@ -15,7 +15,7 @@ export function IssuingLimits() {
   const people = state.settings.members as D[]
   return <Card title="Issuing limits">
     <p>A posting grant is still required. Limits cover the full USD total including tax, after discounts and delivery, before deposits or early-payment offers. A person setting overrides their role, including no limit. Blank or zero means a second person approves.</p>
-    <Field label="Limit for" name="limitFor" value={id} onChange={(e: any) => setId(e.target.value)} options={[{ value: 'role:bookkeeper', label: 'Bookkeeper role' }, { value: 'role:accountant', label: 'Accountant role' }, ...people.map(p => ({ value: `person:${p.email}`, label: p.name + ' — ' + p.email }))]} />
+    <Field label="Limit for" name="limitFor" value={id} onChange={(e: any) => setId(e.target.value)} options={[{ value: 'role:bookkeeper', label: 'Bookkeeper role' }, { value: 'role:accountant', label: 'Accountant role' }, { value: 'role:sales', label: 'Sales role' }, ...people.map(p => ({ value: `person:${p.email}`, label: p.name + ' — ' + p.email }))]} />
     <Form key={id + current?.revision} label="Save issuing limits" submit={b => command('issuing-limit.save', { ...b, id, revision: current?.revision })} onDone={reload} className="grid-form">
       <Field label="Invoice issuing limit (USD)" name="issuing" inputMode="decimal" defaultValue={current ? (current.issuing_cents / 100).toFixed(2) : ''} />
       <Field label="Credit limit (USD)" name="credit" inputMode="decimal" defaultValue={current ? (current.credit_cents / 100).toFixed(2) : ''} />

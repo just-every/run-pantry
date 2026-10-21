@@ -1,0 +1,103 @@
+import assert from 'node:assert/strict'
+import { mkdir } from 'node:fs/promises'
+import { chromium, expect } from '@playwright/test'
+import { providerWorker } from './provider-worker.mjs'
+import { TOKEN } from './worker.mjs'
+
+// One browser journey for the roles' actual screens at both supported widths.
+// Sign-ins use fresh invitation tokens from this test's own mail edge.
+export async function access001Browser(t) {
+  const evidence = process.env.PANTRY_EVIDENCE_DIR || '/tmp/pantry-access001'
+  await mkdir(evidence, { recursive: true })
+  const mail = []
+  const app = await providerWorker({ bindings: { MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'synthetic-pantry-1' }, outbound: async request => {
+    assert.equal(new URL(request.url).hostname, 'api.resend.com'); mail.push(await request.json()); return Response.json({ id: 'synthetic-pantry-' + mail.length })
+  } }); t.after(() => app.close())
+  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
+  const owner = await browser.newContext(); t.after(() => owner.close())
+  const { origin } = app
+  assert.equal((await owner.request.post(`${origin}/auth/bootstrap`, { headers: { origin }, data: { token: TOKEN, displayName: 'Rosa Rivera' }, maxRedirects: 0 })).status(), 303)
+  await owner.request.post(`${origin}/setup`, { headers: { origin }, form: { confirm: 'yes' }, maxRedirects: 0 })
+  const command = async (context, op, data, status = 200) => {
+    const r = await context.request.post(`${origin}/api/pantry/command/${op}`, { headers: { origin }, data })
+    assert.equal(r.status(), status, `${op}: ${await r.text()}`); return r.json()
+  }
+  await command(owner, 'entity.save', { legalName: 'Juniper Studio LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2026-01-01' })
+  await command(owner, 'chart.start', {})
+  const state = await (await owner.request.get(`${origin}/api/pantry/state`)).json(), income = state.accounts.find(a => a.code === '4000').id
+  const customer = await command(owner, 'contact.save', { kind: 'customer', name: 'Cedar Workshop' })
+  const service = await command(owner, 'item.save', { name: 'Design consultation', kind: 'service', rate: '125', accountId: income, taxCategory: 'non-taxable' })
+  const project = await command(owner, 'time-project.save', { customerId: customer.id, name: 'Autumn brand refresh' })
+  for (const width of [1440, 390]) {
+    const settings = await owner.newPage(); await settings.setViewportSize({ width, height: 1000 })
+    await settings.goto(`${origin}/app/settings`)
+    const people = settings.locator('section.card').filter({ has: settings.getByRole('heading', { name: 'People', exact: true }) })
+    const emails = {}
+    for (const [role, n] of [['sales', 7], ['payables-clerk', 8], ['accountant', 9], ['time-only', 10]]) {
+      const email = `synthetic-pantry-${n}-${width}@example.test`; emails[role] = email
+      await people.getByLabel('Name', { exact: true }).fill(({ sales: 'Maya Chen', 'payables-clerk': 'Alex Morgan', accountant: 'Jordan Kim', 'time-only': 'Sam Patel' })[role])
+      await people.getByLabel('Email', { exact: true }).fill(email)
+      await people.getByLabel('Role', { exact: true }).selectOption(role)
+      if (role === 'accountant') {
+        await people.getByLabel('Post and approve entries', { exact: true }).check()
+        for (const label of ['Bill approval limit (USD)', 'Payment approval limit (USD)', 'Journal approval limit (USD)']) await people.getByLabel(label, { exact: true }).fill('5000')
+      }
+      await Promise.all([settings.waitForResponse(r => r.url().endsWith('/command/member.save') && r.status() === 200), people.getByRole('button', { name: 'Add person', exact: true }).click()])
+      await expect(people.getByRole('cell', { name: email, exact: true })).toBeVisible()
+    }
+    await people.screenshot({ path: `${evidence}/access001-people-${width}.png` })
+    const privacy = settings.locator('section.card').filter({ has: settings.getByRole('heading', { name: 'Role privacy', exact: true }) })
+    await privacy.screenshot({ path: `${evidence}/access001-privacy-${width}.png` })
+    const signIn = async role => {
+      const context = await browser.newContext({ viewport: { width, height: 1000 } }); t.after(() => context.close())
+      const message = mail.findLast(m => [m.to].flat().includes(emails[role])), token = new URL(message.text.match(/http:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get('token')
+      assert.equal((await context.request.post(`${origin}/auth/confirm`, { headers: { origin }, data: { token }, maxRedirects: 0 })).status(), 303)
+      return context
+    }
+    const sales = await signIn('sales'), salesPage = await sales.newPage()
+    await salesPage.goto(`${origin}/app/bank`)
+    await expect(salesPage.getByRole('navigation', { name: 'Work' }).getByRole('link', { name: 'Bank', exact: true })).toHaveCount(0)
+    assert.equal((await sales.request.get(`${origin}/api/pantry/bank`)).status(), 403)
+    await salesPage.screenshot({ path: `${evidence}/access001-sales-refused-${width}.png`, fullPage: true })
+    await salesPage.goto(`${origin}/app/sales?tab=contacts`)
+    await expect(salesPage.getByRole('tab', { name: 'Bills', exact: true })).toHaveCount(0)
+    await expect(salesPage.getByLabel('Kind', { exact: true })).toHaveCount(0)
+    await salesPage.screenshot({ path: `${evidence}/access001-sales-${width}.png`, fullPage: true })
+    const clerk = await signIn('payables-clerk'), clerkPage = await clerk.newPage()
+    const vendor = await command(clerk, 'contact.save', { kind: 'vendor', name: `Studio equipment ${width}` })
+    const bill = await command(clerk, 'bill.save', { vendorId: vendor.id, reference: `EQUIP-${width}`, billDate: '2026-10-21', lines: [{ description: 'Studio equipment', accountId: state.accounts.find(a => a.code === '6200').id, amount: '6000' }] })
+    await clerkPage.goto(`${origin}/app/sales?tab=bills`)
+    await expect(clerkPage.getByRole('tab', { name: 'Payments', exact: true })).toHaveCount(0)
+    await clerkPage.getByRole('row').filter({ hasText: bill.reference }).click()
+    await clerkPage.screenshot({ path: `${evidence}/access001-payables-${width}.png`, fullPage: true })
+    const accountant = await signIn('accountant'), accountantPage = await accountant.newPage()
+    await accountantPage.goto(`${origin}/app/sales?tab=bills`)
+    await accountantPage.getByRole('row').filter({ hasText: bill.reference }).click()
+    await expect(accountantPage.getByText('This amount exceeds your bill approval limit. The owner must approve it.', { exact: true })).toBeVisible()
+    await accountantPage.screenshot({ path: `${evidence}/access001-limit-${width}.png`, fullPage: true })
+    const time = await signIn('time-only'), page = await time.newPage()
+    await page.goto(`${origin}/app/time`)
+    await expect(page.getByRole('heading', { name: 'Time', exact: true })).toBeVisible()
+    await page.getByLabel('Customer', { exact: true }).selectOption(customer.id)
+    await page.getByLabel('Project', { exact: true }).selectOption(project.id)
+    await page.getByLabel('Service item', { exact: true }).selectOption(service.id)
+    await page.getByLabel('Hours', { exact: true }).fill('4')
+    await Promise.all([page.waitForResponse(r => r.url().endsWith('/command/time.save') && r.status() === 200), page.getByRole('button', { name: 'Record hours', exact: true }).click()])
+    await expect(page.getByRole('cell', { name: '4.00', exact: true })).toBeVisible()
+    await expect(page.getByText('Waiting for invoice', { exact: true })).toBeVisible()
+    assert.equal(await page.getByText(/\$125|500\.00/).count(), 0)
+    assert.equal(await page.getByLabel(/rate|price|amount/i).count(), 0)
+    await page.screenshot({ path: `${evidence}/access001-hours-${width}.png`, fullPage: true })
+    await page.goto(`${origin}/app/books`)
+    assert.equal(await page.getByRole('heading', { name: /Books|Journal entries/, exact: true }).count(), 0)
+    assert.equal((await time.request.get(`${origin}/api/pantry/journal`)).status(), 403)
+    await page.screenshot({ path: `${evidence}/access001-time-refused-${width}.png`, fullPage: true })
+    const invoice = await command(owner, 'invoice.save-draft', { customerId: customer.id, issueDate: '2026-10-21', lines: [] })
+    assert.equal(invoice.lines.find(l => l.item_id === service.id).quantity_milli, 4000)
+    await settings.goto(`${origin}/app/sales`)
+    await settings.getByRole('row').filter({ hasText: invoice.number }).click()
+    await expect(settings.getByText('Autumn brand refresh', { exact: false }).first()).toBeVisible()
+    await settings.screenshot({ path: `${evidence}/access001-invoice-hours-${width}.png`, fullPage: true })
+    await settings.close()
+  }
+}

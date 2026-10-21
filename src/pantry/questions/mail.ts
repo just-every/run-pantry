@@ -12,7 +12,7 @@ import { ownerEmail } from '../access'
 import { now, uid, type Data } from '../core'
 import { all, one, q, run } from '../db'
 import { pantryAddress } from '../receipts/mail'
-import { answer, confirm, hear, ownerByEmail, memberByEmail, effectMessage } from './answer'
+import { answer, confirm, hear, ownerByEmail, memberByEmail, effectMessage, financialQuestionAllowed } from './answer'
 import { AGENT, OPEN, parse, say, type Question } from './store'
 
 type MailResult = { status: 'accepted' | 'rejected' | 'rate_limited' | 'uncertain' | 'development'; provider: string; providerMessageId: string | null; code?: string }
@@ -117,7 +117,7 @@ export async function receiveReply(env: Bindings, raw: Uint8Array): Promise<Repl
   const recipient = qn.assignee || owner
   if (!from || from !== recipient || (qn.emailed_to && from !== qn.emailed_to)) return { result: 'refused', reason: 'Only the question’s recipient answers by email' }
   const by = qn.assignee ? await memberByEmail(db, from) : ownerByEmail(owner), words = replyText(m)
-  if (!by) return { result: 'refused', reason: 'The accountant no longer has access to these books' }
+  if (!by || !financialQuestionAllowed(by)) return { result: 'refused', reason: 'The recipient no longer has full, unmasked access to these books' }
   if (qn.kind === 'accountant' && OPEN.includes(qn.status) && words) { await hear(env, db, qn.id, words, by); return { result: 'answered', question: qn.id } }
   if (!OPEN.includes(qn.status)) {
     await run(db, [say(qn.id, by.audit.email, 'email', words || '(an empty reply)'), say(qn.id, AGENT.email, 'agent', 'This question was already settled, so the reply changed nothing.')])

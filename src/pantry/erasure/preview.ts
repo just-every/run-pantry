@@ -8,6 +8,7 @@ import { erasureValues, MARKER } from './personal'
 import { eraseCopies } from './copies'
 import { immutableCopies } from './immutable-copies'
 import { retentionItems } from './retention'
+import { unbilledTime } from './time'
 import { pendingErased } from '../webhooks/erasure'
 
 export async function erasurePreview(c: Context, input: Data) {
@@ -29,6 +30,7 @@ export async function erasurePreview(c: Context, input: Data) {
   const blockers: Data[] = [], classes: Data[] = []
   let posted = false
   if (!member) {
+    blockers.push(...await unbilledTime(c.db,id))
     const entries = await all(c.db,`SELECT DISTINCT e.id,e.entry_date,e.status FROM pt_journal_entries e LEFT JOIN pt_journal_lines l ON l.entry_id=e.id
       WHERE l.contact_id=? OR e.id IN (SELECT journal_id FROM pt_invoices WHERE customer_id=? UNION SELECT journal_id FROM pt_bills WHERE vendor_id=? UNION SELECT journal_id FROM pt_payments WHERE contact_id=? UNION SELECT journal_id FROM pt_vendor_credits WHERE vendor_id=?) ORDER BY e.id`,id,id,id,id,id)
     posted = entries.some(e=>e.status==='posted')
@@ -62,13 +64,17 @@ export async function erasurePreview(c: Context, input: Data) {
   classes.push(...retained.map((item: Data)=>({...item,action:'retained'})), {table:'pt_audit',action:'replaced',reason:'Entries and bookkeeping retained; declared personal values replaced'},
     {table:'pt_approvals',action:'replaced',reason:'Approval chronology and decisions retained'})
   const values=person?[subject.name,subject.email,subject.phone].filter(Boolean):await erasureValues(c.db,subject,member,posted)
-  const copies=await eraseCopies(c.db,{id,member:member||person,posted,values,marker:MARKER,erasureId:'preview',at:new Date().toISOString()})
+  const copies=await eraseCopies(c.db,{id,member:member||person,memberEmail:member?id:undefined,posted,values,marker:MARKER,erasureId:'preview',at:new Date().toISOString()})
+  if(member) {
+    const delegations=(copies.counts.pt_members?.delegationsRemoved??0)+JSON.parse(parent.time_people).length
+    if(delegations)classes.push({table:'pt_members.time_people',action:'removed',count:delegations,reason:'Erased identities and the former member’s own time delegation are removed'})
+  }
   const pendingWebhooks=await pendingErased(c.db,id,copies.affectedRecordIds)
   if(pendingWebhooks)classes.push({table:'pt_webhook_deliveries',action:'replaced',count:pendingWebhooks,reason:`${pendingWebhooks} pending webhook notices cancelled as record_erased; body-free history retained`})
   const immutable=await immutableCopies(c.db,{values,marker:MARKER,member,erasureId:'preview'})
   if(!member&&!person&&!posted)for(const [table,counts] of Object.entries((await unpostedDependents(c.db,id)).counts))classes.push({table,action:'removed',reason:'Dormant records without posted transactions',counts})
   const listed=new Set(classes.map(r=>r.table))
-  for(const [table,counts] of Object.entries({...copies.counts,...immutable.counts}))if(!listed.has(table)&&Object.values(counts).some(v=>Number(v)>0))classes.push({table,action:'replaced',reason:'Declared personal copies removed; accounting fields retained',counts})
+  for(const [table,counts] of Object.entries({...copies.counts,...immutable.counts}))if(!listed.has(table)&&Object.values(counts).some(v=>Number(v)>0))classes.push({table,action:table==='pt_time_entries'&&!counts.fieldsReplaced?'retained':'replaced',reason:table==='pt_time_entries'?'Invoiced hours, dates, services and invoice links retained; personal identities and notes replaced':'Declared personal copies removed; accounting fields retained',counts})
   const fingerprint = await sha256(JSON.stringify({kind,id,personIndex,parent,subject,auditCount,blockers,retained,classes}))
   return {kind,id,personIndex,parent,subject,posted,auditCount,classes,retained,blockers,fingerprint}
 }

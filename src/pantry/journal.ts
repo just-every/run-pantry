@@ -1,6 +1,8 @@
 // The general journal: every posting in Pantry is a balanced entry written here.
 // Drafts may change; posted entries are immutable (the schema's triggers refuse
 // edits) and are corrected only by a linked reversal.
+import { nativeApprovalAuthority } from './access-policy/approvals'
+import { ledgerBankAuthority } from './access-policy/banks'
 import { authority, who, type Actor } from './access'
 import { cents, date, now, optionalText, requireThat, text, uid, list, type Data } from './core'
 import { all, approval, assertOpen, audit, changed, one, q, run, type AuditActor, type Sql } from './db'
@@ -88,18 +90,19 @@ const saveDraft: Command = { need: 'record', async run(c, b) {
   if (adjusting) await assertAdjustingDate(c.db, day)
   await assertOpen(c.db, day)
   const lines = await parseLines(c.db, b.lines)
+  const scope = await ledgerBankAuthority(c.db, c.actor, lines.map(l => l.accountId))
   const documentId = b.documentId ? text(b.documentId, 'Document') : null
   if (documentId) requireThat(await one(c.db, 'SELECT 1 FROM pt_documents WHERE id = ?', documentId), 'Document not found', 404)
   if (!b.id) {
     const id = uid(), revision = uid()
-    await run(c.db, [authority(c.actor, 'record'), ...entryStatements({ id, revision, date: day, memo, sourceKind: 'manual', preparedBy: c.actor.email, preparedKind: 'person', documentId, adjusting, lines }), audit(who(c.actor), 'journal.draft', 'journal', id, { date: day, memo, before: null, after: { revision, date: day, memo, documentId, adjusting, status: 'draft', lines } })])
+    await run(c.db, [authority(c.actor, 'record'), ...scope, ...entryStatements({ id, revision, date: day, memo, sourceKind: 'manual', preparedBy: c.actor.email, preparedKind: 'person', documentId, adjusting, lines }), audit(who(c.actor), 'journal.draft', 'journal', id, { date: day, memo, before: null, after: { revision, date: day, memo, documentId, adjusting, status: 'draft', lines } })])
     return entry(c.db, id)
   }
   const current = await entry(c.db, text(b.id, 'Entry'))
   requireThat(current.status === 'draft' && current.source_kind === 'manual', 'Only manual drafts can be edited', 409)
   requireThat(current.revision === b.revision, 'Entry changed; reload', 409)
   const revision = uid()
-  await run(c.db, [authority(c.actor, 'record'),
+  await run(c.db, [authority(c.actor, 'record'), ...scope,
     q('UPDATE pt_journal_entries SET entry_date = ?, memo = ?, document_id = ?, adjusting = ?, prepared_by = ?, revision = ? WHERE id = ? AND revision = ? AND status = ?', day, memo, documentId, adjusting ? 1 : 0, c.actor.email, revision, current.id, b.revision, 'draft'), changed(),
     q('DELETE FROM pt_journal_lines WHERE entry_id = ?', current.id),
     ...lines.map((l, i) => q('INSERT INTO pt_journal_lines (id, entry_id, line_no, account_id, debit_cents, credit_cents, memo, contact_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', uid(), current.id, i + 1, l.accountId, l.debit, l.credit, l.memo ?? '', l.contactId ?? null)),
@@ -110,7 +113,7 @@ const saveDraft: Command = { need: 'record', async run(c, b) {
 const deleteDraft: Command = { need: 'record', async run(c, b) {
   const current = await entry(c.db, text(b.id, 'Entry'))
   requireThat(current.status === 'draft' && current.source_kind === 'manual', 'Only manual drafts can be discarded', 409)
-  await run(c.db, [authority(c.actor, 'record'), q('DELETE FROM pt_journal_lines WHERE entry_id = ?', current.id), q("DELETE FROM pt_journal_entries WHERE id = ? AND revision = ? AND status = 'draft'", current.id, b.revision), changed(), audit(who(c.actor), 'journal.discard', 'journal', current.id, { before: draftSnapshot(current), after: null })])
+  await run(c.db, [authority(c.actor, 'record'), ...await ledgerBankAuthority(c.db, c.actor, current.lines.map((l: Data) => l.account_id)), q('DELETE FROM pt_journal_lines WHERE entry_id = ?', current.id), q("DELETE FROM pt_journal_entries WHERE id = ? AND revision = ? AND status = 'draft'", current.id, b.revision), changed(), audit(who(c.actor), 'journal.discard', 'journal', current.id, { before: draftSnapshot(current), after: null })])
   return { id: current.id }
 } }
 
@@ -123,7 +126,7 @@ const post: Command = { need: 'post', async run(c, b) {
   requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || current.prepared_by !== c.actor.email), 'Someone other than the preparer approves this entry', 403)
   if (current.adjusting) await assertAdjustingDate(c.db, current.entry_date)
   await assertOpen(c.db, current.entry_date)
-  await run(c.db, [authority(c.actor, 'post'), approval(who(c.actor), 'journal', current.id, current.revision, 'post', 'approved', optionalText(b.note, 'Note', 500)), ...postStatements(current.id, c.actor.email, current.revision), audit(who(c.actor), 'journal.post', 'journal', current.id, { before: draftSnapshot(current), after: { status: 'posted', postedBy: c.actor.email } })])
+  await run(c.db, [authority(c.actor, 'post'), ...nativeApprovalAuthority(c.actor, 'journal', current.lines.reduce((sum: number, l: Data) => sum + l.debit_cents, 0)), ...await ledgerBankAuthority(c.db, c.actor, current.lines.map((l: Data) => l.account_id), 'post'), approval(who(c.actor), 'journal', current.id, current.revision, 'post', 'approved', optionalText(b.note, 'Note', 500)), ...postStatements(current.id, c.actor.email, current.revision), audit(who(c.actor), 'journal.post', 'journal', current.id, { before: draftSnapshot(current), after: { status: 'posted', postedBy: c.actor.email } })])
   return entry(c.db, current.id)
 } }
 
@@ -138,6 +141,8 @@ export async function reversalStatements(db: D1Database, actor: AuditActor, orig
   const id = uid()
   const lines: Line[] = original.lines.map((l: Data) => ({ accountId: l.account_id, debit: l.credit_cents, credit: l.debit_cents, memo: l.memo, contactId: l.contact_id }))
   return { id, statements: [
+    ...nativeApprovalAuthority(actor, original.source_kind === 'bill' ? 'bill' : original.source_kind === 'payment' ? 'payment' : 'journal', lines.reduce((sum, l) => sum + l.debit, 0), original.source_kind === 'bank' ? 'record' : undefined),
+    ...await ledgerBankAuthority(db, actor, lines.map(l => l.accountId), original.source_kind === 'manual' ? 'post' : 'record'),
     ...entryStatements({ id, date: day, memo, sourceKind: 'reversal', sourceId: original.id, preparedBy: actor.email, preparedKind: 'person', lines }),
     q('UPDATE pt_journal_entries SET reverses_id = ? WHERE id = ?', original.id, id),
     ...postStatements(id, actor.email),

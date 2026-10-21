@@ -34,7 +34,7 @@ export async function withinLimit(db: D1Database, actor: Actor, document: Data, 
 
 const save: Command = { need: 'owner', async run(c, b) {
   const id = text(b.id, 'Role or person')
-  requireThat(['role:bookkeeper', 'role:accountant'].includes(id) || (id.startsWith('person:') && !!await one(c.db, 'SELECT 1 FROM pt_members WHERE email = ?', id.slice(7))), 'Choose a current role or person')
+  requireThat(['role:bookkeeper', 'role:accountant', 'role:sales'].includes(id) || (id.startsWith('person:') && !!await one(c.db, 'SELECT 1 FROM pt_members WHERE email = ?', id.slice(7))), 'Choose a current role or person')
   const before = await one(c.db, 'SELECT * FROM pt_issuing_limits WHERE id = ?', id)
   requireThat((before?.revision ?? null) === (b.revision ?? null), 'Limits changed; reload', 409)
   const after = b.inherit === true ? null : { id, issuing_cents: b.issuing ? cents(b.issuing, 'Issuing limit', { zero: true }) : 0, credit_cents: b.credit ? cents(b.credit, 'Credit limit', { zero: true }) : 0, revision: uid() }

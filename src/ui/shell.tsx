@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { HydrationUnit } from '../base/hydration/unit'
 import { api, Loading, ROLE_LABEL, SharedState, type D } from './kit'
 import { Icon } from './icons'
+import { roleScreen } from './role-navigation'
 
 const MAIN = [
   { to: '/app/sales', label: 'Sales & bills', short: 'Sales', icon: 'invoice' },
@@ -14,6 +15,7 @@ const MAIN = [
   { to: '/app/reports', label: 'Reports', short: 'Reports', icon: 'chart' },
 ] as const
 const MORE = [
+  { to: '/app/time', label: 'Time' },
   { to: '/app', label: 'Overview' },
   { to: '/app/questions', label: 'Questions from Pantry' },
   { to: '/app/receipts', label: 'Receipts' },
@@ -24,7 +26,7 @@ const MORE = [
   { to: '/app/activity', label: 'Activity' },
 ] as const
 
-function More({ path }: { path: string }) {
+function More({ path, allowed }: { path: string; allowed: (path: string) => boolean }) {
   const [open, setOpen] = useState(false), ref = useRef<HTMLDivElement>(null), button = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (!open) return
@@ -34,10 +36,10 @@ function More({ path }: { path: string }) {
     ref.current?.querySelector<HTMLAnchorElement>('a')?.focus()
     return () => { document.removeEventListener('keydown', key); document.removeEventListener('mousedown', click) }
   }, [open])
-  const active = MORE.some(m => m.to === path)
+  const active = MORE.some(m => m.to === path && allowed(m.to))
   return <div className="more" ref={ref}>
     <button ref={button} type="button" className={`nav-link${active ? ' active' : ''}`} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen(o => !o)}><Icon name="more" /><span>More</span></button>
-    {open && <div className="more-menu" role="menu">{MORE.map(m => <Link key={m.to} to={m.to} role="menuitem" onClick={() => setOpen(false)} aria-current={path === m.to ? 'page' : undefined}>{m.label}</Link>)}<a href="/signout" role="menuitem">Sign out or switch person</a></div>}
+    {open && <div className="more-menu" role="menu">{MORE.filter(m => allowed(m.to)).map(m => <Link key={m.to} to={m.to} role="menuitem" onClick={() => setOpen(false)} aria-current={path === m.to ? 'page' : undefined}>{m.label}</Link>)}<a href="/signout" role="menuitem">Sign out or switch person</a></div>}
   </div>
 }
 
@@ -46,17 +48,19 @@ export function Shell() {
   const [state, setState] = useState<D>(), [error, setError] = useState('')
   const reload = useCallback(async () => { try { setState(await api('state')); setError('') } catch (e) { setError((e as Error).message) } }, [])
   useEffect(() => { void reload() }, [reload])
+  const allowed = (destination: string) => !state || roleScreen(state.actor.role, destination, state.actor.policy?.bankAccounts != null)
+  const main = state?.actor.role === 'time-only' ? [] : MAIN.filter(m => allowed(m.to))
   return <div className="app">
     <HydrationUnit><header className="app-header">
       <Link to="/app" className="brand"><img src="/brand/mark.svg" alt="" width="28" height="28" /><span data-rer-name>Pantry</span></Link>
       <nav className="app-nav" aria-label="Work">
-        {MAIN.map(m => <Link key={m.to} to={m.to} className={`nav-link${path.startsWith(m.to) ? ' active' : ''}`} aria-current={path.startsWith(m.to) ? 'page' : undefined}><Icon name={m.icon} /><span className="wide-label">{m.label}</span><span className="short-label">{m.short}</span></Link>)}
-        <More path={path} />
+        {main.map(m => <Link key={m.to} to={m.to} className={`nav-link${path.startsWith(m.to) ? ' active' : ''}`} aria-current={path.startsWith(m.to) ? 'page' : undefined}><Icon name={m.icon} /><span className="wide-label">{m.label}</span><span className="short-label">{m.short}</span></Link>)}
+        <More path={path} allowed={allowed} />
       </nav>
       {state && <div className="profile"><span className="profile-name">{state.actor.name}</span>{state.actor.name !== ROLE_LABEL[state.actor.role] && <small>{ROLE_LABEL[state.actor.role]}</small>}</div>}
     </header></HydrationUnit>
     <main className="workspace">
-      {state ? <SharedState.Provider value={{ state, reload }}><Outlet /></SharedState.Provider> : <><Loading error={error} what="your books" />{error && <p><a href="/signout">Sign out or switch person</a></p>}</>}
+      {state ? <SharedState.Provider value={{ state, reload }}><>{allowed(path) ? <Outlet /> : <><h1>Access restricted</h1><p>This screen is not part of your role. Choose an available destination above.</p>{state.actor.role === 'time-only' && <Link to="/app/time">Record time</Link>}</>}</></SharedState.Provider> : <><Loading error={error} what="your books" />{error && <p><a href="/signout">Sign out or switch person</a></p>}</>}
     </main>
   </div>
 }

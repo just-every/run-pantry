@@ -8,7 +8,8 @@ const ROLES = ['primary', 'billing', 'cc'] as const
 const parsed = (value: any, empty: any) => typeof value === 'string' ? JSON.parse(value) : value ?? empty
 
 function ContactEditor({ editing, onDone, onCancel }: { editing: D | null; onDone: (c: D) => Promise<void>; onCancel: () => void }) {
-  const [kind, setKind] = useState(editing?.kind ?? 'customer')
+  const { state } = useShared(), fixedKind = state.actor.role === 'sales' ? 'customer' : state.actor.role === 'payables-clerk' ? 'vendor' : null
+  const [kind, setKind] = useState(editing?.kind ?? fixedKind ?? 'customer')
   const [people, setPeople] = useState<D[]>(() => parsed(editing?.contacts_json, []))
   const [methods, setMethods] = useState<string[] | null>(() => parsed(editing?.pay_methods, null))
   const patch = (index: number, values: D) => setPeople(p => p.map((v, i) => i === index ? { ...v, ...values } : v))
@@ -16,7 +17,7 @@ function ContactEditor({ editing, onDone, onCancel }: { editing: D | null; onDon
     <Form label={editing ? 'Save' : 'Add'} submit={b => command('contact.save', { ...b, id: editing?.id, revision: editing?.revision, kind,
       active: b.active !== 'no', ...(kind === 'customer' ? { contacts: people, payMethods: methods } : {}) })} onDone={onDone}
       secondary={editing && <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>}>
-      {!editing && <Field label="Kind" name="kind" value={kind} onChange={(e: any) => setKind(e.target.value)} required options={[{ value: 'customer', label: 'Customer' }, { value: 'vendor', label: 'Vendor' }]} />}
+      {!editing && !fixedKind && <Field label="Kind" name="kind" value={kind} onChange={(e: any) => setKind(e.target.value)} required options={[{ value: 'customer', label: 'Customer' }, { value: 'vendor', label: 'Vendor' }]} />}
       <Field label="Name" name="name" defaultValue={editing?.name} required />
       <Field label="Email" name="email" type="email" defaultValue={editing?.email} />
       <Field label="Payment terms (days)" name="termsDays" type="number" defaultValue={editing?.terms_days ?? 30} min={0} max={365} />

@@ -1,7 +1,7 @@
 import { Field, type D } from './kit'
 
 export const selectedOptions = (event: any): string[] => Array.from(event.target.selectedOptions, (o: any) => o.value).filter(Boolean)
-export const ROLES = ['accountant', 'bookkeeper', 'viewer', 'owner']
+export const ROLES = ['accountant', 'bookkeeper', 'viewer', 'owner', 'sales', 'payables-clerk', 'time-only']
 export function Sharing({ roles, setRoles }: { roles: string[]; setRoles: (roles: string[]) => void }) {
   return <fieldset className="allocations"><legend>Share with roles</legend>
     <p className="hint">Leave clear for a personal report. The owner can always view and edit personal reports and packages. Shared roles can read and export; they cannot edit your definition.</p>

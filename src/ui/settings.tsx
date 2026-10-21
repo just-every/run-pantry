@@ -10,6 +10,7 @@ import { WebhookSettings } from './webhook-settings'
 import { ErasureSettings } from './erasure-settings'
 import { IntegrationSettings } from './integration-settings'
 import { DataFlows } from './data-flows'
+import { People, RolePrivacy } from './people'
 
 const ENTITY_LABEL: Record<string, string> = { 'sole-proprietorship': 'Sole proprietorship', 'single-member-llc': 'Single-member LLC', 'multi-member-llc': 'Multi-member LLC', 's-corporation': 'S corporation', 'c-corporation': 'C corporation', partnership: 'Partnership' }
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -42,33 +43,6 @@ function Owner() {
       <Field label="Your sign-in email" name="email" type="email" defaultValue={me.email} required hint={placeholderEmail(me.email) ? `${me.email} is a placeholder no mail reaches, which is fine on this computer. Put Pantry online (below) asks for your own email for the hosted Pantry.` : 'Where your sign-in links go. Entries you already made keep the address they were made with.'} />
     </Form>
     {here && setupOwner && setupOwner !== me.email && <details className="setup-steps"><summary>Set up: stay the owner when Pantry goes online</summary><p className="hint">Put <code>OWNER_EMAIL={me.email}</code> in <code>.env.pantry</code> (see <a href="#put-online">Put Pantry online</a>). Without it, the hosted Pantry's owner is {setupOwner}, the address this Pantry was first set up with.</p></details>}
-  </Card>
-}
-
-function People() {
-  const { state, reload } = useShared(), members = state.settings.members
-  const [editing, setEditing] = useState<D | null>(null), [invited, setInvited] = useState<D | null>(null), [added, setAdded] = useState(0)
-  return <Card title={<><Icon name="people" /> People</>}>
-    <Table heads={['Name', 'Email', 'Role', 'Grants', 'Status', '']} empty="Only the owner so far. Add a bookkeeper or accountant.">
-      {members.map((m: D) => <tr key={m.email}><td>{m.name}</td><td>{m.email}</td><td>{ROLE_LABEL[m.role]}</td><td>{[m.can_post && 'Post', m.can_lock && 'Lock', m.can_reopen && 'Reopen'].filter(Boolean).join(', ') || '—'}</td><td>{m.active ? <Chip tone="good">Active</Chip> : <Chip>Inactive</Chip>}</td>
-        <td><div className="row-actions"><button type="button" className="btn btn-link" onClick={() => setEditing(m)}>Edit</button>{m.active ? <Action run={async () => { setInvited(null); setInvited(await command('member.invite', { email: m.email })) }}>Send sign-in invitation</Action> : null}</div></td></tr>)}
-    </Table>
-    {invited && (invited.emailed ? <p role="status" className="hint">Sign-in invitation emailed to {invited.invited}.</p>
-      : <div role="status" className="callout callout-warn"><strong>{invited.name} can sign in; no email was sent</strong><span>Pantry on this computer sends no email. To work as {invited.name} here, choose <a href="/signout">Sign out or switch person</a> (under More), then Switch person and Sign in as {invited.name}. Once Pantry is hosted with a mail provider, invitations reach their mailbox.</span>
-        <details className="setup-steps"><summary>Set up: sign in as them from the command line</summary><p className="hint">Stop Pantry and run <code>rer dev --as {invited.invited}</code>.</p></details></div>)}
-    <Form key={editing?.email ?? `new-${added}`} label={editing ? 'Save person' : 'Add person'} submit={b => command('member.save', { ...b, previousEmail: editing?.email, canPost: b.canPost === 'on', canLock: b.canLock === 'on', canReopen: b.canReopen === 'on', active: b.active !== 'no' })} onDone={async r => { setEditing(null); setAdded(n => n + 1); setInvited(r?.invited ? r : null); await reload() }} className="grid-form"
-      secondary={editing && <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>Cancel</button>}>
-      <Field label="Name" name="name" defaultValue={editing?.name} required />
-      <Field label="Email" name="email" type="email" defaultValue={editing?.email} required />
-      <Field label="Role" name="role" defaultValue={editing?.role} required options={[{ value: 'bookkeeper', label: 'Bookkeeper — records and prepares' }, { value: 'accountant', label: 'Accountant — reviews and posts' }, { value: 'viewer', label: 'Viewer — read only' }]} />
-      <fieldset className="checks"><legend>Grants</legend>
-        <label><input type="checkbox" name="canPost" defaultChecked={!!editing?.can_post} /> Post and approve entries</label>
-        <label><input type="checkbox" name="canLock" defaultChecked={!!editing?.can_lock} /> Lock periods</label>
-        <label><input type="checkbox" name="canReopen" defaultChecked={!!editing?.can_reopen} /> Approve reopening</label>
-      </fieldset>
-      {editing && <Field label="Status" name="active" defaultValue={editing.active ? 'yes' : 'no'} options={[{ value: 'yes', label: 'Active' }, { value: 'no', label: 'Inactive' }]} />}
-    </Form>
-    <p className="hint">Adding someone sends them a one-time sign-in link by email; <strong>Send sign-in invitation</strong> sends a fresh one. Roles take effect on the person's next request.</p>
   </Card>
 }
 
@@ -124,6 +98,6 @@ export function Settings() {
     <PageHead title="People & settings" lead="The business these books belong to, invoice sending and online payments, Stripe payouts and Gusto payroll, who works in them, agent access, and how receipts are read and received." />
     <Business />
     {state.settings.entity && <><InvoicingSettings /><ConnectedSettings /></>}
-    {state.actor.can.owner && <><DataFlows /><Owner /><People /><IssuingLimits /><Agents /><IntegrationSettings /><WebhookSettings /><ErasureSettings /><ReceiptSettings /><Hosting /></>}
+    {state.actor.can.owner && <><DataFlows /><Owner /><People /><RolePrivacy /><IssuingLimits /><Agents /><IntegrationSettings /><WebhookSettings /><ErasureSettings /><ReceiptSettings /><Hosting /></>}
   </>
 }

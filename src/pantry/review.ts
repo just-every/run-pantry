@@ -3,6 +3,8 @@
 // review with who changed it. Originals never change: each selected line is
 // moved by its own posted correcting entry, dated on the original's date, so
 // only open months can be corrected this way.
+import { nativeApprovalAuthority } from './access-policy/approvals'
+import { ledgerBankAuthority } from './access-policy/banks'
 import { authority, who } from './access'
 import { list, now, optionalText, requireThat, text, uid, type Data } from './core'
 import { all, approval, assertOpen, audit, guard, one, periodOpen, q, run, type Sql } from './db'
@@ -33,14 +35,14 @@ const reclassify: Command = { need: 'post', async run(c, b) {
     requireThat(l.account_id !== to.id, `${label} is already on ${to.name}`)
     await assertOpen(c.db, l.entry_date)
   }
-  const batch = uid(), statements: Sql[] = [authority(c.actor, 'post')]
+  const batch = uid(), statements: Sql[] = [authority(c.actor, 'post'), ...await ledgerBankAuthority(c.db, c.actor, [to.id, ...lines.map(l => l.account_id)], 'post')]
   for (const l of lines) {
     const id = uid(), revision = uid(), amount = l.debit_cents || l.credit_cents, debit = l.debit_cents > 0
     const moved: Line[] = [
       { accountId: to.id, debit: debit ? amount : 0, credit: debit ? 0 : amount, memo: l.memo, contactId: l.contact_id },
       { accountId: l.account_id, debit: debit ? 0 : amount, credit: debit ? amount : 0, memo: l.memo, contactId: l.contact_id },
     ]
-    statements.push(periodOpen(l.entry_date), guard("EXISTS (SELECT 1 FROM pt_journal_entries WHERE id = ? AND status = 'posted' AND reversed_by_id IS NULL)", l.entry_id),
+    statements.push(...nativeApprovalAuthority(c.actor, 'journal', amount), periodOpen(l.entry_date), guard("EXISTS (SELECT 1 FROM pt_journal_entries WHERE id = ? AND status = 'posted' AND reversed_by_id IS NULL)", l.entry_id),
       ...entryStatements({ id, revision, date: l.entry_date, memo: `Reclassify entry ${l.number} line ${l.line_no}: ${l.account_code} ${l.account_name} → ${to.code} ${to.name}${reason ? ` — ${reason}` : ''}`,
         sourceKind: 'manual', sourceId: l.entry_id, preparedBy: c.actor.email, preparedKind: 'person', lines: moved }, c.actor.email),
       q('INSERT INTO pt_reclassifications (id, batch_id, original_entry_id, original_line_id, correcting_entry_id, from_account_id, to_account_id, amount_cents, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',

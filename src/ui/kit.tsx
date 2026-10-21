@@ -162,7 +162,7 @@ export async function readFileBase64(input: HTMLInputElement | null) {
   return { name: file.name, mediaType: file.type || 'application/octet-stream', base64: btoa(binary) }
 }
 
-export const ROLE_LABEL: Record<string, string> = { owner: 'Owner', bookkeeper: 'Bookkeeper', accountant: 'Accountant', viewer: 'Viewer' }
+export const ROLE_LABEL: Record<string, string> = { owner: 'Owner', bookkeeper: 'Bookkeeper', accountant: 'Accountant', viewer: 'Viewer', sales: 'Sales', 'payables-clerk': 'Payables clerk', 'time-only': 'Time tracking only' }
 
 /** A reserved address no mail reaches, such as the owner@run-pantry.test a first `rer dev` sets up with. */
 export const placeholderEmail = (email: string | null | undefined) => !email || /@(?:[^@]*\.)?(?:test|localhost|invalid|example|example\.(?:com|net|org))$/i.test(email)

@@ -1,5 +1,7 @@
 // Journal schedules share invoice month/week arithmetic, not a second
 // ledger. Each edit revokes automatic posting until that version is approved.
+import { nativeApprovalAuthority } from './access-policy/approvals'
+import { ledgerBankAuthority } from './access-policy/banks'
 import { authority, who } from './access'
 import { addDays, date, now, optionalText, requireThat, text, uid, type Data } from './core'
 import { all, approval, audit, changed, one, q, run } from './db'
@@ -41,7 +43,7 @@ const save: Command = { need: 'record', async run(c, b) {
   const nextDate = end && next > end ? null : next
   const status = !nextDate ? 'ended' : before?.status === 'paused' ? 'paused' : mode === 'post' ? 'awaiting-approval' : 'active'
   const after = { revision, name, memo, lines, every, cadence, start_date: start, end_date: end, next_date: nextDate, mode, status, prepared_by: c.actor.email }
-  await run(c.db, [authority(c.actor, 'record'), ...(before ? [
+  await run(c.db, [authority(c.actor, 'record'), ...await ledgerBankAuthority(c.db, c.actor, lines.map(l => l.accountId)), ...(before ? [
     q('UPDATE pt_recurring_journals SET name = ?, memo = ?, lines = ?, every = ?, cadence = ?, start_date = ?, end_date = ?, next_date = ?, mode = ?, status = ?, prepared_by = ?, approved_by = NULL, approved_revision = NULL, approved_snapshot = NULL, revision = ?, updated_at = ? WHERE id = ? AND revision = ? AND runs = ? AND status = ?', name, memo, JSON.stringify(lines), every, cadence, start, end, nextDate, mode, status, c.actor.email, revision, at, id, b.revision, before.runs, before.status), changed(),
   ] : [q('INSERT INTO pt_recurring_journals (id, name, memo, lines, every, cadence, start_date, end_date, next_date, mode, status, prepared_by, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, name, memo, JSON.stringify(lines), every, cadence, start, end, nextDate, mode, status, c.actor.email, revision, at, at)]),
     audit(who(c.actor), before ? 'recurring-journal.edit' : 'recurring-journal.create', 'recurring-journal', id, { revision, before, after })])
@@ -54,7 +56,7 @@ const approve: Command = { need: 'post', async run(c, b) {
   requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || c.actor.email !== t.prepared_by), 'Someone other than the preparer approves this recurring journal', 403)
   const parsed = await parseLines(c.db, journalInputLines(t.lines))
   requireThat(JSON.stringify(parsed) === JSON.stringify(t.lines), 'Template coding or amounts changed; edit and review it again', 409)
-  await run(c.db, [authority(c.actor, 'post'), approval(who(c.actor), 'recurring-journal', t.id, t.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
+  await run(c.db, [authority(c.actor, 'post'), ...nativeApprovalAuthority(c.actor, 'journal', parsed.reduce((sum, l) => sum + l.debit, 0)), ...await ledgerBankAuthority(c.db, c.actor, parsed.map(l => l.accountId), 'post'), approval(who(c.actor), 'recurring-journal', t.id, t.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
     q("UPDATE pt_recurring_journals SET status = 'active', approved_by = ?, approved_revision = revision, approved_snapshot = ?, updated_at = ? WHERE id = ? AND revision = ? AND status = 'awaiting-approval'", c.actor.email, JSON.stringify(parsed), now(), t.id, b.revision), changed(),
     audit(who(c.actor), 'recurring-journal.approve', 'recurring-journal', t.id, { revision: t.revision, before: { status: t.status }, after: { status: 'active', approved_by: c.actor.email, lines: parsed } })])
   return recurringJournal(c.db, t.id)

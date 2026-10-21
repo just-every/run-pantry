@@ -1,5 +1,7 @@
 // Payables and recorded money movement. Bills post expense against payables;
 // payments record money that moved outside Pantry and allocate it to open items.
+import { nativeApprovalAuthority } from './access-policy/approvals'
+import { bankAuthority } from './access-policy/banks'
 import { authority, who, type Actor } from './access'
 import { addDays, cents, date, list, now, optionalText, requireThat, text, uid, type Data } from './core'
 import { all, assertOpen, audit, changed, one, periodOpen, q, run, type AuditActor, type Sql } from './db'
@@ -63,7 +65,7 @@ const saveBill: Command = { need: 'record', async run(c, b) {
 
 export function postBill(actor: Actor, b: { id: string; journalId: string; payable: string; vendor: Data; reference: string; date: string; lines: Data[]; total: number }): Sql[] {
   const lines: Line[] = [...b.lines.map(l => ({ accountId: l.account_id, debit: l.amount_cents, credit: 0, memo: l.description })), { accountId: b.payable, debit: 0, credit: b.total, memo: `${b.vendor.name} ${b.reference}`, contactId: b.vendor.id }]
-  return [...entryStatements({ id: b.journalId, date: b.date, memo: `Bill ${b.reference} — ${b.vendor.name}`, sourceKind: 'bill', sourceId: b.id, preparedBy: actor.email, preparedKind: 'person', lines }, actor.email),
+  return [...nativeApprovalAuthority(actor, 'bill', b.total), ...entryStatements({ id: b.journalId, date: b.date, memo: `Bill ${b.reference} — ${b.vendor.name}`, sourceKind: 'bill', sourceId: b.id, preparedBy: actor.email, preparedKind: 'person', lines }, actor.email),
     q("UPDATE pt_bills SET status = 'posted', journal_id = ?, revision = ? WHERE id = ? AND status = 'draft'", b.journalId, uid(), b.id), changed()]
 }
 
@@ -130,6 +132,7 @@ export async function paymentStatements(db: D1Database, actor: AuditActor, b: Da
     ? [{ accountId: bank.account_id, debit: amount, credit: 0, memo: `Received from ${who_.name}` }, { accountId: control.id, debit: 0, credit: amount, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }]
     : [{ accountId: control.id, debit: amount, credit: 0, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }, { accountId: bank.account_id, debit: 0, credit: amount, memo: `Paid to ${who_.name}` }]
   const statements: Sql[] = [
+    ...nativeApprovalAuthority(actor, 'payment', amount), ...bankAuthority(actor, [bank.id]),
     ...entryStatements({ id: journalId, date: day, memo: `${received ? 'Payment from' : 'Payment to'} ${who_.name}`, sourceKind: 'payment', sourceId: id, preparedBy: actor.email, preparedKind: actor.kind === 'system' ? 'import' : 'person', lines }, actor.email),
     q('INSERT INTO pt_payments (id, direction, contact_id, payment_date, amount_cents, bank_account_id, reference, memo, method, card_last4, journal_id, recorded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       id, direction, who_.id, day, amount, bank.id, optionalText(b.reference, 'Reference', 80), optionalText(b.memo, 'Memo', 500), method, cardLast4, journalId, actor.email, now()),
@@ -156,7 +159,7 @@ const allocate: Command = { need: 'record', async run(c, b) {
   const allocated = await allocations(c.db, payment.direction, payment.contact_id, b.allocations, payment.amount_cents - used)
   requireThat(allocated.list.length, 'Choose what to allocate')
   const early = payment.direction === 'received' ? await takeEarlyDiscounts(c.db, who(c.actor), allocated.list, day, { payments: payment.id }) : { allocations: allocated.list.map(a => ({ ...a, counted: false })), before: [], after: [] }
-  await run(c.db, [authority(c.actor, 'record'), ...early.before, ...early.allocations.map(a => allocationInsert(c.actor, payment.id, payment.direction === 'received' ? 'invoice' : 'bill', a, day)), ...allocated.guards, ...early.after,
+  await run(c.db, [authority(c.actor, 'record'), ...nativeApprovalAuthority(c.actor, 'payment', payment.amount_cents), ...bankAuthority(c.actor, [payment.bank_account_id]), ...early.before, ...early.allocations.map(a => allocationInsert(c.actor, payment.id, payment.direction === 'received' ? 'invoice' : 'bill', a, day)), ...allocated.guards, ...early.after,
     q(`INSERT INTO pt_guard SELECT CASE WHEN (SELECT COALESCE(SUM(amount_cents), 0) FROM pt_allocations WHERE source_kind = 'payment' AND source_id = ?) <= ? THEN 1 ELSE 0 END`, payment.id, payment.amount_cents),
     audit(who(c.actor), 'payment.allocate', 'payment', payment.id, { allocations: allocated.list })])
   return (await one(c.db, 'SELECT * FROM pt_payments WHERE id = ?', payment.id))!

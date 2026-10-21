@@ -251,3 +251,9 @@ test('ACCT-003 an accountant reclassifies 40 lines by linked correcting entries,
   await h.command('write-off.bulk', { kind: 'invoice', ceiling: '50.00', accountId: badDebts.id, date: '2026-08-31' }, ann, 409)
   await h.command('write-off.bulk', { kind: 'invoice', ceiling: '50.00', accountId: badDebts.id, date: '2026-09-30' }, await h.member('cy@example.test', 'bookkeeper'), 403)
 })
+
+test('ACCESS-001 narrower roles, amount approval routing, bank privacy and time-to-invoice obey every native and shared door', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const { access001Journey } = await import('./access001-journey.mjs')
+  await access001Journey(h)
+})

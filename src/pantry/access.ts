@@ -6,11 +6,12 @@ import { Fault, requireThat, sha256 } from './core'
 import { guard, one, type AuditActor, type Sql } from './db'
 
 export type Need = 'read' | 'record' | 'post' | 'lock' | 'reopen' | 'owner'
-export type Role = 'owner' | 'bookkeeper' | 'accountant' | 'viewer'
+export type Role = 'owner' | 'bookkeeper' | 'accountant' | 'viewer' | 'sales' | 'payables-clerk' | 'time-only'
 
 export type Person = {
   kind: 'person'; id: string; email: string; name: string; session: string; role: Role
-  grants: { post: boolean; lock: boolean; reopen: boolean }
+  grants: { post: boolean; lock: boolean; reopen: boolean }; revision?: string
+  policy?: { bankAccounts: string[] | null; timePeople: string[]; billLimit: number | null; paymentLimit: number | null; journalLimit: number | null; maskTin: boolean; maskBank: boolean; privacyRevision: string }
 }
 export type Agent = { kind: 'agent'; id: string; email: string; name: string; tokenHash: string }
 export type Integration = { kind: 'integration'; id: string; email: string; name: string; tokenHash: string; scope: string }
@@ -25,11 +26,11 @@ export async function person(request: Request, original: Bindings): Promise<Pers
   requireThat(session, 'Sign in required', 401)
   const base = { kind: 'person' as const, id: session.operator.id, email: session.operator.email.toLowerCase(), name: session.operator.displayName, session: session.id }
   if (session.operator.role === 'owner') return { ...base, role: 'owner', grants: { post: true, lock: true, reopen: true } }
-  const member = await one<{ name: string; role: Role; can_post: number; can_lock: number; can_reopen: number }>(env.DB, 'SELECT * FROM pt_members WHERE email = ? AND active = 1', base.email)
+  const member = await one(env.DB, 'SELECT m.*, p.mask_tin, p.mask_bank, p.revision AS privacy_revision FROM pt_members m JOIN pt_role_privacy p ON p.role = m.role WHERE m.email = ? AND m.active = 1', base.email)
   requireThat(member, env.AUTH_LOCAL === 'true' && base.email.endsWith('@dev.localhost')
     ? `${base.email} has no role in these books yet. Sign out, sign in as the owner, and add ${base.email} under People & settings › People with the role to try.`
     : 'You have no role in these books; ask the owner to add you', 403)
-  return { ...base, name: member.name, role: member.role, grants: { post: !!member.can_post && member.role !== 'viewer', lock: !!member.can_lock && member.role !== 'viewer', reopen: !!member.can_reopen && member.role !== 'viewer' } }
+  return { ...base, name: member.name, role: member.role, revision: member.revision, policy: { bankAccounts: member.bank_accounts === null ? null : JSON.parse(member.bank_accounts), timePeople: JSON.parse(member.time_people), billLimit: member.bill_limit_cents, paymentLimit: member.payment_limit_cents, journalLimit: member.journal_limit_cents, maskTin: !!member.mask_tin, maskBank: !!member.mask_bank, privacyRevision: member.privacy_revision }, grants: { post: !!member.can_post && !['viewer', 'time-only'].includes(member.role), lock: !!member.can_lock && ['bookkeeper', 'accountant'].includes(member.role), reopen: !!member.can_reopen && ['bookkeeper', 'accountant'].includes(member.role) } }
 }
 
 export async function agent(request: Request, env: Bindings): Promise<Agent> {
@@ -49,6 +50,8 @@ export function allowed(actor: Person, need: Need) {
   if (need === 'owner') return false
   if (actor.role === 'viewer') return false
   if (need === 'record') return true
+  if (actor.role === 'time-only') return false
+  if ((need === 'lock' || need === 'reopen') && !['bookkeeper', 'accountant'].includes(actor.role)) return false
   return actor.grants[need]
 }
 
@@ -68,9 +71,10 @@ export function authorityCondition(actor: Actor, need: Need): { sql: string; par
   }
   if (actor.kind === 'agent') return { sql: 'EXISTS (SELECT 1 FROM pt_agents WHERE id = ? AND token_hash = ? AND active = 1)', params: [actor.id, actor.tokenHash] }
   if (actor.role === 'owner') return { sql: `${sessionLive} AND o.role = 'owner')`, params: [actor.session, actor.id] }
+  if (need === 'owner') return { sql: '0', params: [] }
   const grant = need === 'post' ? 'AND m.can_post = 1' : need === 'lock' ? 'AND m.can_lock = 1' : need === 'reopen' ? 'AND m.can_reopen = 1' : ''
-  const role = need === 'read' ? '' : "AND m.role <> 'viewer'"
-  return { sql: `${sessionLive}) AND EXISTS (SELECT 1 FROM pt_members m WHERE m.email = ? AND m.active = 1 ${role} ${grant})`, params: [actor.session, actor.id, actor.email] }
+  const role = need === 'read' ? '' : need === 'record' ? "AND m.role <> 'viewer'" : need === 'post' ? "AND m.role NOT IN ('viewer','time-only')" : "AND m.role IN ('bookkeeper','accountant')"
+  return { sql: `${sessionLive}) AND EXISTS (SELECT 1 FROM pt_members m WHERE m.email = ? AND m.active = 1 AND m.role = ? AND m.revision = ? ${role} ${grant} AND EXISTS (SELECT 1 FROM pt_role_privacy p WHERE p.role = m.role AND p.revision = ?))`, params: [actor.session, actor.id, actor.email, actor.role, actor.revision ?? '', actor.policy?.privacyRevision ?? ''] }
 }
 
 /** The capability check evaluated inside the write batch. */
