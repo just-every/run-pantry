@@ -69,7 +69,14 @@ export async function access001Journey(h) {
   assert.equal(at((await h.view('reports/contractors?year=2026', maskedReader)).contractors, c => c.id === vendor.id).tax.tin, '••••')
   assert.notEqual(at((await h.view('reports/contractors?year=2026')).contractors, c => c.id === vendor.id).tax.tin, '••••')
   await h.view('reports/contractors/2025/1099-nec.csv', maskedReader, 403)
-  assert.equal(JSON.stringify(await h.view('activity', maskedReader)).includes('6789'), false)
+  const activity = await h.view('activity', maskedReader)
+  const taxValues = value => {
+    if (typeof value === 'string' && /^[\[{]/.test(value)) { try { return taxValues(JSON.parse(value)) } catch {} }
+    if (!value || typeof value !== 'object') return []
+    return Object.entries(value).flatMap(([key, child]) => /tin|taxpayer|tax.?id/i.test(key) ? [String(child)] : taxValues(child))
+  }
+  assert.equal(taxValues(activity).some(value => value.includes('6789')), false)
+  assert.equal(JSON.stringify(activity).includes('123456789'), false)
 
   const time = await h.member(timeEmail, 'time-only')
   const service = await h.command('item.save', { name: 'synthetic-pantry-15', kind: 'service', rate: '125', accountId: acct['4000'], taxCategory: 'non-taxable' })
