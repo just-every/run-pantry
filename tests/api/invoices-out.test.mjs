@@ -394,6 +394,9 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
   Object.assign(s2, { status: 'complete', pi: { id: 'pi_ach', status: 'processing', amount_received: 0, latest_charge: null } })
   assert.match((await h.send(achPage + '?checkout=cs_test_2')).value, /bank payment is processing/)
   assert.equal((await invoiceOf(h, ach.id)).open_cents, 90000)
+  const erasure = await h.command('erasure.preview', { kind: 'contact', id: ach.customer_id })
+  assert.ok(erasure.blockers.some(b => b.kind === 'provider-payment' && b.reason === 'pending provider payment'))
+  await h.command('erasure.execute', { kind: 'contact', id: ach.customer_id, fingerprint: erasure.fingerprint, requester: 'Customer', channel: 'email', reason: 'Privacy request', confirm: 'ERASE' }, h.owner, 409)
   s2.pi = { id: 'pi_ach', status: 'succeeded', amount_received: 90000, latest_charge: { id: 'ch_2', balance_transaction: { id: 'txn_2', amount: 90000, currency: 'usd', fee: 500, exchange_rate: null } } }
   await h.cron()
   assert.equal((await invoiceOf(h, ach.id)).open_cents, 0)

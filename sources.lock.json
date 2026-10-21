@@ -3108,7 +3108,7 @@
       "executable": false
     },
     "src/pantry/erasure/history.ts": {
-      "sha256": "3b323a5298f4a693c1e28a93b11dfd385477883144f4ed8db074655e2be9635c",
+      "sha256": "37a1bdeca454de9b477b0a489880bfb035d881150d2baabbc9d8f1535682a123",
       "executable": false
     },
     "src/pantry/erasure/immutable-copies.ts": {
@@ -4372,7 +4372,7 @@
       "executable": false
     },
     "tests/api/invoices-out.test.mjs": {
-      "sha256": "39c1d8191fb4f21b60a7977c17dac0ffc38ee23fc1204de5f318c5fefcff0a83",
+      "sha256": "25bac6472428f60406c34c65cc2d1220269631b47e5544c872030996e264bc86",
       "executable": false
     },
     "tests/api/ledger.test.mjs": {
@@ -4380,7 +4380,7 @@
       "executable": false
     },
     "tests/api/move-in.test.mjs": {
-      "sha256": "b6645885b4011d250c8b604bac909921ec881f05d49bdc3fae844b1fd33c8deb",
+      "sha256": "4665455de2b626d6766bee994814d4ee14b5aad48273416f18dae78f877c4b26",
       "executable": false
     },
     "tests/api/oauth-return.test.mjs": {
@@ -4420,7 +4420,7 @@
       "executable": false
     },
     "tests/api/security.test.mjs": {
-      "sha256": "de6704be1ecef5d260fda93cea2c2968064719ad4bb105fed2b6343134d28d0c",
+      "sha256": "98c2efb984e5dfb0c74b343b482ce126a18ac4a632738e3ade0705a635f1599c",
       "executable": false
     },
     "tests/api/statement-provider.mjs": {

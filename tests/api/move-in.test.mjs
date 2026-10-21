@@ -68,6 +68,15 @@ test('PAN-16 a QuickBooks Online cutover is previewed, imported as staged record
   const st = await h.command('statement.import', { bankAccountId: checking.id, fileName: 'operating-checking-2026-09.csv', content: await fixture('bank/operating-checking-2026-09.csv'), opening: '24813.52', closing: '27797.02', start: '2026-09-01', end: '2026-09-30', confirmLast4: '4821' })
   const r = await h.view(`reconciliation/${st.statement.id}`)
   assert.ok(!r.blockers.some(b => b.kind === 'baseline' || b.kind === 'opening'), JSON.stringify(r.blockers))
+  // ERASURE-001 withdraws the original import copies as well as a transaction-free lead.
+  const importedState=await h.view('state'),importedSales=await h.view('sales')
+  const lead=importedState.contacts.find(c=>c.kind==='customer'&&!importedSales.invoices.some(i=>i.customer_id===c.id))
+  assert.ok(lead?.email)
+  const privacy=await h.command('erasure.preview',{kind:'contact',id:lead.id})
+  await h.command('erasure.execute',{kind:'contact',id:lead.id,fingerprint:privacy.fingerprint,requester:'Imported lead',channel:'email',reason:'Remove obsolete contact',confirm:'ERASE'})
+  assert.ok(!(await h.view('state')).contacts.some(c=>c.id===lead.id))
+  assert.deepEqual(await h.view('reports/trial-balance?to=2026-08-31&basis=accrual'),tb)
+  assert.ok(!JSON.stringify((await h.db.prepare('SELECT plan_json FROM ik_jobs').all()).results).includes(lead.email),'the archive cannot carry an erased source email through a saved import plan')
 })
 
 

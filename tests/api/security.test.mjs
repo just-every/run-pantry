@@ -42,6 +42,11 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
   assert.ok(preview.blockers.some(r=>r.id===i.id&&r.reason==='open balance'))
   await h.command('erasure.execute',request(preview),h.owner,409)
   await h.command('payment.record',{direction:'received',contactId:customer.id,date:'2026-09-05',amount:'100.00',bankAccountId:checking.id,allocations:[{targetId:i.id,amount:'100.00'}]})
+  const recurring=await h.command('recurring.save',{customerId:customer.id,startDate:'2030-01-01',every:1,unit:'month',mode:'draft',lines:[{description:'Future retainer',accountId:acct['4000'],quantity:'1',rate:'100.00',taxCode:'exempt'}]})
+  const recurringPreview=await h.command('erasure.preview',{kind:'contact',id:customer.id})
+  assert.ok(recurringPreview.blockers.some(r=>r.id===recurring.id&&r.reason==='active recurring template'))
+  await h.command('erasure.execute',request(recurringPreview),h.owner,409)
+  await h.command('recurring.status',{id:recurring.id,status:'paused'})
   const before=await h.view('reports/trial-balance?to=2026-12-31&basis=accrual'),history=(await h.view('activity')).audit
   const pdf=await h.view(`invoice-documents/${i.id}/preview`)
   preview=await h.command('erasure.preview',{kind:'contact',id:customer.id})
