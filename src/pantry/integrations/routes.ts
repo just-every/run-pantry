@@ -9,6 +9,7 @@ import { documentFile } from '../documents'
 import { invoice } from '../invoices'
 import { entry } from '../journal'
 import { bill } from '../payables'
+import { vendorCredit, prepareVendorCredit, prepareVendorCreditAllocation } from '../vendor-credits'
 import { FINANCIAL_REPORTS, readReport } from '../report-reader'
 import { reportBasis } from '../basis'
 import { identify } from './credentials'
@@ -119,6 +120,19 @@ integrations.get('/payments', async c => {
   await run(ctx.db, [authority(ctx.actor, 'read')])
   return c.json({ payments: await Promise.all(p.rows.map(p => payment(ctx.db, p.id))), nextCursor: p.nextCursor })
 })
+const vendorCreditScope = (c: C) => c.get('integration').scopes.includes('vendor-credits:write') ? 'vendor-credits:write' : 'vendor-credits:read'
+integrations.get('/vendor-credits', async c => {
+  const ctx = context(c, vendorCreditScope(c))
+  await run(ctx.db, [authority(ctx.actor, 'read')])
+  const p = await page(c, 'pt_vendor_credits', { id: 'id', vendorId: 'vendor_id', reference: 'reference' })
+  return c.json({ vendorCredits: await Promise.all(p.rows.map(r => vendorCredit(ctx.db, r.id))), nextCursor: p.nextCursor })
+})
+integrations.get('/vendor-credits/:id', async c => {
+  const ctx = context(c, vendorCreditScope(c))
+  await run(ctx.db, [authority(ctx.actor, 'read')])
+  return c.json(await vendorCredit(ctx.db, c.req.param('id')))
+})
+
 integrations.get('/reports/:kind', async c => {
   const ctx = context(c, 'reports:read'), kind = c.req.param('kind')
   requireThat(FINANCIAL_REPORTS.includes(kind), 'Unknown financial report', 404)
@@ -136,6 +150,8 @@ for (const spec of [
   { path: '/journals', scope: 'journals:write', prepare: prepareJournal, read: entry },
   { path: '/documents', scope: 'documents:write', prepare: prepareDocument, read: document },
   { path: '/payments', scope: 'payments:write', prepare: preparePayment, read: payment },
+  { path: '/vendor-credits', scope: 'vendor-credits:write', prepare: prepareVendorCredit, read: vendorCredit },
+  { path: '/vendor-credits/:id/allocations', scope: 'vendor-credits:write', prepare: (ctx: Context, b: Data, c: C) => prepareVendorCreditAllocation(ctx, { ...b, creditId: c.req.param('id')! }), read: vendorCredit },
   { path: '/bills/:id/readiness', scope: 'bills:write', prepare: (ctx: Context, b: Data, c: C) => prepareReadiness(ctx, b, c.req.param('id')!), read: bill },
 ]) integrations.post(spec.path, async c => {
   const ctx = context(c, spec.scope)
@@ -146,12 +162,14 @@ for (const spec of [
   requireThat(body && typeof body === 'object' && !Array.isArray(body), 'Send a JSON object')
   requireThat(body.post === undefined || typeof body.post === 'boolean', 'post is true or false')
   const postsPayment = spec.scope === 'payments:write'
+  const postsCredit = spec.scope === 'vendor-credits:write'
+  if (postsCredit) requireThat(body.post !== false, 'Vendor credits and their allocations record posted adjustments and cannot be saved as drafts')
   if (postsPayment) requireThat(body.post !== false, 'Payments record money already moved and cannot be saved as drafts')
-  if (postsPayment || body.post === true) requireThat(c.get('integration').scopes.includes('post'), postsPayment ? 'Recording an external payment needs the post grant' : 'This credential needs the post grant; omit post or send false to save a draft', 403)
+  if (postsPayment || postsCredit || body.post === true) requireThat(c.get('integration').scopes.includes('post'), postsPayment ? 'Recording an external payment needs the post grant' : postsCredit ? 'Recording or applying a vendor credit needs the post grant' : 'This credential needs the post grant; omit post or send false to save a draft', 403)
   const operation = c.req.path
   return c.json(await idempotent(ctx, operation, body, async () => {
     const p: Prepared = await spec.prepare(ctx, body, c)
-    if (postsPayment || body.post === true) p.statements.unshift(authority(ctx.actor, 'post'))
+    if (postsPayment || postsCredit || body.post === true) p.statements.unshift(authority(ctx.actor, 'post'))
     return p
   }, id => spec.read(ctx.db, id)))
 })

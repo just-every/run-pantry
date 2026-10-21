@@ -8,6 +8,8 @@ export const SCOPES = [
   { id: 'contacts:write', label: 'Contacts', help: 'Read and upsert customers and vendors.' },
   { id: 'invoices:write', label: 'Invoices', help: 'Read and create invoices and credits.' },
   { id: 'bills:write', label: 'Bills', help: 'Read and create bills; mark received and ready to pay.' },
+  { id: 'vendor-credits:read', label: 'Vendor credits readback', help: 'Read vendor credits and their bill allocations; cannot record or apply credits.' },
+  { id: 'vendor-credits:write', label: 'Vendor credits', help: 'Read, record and apply vendor credits to bills. Recording and applying also need post; no money moves.' },
   { id: 'journals:write', label: 'Journals', help: 'Read and create balanced journal entries.' },
   { id: 'documents:write', label: 'Documents', help: 'Read and attach source documents.' },
   { id: 'payments:read', label: 'Payments readback', help: 'Read payments, allocations and reversals; cannot move money.' },

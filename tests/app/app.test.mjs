@@ -6,6 +6,7 @@ import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
+import { vendorCreditJourney } from './vendor-credit-journey.mjs'
 
 test('REPORT-001 statement column modes persist, reconcile and download on cash and accrual at 1440 and 390', async t => {
   const app = await worker(); t.after(() => app.close())
@@ -300,7 +301,7 @@ test('CAPTURE-004 phone and desktop receipt suggestions wait for their line, att
 })
 
 
-test('API-001 financial-report credential scope is explained, created, used and revoked at 1440 and 390', async t => {
+test('API-001 financial-report and vendor-credit credentials are explained, created, used and revoked at 1440 and 390', async t => {
   const app = await worker(); t.after(() => app.close())
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
   const owner = await browser.newContext(); t.after(() => owner.close())
@@ -349,6 +350,7 @@ test('API-001 financial-report credential scope is explained, created, used and 
     await row.getByText('Revoked', { exact: true }).waitFor()
     assert.equal((await context.request.get(`${app.origin}/api/pantry/integration/v1/reports/profit-and-loss?to=2026-10-31`, { headers })).status(), 401)
     if (process.env.PANTRY_PROOF_DIR) await page.screenshot({ path: `${process.env.PANTRY_PROOF_DIR}/api001-revoked-${width}.png`, fullPage: true })
+    await vendorCreditJourney({ page, context, command, acct, width, origin: app.origin })
     assert.deepEqual(errors, [])
     await context.close()
   }

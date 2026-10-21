@@ -19,12 +19,16 @@ The credential cannot sign in as a person. It keeps working after the owner sign
 | `documents:write` | Read document records and upload documents. |
 | `payments:read` | Read payments and their allocations to bills or invoices. |
 | `payments:write` | Read payments and record external payments and their allocations, with the additional `post` grant. |
+| `vendor-credits:read` | Read vendor credits, their allocations and remaining credit. |
+| `vendor-credits:write` | Read, record and allocate vendor credits, with the additional `post` grant for writes. |
 | `reports:read` | Read the 23 financial reports listed below, with native basis, range, column and filter semantics. |
-| `post` | In addition to a record's write scope, post bills, journals or external payments, or issue invoices and credits. |
+| `post` | In addition to a record's write scope, post bills, journals, external payments or vendor credits, allocate vendor credits, or issue invoices and credits. |
 
 A `:write` scope includes reading that record type. It does not grant access to the other record types. The `post` scope alone grants no record access. Without `post`, created bills, invoices and journals stay drafts for a person to review and post or issue in Pantry.
 
 Payment recording needs both `payments:write` and `post`: it records money that already moved outside Pantry. Payments have no draft state. These credentials cannot move money, sign in, manage users, lock a period or reopen one. A sibling book still needs to map its records to Pantry's accounts, bank accounts, tax codes and contact IDs; this API does not supply an item catalogue or match suppliers for it.
+
+Recording or allocating vendor credits needs both `vendor-credits:write` and `post`. Vendor credits have no draft state. A read-only vendor-credit credential can read credits without the `post` grant.
 
 ## Send a request
 
@@ -56,6 +60,8 @@ All paths below follow `/api/pantry/integration/v1/`. List responses contain the
 | `documents?name=…` | `documents:write` | `{ "documents": […], "nextCursor": … }` |
 | `documents/:id` | `documents:write` | The original document bytes, as a download. |
 | `payments?billId=…`, `payments?invoiceId=…`, `payments?id=…` or `payments?reference=…` | `payments:read` or `payments:write` | `{ "payments": […], "nextCursor": … }`, including allocations and `reversal_id`. |
+| `vendor-credits?id=…`, `vendor-credits?vendorId=…` or `vendor-credits?reference=…` | `vendor-credits:read` or `vendor-credits:write` | `{ "vendorCredits": […], "nextCursor": … }`, including allocations and `unallocated_cents`. |
+| `vendor-credits/:id` | `vendor-credits:read` or `vendor-credits:write` | The exact native credit, including allocations and `unallocated_cents`; an unknown ID returns `404`. |
 | `reports/trial-balance?to=YYYY-MM-DD&basis=cash` | `reports:read` | The trial-balance rows through that date, on the selected basis. Omitting basis uses the business’s declared tax method (accrual when undeclared); an explicit choice wins. |
 
 Bill and invoice readbacks include `open_cents`. Read payment allocations to see which payment was applied to which record. A reversed payment has a `reversal_id`; its allocations no longer reduce the open balance, so the bill or invoice reopens for that amount. Do not infer payment from a bill's readiness flag.
@@ -94,6 +100,8 @@ Every POST below needs its own `Idempotency-Key`.
 | `documents` | `name`, `mediaType`, `base64`, `linkedKind` (for example `bill`), `linkedId`, `note` |
 | `bills/:id/readiness` | `received` and `readyToPay` booleans |
 | `payments` | `direction` (`received` or `paid`), `contactId`, `date`, `amount`, `bankAccountId`, `reference`, `allocations[{targetId, amount}]`; optional `method`, `memo`, `post: true` |
+| `vendor-credits` | `vendorId`, `date`, `amount`, `reference`, `accountId`; optional `allocations[{targetId, amount}]`, `post: true` |
+| `vendor-credits/:id/allocations` | Nonempty `allocations[{targetId, amount}]`; optional `date` (default credit date), `post: true` |
 
 Each write needs the corresponding `:write` scope. Set `post: true` to post or issue at creation, with the additional `post` scope. Use decimal strings for bill amounts, invoice quantities and rates, and journal debits and credits. Invoice `taxCode` is `"exempt"` or a tax-code ID from `state`.
 
@@ -110,6 +118,20 @@ Contact upserts remember the sibling's `externalId`. On the first upsert from a 
 Document uploads preserve the exact decoded bytes and have a 1.5 MB file limit. Base64-encode the file; do not send a path or a download URL.
 
 Readiness needs `bills:write` and a posted bill. A bill must be received before it can be ready to pay; sending both flags as `true` records both together. This records readiness only. It creates no payment or money movement. Writes still respect Pantry's period locks; a locked-period conflict returns `409`.
+
+### Vendor credits
+
+`POST vendor-credits` records a posted vendor credit against the original active expense or asset `accountId`. Bank, receivable and payable accounts are refused. Send the vendor's credit reference and the credit date, with decimal strings for `amount` and any allocation amounts. The reference is unique for that vendor. Omit `allocations` to retain the whole amount as unapplied credit, or supply bill IDs as `targetId` to apply it at creation.
+
+`POST vendor-credits/:id/allocations` applies remaining credit to one or more bills. It requires a nonempty allocation list. Its optional `date` defaults to the original credit date and cannot precede that date. Both POST routes require `vendor-credits:write` **and** `post`, even if `post` is omitted from the body. `post: false` is refused.
+
+Every target must be an open posted bill for the same vendor. Total allocations cannot exceed the credit's remaining amount or any bill's open balance, including amounts already settled by payments or other credits. Native locked-period and accounting guards run inside the atomic write. Allocating a credit reduces the bill's open balance without recording a payment or moving money.
+
+Each write needs its own `Idempotency-Key`, including later allocations on the same credit. Keys and domain changes are committed together: concurrent duplicates apply once, failed writes leave the key available, and a successful key reused with a different path or body returns `409`. A replay returns the current native credit, including allocations added since the original request. Keep the original body and key for an uncertain request; a repeated allocation with a new key is a new write.
+
+Read credits through `GET vendor-credits` with exact `id`, `vendorId` and `reference` filters, which can be combined. Lists use the same exclusive stable record-ID `cursor` and `limit` (default and maximum `100`) as other record lists. The response is `{ "vendorCredits": […], "nextCursor": … }`; `GET vendor-credits/:id` returns the native credit itself. Both accept `vendor-credits:read` or `vendor-credits:write`.
+
+Credit responses use native field names such as `vendor_id`, `credit_date`, `account_id`, `journal_id`, integer `amount_cents` and `unallocated_cents`, and `allocations`. Each allocation contains `id`, `source_kind: "credit"`, `source_id`, `target_kind: "bill"`, `target_id`, integer `amount_cents`, `allocation_date`, `created_by` and `created_at`. Reads and writes use the existing credential budget and call log. Vendor-credit support does not complete the wider API-001 record surface or outbound webhooks.
 
 ## Example: send a bill, mark it ready and read payments
 

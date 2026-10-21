@@ -20,7 +20,7 @@ function NewCredential({ scopes, onCreated }: { scopes: Scope[]; onCreated: (cre
         <span>{scope.label} <code>{scope.id}</code><small className="hint" style={{ display: 'block' }}>{scope.help}</small></span>
       </label>)}
     </fieldset>
-    <p className="hint field-wide">The <strong>post</strong> scope lets a sibling book post its approved records in Pantry. Without it, bills, invoices and journals stay drafts for a person to review. Recording money already received or paid needs both <strong>payments:write</strong> and <strong>post</strong>; it does not move money.</p>
+    <p className="hint field-wide">The <strong>post</strong> scope lets a sibling book post its approved records in Pantry. Without it, bills, invoices and journals stay drafts for a person to review. Recording money already received or paid needs both <strong>payments:write</strong> and <strong>post</strong>; it does not move money. Vendor credits and their allocations also need both <strong>vendor-credits:write</strong> and <strong>post</strong>; credits post immediately and have no draft state.</p>
   </Form>
 }
 
