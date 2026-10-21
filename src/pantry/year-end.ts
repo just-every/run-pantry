@@ -9,6 +9,11 @@ import { requireThat, sha256, type Data } from './core'
 import { yearBounds, yearEndChecks } from './year-end-checks'
 import type { Command } from './context'
 
+// Issuing another copy records its custody without changing the reviewed
+// books. Use the same business-change count in the snapshot and atomic fence;
+// ledger, settings, readiness and permission changes still invalidate it.
+const REVIEWED_CHANGES = "SELECT COUNT(*) FROM pt_audit WHERE action <> 'report.issued'"
+
 export async function adjustingEntries(db: D1Database, year: number) {
   const entity = await requireEntity(db), bounds = yearBounds(year, entity.fiscal_year_start)
   const entries = await all(db, "SELECT * FROM pt_journal_entries WHERE adjusting = 1 AND status = 'posted' AND entry_date BETWEEN ? AND ? ORDER BY number, id", bounds.start, bounds.end)
@@ -25,7 +30,7 @@ export async function yearEndState(db: D1Database, year: number): Promise<Data> 
     months.push({ id: period, status: close.status, ready: close.status === 'locked' || close.ready,
       checks: close.checks.filter((c: Data) => !c.ok), tasksOpen: close.tasks.filter((t: Data) => t.status !== 'done').length, hasTasks: close.tasks.length > 0 })
   }
-  const auditCount = Number((await one(db, 'SELECT COUNT(*) AS n FROM pt_audit'))!.n)
+  const auditCount = Number((await one(db, `SELECT (${REVIEWED_CHANGES}) AS n`))!.n)
   const after = `${Number(readiness.end.slice(0, 4)) + (readiness.end.slice(5) === '12-31' ? 1 : 0)}-${String(entity.fiscal_year_start).padStart(2, '0')}-01`
   return { ...readiness, months, adjusting: await adjustingEntries(db, year),
     closingBalanceSheet: await balanceSheet(db, readiness.end, entity.fiscal_year_start),
@@ -39,7 +44,7 @@ const lockYear: Command = { need: 'lock', async run(c, b) {
   requireThat(!state.locked, 'This fiscal year is already locked', 409)
   requireThat(state.revision === b.revision, 'Year-end changed; review it again', 409)
   requireThat(state.ready, 'Complete every monthly close and resolve year-end checks before locking the year', 409)
-  const statements = [authority(c.actor, 'lock'), guard('(SELECT COUNT(*) FROM pt_audit) = ?', state.auditCount), guard('(SELECT revision FROM pt_entity WHERE id = 1) = ?', state.entityRevision)]
+  const statements = [authority(c.actor, 'lock'), guard(`(${REVIEWED_CHANGES}) = ?`, state.auditCount), guard('(SELECT revision FROM pt_entity WHERE id = 1) = ?', state.entityRevision)]
   statements.push(guard('(SELECT COUNT(*) FROM pt_gusto_payrolls WHERE check_date BETWEEN ? AND ?) = ?', state.start, state.end, state.payroll.length))
   for (const payroll of state.payroll) statements.push(guard('EXISTS (SELECT 1 FROM pt_gusto_payrolls WHERE uuid = ? AND read_at = ? AND status = ? AND gross_cents = ? AND employer_tax_cents = ? AND debit_cents = ?)', payroll.uuid, payroll.read_at, payroll.status, payroll.gross_cents, payroll.employer_tax_cents, payroll.debit_cents))
   for (const month of state.months) if (month.status !== 'locked') statements.push(...await lockPlan(c.db, c.actor, month.id, `Fiscal year ${year} close`))
