@@ -1,3 +1,4 @@
+import { effectsJourney } from './effects-journey.mjs'
 import { moveInJourney } from './move-in-journey.mjs'
 import { captureJourney } from './capture-journey.mjs'
 import { data001Browser } from './data001-journey.mjs'
@@ -12,6 +13,8 @@ import { worker, TOKEN } from './worker.mjs'
 import { vendorCreditJourney } from './vendor-credit-journey.mjs'
 
 test('MIGRATE-007 spreadsheet mapping, preview, undo, reimport and sign-off at 1440 and 390', moveInJourney)
+
+test('AGENT-003 locked correction effects and exact approval at 1440 and 390', effectsJourney)
 
 test('DATA-001 owner inventories data, paths, prices and unavailable brokers, rotates Stripe and removes the model at 1440 and 390', data001Browser)
 

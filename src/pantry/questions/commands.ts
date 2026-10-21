@@ -4,7 +4,7 @@ import { requireThat, text, now, uid, optionalText, cents, usd } from '../core'
 import { authority, ownerEmail, who } from '../access'
 import { all, audit, changed, q, run } from '../db'
 import type { Command, Context } from '../context'
-import { answer, confirm, hear, personAnswerer } from './answer'
+import { answer, confirm, hear, personAnswerer, questionEffects } from './answer'
 import { hosting, pantryAddress } from '../receipts/mail'
 import { mailState } from './mail'
 import { modelState } from './model'
@@ -34,7 +34,11 @@ export async function questionsView(c: Context, focus?: string) {
 const answerCommand: Command = { need: 'record', async run(c, b) {
   const by = personAnswerer(c.actor as any)
   if (typeof b.words === 'string' && b.words.trim()) return { heard: await hear(c.env, c.db, text(b.id, 'Question'), b.words, by) }
-  return { question: await answer(c.env, c.db, text(b.id, 'Question'), { choice: b.choice ? text(b.choice, 'Answer') : null, accountId: b.accountId ? text(b.accountId, 'Category') : null, remember: b.remember === true || b.remember === 'on', note: optionalText(b.note, 'Note', 500) }, by) }
+  return { question: await answer(c.env, c.db, text(b.id, 'Question'), { choice: b.choice ? text(b.choice, 'Answer') : null, accountId: b.accountId ? text(b.accountId, 'Category') : null, remember: b.remember === true || b.remember === 'on', note: optionalText(b.note, 'Note', 500), date: b.date, previewToken: b.previewToken }, by) }
+} }
+
+const previewCommand: Command = { need: 'record', async run(c, b) {
+  return { effects: await questionEffects(c.db, text(b.id, 'Question'), { choice: b.choice, accountId: b.accountId, remember: b.remember === true, note: optionalText(b.note, 'Note', 500), date: b.date }, personAnswerer(c.actor as any)) }
 } }
 
 const confirmCommand: Command = { need: 'record', async run(c, b) {
@@ -70,6 +74,7 @@ const saveSettings: Command = { need: 'owner', async run(c, b) {
 export const questionCommands: Record<string, Command> = {
   ...accountantCommands,
   'question.answer': answerCommand,
+  'question.preview': previewCommand,
   'question.confirm': confirmCommand,
   'question.receipt': receiptCommand,
   'books-agent.run': runCommand,

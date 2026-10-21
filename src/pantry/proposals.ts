@@ -9,6 +9,8 @@ import { entryStatements, parseLines } from './journal'
 import { matchInput, matchPlan } from './matching'
 import { closeState } from './close'
 import type { Command, Context } from './context'
+import { projectedBooks } from './effects/projection'
+import { effectsGuard, previewEffects } from './effects/preview'
 
 type Ref = { kind: string; id: string; revision?: string }
 const REF_TABLES: Record<string, { table: string; revision: boolean }> = {
@@ -50,18 +52,23 @@ async function checkPayload(db: D1Database, actor: Actor, kind: string, payload:
   if (kind === 'match') {
     const input = matchInput(payload)
     requireThat(!input.create.some(x => x.type === 'receipt' || x.type === 'payment'), 'Propose receipts and payments as journal work; a match proposal may add only fees, bank income or transfers')
-    await matchPlan(db, actor, input)
+    await matchPlan(await projectedBooks(db, [], { unlocked: true }), actor, input)
     return { refs: [...input.bankLineIds.map(id => ({ kind: 'bank-line', id })), ...input.journalLineIds.map(id => ({ kind: 'journal-line', id }))] }
   }
   if (kind === 'journal') {
     // No source document means a missing-evidence item in a close packet, never an invented entry.
     requireThat(typeof payload.documentId === 'string' && payload.documentId, 'A proposed entry cites its source document; with none, propose a close packet listing the missing evidence', 400)
     const day = date(payload.date, 'Entry date')
-    await assertOpen(db, day)
     text(payload.memo, 'Description', 500)
-    await parseLines(db, payload.lines)
+    const lines = await parseLines(db, payload.lines)
+    const refs: Ref[] = [{ kind: 'document', id: payload.documentId }, ...lines.map(l => ({ kind: 'account', id: l.accountId }))]
+    if (payload.correctsEntryId) {
+      const original = await one(db, "SELECT id FROM pt_journal_entries WHERE id = ? AND status = 'posted'", text(payload.correctsEntryId, 'Original entry'))
+      requireThat(original, 'The correcting entry must link to a posted original', 409)
+      refs.push({ kind: 'journal', id: original.id })
+    }
     requireThat(Array.isArray(payload.passages) && payload.passages.length > 0 && payload.passages.every((p: unknown) => typeof p === 'string' && p.length <= 2000), 'Quote the source passages the entry relies on')
-    return { refs: [{ kind: 'document', id: payload.documentId }], day }
+    return { refs, day }
   }
   if (kind === 'close-packet') {
     const state = await closeState(db, text(payload.period, 'Period'))
@@ -97,6 +104,38 @@ export async function proposal(db: D1Database, id: string) {
   return { ...row, payload: JSON.parse(row.payload), refs: JSON.parse(row.refs) } as Data
 }
 
+/** Build the same posting plan for preview and approval; only its identifiers
+ * and audit timestamps differ. The approver's date applies to every new entry. */
+async function correctionPlan(db: D1Database, actor: Actor, p: Data, selectedDate?: string, preview = false) {
+  const reading = preview ? await projectedBooks(db, [], { unlocked: true }) : db
+  if (p.kind === 'journal') {
+    const day = date(selectedDate ?? p.payload.date, 'Correction date')
+    if (!preview) await assertOpen(db, day)
+    const lines = await parseLines(db, p.payload.lines), id = uid()
+    return { id, day, dates: [day], statements: entryStatements({ id, date: day, memo: text(p.payload.memo, 'Description', 500), sourceKind: 'manual', sourceId: p.payload.correctsEntryId ?? null,
+      preparedBy: `agent:${p.agent_name}`, preparedKind: 'agent', proposalId: p.id, documentId: p.payload.documentId, lines }, actor.email) }
+  }
+  const input = matchInput(p.payload)
+  const bankLines = await all(db, `SELECT posted_date FROM pt_bank_lines WHERE id IN (${input.bankLineIds.map(() => '?').join(',')})`, ...input.bankLineIds)
+  const day = date(selectedDate ?? p.payload.date ?? [...bankLines.map(l => l.posted_date), ...input.create.map(i => i.date).filter(Boolean)].sort().at(-1), 'Correction date')
+  const plan = await matchPlan(reading, actor, { ...input, create: input.create.map(i => ({ ...i, date: day })), proposalId: p.id })
+  return { ...plan, day, dates: plan.entryIds.length ? [day] : [], lockDates: bankLines.map(l => l.posted_date) }
+}
+
+export async function proposalEffects(db: D1Database, actor: Actor, p: Data, selectedDate?: string) {
+  requireThat(p.status === 'proposed', 'This proposal is already decided', 409)
+  requireThat(p.kind === 'journal' || p.kind === 'match', 'This proposal does not change the books')
+  const plan = await correctionPlan(db, actor, p, selectedDate, true)
+  return previewEffects(db, { proposal: p.id, revision: p.revision }, plan, plan.day)
+}
+
+const preview: Command = { need: 'record', async run(c, b) {
+  const p = await proposal(c.db, text(b.id, 'Proposal'))
+  requireThat(p.revision === b.revision, 'Proposal changed; reload', 409)
+  requireThat(await stillCurrent(c.db, p.refs), 'A cited record changed; the agent must prepare this proposal again', 409)
+  return { effects: await proposalEffects(c.db, c.actor, p, b.date ? date(b.date, 'Correction date') : undefined) }
+} }
+
 const decide: Command = { need: 'record', async run(c, b) {
   const p = await proposal(c.db, text(b.id, 'Proposal'))
   requireThat(p.status === 'proposed', 'This proposal is already decided', 409)
@@ -114,19 +153,26 @@ const decide: Command = { need: 'record', async run(c, b) {
     await run(c.db, [authority(c.actor, 'record'), ...mark('stale'), audit(who(c.actor), 'proposal.stale', 'proposal', p.id, { kind: p.kind })])
     throw new Fault(409, 'A record this proposal relies on has changed; the proposal is now stale and the agent must prepare it again')
   }
-  const agentEmail = `agent:${p.agent_name}`
+  let effectGuard: Sql[] = []
+  let correction: Awaited<ReturnType<typeof correctionPlan>> | undefined
+  if (p.kind === 'journal' || p.kind === 'match') {
+    if (p.kind === 'journal') requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || c.actor.grants.post), 'Posting is not part of your role', 403)
+    const effects = await proposalEffects(c.db, c.actor, p, b.date ? date(b.date, 'Correction date') : undefined)
+    requireThat(b.previewToken === effects.token, 'The books, locks, issued reports or correction date changed; review the effects again before approving', 409)
+    requireThat(!effects.locks.length, `Reopen ${effects.locks.map(l => l.name).join(', ')} before approving this correction, or choose an open correction date`, 409)
+    effectGuard = [effectsGuard(effects.auditCount)]
+    correction = await correctionPlan(c.db, c.actor, p, effects.date)
+  }
   if (p.kind === 'match') {
-    const plan = await matchPlan(c.db, c.actor, { ...matchInput(p.payload), proposalId: p.id })
-    await run(c.db, [authority(c.actor, 'record'), ...plan.statements, ...mark('approved', 'match', plan.id), audit(who(c.actor), 'proposal.approve', 'proposal', p.id, { kind: p.kind, match: plan.id })])
+    const plan = correction!
+    await run(c.db, [authority(c.actor, 'record'), ...effectGuard, ...plan.statements, ...mark('approved', 'match', plan.id), audit(who(c.actor), 'proposal.approve', 'proposal', p.id, { kind: p.kind, match: plan.id, correctionDate: plan.day, previewToken: b.previewToken })])
   } else if (p.kind === 'journal') {
     // Approving a proposed entry is posting it: it needs the posting grant.
     requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || c.actor.grants.post), 'Posting is not part of your role', 403)
-    const day = date(p.payload.date, 'Entry date')
-    await assertOpen(c.db, day)
-    const lines = await parseLines(c.db, p.payload.lines), id = uid()
+    const plan = correction!, id = plan.id
     await run(c.db, [authority(c.actor, 'post'),
-      ...entryStatements({ id, date: day, memo: text(p.payload.memo, 'Description', 500), sourceKind: 'manual', preparedBy: agentEmail, preparedKind: 'agent', proposalId: p.id, documentId: p.payload.documentId, lines }, c.actor.email),
-      ...mark('approved', 'journal', id), audit(who(c.actor), 'journal.post', 'journal', id, { proposal: p.id, preparedBy: agentEmail })])
+      ...effectGuard, ...plan.statements,
+      ...mark('approved', 'journal', id), audit(who(c.actor), 'journal.post', 'journal', id, { proposal: p.id, preparedBy: `agent:${p.agent_name}`, correctionDate: plan.day, previewToken: b.previewToken })])
   } else if (p.kind === 'close-packet') {
     const period = text(p.payload.period, 'Period'), state = await closeState(c.db, period)
     requireThat(state.status !== 'locked', `${period} is locked`, 409)
@@ -144,7 +190,7 @@ const decide: Command = { need: 'record', async run(c, b) {
   return proposal(c.db, p.id)
 } }
 
-export const proposalCommands: Record<string, Command> = { 'proposal.decide': decide }
+export const proposalCommands: Record<string, Command> = { 'proposal.preview': preview, 'proposal.decide': decide }
 
 export async function proposalsView(db: D1Database) {
   const rows = await all(db, 'SELECT p.*, a.name AS agent_name FROM pt_proposals p JOIN pt_agents a ON a.id = p.agent_id ORDER BY CASE p.status WHEN \'proposed\' THEN 0 ELSE 1 END, p.created_at DESC, p.id LIMIT 200')

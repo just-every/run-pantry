@@ -127,7 +127,8 @@ test('AUDIT-001 / PAN-10 a journal entry posts balanced, approved by someone oth
 
   // Agent preparation and the human approval are separate, connected events.
   const proposed = await agent.call('proposals', { kind: 'journal', summary: 'Accrue documented legal work', payload: { date: '2026-09-30', memo: 'Agent-prepared legal accrual', documentId: doc.id, passages: ['September legal work, $900'], lines: [{ accountId: acct['6500'], debit: '900.00' }, { accountId: acct['3000'], credit: '900.00' }] } })
-  const decided = await h.command('proposal.decide', { id: proposed.id, revision: proposed.revision, decision: 'approve' }, ann)
+  const preview = await h.command('proposal.preview', { id: proposed.id, revision: proposed.revision }, ann)
+  const decided = await h.command('proposal.decide', { id: proposed.id, revision: proposed.revision, decision: 'approve', previewToken: preview.effects.token }, ann)
   const agentEvent = at((await h.view(`activity?record=${proposed.id}`)).audit, a => a.action === 'proposal.file')
   assert.equal(agentEvent.actor_kind, 'agent'); assert.equal(agentEvent.subject_revision, proposed.revision)
   const agentPosting = at((await h.view(`activity?record=${decided.result_id}`)).audit, a => a.action === 'journal.post')

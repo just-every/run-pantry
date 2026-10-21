@@ -56,10 +56,13 @@ test('PAN-13 a period closes through its checklist and lock; locked dates refuse
   await h.command('bill.save', { vendorId: s.c['Harbor Office Rentals'].id, reference: 'LATE-1', billDate: '2026-09-15', lines: [{ description: 'Late bill', accountId: s.acct['6500'], amount: '40.00' }] }, bea, 409)
   // The database refuses too, whatever the caller.
   await assert.rejects(h.db.batch([h.db.prepare("INSERT INTO pt_journal_entries (id, entry_date, memo, source_kind, status, prepared_by, prepared_kind, revision, created_at) VALUES ('x', '2026-09-15', 'x', 'manual', 'draft', 'x', 'person', 'r', 'now')")]), /PANTRY_PERIOD_LOCKED/)
-  // Agents: a proposal dated in the locked month is refused when filed.
+  // Agents can propose a locked correction to preview its effects; approval still requires reopening or an open correction date.
   const agent = await h.agent()
   const doc = await h.command('document.upload', { name: 'late.txt', mediaType: 'text/plain', base64: Buffer.from('Late invoice dated 2026-09-28, $40').toString('base64') })
-  await agent.call('proposals', { kind: 'journal', summary: 'Late accrual', payload: { date: '2026-09-28', memo: 'Late accrual', documentId: doc.id, passages: ['$40'], lines: [{ accountId: s.acct['6500'], debit: '40.00' }, { accountId: s.acct['3000'], credit: '40.00' }] } }, 409)
+  const correction = await agent.call('proposals', { kind: 'journal', summary: 'Late accrual', payload: { date: '2026-09-28', memo: 'Late accrual', documentId: doc.id, passages: ['$40'], lines: [{ accountId: s.acct['6500'], debit: '40.00' }, { accountId: s.acct['3000'], credit: '40.00' }] } })
+  const correctionPreview = await h.command('proposal.preview', {id:correction.id,revision:correction.revision})
+  assert.ok(correctionPreview.effects.locks.some(l=>l.id==='2026-09'))
+  await h.command('proposal.decide', {id:correction.id,revision:correction.revision,decision:'approve',previewToken:correctionPreview.effects.token},h.owner,409)
   // October stays open.
   await h.command('journal.save-draft', { date: '2026-10-01', memo: 'October accrual', lines: [{ accountId: s.acct['6500'], debit: '10.00' }, { accountId: s.acct['3000'], credit: '10.00' }] }, bea)
   // Reopening: requested with a reason, approved by someone else with the grant.

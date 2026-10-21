@@ -7,6 +7,7 @@ import { Link } from '@tanstack/react-router'
 import { Action, Card, Chip, command, day, Field, Loading, PageHead, readFileBase64, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
 import { AssignAccountant } from './ask-accountant'
+import { QuestionApproval } from './proposals'
 
 const STATUS: Record<string, [string, 'warn' | 'agent' | 'good' | 'neutral']> = {
   open: ['Open', 'warn'], confirm: ['Waiting for your yes', 'agent'], filed: ['Filed', 'good'], answered: ['Answered', 'good'], dismissed: ['Not a problem', 'neutral'], resolved: ['Settled itself', 'neutral'],
@@ -49,23 +50,22 @@ export function QuestionCard({ q, onDone, focused = false, compact = false, acco
       <Field label="Your answer" name={`words-${q.id}`} type="textarea" value={words} maxLength={2000} onChange={(e: any) => setWords(e.target.value)} hint="Your answer is kept with this record and settles the question. It does not post an entry." />
       <Action tone="primary" disabled={!words.trim()} run={async () => { await send({ words }); setWords('') }}>Save answer</Action>
     </div> : q.status === 'confirm' ? <div className="callout" role="status"><Icon name="agent" /><div>
-      <strong>You said: “{q.pending.read}”</strong><span>Pantry reads that as <b>{q.pending.label}</b>. {q.pending.effect}{q.pending.remember ? ' And from now on, the same for this payee (a bank rule).' : ''}</span>
-      <div className="row-actions small"><Action tone="primary" run={async () => { await command('question.confirm', { id: q.id, yes: true }); await onDone() }}>Yes, do it</Action><Action run={async () => { await command('question.confirm', { id: q.id, yes: false }); await onDone() }}>Not that</Action></div>
+      <strong>You said: “{q.pending.read}”</strong><span>Pantry reads that as <b>{q.pending.label}</b>. {q.pending.effects ? 'Review the current report effects below.' : q.pending.effect}{q.pending.remember ? ' And from now on, the same for this payee (a bank rule).' : ''}</span>
+      {q.pending.effects ? <QuestionApproval q={q} answer={{ choice: q.pending.choice, accountId: q.pending.accountId, remember: q.pending.remember, note: q.pending.note }} label="Yes, do it" onDone={onDone} /> : <Action tone="primary" run={async () => { await command('question.confirm', { id: q.id, yes: true }); await onDone() }}>Yes, do it</Action>}
+      <Action run={async () => { await command('question.confirm', { id: q.id, yes: false }); await onDone() }}>Not that</Action>
     </div></div> : <>
       {q.choices.length > 0 && <fieldset className="choices"><legend>{q.kind === 'missing-receipt' ? 'If there is no receipt' : 'What was it?'}</legend>
         {q.choices.map((c: D, i: number) => <label key={c.id} className={`choice${pick === c.id ? ' picked' : ''}`}>
           <input type="radio" name={`q-${q.id}`} value={c.id} checked={pick === c.id} onChange={() => { setPick(c.id); setOther('') }} />
-          <span><strong>{i + 1}. {c.label}</strong>{pick === c.id && <small>{c.effect}</small>}</span>
+          <span><strong>{i + 1}. {c.label}</strong>{pick === c.id && <small>{FILES.includes(c.action.type) ? 'Review the current report effects below before filing.' : c.effect}</small>}</span>
         </label>)}
       </fieldset>}
       {lineQuestion && <Field label="Something else: file it to" name={`other-${q.id}`} value={other} onChange={(e: any) => { setOther(e.target.value); setPick('') }} empty="Choose a category…" options={categories.map((a: D) => ({ value: a.id, label: `${a.code} · ${a.name}` }))} />}
       {(choice || other) && <div className="change">
         {choice?.note && <Field label={choice.note} name={`note-${q.id}`} value={note} onChange={(e: any) => setNote(e.target.value)} required />}
         {(choice?.learn || other) && <label className="remember"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} /> Always file this payee the same way (Pantry makes a bank rule)</label>}
-        <div className="row-actions small">
-          <Action tone="primary" run={() => send(choice ? { choice: choice.id, remember, note } : { accountId: other, remember })}>{choice ? doLabel(choice) : 'File it'}</Action>
-          <span className="hint">Nothing changes until you choose this.</span>
-        </div>
+        {other || (choice && FILES.includes(choice.action.type)) ? <QuestionApproval q={q} answer={choice ? { choice: choice.id, remember, note } : { accountId: other, remember }} label={choice ? doLabel(choice) : 'File it'} onDone={onDone} /> : <div className="row-actions small"><Action tone="primary" run={() => send({ choice: choice.id, remember, note })}>{doLabel(choice)}</Action></div>}
+        <span className="hint">Nothing changes until you choose this.</span>
       </div>}
       {q.kind === 'missing-receipt' && <ReceiptUpload q={q} onDone={onDone} />}
       {!compact && <div className="own-words">

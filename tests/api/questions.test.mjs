@@ -73,6 +73,8 @@ test('BOOKS-AGENT the agent asks the owner what does not add up, by email first;
   q = at((await h.view('questions')).open, x => x.id === stripe.id)
   assert.equal(q.status, 'confirm')
   assert.equal(q.pending.accountId, s.acct['4000'])
+  assert.equal(q.pending.effects.netIncome.after - q.pending.effects.netIncome.before, 125000)
+  assert.equal(q.pending.effects.bases.accrual.after.cashFlow.ties, true)
   assert.equal(await entries(), posted, 'nothing is filed before the yes')
   const confirmMail = h.mail.findLast(m => m.subject.includes(stripe.ref))
   assert.match(confirmMail.text, /Reply YES/)
@@ -98,9 +100,12 @@ test('BOOKS-AGENT the agent asks the owner what does not add up, by email first;
 
   // In the app: a chosen answer files it without a rule unless asked; a receipt question takes the file.
   const adobe = at((await h.view('questions')).open, x => x.kind === 'unfiled' && x.record_date === '2026-10-02')
-  const filed = await h.command('question.answer', { id: adobe.id, accountId: s.acct['6200'] })
+  const effects = (await h.command('question.preview', { id: adobe.id, accountId: s.acct['6200'] })).effects
+  assert.equal(effects.netIncome.after - effects.netIncome.before, adobe.amount_cents)
+  const filed = await h.command('question.answer', { id: adobe.id, accountId: s.acct['6200'], date: effects.date, previewToken: effects.token })
   assert.equal(filed.question.status, 'filed')
   assert.equal(filed.question.rule_id, null)
+  assert.equal((await h.view('reports/profit-and-loss?from=2026-10-01&to=2026-10-31&basis=accrual')).netIncome, effects.netIncome.after)
   const harbor = at((await h.view('questions')).open, x => x.subject_id === s.bills.harbor.id)
   await h.command('question.receipt', { id: harbor.id, name: 'harbor-lease.pdf', mediaType: 'application/pdf', base64: Buffer.from('%PDF-1.4 lease').toString('base64') })
   assert.ok((await h.view('documents')).documents.some(d => d.name === 'harbor-lease.pdf' && d.linked_id === s.bills.harbor.id))
@@ -161,6 +166,26 @@ test('REPORT-005 / CLOSE-003 / ACCOUNTANT questions carry their entry or report,
   await h.command('question.assign', { id: deposit.id, assignee: 'jordan@example.test' })
   const routed = h.mail.findLast(m => m.subject.includes(deposit.ref))
   assert.deepEqual([routed.to].flat(), ['jordan@example.test'])
+  // Matching a recorded posting adds no ledger activity; paying the open bill
+  // projects its real payment-basis reports, including unknown 1099 methods.
+  let pending = (await h.view('questions')).open
+  const recorded = at(pending, q => q.subject_kind === 'bank-line' && q.choices.some(c => c.action.type === 'posting'))
+  const posting = recorded.choices.find(c => c.action.type === 'posting')
+  const matchEffects = (await h.command('question.preview', { id: recorded.id, choice: posting.id }, accountant)).effects
+  assert.deepEqual(matchEffects.bases.accrual.before, matchEffects.bases.accrual.after)
+  await h.command('question.answer', { id: recorded.id, choice: posting.id, date: matchEffects.date, previewToken: matchEffects.token }, accountant)
+  await h.command('contractor.save', { contactId: s.c['Brightline Software'].id, is1099: true })
+  pending = (await h.view('questions')).open
+  const payable = at(pending, q => q.subject_kind === 'bank-line' && q.choices.some(c => c.action.type === 'bill'))
+  const bill = payable.choices.find(c => c.action.type === 'bill')
+  const paidEffects = (await h.command('question.preview', { id: payable.id, choice: bill.id }, accountant)).effects
+  const before1099 = paidEffects.bases.accrual.before.contractors.vendors.find(v => v.id === s.c['Brightline Software'].id)
+  const after1099 = paidEffects.bases.accrual.after.contractors.vendors.find(v => v.id === before1099.id)
+  assert.equal(after1099.unrecorded - before1099.unrecorded, 64000)
+  assert.equal(paidEffects.bases.cash.after.profitAndLoss.netIncome - paidEffects.bases.cash.before.profitAndLoss.netIncome, -64000)
+  await h.command('question.answer', { id: payable.id, choice: bill.id, date: paidEffects.date, previewToken: paidEffects.token }, accountant)
+  const taxYear = await h.view('reports/contractors?year=2026')
+  assert.equal(taxYear.contractors.find(v => v.id === before1099.id).unrecorded, after1099.unrecorded)
   // The tax reports carry their server-resolved figure too, without copying tax identifiers.
   await h.command('contractor.save', { contactId: s.c['Harbor Office Rentals'].id, is1099: true })
   for (const scope of [

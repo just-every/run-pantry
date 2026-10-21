@@ -6,14 +6,16 @@
 // a yes. Nothing is ever filed without the owner's answer.
 import type { Bindings } from '../../auth.server'
 import { authority, allowed, who, type Person } from '../access'
-import { now, optionalText, requireThat, text, uid } from '../core'
+import { date, now, optionalText, requireThat, text, uid, usd, type Data } from '../core'
 import { all, audit, changed, guard, one, q, run, type AuditActor, type Sql } from '../db'
 import { documentInsert } from '../contacts'
 import { matchInput, matchPlan } from '../matching'
-import { applyRules, newRuleStatements, payeeKey } from '../rules'
+import { newRuleStatements, payeeKey } from '../rules'
 import { categoryEffect, NetIncome, type Choice } from './checks'
 import { modelState, ModelError, readAnswer, type Reading } from './model'
 import { AGENT, OPEN, question, say, type Question } from './store'
+import { projectedBooks } from '../effects/projection'
+import { effectsGuard, previewEffects } from '../effects/preview'
 
 /** Who answered and the authority their write carries: a signed-in person, or the owner by email. */
 export type Answerer = { person: Person; audit: AuditActor; authority: (need: 'record' | 'post') => Sql; via: 'app' | 'email' }
@@ -39,7 +41,8 @@ export async function memberByEmail(db: D1Database, email: string): Promise<Answ
   } }
 }
 
-export type Answer = { choice?: string | null; accountId?: string | null; remember?: boolean; note?: string; document?: { name: string; mediaType: string; bytes: Uint8Array } | null; words?: string }
+export type Answer = { choice?: string | null; accountId?: string | null; remember?: boolean; note?: string; date?: string; previewToken?: string; document?: { name: string; mediaType: string; bytes: Uint8Array } | null; words?: string }
+export const filesBooks = (c: Choice) => ['category', 'invoice', 'bill', 'transfer', 'posting'].includes(c.action.type)
 
 /** The question's offered answer, or a category the owner picked for a transaction ("something else"). */
 async function chosen(db: D1Database, qn: Question, a: Answer): Promise<Choice> {
@@ -60,20 +63,54 @@ const settle = (qn: Question, status: string, by: Answerer, answer: string, resu
 ]
 
 /** File the bank line the way the answer says: one match with the new entry or payment it needs. */
-async function fileLine(db: D1Database, qn: Question, c: Choice, by: Answerer) {
+async function fileLine(db: D1Database, qn: Question, c: Choice, by: Answerer, selectedDate?: string, preview = false) {
   const line = await one(db, 'SELECT * FROM pt_bank_lines WHERE id = ?', qn.subject_id)
   requireThat(line && !line.removed_at, 'The bank removed this transaction', 409)
   const abs = Math.abs(line.amount_cents), amount = (abs / 100).toFixed(2), into = line.amount_cents > 0, a = c.action
-  if (a.type === 'posting') return matchPlan(db, by.person, { ...matchInput({ bankLineIds: [line.id], journalLineIds: [a.journalLineId], note: `Answer to Pantry's question: ${c.label}` }), proposalId: null })
+  const day = date(selectedDate ?? line.posted_date, 'Correction date')
+  const reading = preview ? await projectedBooks(db, [], { unlocked: true }) : db
+  if (a.type === 'posting') return { ...await matchPlan(reading, by.person, { ...matchInput({ bankLineIds: [line.id], journalLineIds: [a.journalLineId], note: `Answer to Pantry's question: ${c.label}` }), proposalId: null }), day, dates: [], lockDates: [line.posted_date] }
   const item = a.type === 'category' ? { type: into ? 'income' : 'fee', amount, accountId: a.accountId, direction: into ? 'in' : 'out', memo: line.description }
-    : a.type === 'invoice' ? { type: 'receipt', amount, contactId: a.contactId, date: line.posted_date, reference: line.reference, allocations: [{ targetId: a.invoiceId, amount }] }
-    : a.type === 'bill' ? { type: 'payment', amount, contactId: a.contactId, date: line.posted_date, reference: line.reference, allocations: [{ targetId: a.billId, amount }] }
+    : a.type === 'invoice' ? { type: 'receipt', amount, contactId: a.contactId, date: day, reference: line.reference, allocations: [{ targetId: a.invoiceId, amount }] }
+    : a.type === 'bill' ? { type: 'payment', amount, contactId: a.contactId, date: day, reference: line.reference, allocations: [{ targetId: a.billId, amount }] }
     : a.type === 'transfer' ? { type: 'transfer', amount, otherBankAccountId: a.otherBankAccountId, direction: into ? 'in' : 'out', memo: line.description } : null
   requireThat(item, 'This answer does not file a transaction')
-  return matchPlan(db, by.person, { ...matchInput({ bankLineIds: [line.id], create: [item], note: `Answer to Pantry's question: ${c.label}` }), proposalId: null })
+  return { ...await matchPlan(reading, by.person, { ...matchInput({ bankLineIds: [line.id], create: [{ ...item, date: day }], note: `Answer to Pantry's question: ${c.label}` }), proposalId: null }), day, dates: [day], lockDates: [line.posted_date] }
 }
 
-/** A rule for this payee and direction filing to the chosen category, then every open line it matches. */
+export async function questionEffects(db: D1Database, id: string, a: Answer, by: Answerer) {
+  const qn = await question(db, id)
+  requireThat(OPEN.includes(qn.status), 'This question is already answered', 409)
+  const c = await chosen(db, qn, a)
+  requireThat(filesBooks(c), 'This answer changes no financial report')
+  const plan = await fileLine(db, qn, c, by, a.date, true)
+  return previewEffects(db, { question: qn.id, revision: qn.revision, choice: c.id, remember: !!a.remember, note: optionalText(a.note, 'Note', 500) }, plan, plan.day)
+}
+
+/** The financial summary carried by an email confirmation as well as its app card. */
+export function effectMessage(e: Data) {
+  const { before: b, after: a } = e.bases.accrual
+  const changedRows = (before: Data[], after: Data[], field: string) => {
+    const byId = new Map(before.map(r => [r.id ?? r.state, r])), toId = new Map(after.map(r => [r.id ?? r.state, r]))
+    return [...new Set([...byId.keys(), ...toId.keys()])].map(id => {
+      const was = byId.get(id), next = toId.get(id), from = was?.[field] ?? 0, to = next?.[field] ?? 0
+      return from === to ? '' : `${(next ?? was)!.name ?? id}: ${usd(from)} → ${usd(to)}`
+    }).filter(Boolean).join('; ') || 'no change'
+  }
+  const opening = changedRows(b.nextOpening.rows, a.nextOpening.rows, 'net')
+  return ` Correction date ${e.date}. Net income ${usd(b.profitAndLoss.netIncome)} → ${usd(a.profitAndLoss.netIncome)}; trial balance debits ${usd(b.trialBalance.debit)} → ${usd(a.trialBalance.debit)} and credits ${usd(b.trialBalance.credit)} → ${usd(a.trialBalance.credit)}; assets ${usd(b.balanceSheet.totalAssets)} → ${usd(a.balanceSheet.totalAssets)}, liabilities ${usd(b.balanceSheet.totalLiabilities)} → ${usd(a.balanceSheet.totalLiabilities)}, equity ${usd(b.balanceSheet.totalEquity)} → ${usd(a.balanceSheet.totalEquity)}; cash change ${usd(b.cashFlow.netChange)} → ${usd(a.cashFlow.netChange)}; sales tax liability ${usd(b.salesTax.ledger.accounts.reduce((n: number, r: Data) => n + r.closing, 0))} → ${usd(a.salesTax.ledger.accounts.reduce((n: number, r: Data) => n + r.closing, 0))}; 1099 total ${usd(b.contractors.total)} → ${usd(a.contractors.total)}.` +
+    `\nTrial balance changes: ${changedRows(b.trialBalance.rows, a.trialBalance.rows, 'net')}.` +
+    `\nP&L changes: ${changedRows([...b.profitAndLoss.income, ...b.profitAndLoss.expenses], [...a.profitAndLoss.income, ...a.profitAndLoss.expenses], 'amount')}.` +
+    `\nBalance sheet changes: ${changedRows([...b.balanceSheet.assets, ...b.balanceSheet.liabilities, ...b.balanceSheet.equity], [...a.balanceSheet.assets, ...a.balanceSheet.liabilities, ...a.balanceSheet.equity], 'amount')}.` +
+    `\nCash flow changes: ${changedRows([...b.cashFlow.operating, ...b.cashFlow.investing, ...b.cashFlow.financing], [...a.cashFlow.operating, ...a.cashFlow.investing, ...a.cashFlow.financing], 'amount')}.` +
+    `\nSales tax changes: ${changedRows(b.salesTax.ledger.accounts, a.salesTax.ledger.accounts, 'closing')}.` +
+    `\n1099 changes: ${changedRows(b.contractors.vendors, a.contractors.vendors, 'box1')}; payment method unrecorded: ${changedRows(b.contractors.vendors, a.contractors.vendors, 'unrecorded')}.` +
+    `\nNext opening balances (${a.nextOpening.date}): ${opening}.` +
+    (e.locks.length ? ` Reopening required: ${e.locks.map((l: Data) => l.name).join(', ')}.` : '') + (e.issued.length ? ` Issued copies affected: ${e.issued.map((i: Data) => i.name).join(', ')}.` : '')
+}
+
+/** A rule for future arrivals from this payee. Existing open lines retain their
+ * own questions and previews; approving this answer posts only this answer. */
 async function learn(db: D1Database, qn: Question, accountId: string, by: Answerer) {
   const line = (await one(db, 'SELECT * FROM pt_bank_lines WHERE id = ?', qn.subject_id))!, key = payeeKey(line)
   if (!key) return null
@@ -82,9 +119,7 @@ async function learn(db: D1Database, qn: Question, accountId: string, by: Answer
   const rule = await newRuleStatements(db, { name: `${payee} → ${account.name}`.slice(0, 120), payee, direction: line.amount_cents < 0 ? 'out' : 'in', splits: [{ accountId, percent: '100' }] }, by.audit)
   await run(db, [by.authority('record'), ...rule.statements, q('UPDATE pt_questions SET rule_id = ? WHERE id = ?', rule.id, qn.id),
     say(qn.id, AGENT.email, 'agent', `Learned: a bank rule now files ${payee} ${line.amount_cents < 0 ? 'payments' : 'deposits'} to ${account.name}. Undo any filing, or retire the rule, in Bank → Rules.`)])
-  const open = await all(db, `SELECT l.id FROM pt_bank_lines l WHERE l.removed_at IS NULL AND l.rules_off = 0 AND NOT EXISTS (SELECT 1 FROM pt_match_bank_lines m WHERE m.bank_line_id = l.id AND m.active = 1)`)
-  const filed = await applyRules(db, open.map(l => l.id), () => ({ actor: by.audit, authority: by.authority('record') }))
-  return { id: rule.id, filed: filed.filed }
+  return { id: rule.id }
 }
 
 /** Apply a definite answer. Returns the question as it now stands. */
@@ -106,8 +141,12 @@ export async function answer(env: Bindings, db: D1Database, id: string, a: Answe
   const base = (status: string, result: { kind?: string; id?: string } = {}) => [...settle(qn, status, by, said, result), say(qn.id, by.audit.email, by.via, a.words ? `${a.words}` : said)]
   switch (c.action.type) {
     case 'category': case 'invoice': case 'bill': case 'transfer': case 'posting': {
-      const plan = await fileLine(db, qn, c, by)
-      await run(db, [by.authority('record'), ...plan.statements, ...base('filed', { kind: 'match', id: plan.id }), say(qn.id, AGENT.email, 'agent', `Filed: ${c.effect}`),
+      if (by.via === 'email' && !a.previewToken) return (await awaitYes(db, qn, a.words || said, { choice: c.id, accountId: null, remember: !!a.remember, note }, by)).question
+      const effects = await questionEffects(db, id, a, by)
+      requireThat(a.previewToken === effects.token, 'The books, locks, issued reports or correction date changed; review the effects again before filing', 409)
+      requireThat(!effects.locks.length, `Reopen ${effects.locks.map(l => l.name).join(', ')} before filing`, 409)
+      const plan = await fileLine(db, qn, c, by, effects.date)
+      await run(db, [by.authority('record'), effectsGuard(effects.auditCount), ...plan.statements, ...base('filed', { kind: 'match', id: plan.id }), say(qn.id, AGENT.email, 'agent', `Filed: ${c.label}.${effectMessage(effects)}`),
         audit(by.audit, 'question.answer', 'question', qn.id, { kind: qn.kind, via: by.via, answer: c.label, match: plan.id })])
       if (a.remember && c.action.type === 'category' && c.learn) await learn(db, qn, c.action.accountId, by)
       break
@@ -162,10 +201,17 @@ export async function hear(env: Bindings, db: D1Database, id: string, words: str
 /** The owner's words, read into one answer that waits for their yes. */
 export async function awaitYes(db: D1Database, qn: Question, said: string, read: Omit<Reading, 'understood'>, by: Answerer): Promise<Heard> {
   const c = await chosen(db, qn, { choice: read.choice, accountId: read.accountId })
-  const pending = { choice: read.choice, accountId: read.accountId, remember: read.remember && !!c.learn, note: read.note, read: said, label: c.label, effect: c.effect }
-  const message = `I read that as: ${c.label}. ${c.effect}${pending.remember ? ' And from now on, the same for this payee.' : ''} Nothing changes until you say yes.`
+  const pending: Data = { choice: read.choice, accountId: read.accountId, remember: read.remember && !!c.learn, note: read.note, read: said, label: c.label, effect: c.effect }
+  let message = `I read that as: ${c.label}. ${c.effect}${pending.remember ? ' And from now on, the same for this payee.' : ''} Nothing changes until you say yes.`
   await run(db, [by.authority('record'), q("UPDATE pt_questions SET status = 'confirm', pending = ?, revision = ? WHERE id = ? AND revision = ?", JSON.stringify(pending), uid(), qn.id, qn.revision), changed(),
     say(qn.id, by.audit.email, by.via, said), say(qn.id, AGENT.email, 'agent', message), audit(AGENT, 'question.read', 'question', qn.id, { via: by.via, read: c.label })])
+  if (filesBooks(c)) {
+    pending.effects = await questionEffects(db, qn.id, pending, by)
+    pending.date = pending.effects.date; pending.previewToken = pending.effects.token
+    message += effectMessage(pending.effects)
+    const current = await question(db, qn.id)
+    await run(db, [by.authority('record'), q("UPDATE pt_questions SET pending = ? WHERE id = ? AND revision = ? AND status = 'confirm'", JSON.stringify(pending), qn.id, current.revision), changed()])
+  }
   return { result: 'confirm', question: await question(db, qn.id), message }
 }
 
@@ -179,5 +225,9 @@ export async function confirm(env: Bindings, db: D1Database, id: string, yes: bo
     return question(db, id)
   }
   const p = qn.pending
-  return answer(env, db, id, { choice: p.choice, accountId: p.accountId, remember: p.remember, note: p.note, words: by.via === 'email' ? 'Yes' : undefined }, by)
+  if (by.via === 'email' && p.effects) {
+    const current = await questionEffects(db, id, p, by)
+    if (current.token !== p.previewToken) return (await awaitYes(db, qn, p.read, { choice: p.choice, accountId: p.accountId, remember: p.remember, note: p.note }, by)).question
+  }
+  return answer(env, db, id, { choice: p.choice, accountId: p.accountId, remember: p.remember, note: p.note, date: p.date, previewToken: p.previewToken, words: by.via === 'email' ? 'Yes' : undefined }, by)
 }

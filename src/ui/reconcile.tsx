@@ -6,6 +6,7 @@ import { Action, Card, Chip, command, Details, Field, Loading, Metrics, accountO
 import { RecordedPaymentProposal } from './recorded-payment-proposal'
 import { DepositProposal } from './deposit-proposal'
 import { ReconciliationUndo } from './reconciliation-undo'
+import { ProposalApproval } from './proposals'
 import { Icon } from './icons'
 
 type NewItem = { type: string; amount: string; accountId?: string; contactId?: string; otherBankAccountId?: string; direction?: string; memo?: string; allocations?: Record<string, string> }
@@ -92,12 +93,9 @@ function Applies({ it, open, applied, onChange }: { it: NewItem; open: D[]; appl
 function Proposed({ p, onDone }: { p: D; onDone: () => Promise<void> }) {
   return <Card title={<><Icon name="agent" /> Match proposed by {p.agent_name}</>} className="match-panel">
     <p>{p.summary}</p>
-    <p className="hint">Used {p.payload.bankLineIds.length} statement line{p.payload.bankLineIds.length === 1 ? '' : 's'} and {p.payload.journalLineIds.length} ledger posting{p.payload.journalLineIds.length === 1 ? '' : 's'}{p.payload.create?.length ? `, adding ${p.payload.create.length} bank item${p.payload.create.length === 1 ? '' : 's'}` : ''}. Approving re-checks every one of them.</p>
-    <div className="row-actions">
-      <Action tone="primary" run={async () => { await command('proposal.decide', { id: p.id, revision: p.revision, decision: 'approve' }); await onDone() }}>Approve match</Action>
-      <Action run={async () => { await command('proposal.decide', { id: p.id, revision: p.revision, decision: 'reject' }); await onDone() }}>Reject</Action>
-    </div>
-    <Details facts={{ proposal: p.id, 'statement lines': p.payload.bankLineIds.join(', '), postings: p.payload.journalLineIds.join(', ') }} />
+    <p className="hint">Used {p.payload.bankLineIds.length} statement line{p.payload.bankLineIds.length === 1 ? '' : 's'} and {(p.payload.journalLineIds ?? []).length} ledger posting{(p.payload.journalLineIds ?? []).length === 1 ? '' : 's'}{p.payload.create?.length ? `, adding ${p.payload.create.length} bank item${p.payload.create.length === 1 ? '' : 's'}` : ''}. Approving re-checks every one of them.</p>
+    <ProposalApproval p={p} onDone={onDone} approveLabel="Approve match" />
+    <Details facts={{ proposal: p.id, 'statement lines': p.payload.bankLineIds.join(', '), postings: (p.payload.journalLineIds ?? []).join(', ') }} />
   </Card>
 }
 

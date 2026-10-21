@@ -2,6 +2,7 @@
 import { useRef } from 'react'
 import { Action, Card, Chip, command, Details, Empty, Field, FileLink, Form, Loading, PageHead, Table, day, readFileBase64, usd, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
+import { ProposalApproval } from './proposals'
 
 const KIND: Record<string, string> = { match: 'Bank match', journal: 'Journal entry', 'close-packet': 'Close packet', 'variance-note': 'Variance explanation' }
 
@@ -13,7 +14,7 @@ function ProposalBody({ p, accounts }: { p: D; accounts: D[] }) {
   </>
   if (p.kind === 'close-packet') return <ul>{p.payload.exceptions.map((e: string, i: number) => <li key={i}>{e}</li>)}</ul>
   if (p.kind === 'variance-note') return <><p>{p.payload.body}</p><p className="hint">Explanation only: it cites {p.payload.citations.length} posted entries and changes no figure.</p></>
-  return <p className="hint">{p.payload.bankLineIds.length} statement line(s) to {p.payload.journalLineIds.length} posting(s). Review it on the statement in Bank.</p>
+  return <p className="hint">{p.payload.bankLineIds.length} statement line(s) to {(p.payload.journalLineIds ?? []).length} posting(s). Review it on the statement in Bank.</p>
 }
 
 export function Agents() {
@@ -26,10 +27,7 @@ export function Agents() {
     {waiting.map((p: D) => <Card key={p.id} title={<><Icon name="agent" /> {KIND[p.kind]} from {p.agent_name}</>} actions={<Chip tone="agent">Proposed</Chip>}>
       <p><strong>{p.summary}</strong></p>
       <ProposalBody p={p} accounts={shared.state.accounts} />
-      {shared.state.actor.can.record && <div className="row-actions">
-        <Action tone="primary" run={async () => { await command('proposal.decide', { id: p.id, revision: p.revision, decision: 'approve' }); await reload(); await shared.reload() }}>{p.kind === 'journal' ? 'Approve and post' : 'Approve'}</Action>
-        <Action run={async () => { await command('proposal.decide', { id: p.id, revision: p.revision, decision: 'reject' }); await reload() }}>Reject</Action>
-      </div>}
+      <ProposalApproval p={p} canApprove={shared.state.actor.can.record} onDone={async()=>{await reload();await shared.reload()}} />
       <Details facts={{ id: p.id, filed: p.created_at, cited: p.refs.map((r: D) => `${r.kind}:${r.id}`).join(', ') }} />
     </Card>)}
     {decided.length > 0 && <Card title="Decided"><Table heads={['Filed', 'Kind', 'Summary', 'Decision', 'By']}>

@@ -12,7 +12,7 @@ import { ownerEmail } from '../access'
 import { now, uid, type Data } from '../core'
 import { all, one, q, run } from '../db'
 import { pantryAddress } from '../receipts/mail'
-import { answer, confirm, hear, ownerByEmail, memberByEmail } from './answer'
+import { answer, confirm, hear, ownerByEmail, memberByEmail, effectMessage } from './answer'
 import { AGENT, OPEN, parse, say, type Question } from './store'
 
 type MailResult = { status: 'accepted' | 'rejected' | 'rate_limited' | 'uncertain' | 'development'; provider: string; providerMessageId: string | null; code?: string }
@@ -127,6 +127,10 @@ export async function receiveReply(env: Bindings, raw: Uint8Array): Promise<Repl
   if (file) { await answer(env, db, qn.id, { document: { name: file.filename || 'receipt', mediaType: file.contentType, bytes: file.content }, note: words.slice(0, 500) }, by); return { result: 'filed', question: qn.id } }
   if (qn.status === 'confirm' && /^(yes|y|yep|yeah|ok|okay|sure|do it|file it|approve)\b/i.test(words)) {
     const done = await confirm(env, db, qn.id, true, by)
+    if (done.status === 'confirm') {
+      await emailConfirmation(env, db, done, `The books changed since the last preview. Review the updated effects before saying yes.${effectMessage(done.pending!.effects)}`)
+      return { result: 'confirm', question: qn.id }
+    }
     return { result: done.status === 'filed' ? 'filed' : 'answered', question: qn.id }
   }
   if (qn.status === 'confirm' && /^(no|nope|not now|leave it)\b/i.test(words)) { await confirm(env, db, qn.id, false, by); return { result: 'declined', question: qn.id } }
@@ -138,6 +142,10 @@ export async function receiveReply(env: Bindings, raw: Uint8Array): Promise<Repl
       const note = rest.replace(/\balways\b|\bfrom now on\b|\bevery time\b/gi, '').replace(/^[\s,.;:—-]+/, '').trim()
       if (choice.action.type !== 'no-receipt' || note) {
         const done = await answer(env, db, qn.id, { choice: choice.id, remember, note, words }, by)
+        if (done.status === 'confirm') {
+          await emailConfirmation(env, db, done, `Review this answer before saying yes: ${done.pending!.label}.${effectMessage(done.pending!.effects)}`)
+          return { result: 'confirm', question: qn.id }
+        }
         return { result: done.status === 'filed' ? 'filed' : 'answered', question: qn.id }
       }
     }

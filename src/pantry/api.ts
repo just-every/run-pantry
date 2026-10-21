@@ -7,7 +7,7 @@ import { Hono, type Context as HonoContext } from 'hono'
 import type { Bindings } from '../auth.server'
 import { deploymentHealth } from '../base/deployment-health'
 import { agent, must, person, who, type Actor } from './access'
-import { cents, date, Fault, requireThat, type Data } from './core'
+import { cents, date, Fault, monthBounds, requireThat, type Data } from './core'
 import { all, one } from './db'
 import type { Command, Context } from './context'
 import { settingsCommands, settingsView } from './settings'
@@ -91,6 +91,7 @@ import { ownerSession } from './erasure/owner'
 import { webhookCommands, webhookSettings } from './webhooks/commands'
 import { runWebhooks } from './webhooks/deliver'
 import { dataFlows } from './data-flows'
+import { recordReportIssue } from './effects/issues'
 
 const commands: Record<string, Command> = {
   ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
@@ -154,6 +155,7 @@ view('reconciliation/:statement', async (ctx, c) => { const r = await reconcilia
 view('year-end/:year', async (ctx, c) => yearEndState(ctx.db, Number(c.req.param('year'))))
 api.get('/api/pantry/year-end/:year/adjusting-entries.pdf', async c => {
   const ctx = await reader(c), basis = await reportBasis(ctx.db, c.req.query('basis')), r = await adjustingEntries(ctx.db, Number(c.req.param('year'))), entity = await one(ctx.db, 'SELECT legal_name FROM pt_entity WHERE id = 1')
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`Adjusting entries · ${r.year}`,from:r.start,to:r.end,basis,report:'general-ledger'})
   return new Response(reportPdf({ business: entity!.legal_name, title: 'Adjusting entries', basis: BASIS_LABEL[basis], range: `${r.start} to ${r.end}`,
     rows: r.entries.flatMap(e => e.lines.flatMap((l: Data) => [
       ...(l.debit_cents ? [{ description: `Entry ${e.number} · ${e.memo} · ${l.code} ${l.name} · debit`, amount: l.debit_cents }] : []),
@@ -180,6 +182,7 @@ view('budgets/:id', async (ctx, c) => budget(ctx.db, c.req.param('id')!))
 view('budgets/:id/report', async (ctx, c) => budgetReport(ctx.db, c.req.param('id')!, day(c, 'from'), day(c, 'to'), await reportBasis(ctx.db, c.req.query('basis'))))
 api.get('/api/pantry/budgets/:id/report.csv', async c => {
   const ctx = await reader(c), r = await budgetReport(ctx.db, c.req.param('id')!, day(c, 'from'), day(c, 'to'), await reportBasis(ctx.db, c.req.query('basis')))
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`Budget report`,from:day(c,'from'),to:day(c,'to'),basis:await reportBasis(ctx.db,c.req.query('basis')),budgetId:c.req.param('id')!})
   return new Response(budgetCsv(r), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="budget-actual.csv"', 'cache-control': 'no-store' } })
 })
 view('recognition', async (ctx, c) => recognitionView(ctx.db, day(c, 'to')))
@@ -189,8 +192,11 @@ const figureQuery = async (db: D1Database, c: C, from: string, to: string): Prom
 api.get('/api/pantry/reports/detail/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const entity = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
-  const detail = await reportFigure(ctx.db, await figureQuery(ctx.db, c, from, to), Number(entity?.fiscal_year_start ?? 1))
-  return figureExport(detail, c.req.query())
+  const figure = await figureQuery(ctx.db, c, from, to)
+  const detail = await reportFigure(ctx.db, figure, Number(entity?.fiscal_year_start ?? 1))
+  const response=figureExport(detail,c.req.query())
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`${figure.report} · source figure`,from:detail.from ?? from,to:detail.to,basis:figure.basis,report:figure.report,account:figure.account,payee:figure.payee,columns:figure.columns,budgetId:figure.budget,figure})
+  return response
 })
 api.get('/api/pantry/reports/record/:kind/:id/export', async c => {
   const ctx = await reader(c)
@@ -207,17 +213,24 @@ view('reports/contractors', async (ctx, c) => contractors(ctx.db, year(c)))
 api.get('/api/pantry/reports/cash-flow/detail/export', async c => {
   const ctx = await reader(c)
   const detail = await cashFlowDetail(ctx.db, day(c, 'from'), day(c, 'to'), c.req.query('line') ?? '')
-  return figureExport(detail, c.req.query())
+  const response=figureExport(detail,c.req.query())
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:'Cash flow · source figure',from:day(c,'from'),to:day(c,'to'),basis:'accrual',report:'cash-flow'})
+  return response
 })
 view('reports/cash-flow/detail', async (ctx, c) => cashFlowDetail(ctx.db, day(c, 'from'), day(c, 'to'), c.req.query('line') ?? ''))
 api.get('/api/pantry/reports/cash-flow.csv', async c => {
   const ctx = await reader(c), from = day(c, 'from'), to = day(c, 'to')
-  return new Response(cashFlowCsv(await cashFlow(ctx.db, from, to)), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-cash-flow-${from}-${to}.csv"`, 'cache-control': 'no-store' } })
+  const csv=cashFlowCsv(await cashFlow(ctx.db,from,to))
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:'Cash flow',from,to,basis:'accrual',report:'cash-flow'})
+  return new Response(csv, { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-cash-flow-${from}-${to}.csv"`, 'cache-control': 'no-store' } })
 })
 api.get('/api/pantry/reports/:kind/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
-  if (isLibrary(c.req.param('kind')!)) return libraryExport(ctx.db, await libraryReport(ctx.db, c.req.param('kind')!, from, to, await reportBasis(ctx.db, c.req.query('basis')), c.req.query('account'), c.req.query('payee')), c.req.query('format') ?? 'pdf')
-  return reportExport(ctx.db, c.req.param('kind')!, from, to, await reportBasis(ctx.db, c.req.query('basis')), c.req.query('format') ?? 'pdf', c.req.query('columns'), c.req.query('account'))
+  const kind=c.req.param('kind')!,basis=await reportBasis(ctx.db,c.req.query('basis'))
+  const response=isLibrary(kind)?await libraryExport(ctx.db,await libraryReport(ctx.db,kind,from,to,basis,c.req.query('account'),c.req.query('payee')),c.req.query('format')??'pdf')
+    :await reportExport(ctx.db,kind,from,to,basis,c.req.query('format')??'pdf',c.req.query('columns'),c.req.query('account'))
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:kind.replaceAll('-',' '),from,to,basis,report:kind,account:c.req.query('account'),payee:c.req.query('payee'),columns:c.req.query('columns')})
+  return response
 })
 view('reports/:kind', async (ctx, c) => {
   const to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
@@ -230,7 +243,9 @@ api.get('/api/pantry/reports/contractors/:year/1099-nec.csv', async c => {
   must(ctx.actor, 'post')
   const y = Number(c.req.param('year'))
   requireThat(Number.isInteger(y) && y >= 2000 && y <= 2100, 'Choose a tax year')
-  return new Response(await necCsv(ctx.db, who(ctx.actor), y), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-1099-nec-${y}.csv"`, 'cache-control': 'no-store' } })
+  const csv=await necCsv(ctx.db,who(ctx.actor),y)
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`1099-NEC · ${y}`,from:`${y}-01-01`,to:`${y}-12-31`,basis:'cash',report:'contractors'})
+  return new Response(csv, { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-1099-nec-${y}.csv"`, 'cache-control': 'no-store' } })
 })
 
 api.get('/api/pantry/documents/:id', async c => {
@@ -252,6 +267,8 @@ const suffix = (basis: string) => basis === 'cash' ? '-cash' : ''
 api.get('/api/pantry/package/:period', async c => {
   const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis'))
   const body = JSON.stringify(await accountantPackage(ctx.db, period, basis), null, 2)
+  const range=monthBounds(period)
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'accountant-package',name:`Accountant package · ${period}`,from:range.start,to:range.end,basis})
   return new Response(body, { headers: { 'content-type': 'application/json', 'content-disposition': `attachment; filename="pantry-close-${period}${suffix(basis)}.json"`, 'cache-control': 'no-store' } })
 })
 
@@ -259,12 +276,16 @@ api.get('/api/pantry/package/:period', async c => {
 api.get('/api/pantry/package/:period/accountant-package.zip', async c => {
   const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis'))
   const { bytes } = await packageZip(ctx.db, period, basis)
+  const range=monthBounds(period)
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'accountant-package',name:`Accountant package · ${period}`,from:range.start,to:range.end,basis})
   return new Response(bytes, { headers: { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="pantry-close-${period}${suffix(basis)}.zip"`, 'x-pantry-basis': BASIS_LABEL[basis], 'cache-control': 'no-store' } })
 })
 
 api.get('/api/pantry/package/:period/general-ledger.csv', async c => {
   const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis'))
-  return new Response(await ledgerCsv(ctx.db, period, basis), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-general-ledger-${period}${suffix(basis)}.csv"`, 'x-pantry-basis': BASIS_LABEL[basis], 'cache-control': 'no-store' } })
+  const csv=await ledgerCsv(ctx.db,period,basis),range=monthBounds(period)
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`General ledger · ${period}`,from:range.start,to:range.end,basis,report:'general-ledger'})
+  return new Response(csv, { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-general-ledger-${period}${suffix(basis)}.csv"`, 'x-pantry-basis': BASIS_LABEL[basis], 'cache-control': 'no-store' } })
 })
 
 api.post('/api/pantry/command/:op', async c => {
