@@ -69,3 +69,7 @@ The 18 October integration extension is separate from the homepage claims above.
 ## Erasure evidence
 
 ERASURE-001 is implemented separately from the homepage claims. The native owner previews and confirms contact or deactivated-member erasure; personal values become markers while posted facts, audit chronology and approvals remain. TINs and supporting documents expire only after owner confirmation of the recomputed retention clock. `tests/api/security.test.mjs`, the ERASURE-001 browser journey in `tests/app/app.test.mjs`, and `tests/restore/restore.test.mjs` prove the corresponding contact/member/retention, 1440/390 and archive-fence points. A fresh destination without the later source archive is explicitly unverified; downloaded files, prior backups and connected services remain outside erasure.
+
+## API evidence
+
+API-001 (ct API-001a) is complete separately from the homepage claims: projected record-type reads and native prepared writes, owner-selected granular scopes, durable admission/idempotency and signed thin webhooks. `tests/api/integrations.test.mjs` proves record reads, grants, native calculations, atomic events, signatures, persisted retries, rotation and cancellation; `tests/app/app.test.mjs` proves owner credential/subscription flows at 1440/390; `tests/restore/restore.test.mjs` proves disabled, secret-free and queue-free restore with a new secret on enable. `API.md` documents receiver verification and timestamp refusal. API-EGRESS-001 remains Base-dependent; no resolved-address/pinned-egress claim is made.
