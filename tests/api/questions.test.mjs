@@ -115,7 +115,7 @@ test('BOOKS-AGENT the agent asks the owner what does not add up, by email first;
   assert.ok(thread.filter(v => v === 'email').length >= 3)
 })
 
-test('REPORT-005 / ACCOUNTANT questions carry their entry or report, can be answered at close or by the invited recipient’s email, and survive agent checks', async t => {
+test('REPORT-005 / CLOSE-003 / ACCOUNTANT questions carry their entry or report, can be answered at close or by the invited recipient’s email, and survive agent checks', async t => {
   const h = await harness(); t.after(() => h.close())
   const s = await september(h)
   const accountant = await h.member('jordan@example.test', 'accountant', { canLock: true })
@@ -131,10 +131,14 @@ test('REPORT-005 / ACCOUNTANT questions carry their entry or report, can be answ
   const close = await h.view(`close/${q.period}`, accountant)
   assert.equal(at(close.checks, c => c.key === 'questions').ok, false)
   assert.ok(close.questions.some(x => x.id === q.id && x.facts.Record))
+  const boardWaiting = async period => (await h.view('close-board?year=' + period.slice(0, 4))).months.find(m => m.id === period).waiting
+  const waitingBefore = await boardWaiting(q.period)
+  assert.ok(waitingBefore > 0)
   await h.command('question.answer', { id: q.id, words: 'Agreed to the signed trial balance.' }, viewer, 403)
   const done = await h.command('question.answer', { id: q.id, words: 'Agreed to the signed trial balance.' }, accountant)
   assert.equal(done.heard.question.status, 'answered')
   assert.equal(done.heard.question.answered_by, 'jordan@example.test')
+  assert.equal(await boardWaiting(q.period), waitingBefore - 1)
   const report = { report: 'profit-and-loss', line: 'net-income', from: '2026-09-01', to: '2026-09-30', basis: 'accrual' }
   const figure = (await h.command('question.ask', { subjectKind: 'report-line', subjectId: JSON.stringify(report), question: 'Is this September profit ready for review?', assignee: 'jordan@example.test' })).question
   assert.equal(figure.record_date, report.to)
@@ -142,10 +146,12 @@ test('REPORT-005 / ACCOUNTANT questions carry their entry or report, can be answ
   assert.deepEqual([mail.to].flat(), ['jordan@example.test'])
   await h.email(reply('owner@example.test', box, mail.subject, 'An unrelated sender cannot answer.'), { from: 'owner@example.test', to: box })
   assert.ok((await h.view('questions')).open.some(x => x.id === figure.id))
+  const beforeEmail = await boardWaiting(figure.period)
   await h.email(reply('jordan@example.test', box, mail.subject, 'Yes, the September income is complete.'), { from: 'jordan@example.test', to: box })
   const answered = at((await h.view('questions')).settled, x => x.id === figure.id)
   assert.equal(answered.status, 'answered')
   assert.equal(answered.answered_via, 'email')
+  assert.equal(await boardWaiting(figure.period), beforeEmail - 1)
   assert.ok(answered.messages.some(m => m.body === 'Yes, the September income is complete.'))
   // Existing bank findings can be routed to the accountant, who uses the same supported filing choices.
   await importStatements(h, s)

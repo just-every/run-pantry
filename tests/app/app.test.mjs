@@ -353,3 +353,74 @@ test('API-001 financial-report credential scope is explained, created, used and 
     await context.close()
   }
 })
+
+test('CLOSE-003 custom task assignment, due dates, revision review and month locking work at 1440 and 390', async t => {
+  const app = await worker(); t.after(() => app.close())
+  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
+  const owner = await browser.newContext(); t.after(() => owner.close())
+  const origin = app.origin
+  assert.equal((await owner.request.post(`${origin}/auth/bootstrap`, { headers: { origin }, data: { token: TOKEN, displayName: 'Olivia Owner' }, maxRedirects: 0 })).status(), 303)
+  await owner.request.post(`${origin}/setup`, { headers: { origin }, form: { confirm: 'yes' }, maxRedirects: 0 })
+  const cmd = async (op, data) => {
+    const r = await owner.request.post(`${origin}/api/pantry/command/${op}`, { headers: { origin }, data })
+    assert.equal(r.status(), 200, `${op}: ${await r.text()}`); return r.json()
+  }
+  await cmd('entity.save', { legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2026-01-01', policies: 'Revenue when invoiced.' })
+  await cmd('chart.start', {})
+  const state = await (await owner.request.get(`${origin}/api/pantry/state`)).json(), acct = Object.fromEntries(state.accounts.map(a => [a.code, a.id]))
+  const entry = await cmd('journal.save-draft', { date: '2026-08-15', memo: 'Design consultation received', lines: [{ accountId: acct['1000'], debit: '1200.00' }, { accountId: acct['4000'], credit: '1200.00' }] })
+  await cmd('journal.post', { id: entry.id, revision: entry.revision })
+  const signedIn = await owner.storageState()
+  const proof = process.env.PANTRY_PROOF_DIR
+  if (proof) await (await import('node:fs/promises')).mkdir(proof, { recursive: true })
+  for (const [width, period] of [[1440, '2026-09'], [390, '2026-10']]) {
+    const context = await browser.newContext({ storageState: signedIn, viewport: { width, height: 1000 } }), page = await context.newPage(), errors = []
+    page.on('pageerror', e => errors.push(String(e)))
+    try {
+      await page.goto(`${origin}/app/close?period=${period}`)
+      const tasks = page.getByRole('heading', { name: 'Review tasks', exact: true }).locator('..').locator('..')
+      await tasks.getByLabel('New review task', { exact: true }).fill('Confirm insurance renewal')
+      await tasks.getByLabel('Assign to', { exact: true }).selectOption('owner@example.test')
+      await tasks.getByLabel('Due date', { exact: true }).fill('2026-11-05')
+      await tasks.getByRole('button', { name: 'Add task', exact: true }).click()
+      const first = tasks.getByRole('row').filter({ hasText: 'Confirm insurance renewal' })
+      await first.getByText('Olivia Owner', { exact: true }).waitFor()
+      assert.equal(await first.locator('time[datetime="2026-11-05"]').count(), 1)
+      await tasks.getByLabel('New review task', { exact: true }).fill('Review tax correspondence')
+      await tasks.getByLabel('Due date', { exact: true }).fill('2026-11-06')
+      await tasks.getByRole('button', { name: 'Add task', exact: true }).click()
+      const second = tasks.getByRole('row').filter({ hasText: 'Review tax correspondence' })
+      await second.getByRole('button', { name: 'Mark done', exact: true }).waitFor()
+      const board = page.getByRole('heading', { name: 'Monthly close board', exact: true }).locator('..').locator('..')
+      await board.locator('summary').click()
+      const month = board.getByRole('row').filter({ has: page.getByRole('link', { name: period.endsWith('09') ? 'September 2026' : 'October 2026', exact: true }) })
+      await month.getByText('0 of 2 done', { exact: true }).waitFor()
+      await first.getByRole('button', { name: 'Mark done', exact: true }).click()
+      await first.getByRole('button', { name: 'Edit Confirm insurance renewal', exact: true }).click()
+      await first.getByLabel('Task title', { exact: true }).fill('Confirm renewed insurance')
+      await first.getByLabel('Task due date', { exact: true }).fill('2026-11-07')
+      await first.getByRole('button', { name: 'Save review task', exact: true }).click()
+      const revised = tasks.getByRole('row').filter({ hasText: 'Confirm renewed insurance' })
+      await revised.getByRole('button', { name: 'Mark done', exact: true }).waitFor()
+      assert.equal(await revised.locator('time[datetime="2026-11-07"]').count(), 1)
+      if (proof) await tasks.screenshot({ path: `${proof}/close-tasks-${width}.png` })
+      await revised.getByRole('button', { name: 'Mark done', exact: true }).click()
+      await second.getByRole('button', { name: 'Mark done', exact: true }).click()
+      await month.getByText('2 of 2 done', { exact: true }).waitFor()
+      const monthName = period.endsWith('09') ? 'September 2026' : 'October 2026'
+      await page.getByRole('button', { name: `Lock ${monthName}`, exact: true }).click()
+      await month.getByText('Locked', { exact: true }).waitFor()
+      assert.equal(await tasks.getByRole('button', { name: 'Add task', exact: true }).count(), 0)
+      assert.equal(await tasks.getByRole('button', { name: 'Mark done', exact: true }).count(), 0)
+      if (proof) {
+        await board.screenshot({ path: `${proof}/close-board-${width}.png` })
+        await page.screenshot({ path: `${proof}/after-close-${width}.png`, fullPage: true })
+      }
+      const other = period.endsWith('09') ? 'October 2026' : 'September 2026'
+      await board.getByRole('link', { name: other, exact: true }).click()
+      await page.getByRole('heading', { level: 1 }).filter({ hasText: other }).waitFor()
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+      assert.deepEqual(errors, [])
+    } finally { await context.close() }
+  }
+})

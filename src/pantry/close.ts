@@ -1,3 +1,4 @@
+import { assigneeGuard, closeAssignees, saveCloseTask, taskFields } from './close-workflow'
 import { YEAR_END_TASKS, yearEndChecks } from './year-end-checks'
 import { recognitionCloseGuards, recognitionTies } from './recognition'
 import { feedCloseExceptions } from './feeds/health'
@@ -100,7 +101,7 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
   const ready = checks.every(x => x.ok) && tasks.length > 0 && tasks.every(t => t.status === 'done')
   // Every entry keeps its receipt: spending without one is listed here, to add one or say why none is needed.
   const receipts = { missing: await missingReceipts(db, start, end), waived: await all(db, 'SELECT w.*, e.memo, e.entry_date FROM pt_receipt_waivers w JOIN pt_journal_entries e ON e.id = w.entry_id WHERE e.entry_date BETWEEN ? AND ? ORDER BY e.entry_date', start, end) }
-  return { id, start, end, status: p?.status ?? 'open', period: p, checks, tasks, requests, approvals, notes, ready, receipts, questions }
+  return { id, start, end, status: p?.status ?? 'open', period: p, checks, tasks, requests, approvals, notes, ready, receipts, questions, assignees: await closeAssignees(db) }
 }
 
 const ensureTasks: Command = { need: 'record', async run(c, b) {
@@ -108,10 +109,11 @@ const ensureTasks: Command = { need: 'record', async run(c, b) {
   const existing = await all(c.db, 'SELECT title FROM pt_close_tasks WHERE period = ?', id)
   const entity = await requireEntity(c.db), isYearEnd = Number(id.slice(5)) === (Number(entity.fiscal_year_start) + 10) % 12 + 1
   const defaults = [...DEFAULT_TASKS, ...(isYearEnd ? YEAR_END_TASKS : [])]
+  const { assignee, dueDate } = taskFields(b)
   const titles = b.title ? [text(b.title, 'Task', 200)] : existing.length ? (isYearEnd ? YEAR_END_TASKS.filter(title => !existing.some(t => t.title === title)) : []) : defaults
-  await run(c.db, [authority(c.actor, 'record'), guard("NOT EXISTS (SELECT 1 FROM pt_periods WHERE id = ? AND status = 'locked')", id),
-    ...titles.map(t => q("INSERT INTO pt_close_tasks (id, period, title, status, revision) VALUES (?, ?, ?, 'open', ?)", uid(), id, t, uid())),
-    audit(who(c.actor), 'close.tasks', 'period', id, { added: titles })])
+  await run(c.db, [authority(c.actor, 'record'), assigneeGuard(assignee), guard("NOT EXISTS (SELECT 1 FROM pt_periods WHERE id = ? AND status = 'locked')", id),
+    ...titles.map(t => q("INSERT INTO pt_close_tasks (id, period, title, status, revision, assignee, due_date) VALUES (?, ?, ?, 'open', ?, ?, ?)", uid(), id, t, uid(), assignee, dueDate)),
+    audit(who(c.actor), 'close.tasks', 'period', id, { added: titles, assignee, dueDate })])
   return closeState(c.db, id)
 } }
 
@@ -121,7 +123,7 @@ const completeTask: Command = { need: 'record', async run(c, b) {
   const done = b.done !== false
   await run(c.db, [authority(c.actor, 'record'), guard("NOT EXISTS (SELECT 1 FROM pt_periods WHERE id = ? AND status = 'locked')", task.period),
     q('UPDATE pt_close_tasks SET status = ?, note = ?, done_by = ?, done_at = ?, revision = ? WHERE id = ? AND revision = ?', done ? 'done' : 'open', optionalText(b.note, 'Note', 1000), done ? c.actor.email : null, done ? now() : null, uid(), task.id, b.revision), changed(),
-    audit(who(c.actor), done ? 'close.task-done' : 'close.task-reopened', 'period', task.period, { task: task.title })])
+    audit(who(c.actor), done ? 'close.task-done' : 'close.task-reopened', 'period', task.period, { task: task.title, taskId: task.id, revision: task.revision, assignee: task.assignee, dueDate: task.due_date })])
   return closeState(c.db, task.period)
 } }
 
@@ -183,6 +185,7 @@ const decideReopen: Command = { need: 'reopen', async run(c, b) {
 
 export const closeCommands: Record<string, Command> = {
   'close.tasks': ensureTasks,
+  'close.task-save': saveCloseTask,
   'close.task': completeTask,
   'period.lock': lock,
   'period.request-reopen': requestReopen,

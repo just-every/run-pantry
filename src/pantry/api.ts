@@ -1,3 +1,4 @@
+import { closeBoard } from './close-workflow'
 import { figureExport, recordExport } from './detail-export'
 // Pantry's HTTP surface. People use /api/pantry/* with their native session;
 // agents use /api/pantry/agent/* with a bearer token the owner issued. Every
@@ -127,6 +128,7 @@ view('customers/:id', async (ctx, c) => customerHistory(ctx.db, c.req.param('id'
 view('customers/:id/history', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to')))
 view('dashboard', async (ctx, c) => dashboard(ctx.db, day(c, 'to'), c.req.query('basis') ? basisOf(c.req.query('basis')) : undefined))
 view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await lookups(ctx.db)), overview: await overview(ctx.db), settings: await settingsView(ctx) }))
+view('close-board', async (ctx, c) => closeBoard(ctx.db, c.req.query('year') ?? new Date().getUTCFullYear().toString()))
 view('recurring-journals', async ctx => recurringJournalsView(ctx.db))
 view('journal', async ctx => ({ entries: await journalView(ctx.db) }))
 view('review', async ctx => reviewView(ctx.db, ctx.actor.email))

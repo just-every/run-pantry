@@ -1,3 +1,4 @@
+import { CloseBoard, ReviewTasks } from './close-workflow'
 // Close: calculated checks, reviewed tasks, the lock, and reopening by request and approval.
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
@@ -34,12 +35,14 @@ export function Close() {
   const shared = useShared(), who = useWho(), [period, setPeriod] = useState(() => new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('period') ?? shared.state.overview.closing ?? thisMonth())
   const { data: s, error, reload } = useView<D>(`close/${period}`)
   const can = shared.state.actor.can
-  const refresh = async () => { await reload(); await shared.reload() }
+  const { data: board, reload: reloadBoard } = useView<D>(`close-board?year=${period.slice(0, 4)}`)
+  const refresh = async () => { await reload(); await reloadBoard(); await shared.reload() }
   const pending = s?.requests.find((r: D) => r.status === 'pending')
   return <>
     <PageHead title={<>Close — {monthName(period)}</>} chip={s && (s.status === 'locked' ? <Chip tone="info"><Icon name="lock" /> Locked</Chip> : s.ready ? <Chip tone="good">Ready to lock</Chip> : <Chip tone="warn">In progress</Chip>)}
       lead="Every check must pass and every review task be done before the period locks. A lock stops all changes dated in the period, by people and agents alike."
       actions={<div className="field inline"><label htmlFor="close-period">Period</label><input id="close-period" type="month" value={period} onChange={e => e.target.value && setPeriod(e.target.value)} /></div>} />
+    {board && <CloseBoard board={board} period={period} select={setPeriod} />}
     {!s ? <Loading error={error} what="the close" /> : <div className="split split-wide-left">
       <div className="stack">
         <Card title="Close checklist" actions={s.checks.every((c: D) => c.ok) ? <Chip tone="good">All checks passed</Chip> : <Chip tone="warn">{s.checks.filter((c: D) => !c.ok).length} to resolve</Chip>}>
@@ -51,13 +54,7 @@ export function Close() {
         <RecurringJournals />
         <div id="recognition"><RecognitionSchedules to={s.end} onChange={refresh} /></div>
         <MonthQuestions questions={s.questions} month={monthName(period)} onDone={refresh} />
-        <Card title="Review tasks" actions={s.status !== 'locked' && can.record && (!s.tasks.length || s.checks.some((c: D) => c.key === 'year-end-reviews' && !c.ok)) && <Action tone="primary" run={async () => { await command('close.tasks', { period }); await reload() }}>Add the standard review tasks</Action>}>
-          <Table heads={['Task', 'Status', 'Completed by', '']} empty="No review tasks yet. Add the standard ones, or your own.">
-            {s.tasks.map((t: D) => <tr key={t.id}><td>{t.title}{t.note && <small className="sub"> — {t.note}</small>}</td><td>{t.status === 'done' ? <Chip tone="good">Done</Chip> : <Chip tone="warn">Open</Chip>}</td><td>{t.done_by ? <>{who(t.done_by)}, {day(t.done_at)}</> : '—'}</td>
-              <td>{s.status !== 'locked' && can.record && <Action run={async () => { await command('close.task', { id: t.id, revision: t.revision, done: t.status !== 'done' }); await reload() }}>{t.status === 'done' ? 'Reopen task' : 'Mark done'}</Action>}</td></tr>)}
-          </Table>
-          {s.status !== 'locked' && can.record && <Form label="Add task" submit={b => command('close.tasks', { period, ...b })} onDone={reload} className="inline-form"><Field label="New review task" name="title" required /></Form>}
-        </Card>
+        <ReviewTasks key={period} s={s} canRecord={can.record} onChange={refresh} />
         <ReceiptsCard s={s} onChange={async () => { await reload(); await shared.reload() }} />
         {s.notes.length > 0 && <Card title="Approved notes">{s.notes.map((n: D) => <div key={n.id} className="note"><strong>{n.kind === 'variance' ? 'Variance explanation' : 'Close packet'}</strong><p>{n.body || JSON.parse(n.evidence).join('; ')}</p><small>Approved by {who(n.approved_by)}, {day(n.approved_at)}</small></div>)}</Card>}
       </div>
