@@ -69,7 +69,7 @@ export function WebhookSettings() {
             <td style={{ overflowWrap: 'anywhere' }}>{subscription.host}</td>
             <td>{subscription.events.join(', ')}</td>
             <td><Chip tone={subscription.enabled ? 'good' : 'neutral'}>{subscription.enabled ? 'Enabled' : 'Disabled'}</Chip></td>
-            <td><div className="row-actions">
+            <td><div className="row-actions" style={{flexWrap: 'wrap',clear: 'both'}}>
               <button type="button" className="btn btn-link" onClick={() => { setIssued(null); setEditing(subscription) }}>Edit webhook</button>
               <Action run={async () => done(await change('webhook.rotate', { id: subscription.id, revision: subscription.revision }))}>Rotate secret</Action>
               <Action run={async () => done(await change('webhook.set-enabled', { id: subscription.id, revision: subscription.revision, enabled: !subscription.enabled }))}>{subscription.enabled ? 'Disable webhook' : 'Enable webhook'}</Action>

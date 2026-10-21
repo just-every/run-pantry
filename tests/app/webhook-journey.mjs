@@ -41,6 +41,7 @@ export async function webhookJourney(t) {
       const shot = async state => {
         await card.screenshot({ mask: [secret.locator('code')], path: `${dir}/webhooks-${state}-${width}.png` })
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+        assert.equal(await card.getByRole('button').evaluateAll(buttons=>buttons.every(button=>{const r=button.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth})),true,'every webhook action fits the viewport')
       }
       await card.getByLabel('Webhook destination', { exact: true }).fill('https://receiver.example.test/pantry')
       await card.getByLabel('approved', { exact: true }).check()

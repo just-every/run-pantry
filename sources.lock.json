@@ -4388,7 +4388,7 @@
       "executable": false
     },
     "src/ui/webhook-settings.tsx": {
-      "sha256": "27c63f24486a437776f7595765e4d4bfe3252771db3ff94851243639ce9f9d6f",
+      "sha256": "c94157c39f7084c28e54a6824a64018554dcd0987566653aaa112a7e73608d96",
       "executable": false
     },
     "src/ui/year-end.tsx": {
@@ -4628,7 +4628,7 @@
       "executable": false
     },
     "tests/app/webhook-journey.mjs": {
-      "sha256": "9f927bdbf63b376a03eb9042769c67879d451a302d8c761aff583c892b7483b0",
+      "sha256": "c6bfcaa91d4fb92d7852e3accae533c8f9be3223537b75d6c092b48288068537",
       "executable": false
     },
     "tests/app/worker.mjs": {
