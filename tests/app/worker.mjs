@@ -30,6 +30,6 @@ export async function worker() {
     try { if ((await fetch(`${origin}/health`)).ok) break } catch {}
     await new Promise(r => setTimeout(r, 250))
   }
-  return { origin, async close() { child.kill('SIGTERM'); await new Promise(r => child.exitCode !== null ? r() : child.once('exit', r)); await rm(persist, { recursive: true, force: true }) } }
+  return { origin, logs: () => output, async close() { child.kill('SIGTERM'); await new Promise(r => child.exitCode !== null ? r() : child.once('exit', r)); await rm(persist, { recursive: true, force: true }) } }
 }
 

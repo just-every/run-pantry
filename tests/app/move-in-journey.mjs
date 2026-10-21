@@ -93,10 +93,8 @@ export async function moveInJourney(t) {
     await page.getByRole('heading', { name: 'Every row (292)', exact: true }).locator('../..').screenshot({ path: `${dir}/move-in-rows-${width}.png` })
     await page.getByLabel('Leave the 3 refused rows out of this import', { exact: true }).check()
     await page.getByRole('button', { name: 'Import spreadsheet records as staged', exact: true }).click()
-    await expect.poll(async () => {
-      if (await page.getByRole('heading', { name: 'Cutover from Spreadsheet', exact: true }).count()) return 'staged'
-      const alert = page.getByRole('alert'); return await alert.count() ? await alert.allTextContents() : 'importing'
-    }, { timeout: 180000 }).toEqual('staged')
+    await page.waitForFunction(() => [...document.querySelectorAll('h2')].some(h => h.textContent === 'Cutover from Spreadsheet') || document.querySelector('[role=alert]'), { timeout: 180000 })
+    assert.equal(await page.getByRole('alert').count(), 0, `${await page.getByRole('alert').allTextContents()}\n${app.logs().slice(-8000)}`)
     // A cutover is written last; wait for the completed job so undo is offered.
     await page.getByRole('button', { name: 'Undo import', exact: true }).waitFor({ timeout: 180000 })
     const firstCustomer = (await view('state')).contacts.find(c => c.name === 'Customer 0')
