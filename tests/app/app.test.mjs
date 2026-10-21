@@ -414,6 +414,7 @@ test('CLOSE-003 custom task assignment, due dates, revision review and month loc
       assert.equal(await tasks.getByRole('button', { name: 'Mark done', exact: true }).count(), 0)
       if (proof) {
         await board.screenshot({ path: `${proof}/close-board-${width}.png` })
+        await page.evaluate(() => window.scrollTo(0, 0))
         await page.screenshot({ path: `${proof}/after-close-${width}.png`, fullPage: true })
       }
       const other = period.endsWith('09') ? 'October 2026' : 'September 2026'

@@ -33,7 +33,7 @@ export function ReviewTasks({ s, canRecord, onChange }: { s: D; canRecord: boole
         <td>{open && <div className="row-actions"><Action run={async () => { await command('close.task', { id: t.id, revision: t.revision, done: t.status !== 'done' }); await onChange() }}>{t.status === 'done' ? 'Reopen task' : 'Mark done'}</Action>
           <button type="button" className="btn btn-link" aria-label={`Edit ${t.title}`} onClick={() => setEditing(editing === t.id ? null : t.id)}>{editing === t.id ? 'Cancel edit' : 'Edit'}</button></div>}</td></tr>)}
     </Table>
-    {open && <Form label="Add task" submit={b => command('close.tasks', { period: s.id, ...b })} onDone={onChange} className="inline-form">
+    {open && <Form label="Add task" submit={b => command('close.tasks', { period: s.id, ...b })} onDone={onChange}>
       <Field label="New review task" name="title" required />
       <Field label="Assign to" name="assignee" options={people} empty="Unassigned" />
       <Field label="Due date" name="dueDate" type="date" />

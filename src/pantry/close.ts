@@ -111,9 +111,11 @@ const ensureTasks: Command = { need: 'record', async run(c, b) {
   const defaults = [...DEFAULT_TASKS, ...(isYearEnd ? YEAR_END_TASKS : [])]
   const { assignee, dueDate } = taskFields(b)
   const titles = b.title ? [text(b.title, 'Task', 200)] : existing.length ? (isYearEnd ? YEAR_END_TASKS.filter(title => !existing.some(t => t.title === title)) : []) : defaults
+  const tasks = titles.map(title => ({ id: uid(), revision: uid(), title }))
   await run(c.db, [authority(c.actor, 'record'), assigneeGuard(assignee), guard("NOT EXISTS (SELECT 1 FROM pt_periods WHERE id = ? AND status = 'locked')", id),
-    ...titles.map(t => q("INSERT INTO pt_close_tasks (id, period, title, status, revision, assignee, due_date) VALUES (?, ?, ?, 'open', ?, ?, ?)", uid(), id, t, uid(), assignee, dueDate)),
-    audit(who(c.actor), 'close.tasks', 'period', id, { added: titles, assignee, dueDate })])
+    ...tasks.flatMap(t => [q("INSERT INTO pt_close_tasks (id, period, title, status, revision, assignee, due_date) VALUES (?, ?, ?, 'open', ?, ?, ?)", t.id, id, t.title, t.revision, assignee, dueDate),
+      audit(who(c.actor), 'close.task-added', 'close-task', t.id, { period: id })]),
+    audit(who(c.actor), 'close.tasks', 'period', id, { added: titles, tasks: tasks.map(t => t.id), assignee, dueDate })])
   return closeState(c.db, id)
 } }
 
@@ -123,7 +125,7 @@ const completeTask: Command = { need: 'record', async run(c, b) {
   const done = b.done !== false
   await run(c.db, [authority(c.actor, 'record'), guard("NOT EXISTS (SELECT 1 FROM pt_periods WHERE id = ? AND status = 'locked')", task.period),
     q('UPDATE pt_close_tasks SET status = ?, note = ?, done_by = ?, done_at = ?, revision = ? WHERE id = ? AND revision = ?', done ? 'done' : 'open', optionalText(b.note, 'Note', 1000), done ? c.actor.email : null, done ? now() : null, uid(), task.id, b.revision), changed(),
-    audit(who(c.actor), done ? 'close.task-done' : 'close.task-reopened', 'period', task.period, { task: task.title, taskId: task.id, revision: task.revision, assignee: task.assignee, dueDate: task.due_date })])
+    audit(who(c.actor), done ? 'close.task-done' : 'close.task-reopened', 'close-task', task.id, { period: task.period })])
   return closeState(c.db, task.period)
 } }
 

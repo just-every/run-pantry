@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "fa1416c01a031eb287b37a70f97a003491d1c515a6de05567209a7c79c58346c",
+      "sha256": "395e0e60fca4f65dc63ca166f067178b1e368fa63352c41501833932fdc17b4a",
       "executable": false
     },
     "DEMO.md": {
@@ -2892,7 +2892,7 @@
       "executable": false
     },
     "src/pantry/close.ts": {
-      "sha256": "f489ea0cb7c89e9b784beb697320c1b2bbb654eaac2f9714f232d3002e33e2a5",
+      "sha256": "368682b0c22c18fcd1694de1ce5c585c5dcbedb701b2969ad306a786e71daf31",
       "executable": false
     },
     "src/pantry/connected-match.ts": {
@@ -3232,7 +3232,7 @@
       "executable": false
     },
     "src/pantry/package-files.ts": {
-      "sha256": "e738dba6f13babcd9b93512b40e69d107a23488e463c59ca83b56dc590e6f18f",
+      "sha256": "2404ed8c3c996212dd3d5db89d183f11d2f757df52bcf55cb44cded493280cf4",
       "executable": false
     },
     "src/pantry/package.ts": {
@@ -3968,7 +3968,7 @@
       "executable": false
     },
     "src/ui/close-workflow.tsx": {
-      "sha256": "1b404945b9cb5e74e7bdfa38b513698c3104add7538ba6724d61799b72c72dac",
+      "sha256": "b37ba5db497129661265dbbb5028728a665c2e5a7474d2d5c5cd898d70a696a6",
       "executable": false
     },
     "src/ui/close.tsx": {
@@ -4240,7 +4240,7 @@
       "executable": false
     },
     "tests/api/close.test.mjs": {
-      "sha256": "87ee42bdb737848dbc6b48b9dc3910fbb1549fa4c9109108df48184871deb222",
+      "sha256": "48c50bc84ba8a432191d48b244b5193413b01e700351d057d6d89b7bdd8166eb",
       "executable": false
     },
     "tests/api/connected.test.mjs": {
@@ -4348,7 +4348,7 @@
       "executable": false
     },
     "tests/app/app.test.mjs": {
-      "sha256": "91083876896b5b496b717dabbd8adc5586200822b0b91ca9651d41909b6bba56",
+      "sha256": "0867626cb25175b3c66eb15911637b130ecef94da7edd2c0ec3ebfb6f42661f9",
       "executable": false
     },
     "tests/app/bank-rules.test.mjs": {
