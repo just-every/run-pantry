@@ -1,3 +1,5 @@
+import { readFile, mkdir } from 'node:fs/promises'
+import { spreadsheet } from '../xlsx.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
@@ -10,7 +12,8 @@ const choices = [
   ['Check detail','check-detail'],['Reconciliation reports','reconciliations'],['Audit log','audit-log'],['1099 summary','contractor-summary'],
 ]
 
-test('REPORT-004 run the everyday library, filter journal, open records and download the same reports at 1440 and 390', async t => {
+test('REPORT-007 / REPORT-004 run the everyday library, filter journal, open records and download the same reports at 1440 and 390', async t => {
+  const evidence = process.env.PANTRY_EVIDENCE_DIR || '/tmp/sx-pantry-r27'; await mkdir(evidence, { recursive: true })
   const app=await worker(); t.after(()=>app.close())
   const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']}); t.after(()=>browser.close())
   const owner=await browser.newContext()
@@ -28,6 +31,18 @@ test('REPORT-004 run the everyday library, filter journal, open records and down
   for(const width of [1440,390]){
     const context=await browser.newContext({storageState,viewport:{width,height:width===390?844:1000}}), page=await context.newPage(), errors=[]
     page.on('pageerror',e=>errors.push(String(e)))
+
+    await page.goto(`${app.origin}/app/reports?report=balance-sheet&from=2026-09-01&to=2026-09-30&basis=accrual`)
+    await page.getByRole('heading', { name: /^Balance sheet Accrual basis/ }).waitFor()
+    const [balance] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: 'Download Excel · accrual', exact: true }).click()])
+    assert.equal(await balance.failure(), null)
+    const bs = await view('reports/balance-sheet?to=2026-09-30&basis=accrual')
+    const balanceRows = spreadsheet(await readFile(await balance.path()))
+    assert.equal(balanceRows.find(row => row[0] === 'Total assets')[1], bs.totalAssets / 100)
+    assert.equal(balanceRows.find(row => row[0] === 'Liabilities and equity')[1], (bs.totalLiabilities + bs.totalEquity) / 100)
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    await balance.saveAs(`${evidence}/balance-sheet-${width}.xlsx`)
+    await page.screenshot({ path: `${evidence}/balance-excel-${width}.png`, fullPage: true })
     for(const [label,kind] of choices){
       const from=kind==='audit-log'?today:'2026-09-01', to=kind==='audit-log'?today:'2026-09-30'
       await page.goto(`${app.origin}/app/reports?report=${kind}&from=${from}&to=${to}&basis=accrual`)
@@ -43,6 +58,16 @@ test('REPORT-004 run the everyday library, filter journal, open records and down
       }
       for(const total of r.totals)await page.getByRole('row').filter({has:page.getByText(total.label,{exact:true})}).getByText(money(total.amount),{exact:true}).waitFor()
       const pdf=page.getByRole('link',{name:/^Download PDF/}), csv=page.getByRole('link',{name:/^Download CSV/})
+
+      const [excel] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: /^Download Excel(?: · accrual)?$/ }).click()])
+      assert.equal(await excel.failure(), null)
+      const cells = spreadsheet(await readFile(await excel.path()))
+      assert.deepEqual(cells[0], [r.title, r.basisLabel, from, to])
+      assert.deepEqual(cells.slice(3), [...r.rows.map(row => row.cells.map((v, i) => r.moneyColumns.includes(i) ? v / 100 : v)), ...r.totals.map(total => [total.label, total.amount / 100])])
+      if (kind === 'transactions') {
+        await excel.saveAs(`${evidence}/transactions-${width}.xlsx`)
+        await page.screenshot({ path: `${evidence}/library-excel-${width}.png`, fullPage: true })
+      }
       for(const [link,format]of [[pdf,'pdf'],[csv,'csv']]){
         const href=await link.getAttribute('href'), response=await context.request.get(new URL(href,app.origin).href)
         assert.equal(response.status(),200);assert.equal(response.headers()['x-pantry-basis'],r.basisLabel)

@@ -1,3 +1,4 @@
+import { downloadSpreadsheet } from '../xlsx.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { fakePlaid } from './plaid.mjs'
@@ -45,7 +46,7 @@ async function october(h, approveBills = false) {
 const lineOf = (report, code) => [...(report.income ?? []), ...(report.expenses ?? []), ...(report.assets ?? []), ...(report.liabilities ?? []), ...(report.equity ?? [])].find(r => r.code === code)?.amount ?? 0
 const OCT = 'from=2026-10-01&to=2026-10-31'
 
-test('REPORT-002 cash or accrual: one switch reads the same books both ways, partial payments split across lines and tax', async t => {
+test('REPORT-007 / REPORT-002 cash or accrual: one switch reads the same books both ways, partial payments split across lines and tax', async t => {
   const h = await harness(); t.after(() => h.close())
   const s = await october(h)
   const accrual = await h.view(`reports/profit-and-loss?${OCT}&basis=accrual`), cash = await h.view(`reports/profit-and-loss?${OCT}&basis=cash`)
@@ -88,6 +89,17 @@ test('REPORT-002 cash or accrual: one switch reads the same books both ways, par
       assert.equal((pdf.value.match(new RegExp(basis === 'cash' ? 'Cash basis' : 'Accrual basis', 'g')) ?? []).length, pages, 'each PDF page declares its basis')
       const csv = await h.send(`/api/pantry/reports/${kind}/export?${OCT}&basis=${basis}&format=csv`, undefined, { cookie: h.owner })
       assert.equal(csv.status, 200); assert.match(csv.value, new RegExp(basis === 'cash' ? 'Cash basis' : 'Accrual basis'))
+      const xlsx = await downloadSpreadsheet(h.origin, `reports/${kind}/export?${OCT}&basis=${basis}&format=xlsx`, h.owner)
+      assert.equal(xlsx[0][3], basis === 'cash' ? 'Cash basis' : 'Accrual basis')
+      assert.ok(xlsx.slice(2).every(row => typeof row[1] === 'number'), 'amounts are summable Excel numbers')
+      const csvAmounts = [...csv.value.matchAll(/"([^"\r\n]*)","","(-?\d+\.\d{2})","(?:Cash|Accrual) basis"/g)].map(match => [match[1], Number(match[2])])
+      assert.deepEqual(xlsx.slice(2).map(row => row.slice(0, 2)), csvAmounts, `${kind} Excel and CSV figures agree`)
+      if (kind === 'balance-sheet') {
+        const bs = await h.view(`reports/balance-sheet?${OCT}&basis=${basis}`)
+        assert.equal(xlsx.find(row => row[0] === 'Total assets')[1], bs.totalAssets / 100)
+        assert.equal(xlsx.find(row => row[0] === 'Liabilities and equity')[1], (bs.totalLiabilities + bs.totalEquity) / 100)
+      }
+
     }
     const pdf = await h.send(`/api/pantry/reports/profit-and-loss/export?${OCT}&basis=${basis}`, undefined, { cookie: h.owner })
     assert.ok(pdf.value.includes(basis === 'cash' ? '-$177.28' : '$1,048.00'), 'PDF includes the calculated P&L total')
@@ -441,7 +453,7 @@ test('REPORT-008 dashboard figures tie to reports, waiting work has destinations
 
 })
 
-test('REPORT-001 financial statements with comparisons, fiscal periods, YTD and customer columns tie to single reports on both bases', async t => {
+test('REPORT-007 / REPORT-001 financial statements with comparisons, fiscal periods, YTD and customer columns tie to single reports on both bases', async t => {
   const h = await harness(); t.after(() => h.close())
   const s = await october(h)
   await s.issue('Cedar Studio', '2025-10-05', [{ description: 'Prior-year design', quantity: '1', rate: '450.00', accountId: s.acct['4000'], taxCode: 'exempt' }])
@@ -481,6 +493,12 @@ test('REPORT-001 financial statements with comparisons, fiscal periods, YTD and 
         assert.equal(row.values[2], row.values[0] - row.values[1])
         assert.equal(row.values[3], row.values[1] === 0 ? null : Math.round((row.values[0] - row.values[1]) / Math.abs(row.values[1]) * 10000) / 100)
       }
+
+      const xlsx = await downloadSpreadsheet(h.origin, `reports/${kind}/export?${OCT}&basis=${basis}&columns=${mode}&format=xlsx`, h.owner)
+      assert.equal(xlsx[0][2], basis === 'cash' ? 'Cash basis' : 'Accrual basis')
+      assert.deepEqual(xlsx[1].slice(4), r.columns.map(c => `${c.label} · ${c.from} to ${c.to} · ${c.unit === 'percent' ? '%' : 'USD'}`))
+      assert.deepEqual(xlsx.slice(2), [...r.rows, ...r.totals].map(l => [l.name, l.section, l.code, basis === 'cash' ? 'Cash basis' : 'Accrual basis', ...l.values.map((v, i) => v === null ? 'Not comparable (prior is zero)' : r.columns[i].unit === 'percent' ? v : v / 100)]))
+      if (basis === 'cash') assert.deepEqual(await downloadSpreadsheet(h.origin, `reports/${kind}/export?${OCT}&columns=${mode}&format=xlsx`, h.owner), xlsx)
       for (const format of ['csv', 'pdf']) {
         const x = await h.send(`/api/pantry/reports/${kind}/export?${OCT}&basis=${basis}&columns=${mode}&format=${format}`, undefined, { cookie: h.owner })
         assert.equal(x.status, 200, x.value)
@@ -582,7 +600,7 @@ test('BUDGET-001 annual account/month plans copy posted actuals plus 5%, edit a 
   assert.deepEqual(await h.view('reports/trial-balance?to=2026-12-31&basis=accrual'), before, 'planning never changes the posted ledger')
 })
 
-test('REPORT-004 everyday library: every current report ties to its ledger, open items, payments or saved reconciliation, on its actual basis', async t => {
+test('REPORT-007 / REPORT-004 everyday library: every current report ties to its ledger, open items, payments or saved reconciliation, on its actual basis', async t => {
   const h = await harness(); t.after(() => h.close())
   const s = await october(h)
   await h.command('contractor.save', { contactId: s.c['Brightline Software'].id, is1099: true })
@@ -654,6 +672,11 @@ test('REPORT-004 everyday library: every current report ties to its ledger, open
       assert.equal(e.status,200); assert.equal(e.headers.get('x-pantry-basis'),r.basisLabel)
       assert.ok(e.value.includes(format==='csv' ? r.columns[0] : '%PDF-'),`${kind} ${format}`)
     }
+
+    const xlsx = await downloadSpreadsheet(h.origin, `reports/${kind}/export?from=${from}&to=${to}&format=xlsx`, viewer)
+    assert.deepEqual(xlsx[0], [r.title, r.basisLabel, from, to])
+    assert.deepEqual(xlsx.slice(3), [...r.rows.map(row => row.cells.map((v, i) => r.moneyColumns.includes(i) ? v / 100 : v)), ...r.totals.map(total => [total.label, total.amount / 100])])
+    assert.equal((await h.send(`/api/pantry/reports/${kind}/export?from=${from}&to=${to}&format=xlsx`)).status, 401)
     await h.view(`reports/${kind}?from=${from}&to=${to}`,'',401)
   }
   await h.view('reports/journal?from=2026-11-01&to=2026-10-01',h.owner,400)

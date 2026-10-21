@@ -1,4 +1,5 @@
 // Download the same calculated report as the screen, with an explicit basis.
+import { xlsxResponse } from './xlsx'
 import { Fault, type Data } from './core'
 import { one } from './db'
 import { BASIS_LABEL, type Basis } from './basis'
@@ -56,7 +57,8 @@ export async function reportExport(db: D1Database, kind: string, from: string, t
   const range = ['trial-balance', 'balance-sheet'].includes(kind) ? `As of ${to}` : `${from} to ${to}`
   const name = `${kind}-${to}-${basis}.${format}`
   const headers = { 'content-disposition': `attachment; filename="${name}"`, 'cache-control': 'no-store', 'x-pantry-basis': BASIS_LABEL[basis] }
+  if (format === 'xlsx') return xlsxResponse([[entity?.legal_name ?? 'Pantry', title, range, BASIS_LABEL[basis]], ['Description', 'Amount (USD)', 'Basis'], ...[...rows, ...totals].map(l => [l.description, l.amount / 100, BASIS_LABEL[basis]])], `${kind}-${to}-${basis}`, { 'x-pantry-basis': BASIS_LABEL[basis] })
   if (format === 'pdf') return new Response(reportPdf({ business: entity?.legal_name ?? 'Pantry', title, basis: BASIS_LABEL[basis], range, rows, totals }), { headers: { ...headers, 'content-type': 'application/pdf' } })
   if (format === 'csv') return new Response([[title, range, 'Amount (USD)', 'Basis'], ...[...rows, ...totals].map(l => [l.description, '', money(l.amount), BASIS_LABEL[basis]])].map(r => r.map(cell).join(',')).join('\r\n') + '\r\n', { headers: { ...headers, 'content-type': 'text/csv; charset=utf-8' } })
-  throw new Fault(400, 'Export format is pdf or csv')
+  throw new Fault(400, 'Export format is pdf, csv or xlsx')
 }

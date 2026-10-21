@@ -1,9 +1,10 @@
+import { downloadSpreadsheet } from '../xlsx.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { books, harness } from './harness.mjs'
 
 const basic = { name: 'Personal income', source: 'profit-and-loss', from: '2026-10-01', to: '2026-10-31', columns: ['name', 'amount'] }
-const doors = (prefix, id) => [`${prefix}/${id}`, `${prefix}/${id}/render`, `${prefix}/${id}/export.pdf`, `${prefix}/${id}/export.csv`, `${prefix}/${id}/export.json`, ...(prefix === 'custom-reports' ? [`${prefix}/${id}/figures?row=missing&column=amount`, `${prefix}/${id}/figures/export?row=missing&column=amount`] : [])]
+const doors = (prefix, id) => [`${prefix}/${id}`, `${prefix}/${id}/render`, `${prefix}/${id}/export.pdf`, `${prefix}/${id}/export.csv`, `${prefix}/${id}/export.xlsx`, `${prefix}/${id}/export.json`, ...(prefix === 'custom-reports' ? [`${prefix}/${id}/figures?row=missing&column=amount`, `${prefix}/${id}/figures/export?row=missing&column=amount`] : [])]
 
 test('REPORT-006 personal and role sharing applies on every door, owner edits, revision fences and revoked references', async t => {
   const h = await harness(); t.after(() => h.close())
@@ -37,7 +38,7 @@ test('REPORT-006 personal and role sharing applies on every door, owner edits, r
   await h.command('custom-report.save', { id: saved.id, revision: saved.revision, definition: basic, sharedRoles: [] }, bookkeeper)
   for (const path of doors('custom-reports', saved.id)) await h.view(path, accountant, 404)
   assert.deepEqual((await h.view('custom-reports', accountant)).reports, [])
-  for (const suffix of ['/render', '/export.pdf', '/export.csv', '/export.json']) await h.view(`management-packages/${pkg.id}${suffix}`, accountant, 404)
+  for (const suffix of ['/render', '/export.pdf', '/export.csv', '/export.xlsx', '/export.json']) await h.view(`management-packages/${pkg.id}${suffix}`, accountant, 404)
   await h.command('management-package.save', { name: 'Cannot borrow package authority', reportIds: [saved.id] }, accountant, 404)
   // An existing package still belongs to its creator and the owner.
   for (const cookie of [bookkeeper, h.owner]) assert.equal((await h.view(`management-packages/${pkg.id}/render`, cookie)).reports.length, 1)
@@ -164,6 +165,17 @@ test('REPORT-005 / REPORT-006 / REPORT-007 saved P&L filters, gross margin and r
   assert.ok(all.some(row => row[4] === 'Accrual basis' && row[7] === 'Gross profit' && row[13] === '600.00'))
   assert.ok(all.filter(row => row[7] === 'Gross profit').every(row => row[5] === '2026-10-01' && row[6] === '2026-10-31'))
   assert.ok(all.some(row => row[8] === 'commentary' && row[14] === 'Cash receipts remain outstanding.'))
+  const singleXlsx = await downloadSpreadsheet(h.origin, `custom-reports/${saved.id}/export.xlsx`, accountant)
+  const packageXlsx = await downloadSpreadsheet(h.origin, `management-packages/${pkg.id}/export.xlsx`, accountant)
+  for (const [sheet, csvRows] of [[singleXlsx, csv], [packageXlsx, all]]) {
+    assert.deepEqual(sheet.slice(1).map(row => row.map(value => String(value))), csvRows.map(row => row.map((value, i) => [1, 13].includes(i) && value !== '' && Number.isFinite(Number(value)) ? String(Number(value)) : value.replace(/^'(?=[\s]*[=+\-@])/, ''))))
+  }
+  assert.equal(singleXlsx.find(row => row[7] === 'Gross profit' && row[9] === rendered.report.columns.find(c => c.id === 'amount').label)[13], 600)
+  assert.equal(singleXlsx.find(row => row[7] === 'Gross margin' && row[9] === rendered.report.columns.find(c => c.id === 'amount').label)[13], 60)
+  assert.equal(singleXlsx.find(row => row[7] === 'Cost ratio' && row[9] === rendered.report.columns.find(c => c.id === 'amount').label)[13], 0.4)
+  assert.ok(singleXlsx.some(row => row[14] === '=1+1, "not a formula"\nRetained note.'))
+  assert.ok(packageXlsx.some(row => row[4] === 'Cash basis' && row[7] === 'Gross margin' && row[13] === 'undefined'))
+
   const pdf = await h.send(`/api/pantry/management-packages/${pkg.id}/export.pdf`, undefined, { cookie: accountant })
   assert.equal(pdf.status, 200)
   assert.equal(pdf.headers.get('content-type'), 'application/pdf')

@@ -1,3 +1,4 @@
+import { spreadsheet } from '../xlsx.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -141,6 +142,14 @@ test('REPORT-005 / REPORT-006 / REPORT-007 build and reopen a role-shared gross-
     await page.evaluate(() => window.scrollTo(0, 0))
     await page.screenshot({ path: `${evidence}/report-csv-${width}.png`, fullPage: true })
     await csvDownload.saveAs(`${evidence}/custom-report-${width}.csv`)
+    const [excel] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: 'Download custom report Excel · accrual', exact: true }).click()])
+    assert.equal(await excel.failure(), null)
+    const cells = spreadsheet(await readFile(await excel.path()))
+    assert.ok(cells.some(row => row[7] === 'Gross profit' && row[13] === 8000))
+    assert.ok(cells.some(row => row[7] === 'Gross margin' && row[13] === 66.67))
+    await excel.saveAs(`${evidence}/custom-report-${width}.xlsx`)
+    await page.screenshot({ path: `${evidence}/report-excel-${width}.png`, fullPage: true })
+
     // The custom report shows its range and opens its source report on the same basis and range.
     const resultCard = page.locator('.card').filter({ has: page.getByRole('heading', { name: new RegExp(`^${name} Accrual basis`) }) })
     await resultCard.getByText(/^2026-09-01 to 2026-09-30/).waitFor()
@@ -183,6 +192,15 @@ test('REPORT-005 / REPORT-006 / REPORT-007 build and reopen a role-shared gross-
     assert.ok(packageText.includes('"Accrual basis"') && packageText.includes('"Cash basis"'))
     assert.ok(packageText.includes('Strong recurring design demand.'))
     await packageDownload.saveAs(`${evidence}/management-package-${width}.csv`)
+    const [packageExcel] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: 'Download management package Excel', exact: true }).click()])
+    assert.equal(await packageExcel.failure(), null)
+    const excelRows = spreadsheet(await readFile(await packageExcel.path()))
+    assert.ok(excelRows.some(row => row[4] === 'Accrual basis' && row[7] === 'Gross profit' && row[13] === 8000))
+    assert.ok(excelRows.some(row => row[4] === 'Cash basis'))
+    assert.ok(excelRows.some(row => row[14] === 'Strong recurring design demand.'))
+    await packageExcel.saveAs(`${evidence}/management-package-${width}.xlsx`)
+    await page.screenshot({ path: `${evidence}/package-excel-${width}.png`, fullPage: true })
+
     await page.evaluate(() => window.scrollTo(0, 0))
     await page.screenshot({ path: `${evidence}/package-csv-${width}.png`, fullPage: true })
     const link = page.getByRole('link', { name: 'Download management package PDF', exact: true })

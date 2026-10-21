@@ -1,4 +1,5 @@
-import { customReportsCsv } from './csv'
+import { xlsxResponse } from '../xlsx'
+import { customReportsCsv, customReportsRows } from './csv'
 import type { Hono, Context as HonoContext } from 'hono'
 import type { Bindings } from '../../auth.server'
 import type { Context } from '../context'
@@ -49,6 +50,13 @@ export function registerCustomReportRoutes(api: Hono<{ Bindings: Bindings }>, re
     await assertReportRead(ctx)
     return csvResponse(csv, 'pantry-custom-report')
   })
+  api.get('/api/pantry/custom-reports/:id/export.xlsx', async c => {
+    const ctx = await reader(c), rendered = await renderSavedReport(ctx, c.req.param('id'))
+    const rows = customReportsRows([exportReport(rendered)])
+    await savedReport(ctx, rendered.saved.id)
+    await assertReportRead(ctx)
+    return xlsxResponse(rows, 'pantry-custom-report', { 'x-pantry-basis': rendered.report.basisLabel })
+  })
   api.get('/api/pantry/custom-reports/:id/export.pdf', async c => {
     const ctx = await reader(c), rendered = await renderSavedReport(ctx, c.req.param('id'))
     const business = await one(ctx.db, 'SELECT legal_name FROM pt_entity WHERE id = 1')
@@ -72,6 +80,15 @@ export function registerCustomReportRoutes(api: Hono<{ Bindings: Bindings }>, re
     await savedReport(ctx, rendered.saved.id, 'package')
     await assertReportRead(ctx)
     return csvResponse(csv, 'pantry-management-package')
+  })
+  api.get('/api/pantry/management-packages/:id/export.xlsx', async c => {
+    const ctx = await reader(c), rendered = await renderSavedPackage(ctx, c.req.param('id'))
+    const rows = customReportsRows(rendered.reports.map(exportReport), rendered.saved.name,
+      [rendered.saved.cover, ...rendered.saved.commentary, sharingNote(rendered.saved)].filter(Boolean))
+    for (const report of rendered.reports) await savedReport(ctx, report.saved.id)
+    await savedReport(ctx, rendered.saved.id, 'package')
+    await assertReportRead(ctx)
+    return xlsxResponse(rows, 'pantry-management-package')
   })
   api.get('/api/pantry/management-packages/:id/export.pdf', async c => {
     const ctx = await reader(c), rendered = await renderSavedPackage(ctx, c.req.param('id'))

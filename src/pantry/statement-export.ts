@@ -1,4 +1,5 @@
 // Column exports retain each column's dates, units, basis and exact cent values.
+import { xlsxResponse } from './xlsx'
 import { Fault } from './core'
 import { BASIS_LABEL } from './basis'
 import { reportPdf } from './report-pdf'
@@ -9,6 +10,7 @@ export function statementExport(r: StatementColumns, business: string, format: s
   const title = r.kind === 'profit-and-loss' ? 'Profit and loss' : 'Balance sheet'
   const basis = BASIS_LABEL[r.basis], lines = [...r.rows, ...r.totals]
   const headers = { 'content-disposition': `attachment; filename="${r.kind}-${r.mode}-${r.to}-${r.basis}.${format}"`, 'cache-control': 'no-store', 'x-pantry-basis': basis }
+  if (format === 'xlsx') return xlsxResponse([[business, title, basis, r.from, r.to], ['Account', 'Section', 'Code', 'Basis', ...r.columns.map(c => `${c.label} · ${c.from} to ${c.to} · ${c.unit === 'percent' ? '%' : 'USD'}`)], ...lines.map(l => [l.name, l.section, l.code, basis, ...l.values.map((v, i) => v === null ? 'Not comparable (prior is zero)' : r.columns[i].unit === 'percent' ? v : v / 100)])], `${r.kind}-${r.mode}-${r.to}-${r.basis}`, { 'x-pantry-basis': basis })
   if (format === 'csv') {
     const head = ['Account', 'Section', 'Code', 'Basis', ...r.columns.map(c => `${c.label} · ${c.from} to ${c.to} · ${c.unit === 'percent' ? '%' : 'USD'}`)]
     const rows = lines.map(l => [l.name, l.section, l.code, basis, ...l.values.map((v, i) => v === null ? 'Not comparable (prior is zero)' : r.columns[i].unit === 'percent' ? `${v}%` : (v / 100).toFixed(2))])
@@ -21,5 +23,5 @@ export function statementExport(r: StatementColumns, business: string, format: s
     const notes = percent < 0 ? [] : lines.map(l => `${l.code} ${l.name} · Change %: ${l.values[percent] === null ? 'Not comparable (prior is zero)' : `${l.values[percent]}%`}`)
     return new Response(reportPdf({ business, title: `${title} · ${r.mode}`, basis, range: `${r.from} to ${r.to}`, rows, notes }), { headers: { ...headers, 'content-type': 'application/pdf' } })
   }
-  throw new Fault(400, 'Export format is pdf or csv')
+  throw new Fault(400, 'Export format is pdf, csv or xlsx')
 }
