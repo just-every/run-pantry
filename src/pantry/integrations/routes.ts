@@ -29,9 +29,12 @@ integrations.use('*', async (c, next) => {
   try {
     requireThat(!credential.revoked, 'This integration credential was revoked; ask the owner for a new one', 401)
     const budget = await integrationBudget(c.env.DB, credential.id)
-    c.header('X-RateLimit-Limit', String(budget.limit))
-    c.header('X-RateLimit-Remaining', String(budget.remaining))
-    c.header('X-RateLimit-Reset', String(budget.reset))
+    const headers = () => {
+      c.header('X-RateLimit-Limit', String(budget.limit))
+      c.header('X-RateLimit-Remaining', String(budget.remaining))
+      c.header('X-RateLimit-Reset', String(budget.reset))
+    }
+    headers()
     if (!budget.allowed) {
       c.header('Retry-After', String(budget.retryAfter))
       status = 429
@@ -39,6 +42,8 @@ integrations.use('*', async (c, next) => {
     }
     c.set('integration', credential)
     await next()
+    // A handler may return original file bytes as a raw Response.
+    headers()
     status = c.res.status
   } catch (error) {
     status = error instanceof Fault ? error.status : 500

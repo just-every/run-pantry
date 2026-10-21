@@ -33,6 +33,7 @@ test('REPORT-002 / API-001 a scoped sibling posts once, readies its bill, reads 
   const document = await call('documents', { name: 'HC-7731.txt', mediaType: 'text/plain', base64: source.toString('base64'), linkedKind: 'bill', linkedId: a.id }, 'source-invoice')
   const raw = await h.send('/api/pantry/integration/v1/documents/' + document.id, undefined, { headers: { authorization: `Bearer ${credential.token}` } })
   assert.equal(raw.value, source.toString())
+  assert.equal(raw.headers.get('x-ratelimit-limit'), '120', 'original-byte downloads retain the API-001 quota headers')
   assert.equal((await call('documents', { name: 'HC-7731.txt', mediaType: 'text/plain', base64: source.toString('base64'), linkedKind: 'bill', linkedId: a.id }, 'source-invoice')).id, document.id)
   const payment = await h.command('payment.record', { direction: 'paid', contactId: vendor.id, date: '2026-10-17', amount: '482.00', method: 'ach', bankAccountId: bank.id, allocations: [{ targetId: a.id, amount: '482.00' }] })
   const payments = await call('payments?billId=' + a.id)

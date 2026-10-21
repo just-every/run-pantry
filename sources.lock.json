@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "7f783ef92a77d95172fc880d0eb8af1d20693441e5e2a3546f83ca6b6e5b6f3b",
+      "sha256": "913d03a1291c13df5562988d544b0699bed481231a5b51bb625b6d93f87be040",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -68,7 +68,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "70bebbfb2f471ceb85df02b642209d715c869eb45c2207957cf4643355a7ade1",
+      "sha256": "74c7b8149b055a06c57940030afd929d678cba1923e703c48751496344f2c5b0",
       "executable": false
     },
     "base-copies.json": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "37e936cdf639139ddb473b37623d3dcf50611e35e17e3f5e2ec3d9578571cc5d",
+      "sha256": "edd12a11c207dfa1b7f469bcca3ca9d2eaeadc3d6483e1c4ceabe29457329013",
       "executable": false
     },
     "DEMO.md": {
@@ -140,7 +140,7 @@
       "executable": false
     },
     "docs/integrations.md": {
-      "sha256": "b9e66670ebd19972f32690cb6a8205861334c2ca9d7fcb1bbc6e2b45322f27cf",
+      "sha256": "dfcc1fbc58fff4610d96e44b6170d76787e43879f187af0c0a54493e4ebdb10e",
       "executable": false
     },
     "docs/journals.md": {
@@ -617,6 +617,10 @@
     },
     "migrations/core/0066_issuing_limits.sql": {
       "sha256": "5665a7c88e62fd5327799359402674f64799a98d2fe4d0bf9a8a6021a260da2e",
+      "executable": false
+    },
+    "migrations/core/0067_integration_rate_limits.sql": {
+      "sha256": "a5de42cb75bece864eff37254502abe8d33c7163b9f316050d2272fef8910167",
       "executable": false
     },
     "migrations/rewrites.json": {
@@ -3132,7 +3136,7 @@
       "executable": false
     },
     "src/pantry/integrations/openapi.ts": {
-      "sha256": "199de4c5b7546fdb6c6e642c809e4b19ac8f2da74eab913e7c21175907d74f5c",
+      "sha256": "cee97f9e295c64ffdfa823d6d982ab5043af104ed9c419c886862864ba2a3d02",
       "executable": false
     },
     "src/pantry/integrations/payments.ts": {
@@ -3143,8 +3147,12 @@
       "sha256": "7af8263c1ad402df9c0de00f18ea6546c1d0dec22c18daaf36471995cbf97dc7",
       "executable": false
     },
+    "src/pantry/integrations/rate-limit.ts": {
+      "sha256": "079ebae66ced26322051b3f250af9b751bb61b3b2372f9815eb289f99580a711",
+      "executable": false
+    },
     "src/pantry/integrations/routes.ts": {
-      "sha256": "cfbf2c9537992a23c11cc60da5764e4201d8fb369cd104b1099f284c7009c42b",
+      "sha256": "34d3ad3e9ccf80dfaac88cd680c052b8f9239c68517e5925fa9f0d9a135caa8f",
       "executable": false
     },
     "src/pantry/invoice-documents.ts": {
@@ -4252,7 +4260,7 @@
       "executable": false
     },
     "tests/api/integrations.test.mjs": {
-      "sha256": "988d5edcbbe459e2b10024a799a515daebb822f6a3d3af5b99c095d051704ece",
+      "sha256": "45fd3b6ef6f8f6c90394e7d496d172cd2df89478b5e73a49ec085e0c576f416e",
       "executable": false
     },
     "tests/api/invoices-out.test.mjs": {
