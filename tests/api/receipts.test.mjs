@@ -1,3 +1,4 @@
+import { captureSizeJourney } from './capture-size-journey.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash, randomBytes } from 'node:crypto'
@@ -615,3 +616,5 @@ test('CAPTURE-004 delayed receipt matching, vendor/card identity, tip and FX bou
   assert.equal(doc.value, 'Local stationery cash receipt 18.75')
   assert.ok((await h.view('reports/trial-balance?to=2026-09-30&basis=accrual')).balanced)
 })
+
+test('CAPTURE-001 native multipart keeps a 25 MB original and its 4 MB reading copy byte for byte', captureSizeJourney)

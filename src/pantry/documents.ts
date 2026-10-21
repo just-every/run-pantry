@@ -5,12 +5,12 @@ import { now, requireThat, sha256, uid } from './core'
 import { all, one, q, type Sql } from './db'
 
 const PART = 1_000_000
-export const MAX_DOCUMENT_BYTES = 12_000_000
+export const MAX_DOCUMENT_BYTES = 25_000_000
 
 export type NewDocument = { name: string; mediaType: string; bytes: Uint8Array; linkedKind?: string | null; linkedId?: string | null; note?: string }
 
 export async function documentStatements(by: string, input: NewDocument) {
-  requireThat(input.bytes.length > 0 && input.bytes.length <= MAX_DOCUMENT_BYTES, 'Files are 1 byte to 12 MB')
+  requireThat(input.bytes.length > 0 && input.bytes.length <= MAX_DOCUMENT_BYTES, 'Files are 1 byte to 25 MB')
   const id = uid(), hash = await sha256(input.bytes), split = input.bytes.length > PART
   const statements: Sql[] = [q('INSERT INTO pt_documents (id, name, media_type, size, sha256, content, linked_kind, linked_id, note, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     id, input.name.slice(0, 200), input.mediaType, input.bytes.length, hash, split ? new Uint8Array(0) : input.bytes, input.linkedKind ?? null, input.linkedId ?? null, (input.note ?? '').slice(0, 500), by, now())]

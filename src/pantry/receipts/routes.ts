@@ -90,7 +90,7 @@ export function receiptRoutes(api: Hono<{ Bindings: Bindings }>) {
   api.post('/api/pantry/receipts/capture', async c => {
     const actor = await person(c.req.raw, c.env)
     must(actor, 'record')
-    requireThat(Number(c.req.header('content-length') ?? 0) <= MAX_DOCUMENT_BYTES + 3_000_000, 'Files are up to 12 MB', 413)
+    requireThat(Number(c.req.header('content-length') ?? 0) <= MAX_DOCUMENT_BYTES + 4_100_000, 'Files are up to 25 MB, plus a reading copy', 413)
     const form = await c.req.formData().catch(() => { throw new Fault(400, 'Send the file as a form upload') })
     const file = await bytesOf(form.get('file'), MAX_DOCUMENT_BYTES, 'The file')
     requireThat(file, 'Choose a photo or file')
