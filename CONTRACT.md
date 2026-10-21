@@ -670,8 +670,8 @@ The 21 October CLOSE-004 round moves Continuous checks to done from `tests/api/c
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 43 | 41 | 36 | 120 |
-| All | 62 | 41 | 36 | 139 |
+| Target and push further | 44 | 41 | 35 | 120 |
+| All | 63 | 41 | 35 | 139 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -797,8 +797,8 @@ The 21 October CLOSE-004 round moves Continuous checks to done from `tests/api/c
 | `NOTIFY-001` | Notifications people control | target | partial | `src/pantry/feeds/notifications.ts`, `src/pantry/questions/mail.ts`, `tests/api/feeds.test.mjs`, `tests/api/questions.test.mjs` | Feed incidents email the owner once with visible outcomes; questions email the owner or assigned invited accountant and support replies through the Pantry address. Local mail suppression is explicit. Notification preferences by channel, SMS consent/provider delivery, push and wider notification types remain absent. |
 | `OWN-001` | Owned, free and open source | target | done | `LICENSE`, `package.json`, `OPERATIONS.json`, `tests/restore/restore.test.mjs` |  |
 | `OWN-002` | A hosted installation without a terminal | target | partial | `deploy.json`, `wrangler.jsonc`, `src/auth.server.ts` | A hosted Cloudflare deployment with a Cron trigger and an RER Managed owner claim by email are wired, but deploying to the business's own Cloudflare account needs `rer deploy` from a terminal; the browser-only route from the homepage, the timed and counted run, the laptop notice, updates from settings and feeds on RER Managed do not exist. |
-| `ACCESS-001` | Narrower roles and approval limits | target | partial | `src/pantry/access.ts`, `tests/api/ledger.test.mjs` | Owner, bookkeeper, accountant, viewer and agent with post/lock/reopen grants ship; sales and payables-clerk roles, amount limits, account visibility and masking do not. |
-| `ACCESS-003` | Issuing limits for invoices, credits and sales | target | missing |  | No implementation; every invoice and credit needs a second person unless the owner prepared it (`src/pantry/invoices.ts`). |
+| `ACCESS-001` | Narrower roles and approval limits | target | partial | `src/pantry/access.ts`, `tests/api/ledger.test.mjs` | Owner, bookkeeper, accountant, viewer and agent with post/lock/reopen grants ship; ACCESS-003 issuing/credit limits ship; sales and payables-clerk roles, bill/payment/journal amount limits, account visibility and masking do not. |
+| `ACCESS-003` | Issuing limits for invoices, credits and sales | target | done | `src/pantry/issuing-limits.ts`, `src/pantry/invoices.ts`, `src/pantry/recurring.ts`, `src/pantry/recurring-prices.ts`, `src/ui/issuing-limits.tsx`, `tests/api/subledgers.test.mjs`, `tests/api/access003-journey.mjs`, `tests/app/invoice-documents.test.mjs`, `tests/app/access003-journey.mjs` › ACCESS-003 | Current bookkeeper/accountant/person doors satisfy ct scope55; ACCESS-001, SALES-001/002, INVOICE-008 and CURRENCY-001 inherit before shipping. No provider, legal or accounting acceptance claimed. |
 | `ACCESS-002` | Sign-in security | target | partial | `src/auth.server.ts`, `src/pantry/access.ts` | Native email sign-in with server-checked sessions and origin checks ships; passkey/MFA requirement, SSO, session list and step-up do not. |
 | `AUDIT-001` | Who, what and when | target | done | `src/pantry/db.ts`, `src/pantry/activity.ts`, `src/ui/activity.tsx`, `tests/api/ledger.test.mjs` › AUDIT-001, `tests/restore/restore.test.mjs` › AUDIT-001 | Atomic immutable events retain actor/origin, record or stored history revision, exact approval or standing authority, and safe before/after snapshots. Activity filters by person, date and record. Accountant JSON/ZIP packages and real rer export/import preserve the raw audit and approvals. Legacy events remain untouched. |
 | `ERASURE-001` | Erasure within record-keeping law | target | missing |  | No implementation in `src/pantry`. |
