@@ -40,7 +40,7 @@ export async function journey(t) {
   await h.command('item.save', { name: 'Design hour', kind: 'service', rate: '150.00', accountId: s.acct['4000'], taxCategory: 'non-taxable' })
   await h.command('contractor.save', { contactId: vendor.id, is1099: true, legalName: 'Brightline Software LLC', tinKind: 'ein', tin: '000000042', address: '1 Example Street', city: 'Albany', state: 'NY', zip: '12207' })
   await h.command('exemption.save', { customerId: customer.id, states: ['CA'], validFrom: '2026-01-01', expiresOn: '2099-12-31', certificateNumber: 'synthetic-pantry-15', name: 'certificate.txt', mediaType: 'text/plain', base64: Buffer.from('Synthetic resale evidence').toString('base64') })
-  await h.command('invoice.send', { id: s.inv.cedar.id })
+  await h.command('invoice.send', { id: s.inv.northstar.id })
   await h.command('question.ask', { subjectKind: 'journal', subjectId: s.bills.brightline.journal_id, question: 'Confirm this annual software charge.', assignee: 'owner@example.test' })
   const agent = await h.agent('synthetic-pantry-16')
   const proposal = await agent.call('proposals', { kind: 'close-packet', summary: 'October review', payload: { period: '2026-10', exceptions: ['Confirm insurance renewal'], notes: 'Prepared from the recorded books.' } })

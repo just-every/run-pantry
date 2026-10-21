@@ -38,7 +38,7 @@ export async function webhookLifecycle(t) {
     await h.command('webhook.edit',{id:sub.id,revision:sub.revision,...base,destination},h.owner,400)
   }
   const customer=await lead(h,1)
-  const bank=await h.command('bank-account.save',{name:'Operating checking',institution:'Community Bank',accountId:acct['1000'],numberLast4:'4821',openingDate:'2026-11-01',openingBalance:'0.00'})
+  const bank=await h.command('bank-account.save',{name:'Operating checking',institution:'Community Bank',accountId:acct['1000'],numberLast4:'4821',openingDate:'2026-10-01',openingBalance:'0.00'})
   const invoiceBody={customerId:customer.id,issueDate:'2026-10-20',lines:[{description:'Private engagement memo',accountId:acct['4000'],quantity:'1',rate:'125.00',taxCode:'exempt'}]}
   const createInvoice=()=>h.send('/api/pantry/integration/v1/invoices',invoiceBody,{headers:{authorization:`Bearer ${credential.token}`,'idempotency-key':'synthetic-pantry-invoice'}})
   const created=await createInvoice();assert.equal(created.status,200);const invoice=created.value

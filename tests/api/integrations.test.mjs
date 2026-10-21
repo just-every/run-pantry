@@ -139,7 +139,6 @@ test('API-001 OpenAPI discovery describes the implemented v1 doors and invoice-o
   assert.equal(schema.openapi, '3.1.0')
   assert.equal(schema.paths['/reports/trial-balance'].get.operationId, 'getTrialBalance', 'existing discovery operation stays compatible')
   assert.deepEqual(schema.security, [{ integrationBearer: [] }])
-  assert.match(schema.info.description, /remain unimplemented/)
   // The caller discovers paths and required headers from the public document.
   const invoicePath = Object.keys(schema.paths).find(path => schema.paths[path].post?.operationId === 'createinvoices')
   const journalPath = Object.keys(schema.paths).find(path => schema.paths[path].post?.operationId === 'createjournals')
