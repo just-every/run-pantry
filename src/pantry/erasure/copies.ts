@@ -56,11 +56,13 @@ function replacement(value: unknown, column: string, input: Input): unknown {
   if (typeof value !== 'string') return value
   if (JSON_FIELDS.has(column) && value.trim()) {
     // Some historical narrative columns admit both JSON and plain text. Keep
-    // either representation intact when no personal leaf was replaced.
-    let parsed: unknown
-    try { parsed = JSON.parse(value) } catch { return scrub(value, input.values, input.marker) }
-    const next = JSON.stringify(scrub(parsed, input.values, input.marker))
-    return next === JSON.stringify(parsed) ? value : next
+    // either representation, numeric tokens and bookkeeping keys intact.
+    try { JSON.parse(value) } catch { return scrub(value, input.values, input.marker) }
+    return value.replace(/"(?:[^"\\]|\\.)*"/g, (token: string, offset: number) => {
+      if (/^\s*:/.test(value.slice(offset + token.length))) return token
+      const before: string = JSON.parse(token), after = scrub(before, input.values, input.marker)
+      return before === after ? token : JSON.stringify(after)
+    })
   }
   return scrub(value, input.values, input.marker)
 }

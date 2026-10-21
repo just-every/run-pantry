@@ -20,6 +20,12 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
     for(const bearer of [token.token,agent.token]) assert.equal((await h.send('/api/pantry/command/'+op,{kind:'contact',id:lead.id},{headers:{authorization:`Bearer ${bearer}`}})).status,401)
   }
   await h.view('erasure',viewer,403)
+  const multi=await h.command('contact.save',{kind:'customer',name:'Shared customer LLC',contacts:[{name:'Departed buyer',email:'departed@example.test',phone:'555-0107',roles:['primary']},{name:'Current buyer',email:'current@example.test',phone:'555-0108',roles:['billing']}]})
+  const personPreview=await h.command('erasure.preview',{kind:'contact-person',id:multi.id,personIndex:0})
+  await h.command('erasure.execute',request(personPreview,{personIndex:0}))
+  const remaining=JSON.parse((await h.view('state')).contacts.find(c=>c.id===multi.id).contacts_json)
+  assert.deepEqual(remaining.map(p=>p.email),['current@example.test'])
+  assert.ok(!JSON.stringify(await h.view('activity')).includes('departed@example.test'))
   const p=await h.command('erasure.preview',{kind:'contact',id:lead.id})
   assert.equal(p.classes.find(r=>r.table==='pt_contacts').action,'removed')
   await h.command('erasure.execute',request(p,{confirm:'erase'}),h.owner,400)
@@ -51,7 +57,7 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
   const after=(await h.view('activity')).audit
   for(const entry of history){const kept=after.find(e=>e.id===entry.id);assert.ok(kept);for(const key of ['at','action','subject_revision','approval_id'])assert.equal(kept[key],entry[key])}
   const serialized=JSON.stringify(after)
-  for(const personal of [customer.email,customer.phone,customer.billing_address,'casey@cedar.example',stale.internal_notes])assert.ok(!serialized.includes(personal),personal)
+  for(const personal of [customer.email,customer.phone,customer.billing_address,'casey@cedar.example','Please use the side entrance',stale.internal_notes])assert.ok(!serialized.includes(personal),personal)
   assert.ok(after.some(e=>JSON.parse(e.detail).erasure?.id===receipt.id))
   assert.equal((await h.view(`invoice-documents/${i.id}/preview`)).sha256,pdf.sha256)
   assert.equal((await h.view('sales')).invoices.find(r=>r.id===i.id).link_token,null)
@@ -64,7 +70,7 @@ test('ERASURE-001 a deactivated member loses identity and sessions while a stabl
   const h=await harness();t.after(h.close);const {acct}=await books(h)
   const email='blair@example.test',cookie=await h.member(email,'bookkeeper',{canPost:true})
   await h.command('contact.save',{kind:'vendor',name:'Blair supplied vendor'},cookie)
-  const entry=await h.command('journal.save-draft',{date:'2026-09-04',memo:'Office supplies',lines:[{accountId:acct['6100'],debit:'25.00'},{accountId:acct['1000'],credit:'25.00'}]},cookie)
+  const entry=await h.command('journal.save-draft',{date:'2026-09-04',memo:'Office supplies',lines:[{accountId:acct['6100'],debit:'25.00'},{accountId:acct['1000'],credit:'25.00'}]})
   await h.command('journal.post',{id:entry.id,revision:entry.revision},cookie)
   await h.command('erasure.preview',{kind:'member',id:'owner@example.test'},h.owner,409)
   await h.command('erasure.preview',{kind:'member',id:email},h.owner,409)

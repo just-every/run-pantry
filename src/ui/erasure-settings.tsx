@@ -7,18 +7,19 @@ export function ErasureSettings() {
   const [preview,setPreview] = useState<D|null>(null), [receipt,setReceipt] = useState<D|null>(null)
   if (!data) return <Loading error={error} what="erasure and retention" />
   const subjects = [...state.contacts.filter((r:D)=>!r.erased_at).map((c:D)=>({value:`contact:${c.id}`,label:`${c.name} · ${c.kind}`})),
+    ...state.contacts.filter((c:D)=>!c.erased_at).flatMap((c:D)=>JSON.parse(c.contacts_json??'[]').map((p:D,i:number)=>({value:`contact-person:${c.id}:${i}`,label:`${p.name||p.email} · contact at ${c.name}`}))),
     ...state.settings.members.filter((m:D)=>!m.active && !m.email.startsWith('Former member ')).map((m:D)=>({value:`member:${m.email}`,label:`${m.name} · deactivated member`}))]
   const done = async (result:D) => {setReceipt(result);setPreview(null);await reload();await refresh()}
   return <>
     <Card title="Erase personal data">
       <p>Record a person’s request, preview what will be removed or retained, then confirm. Posted accounting facts stay. Connected services, downloaded files and earlier backups are outside this erasure.</p>
-      <Form label="Preview erasure" submit={async b=>{const [kind,...id]=String(b.subject).split(':');return command('erasure.preview',{kind,id:id.join(':')})}} onDone={r=>{setPreview(r);setReceipt(null)}} className="grid-form">
+      <Form label="Preview erasure" submit={async b=>{const [kind,...parts]=String(b.subject).split(':');const personIndex=kind==='contact-person'?Number(parts.pop()):undefined;return command('erasure.preview',{kind,id:parts.join(':'),personIndex})}} onDone={r=>{setPreview(r);setReceipt(null)}} className="grid-form">
         <Field label="Person or contact" name="subject" required options={subjects} />
       </Form>
       {preview && <section aria-label="Erasure preview">
         <h3>Erasure preview · {preview.label}</h3>
         <Table heads={['Record class','Action','Reason / expiry']} empty="No records.">{preview.classes.map((r:D,i:number)=><tr key={i}><td>{r.table}{r.id&&<small className="sub">{r.id}</small>}</td><td>{r.action}</td><td>{r.reason}{r.expires&&<small className="sub">Retained until {r.expires}</small>}</td></tr>)}</Table>
-        {preview.blockers.length ? <div role="alert" className="callout callout-warn"><strong>Resolve these records before erasure</strong>{preview.blockers.map((r:D)=><p key={r.kind+r.id}>{r.kind} {r.number??r.id}: {r.reason}</p>)}</div> : <Form label="Erase personal data" submit={b=>command('erasure.execute',{...b,kind:preview.kind,id:preview.id,fingerprint:preview.fingerprint})} onDone={done} className="grid-form">
+        {preview.blockers.length ? <div role="alert" className="callout callout-warn"><strong>Resolve these records before erasure</strong>{preview.blockers.map((r:D)=><p key={r.kind+r.id}>{r.kind} {r.number??r.id}: {r.reason}</p>)}</div> : <Form label="Erase personal data" submit={b=>command('erasure.execute',{...b,kind:preview.kind,id:preview.id,personIndex:preview.personIndex,fingerprint:preview.fingerprint})} onDone={done} className="grid-form">
           <Field label="Requester" name="requester" required hint="Who asked for this erasure" /><Field label="Request channel" name="channel" options={['email','phone','in-person','other'].map(value=>({value,label:value}))} required />
           <Field label="Reason for erasure" name="reason" type="textarea" required /><Field label="Type ERASE to confirm" name="confirm" required />
         </Form>}

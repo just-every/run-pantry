@@ -63,3 +63,13 @@ WHEN
   AND NOT EXISTS (SELECT 1 FROM pt_erasure_scope s JOIN pt_erasure_journal j ON j.id=s.erasure_id
    WHERE s.table_name='pt_matches' AND s.row_id=OLD.id AND s.operation='redact'))
 BEGIN SELECT RAISE(ABORT, 'Rule filing evidence is immutable'); END;
+
+DROP TRIGGER pt_document_erased_immutable;
+CREATE TRIGGER pt_document_erased_immutable BEFORE UPDATE ON pt_documents
+WHEN OLD.erased_at IS NOT NULL AND (NOT EXISTS (SELECT 1 FROM pt_erasure_scope s JOIN pt_erasure_journal j ON j.id=s.erasure_id WHERE s.table_name='pt_documents' AND s.row_id=OLD.id AND s.operation='redact') OR NEW."id" IS NOT OLD."id" OR NEW."name" IS NOT OLD."name" OR NEW."media_type" IS NOT OLD."media_type" OR NEW."size" IS NOT OLD."size" OR NEW."sha256" IS NOT OLD."sha256" OR NEW."content" IS NOT OLD."content" OR NEW."linked_kind" IS NOT OLD."linked_kind" OR NEW."linked_id" IS NOT OLD."linked_id" OR NEW."note" IS NOT OLD."note" OR NEW."uploaded_at" IS NOT OLD."uploaded_at" OR NEW."capture_vendor" IS NOT OLD."capture_vendor" OR NEW."capture_invoice_number" IS NOT OLD."capture_invoice_number" OR NEW."capture_date" IS NOT OLD."capture_date" OR NEW."capture_total_cents" IS NOT OLD."capture_total_cents" OR NEW."duplicate_of" IS NOT OLD."duplicate_of" OR NEW."duplicate_basis" IS NOT OLD."duplicate_basis" OR NEW."duplicate_reason" IS NOT OLD."duplicate_reason" OR NEW."duplicate_decision" IS NOT OLD."duplicate_decision" OR NEW."requested_linked_kind" IS NOT OLD."requested_linked_kind" OR NEW."requested_linked_id" IS NOT OLD."requested_linked_id" OR NEW."erased_at" IS NOT OLD."erased_at")
+BEGIN SELECT RAISE(ABORT,'PANTRY_ERASED_IMMUTABLE'); END;
+
+DROP TRIGGER pt_contractor_tax_erased_immutable;
+CREATE TRIGGER pt_contractor_tax_erased_immutable BEFORE UPDATE ON pt_contractor_tax
+WHEN OLD.erased_at IS NOT NULL AND (NOT EXISTS (SELECT 1 FROM pt_erasure_scope s JOIN pt_erasure_journal j ON j.id=s.erasure_id WHERE s.table_name='pt_contractor_tax' AND s.row_id=OLD.contact_id AND s.operation='redact') OR NEW."contact_id" IS NOT OLD."contact_id" OR NEW."legal_name" IS NOT OLD."legal_name" OR NEW."tin_kind" IS NOT OLD."tin_kind" OR NEW."tin" IS NOT OLD."tin" OR NEW."address" IS NOT OLD."address" OR NEW."city" IS NOT OLD."city" OR NEW."state" IS NOT OLD."state" OR NEW."zip" IS NOT OLD."zip" OR NEW."revision" IS NOT OLD."revision" OR NEW."updated_at" IS NOT OLD."updated_at" OR NEW."erased_at" IS NOT OLD."erased_at")
+BEGIN SELECT RAISE(ABORT,'PANTRY_ERASED_IMMUTABLE'); END;

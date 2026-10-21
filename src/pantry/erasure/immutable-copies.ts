@@ -3,7 +3,7 @@ import { all, changed, guard, q, type Sql } from '../db'
 import { scrub } from './personal'
 
 type Options = { values: string[]; marker: string; member: boolean; erasureId: string }
-type Copy = { table: string; key: string; text: string[]; json: string[] }
+type Copy = { table: string; key: string; text: string[]; json: string[]; where?: string }
 
 /** Visit JSON string values without reserializing numbers or object keys. */
 function scrubJson(source: string, values: string[], marker: string): string {
@@ -26,12 +26,14 @@ export async function immutableCopies(db: D1Database, options: Options): Promise
     { table: 'pt_reconciliation_undos', key: 'id', text: member ? ['undone_by', 'reason'] : ['reason'], json: [] },
     { table: 'pt_voided_reconciliations', key: 'id', text: [], json: ['snapshot'] },
     { table: 'pt_line_suggestion_decisions', key: 'bank_line_id', text: member ? ['actor_email'] : [], json: ['suggestion'] },
+    { table: 'pt_documents',key:'id',text:member?['uploaded_by']:[],json:[],where:'erased_at IS NOT NULL' },
+    { table: 'pt_contractor_tax',key:'contact_id',text:member?['updated_by']:[],json:[],where:'erased_at IS NOT NULL' },
     { table: 'pt_matches', key: 'id', text: [], json: ['rule_snapshot'] },
   ]
   const statements: Sql[] = [], counts: Record<string, Data> = {}
   const evidence = await Promise.all(copies.map(async copy => {
     const fields = [...copy.text, ...copy.json]
-    const rows = fields.length && values.length ? await all(db, `SELECT ${copy.key},${fields.join(',')} FROM ${copy.table}`) : []
+    const rows = fields.length && values.length ? await all(db, `SELECT ${copy.key},${fields.join(',')} FROM ${copy.table}${copy.where?' WHERE '+copy.where:''}`) : []
     return { copy, fields, rows }
   }))
   for (const { copy, fields, rows } of evidence) {

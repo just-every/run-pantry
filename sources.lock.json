@@ -636,7 +636,7 @@
       "executable": false
     },
     "migrations/core/0071_erasure_identity.sql": {
-      "sha256": "b99605e1d876e4860f3e8b7c8f30de5cb78da2ab939e5af9b94c8ad249975657",
+      "sha256": "1cf27d9764df5a723d01e7aa534f4382deb5948711d01b0cf8f392556f5d6e6e",
       "executable": false
     },
     "migrations/rewrites.json": {
@@ -3088,11 +3088,11 @@
       "executable": false
     },
     "src/pantry/erasure/commands.ts": {
-      "sha256": "d59828fdd84de38269a1fe4b7349a2f4c3b9d4a2a13395131ef178126906b177",
+      "sha256": "7e6c97ce82d31af622b364151f40b45b417ce0ba3f4647c692a4f1708a5e676d",
       "executable": false
     },
     "src/pantry/erasure/copies.ts": {
-      "sha256": "8962d5870fab2e0556fba1733d2226f7e5eb108262a045cbb2e3e12744280949",
+      "sha256": "a3e6bd7ddb3b32096bae9cac029056ee836edcbda79d20f24b78e87ecc8c40c6",
       "executable": false
     },
     "src/pantry/erasure/custody.ts": {
@@ -3108,7 +3108,7 @@
       "executable": false
     },
     "src/pantry/erasure/immutable-copies.ts": {
-      "sha256": "c14766ab934d46caddf31012b9a19fe0f19e415eac85b9cfd6e8ebf3fb7ce2d8",
+      "sha256": "2cce95cd9374a0ffa62c3800816fc8aad50f1b326bb872bfe6eb5c8dea37f626",
       "executable": false
     },
     "src/pantry/erasure/member.ts": {
@@ -3120,11 +3120,11 @@
       "executable": false
     },
     "src/pantry/erasure/personal.ts": {
-      "sha256": "47b3a63e5aa1042fd44a6315b2eb860a86217a6b4337a7aa4e8fe74e6cde1d5e",
+      "sha256": "13f14a84727ab14f182ba603f9fee91eae9dfae5b6f05a6a7d417c7f72809780",
       "executable": false
     },
     "src/pantry/erasure/preview.ts": {
-      "sha256": "a0f5e62678ced48996dea435bc8dc5bb5ec34c4f0ce90475072eb4d235ceacfd",
+      "sha256": "ea16ac89631058928302587173f5ece2d8ecb247e0d7f1fbebe144bb79297342",
       "executable": false
     },
     "src/pantry/erasure/retention-clock.ts": {
@@ -4096,7 +4096,7 @@
       "executable": false
     },
     "src/ui/erasure-settings.tsx": {
-      "sha256": "f8686d8162282cbe2b47718d1a2b8677b26d04510e4f847c979366ae76a32e7d",
+      "sha256": "84dd9ceb984ad50d24386ef601f91a044d13487df3cf97e1709ad2b04bd7ce0e",
       "executable": false
     },
     "src/ui/exemption-certificates.tsx": {
@@ -4412,7 +4412,7 @@
       "executable": false
     },
     "tests/api/security.test.mjs": {
-      "sha256": "78e7b70523fe3a9cb8c0da4d9b8ce7514b1af0aae20730e4faae2e886605f2b3",
+      "sha256": "7cb5a2009dbb611c6b3afa80d791c9c2efcd7f9b17ee1cf04294ae0cbd405596",
       "executable": false
     },
     "tests/api/statement-provider.mjs": {
