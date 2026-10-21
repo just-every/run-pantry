@@ -14,6 +14,7 @@ import { promisify } from 'node:util'
 import { chromium } from '@playwright/test'
 import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { books } from '../app/books.mjs'
+import { captureForRestore, assertCaptureRestored } from './capture.mjs'
 
 const source = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const entry = join(source, 'node_modules/@runeditrun/rer/global/rer.mjs')
@@ -105,6 +106,7 @@ async function snapshot(context, origin, docName) {
       pl: (await get('reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=cash')).netIncome,
       lines: (await get('bank/lines')).lines.map(l => [l.posted_date, l.description, l.amount_cents]).sort(),
       documents: documents.map(d => [d.name, d.sha256]).sort(),
+      captureProvenance: (await get('receipts')).review.filter(r=>r.capture).map(r=>({id:r.id,documentId:r.document_id,capture:r.capture})).sort((a,b)=>a.id.localeCompare(b.id)),
       customReports: definitions(reports), managementPackages: definitions(packages),
       customReportValues: await Promise.all(reports.map(async r => (await get(`custom-reports/${r.id}/render`)).report)),
       audit: (await get('activity')).audit.map(({ approval, ...row }) => row).sort((a, b) => a.id.localeCompare(b.id)),
@@ -145,6 +147,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   await command('bill.schedule', { id: bill.id, revision: bill.revision, date: '2026-09-24', note: 'Bank transfer outside Pantry' })
   await command('recurring-bill.save', { name: 'Archived rent', vendorId: vendor.id, startDate: '2026-06-30', endDate: '2026-08-30', every: 1, unit: 'month', termsDays: 15, lines: [{ description: 'Monthly rent', amount: '1200.00', accountId: rent }] })
   await command('recurring-bill.generate', { through: '2026-09-30' })
+  const captured = await captureForRestore(context, server.origin)
   const lead = await command('contact.save', { kind: 'customer', name: 'Synthetic Pantry Lead', email: 'synthetic-pantry-lead@example.test', internalNotes: 'Synthetic lead private note' })
   const latestCustomer = (await (await context.request.get(`${server.origin}/api/pantry/state`)).json()).contacts.find(c => c.id === customer.id)
   await command('contact.save', { id: customer.id, revision: latestCustomer.revision, kind: 'customer', email: 'synthetic-pantry-customer@example.test', phone: 'synthetic-pantry-phone', billingAddress: 'Synthetic Pantry Address', internalNotes: 'Synthetic Pantry private note', contacts: [{ name: 'Synthetic Pantry Billing', email: 'synthetic-pantry-billing@example.test', roles: ['billing'] }] })
@@ -182,6 +185,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   const restored = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(restored.view, before.view, 'the fresh install holds the same books')
   assert.deepEqual(restored.bytes, pdf, 'the document comes back byte for byte')
+  await assertCaptureRestored(context, server.origin, captured)
   const restoredWebhooks=await (await context.request.get(`${server.origin}/api/pantry/webhooks`)).json()
   const restoredSubscription=restoredWebhooks.subscriptions.find(row=>row.id===webhook.id)
   assert.equal(restoredSubscription.enabled,false);assert.deepEqual(restoredWebhooks.history,[])

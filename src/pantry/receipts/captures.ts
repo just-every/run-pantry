@@ -6,9 +6,10 @@ import { authority, must, person, who } from '../access'
 import { Fault, now, requireThat, uid, type Data } from '../core'
 import { all, audit, guard, one, q, run } from '../db'
 import { documentStatements, MAX_DOCUMENT_BYTES } from '../documents'
-import { readable, receive } from './intake'
+import { readable, receive, receipt } from './intake'
 import { applyRules } from './review'
 import { bytesOf } from './upload'
+import { duplicateDetails } from './duplicates'
 
 type Region = { x: number; y: number; width: number; height: number }
 function regionsOf(value: FormDataEntryValue | null): Region[] {
@@ -65,6 +66,7 @@ export function captureRoutes(api: Hono<{ Bindings: Bindings }>) {
       guards: [authority(actor, 'record'), guard('EXISTS(SELECT 1 FROM pt_capture_sources s JOIN pt_documents d ON d.id=s.document_id WHERE s.id=? AND s.revision=? AND d.erased_at IS NULL)', source.id, source.revision)],
       publication: (receiptId, documentId) => [q('INSERT INTO pt_capture_parts(source_id,part_index,receipt_id,document_id) VALUES(?,?,?,?)', source.id, index, receiptId, documentId)] })
     await applyRules(c.env.DB, result.id)
-    return c.json({ id: result.id, duplicate: null })
+    const captured = (await receipt(c.env.DB, result.id))!
+    return c.json({ id: result.id, duplicate: await duplicateDetails(c.env.DB, captured.duplicate_document_id ?? captured.duplicate_of) })
   })
 }
