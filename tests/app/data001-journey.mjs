@@ -50,7 +50,7 @@ export async function data001Browser(t) {
         await stripe.getByText('Replace Stripe key',{exact:true}).click()
         await stripe.getByLabel('Replacement Stripe secret key',{exact:true}).fill(process.env.PANTRY_STRIPE_KEY)
         await stripe.getByRole('button',{name:'Replace Stripe key',exact:true}).click()
-        await stripe.getByLabel('Replacement Stripe secret key',{exact:true}).waitFor()
+        await page.waitForFunction(()=>document.querySelector('input[name="secretKey"]')?.value==='')
         assert.equal(await stripe.locator('[type=password]').inputValue(),'','successful rotation clears the entered key')
         await stripe.screenshot({path:`${dir}/data-stripe-${width}.png`})
       }
