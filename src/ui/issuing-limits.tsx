@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Action, Card, Chip, command, Field, Form, Table, today, usd, useShared, useView, type D } from './kit'
+import { Action, Card, Chip, command, Field, Form, ROLE_LABEL, Table, today, usd, useShared, useView, type D } from './kit'
 
 export function canSelfApprove(state: D, document: D) {
   const limit = state.settings.issuingLimits?.effective
@@ -21,10 +21,10 @@ export function IssuingLimits() {
       <Field label="Credit limit (USD)" name="credit" inputMode="decimal" defaultValue={current ? (current.credit_cents / 100).toFixed(2) : ''} />
     </Form>
     {id.startsWith('person:') && current && <Action run={async () => { await command('issuing-limit.save', { id, revision: current.revision, inherit: true }); await reload() }}>Use role limit</Action>}
-    <Table heads={['Role or person', 'Issuing', 'Credit']} empty="No self-approval limits configured.">{rows.map(r => <tr key={r.id}><td>{r.id}</td><td>{r.issuing_cents ? usd(r.issuing_cents) : 'No self-approval'}</td><td>{r.credit_cents ? usd(r.credit_cents) : 'No self-approval'}</td></tr>)}</Table>
+    <Table heads={['Role or person', 'Issuing', 'Credit']} empty="No self-approval limits configured.">{rows.map(r => <tr key={r.id}><td>{r.id.startsWith('role:') ? ROLE_LABEL[r.id.slice(5)] + ' role' : people.find(p => p.email === r.id.slice(7))?.name ?? r.id.slice(7)}</td><td>{r.issuing_cents ? usd(r.issuing_cents) : 'No self-approval'}</td><td>{r.credit_cents ? usd(r.credit_cents) : 'No self-approval'}</td></tr>)}</Table>
     <h3>Self-approved documents</h3><p className="hint">Each document is checked separately. Review this daily list for split invoices. Dates use UTC.</p>
     <div className="grid-form"><Field label="Approval date" name="approvalDate" type="date" value={day} onChange={(e: any) => setDay(e.target.value)} /><Field label="Prepared by" name="approvalPerson" value={person} onChange={(e: any) => setPerson(e.target.value)} empty="Everyone" options={people.map(p => ({ value: p.email, label: p.name }))} /></div>
     {error && <p role="alert">{error}</p>}
-    <Table heads={['Document', 'Person', 'Total', 'Approval']} empty="No self-approved documents for this date and person.">{data?.documents.map((d: D) => { const a = JSON.parse(d.self_approval); return <tr key={d.id}><td><a href="/app/sales">{d.number}</a></td><td>{d.prepared_by}</td><td>{usd(d.total_cents)}</td><td><Chip>Self-approved within limit</Chip><small className="sub">{usd(a.limit)} · {a.source} · {a.limitRevision}</small></td></tr> })}</Table>
+    <Table heads={['Document', 'Person', 'Total', 'Approval']} empty="No self-approved documents for this date and person.">{data?.documents.map((d: D) => { const a = JSON.parse(d.self_approval); return <tr key={d.id}><td><a href="/app/sales">{d.number}</a></td><td>{d.prepared_by}</td><td>{usd(d.total_cents)}</td><td><Chip>Self-approved within limit</Chip><small className="sub">{usd(a.limit)} · {a.source}</small></td></tr> })}</Table>
   </Card>
 }
