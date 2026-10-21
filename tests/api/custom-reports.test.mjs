@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { books, harness } from './harness.mjs'
 
 const basic = { name: 'Personal income', source: 'profit-and-loss', from: '2026-10-01', to: '2026-10-31', columns: ['name', 'amount'] }
-const doors = (prefix, id) => [`${prefix}/${id}`, `${prefix}/${id}/render`, `${prefix}/${id}/export.pdf`, `${prefix}/${id}/export.json`, ...(prefix === 'custom-reports' ? [`${prefix}/${id}/figures?row=missing&column=amount`, `${prefix}/${id}/figures/export?row=missing&column=amount`] : [])]
+const doors = (prefix, id) => [`${prefix}/${id}`, `${prefix}/${id}/render`, `${prefix}/${id}/export.pdf`, `${prefix}/${id}/export.csv`, `${prefix}/${id}/export.json`, ...(prefix === 'custom-reports' ? [`${prefix}/${id}/figures?row=missing&column=amount`, `${prefix}/${id}/figures/export?row=missing&column=amount`] : [])]
 
 test('REPORT-006 personal and role sharing applies on every door, owner edits, revision fences and revoked references', async t => {
   const h = await harness(); t.after(() => h.close())
@@ -37,7 +37,7 @@ test('REPORT-006 personal and role sharing applies on every door, owner edits, r
   await h.command('custom-report.save', { id: saved.id, revision: saved.revision, definition: basic, sharedRoles: [] }, bookkeeper)
   for (const path of doors('custom-reports', saved.id)) await h.view(path, accountant, 404)
   assert.deepEqual((await h.view('custom-reports', accountant)).reports, [])
-  for (const suffix of ['/render', '/export.pdf', '/export.json']) await h.view(`management-packages/${pkg.id}${suffix}`, accountant, 404)
+  for (const suffix of ['/render', '/export.pdf', '/export.csv', '/export.json']) await h.view(`management-packages/${pkg.id}${suffix}`, accountant, 404)
   await h.command('management-package.save', { name: 'Cannot borrow package authority', reportIds: [saved.id] }, accountant, 404)
   // An existing package still belongs to its creator and the owner.
   for (const cookie of [bookkeeper, h.owner]) assert.equal((await h.view(`management-packages/${pkg.id}/render`, cookie)).reports.length, 1)
@@ -48,7 +48,7 @@ test('REPORT-006 personal and role sharing applies on every door, owner edits, r
   assert.deepEqual((await h.view('custom-reports', accountant)).reports, [])
 })
 
-test('REPORT-005 / REPORT-006 saved P&L filters, gross margin and ratio tie to books; ordered PDF carries cover, commentary, formulas, shares and each basis', async t => {
+test('REPORT-005 / REPORT-006 / REPORT-007 saved P&L filters, gross margin and ratio tie to books; ordered PDF carries cover, commentary, formulas, shares and each basis', async t => {
   const h = await harness(); t.after(() => h.close())
   const { acct } = await books(h)
   const customer = await h.command('contact.save', { kind: 'customer', name: 'Cedar Studio' })
@@ -58,7 +58,7 @@ test('REPORT-005 / REPORT-006 saved P&L filters, gross margin and ratio tie to b
   await h.command('invoice.issue', { id: invoice.id })
   await h.command('bill.save', { vendorId: vendor.id, reference: 'BL-October', billDate: '2026-10-10', post: true, lines: [{ description: 'Production cost', accountId: acct['6200'], amount: '400.00' }] })
   const definition = { ...basic, name: 'Accrual margins', basis: 'accrual', comparison: 'single', columns: ['name', 'amount', 'share'],
-    filters: { accountIds: [acct['4000'], acct['6200']] }, grouping: 'section', notes: ['Margins before rent and tax.'], layout: [
+    filters: { accountIds: [acct['4000'], acct['6200']] }, grouping: 'section', notes: ['Margins before rent and tax.', '=1+1, "not a formula"\nRetained note.'], layout: [
       { id: 'revenue', kind: 'section', label: 'Revenue', accountIds: [acct['4000']] },
       { id: 'cost', kind: 'section', label: 'Cost of sales', accountIds: [acct['6200']] },
       { id: 'gross', kind: 'formula', label: 'Gross profit', expression: 'row("revenue") - row("cost")', unit: 'money' },
@@ -143,6 +143,27 @@ test('REPORT-005 / REPORT-006 saved P&L filters, gross margin and ratio tie to b
   const json = await h.view(`management-packages/${pkg.id}/export.json`, accountant)
   assert.deepEqual(json.shared_roles, ['accountant'])
   assert.deepEqual(json.reports.map(row => row.definition.layout), [definition.layout, definition.layout])
+  const readCsv = async path => {
+    const response = await h.send('/api/pantry/' + path + '/export.csv', undefined, { cookie: accountant })
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('content-type'), 'text/csv; charset=utf-8')
+    assert.equal(response.headers.get('cache-control'), 'no-store')
+    const cells = [...response.value.matchAll(/"((?:[^"]|"")*)"(?=,|\r\n|$)/g)].map(m => m[1].replaceAll('""', '"'))
+    const rows = []; for (let i = 15; i < cells.length; i += 15) rows.push(cells.slice(i, i + 15))
+    return rows
+  }
+  const csv = await readCsv(`custom-reports/${saved.id}`)
+  const figure = (name, column = rendered.report.columns.find(c => c.id === 'amount').label) => csv.find(row => row[7] === name && row[9] === column)
+  assert.deepEqual(figure('Gross profit').slice(12, 14), ['USD', '600.00'])
+  assert.deepEqual(figure('Gross margin').slice(12, 14), ['percent', '60.00'])
+  assert.deepEqual(figure('Cost ratio').slice(12, 14), ['ratio', '0.40'])
+  assert.ok(csv.some(row => row[14] === "'=1+1, \"not a formula\"\nRetained note."))
+  const all = await readCsv(`management-packages/${pkg.id}`)
+  assert.deepEqual([...new Set(all.filter(row => row[1]).map(row => [row[1], row[2]].join(':')))], ['1:Declared cash margins', '2:Accrual margins'])
+  assert.ok(all.some(row => row[4] === 'Cash basis' && row[7] === 'Gross margin' && row[13] === 'undefined'))
+  assert.ok(all.some(row => row[4] === 'Accrual basis' && row[7] === 'Gross profit' && row[13] === '600.00'))
+  assert.ok(all.filter(row => row[7] === 'Gross profit').every(row => row[5] === '2026-10-01' && row[6] === '2026-10-31'))
+  assert.ok(all.some(row => row[8] === 'commentary' && row[14] === 'Cash receipts remain outstanding.'))
   const pdf = await h.send(`/api/pantry/management-packages/${pkg.id}/export.pdf`, undefined, { cookie: accountant })
   assert.equal(pdf.status, 200)
   assert.equal(pdf.headers.get('content-type'), 'application/pdf')
@@ -153,6 +174,8 @@ test('REPORT-005 / REPORT-006 saved P&L filters, gross margin and ratio tie to b
   const compared = await h.command('custom-report.save', { definition: { ...basic, name: 'Compared columns', columns: undefined, basis: 'accrual', comparison: 'prior-period', allColumns: true }, sharedRoles: ['accountant'] })
   const comparison = (await h.view(`custom-reports/${compared.id}/render`, accountant)).report
   assert.deepEqual(comparison.columns.map(c => c.id), ['code', 'name', 'amount', 'current', 'prior', 'change', 'percent', 'share'])
+  const comparedCsv = await readCsv(`custom-reports/${compared.id}`)
+  assert.ok(comparedCsv.some(c => c[9] === comparison.columns.find(c => c.id === 'prior').label && c[10] && c[11]))
   for (const row of comparison.rows.filter(row => row.kind !== 'note')) for (const column of comparison.columns.filter(column => column.unit !== 'text')) {
     const detail = await followFigure(`custom-reports/${compared.id}/figures?${new URLSearchParams({ row: row.id, column: column.id })}`)
     assert.equal(detail.value, row.values[column.id])
@@ -162,6 +185,8 @@ test('REPORT-005 / REPORT-006 saved P&L filters, gross margin and ratio tie to b
     const saved = await h.command('custom-report.save', { definition, sharedRoles: ['accountant'] })
     const rendered = (await h.view(`custom-reports/${saved.id}/render`, accountant)).report
     assert.ok(rendered.rows.length > 0)
+    const csv = await readCsv(`custom-reports/${saved.id}`)
+    for (const row of rendered.rows) assert.ok(csv.some(c => c[7] === row.name && c[12] === 'USD' && c[13] === (row.values.amount / 100).toFixed(2)))
     if (source === 'sales-by-customer') assert.deepEqual(rendered.rows.map(row => row.values.amount), [100000])
     if (source === 'expenses-by-vendor') assert.deepEqual(rendered.rows.map(row => row.values.amount), [40000])
     if (source === 'trial-balance') assert.equal(rendered.rows.reduce((total, row) => total + row.values.amount, 0), 0)

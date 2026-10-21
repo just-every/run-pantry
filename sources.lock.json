@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "3a2dd38d94bfeccac562ef3780d5972095b0f7840d992b85518fb746df1d3d6e",
+      "sha256": "efa77bc942c510bbd2831090f99d9bad64ebdc1def310956a3a402eab16fe547",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "395e0e60fca4f65dc63ca166f067178b1e368fa63352c41501833932fdc17b4a",
+      "sha256": "c195695aed643acee47eedc04ad5e6b6b2e4de568d5eda2eabebf8d196bf55ac",
       "executable": false
     },
     "DEMO.md": {
@@ -2951,6 +2951,10 @@
       "sha256": "85457f9c5712261227fe547a01acf13b77c5b4c9b91f405dfce1f7d01937dd26",
       "executable": false
     },
+    "src/pantry/custom-reports/csv.ts": {
+      "sha256": "40d05954ba004741f88cf88401cfc9dc16c2d131e46f629d04378281677f964b",
+      "executable": false
+    },
     "src/pantry/custom-reports/drill.ts": {
       "sha256": "2d8c6b56c7e75a4e15de08c9afe95678942b1d492c202e67824bf8ec0fee03b4",
       "executable": false
@@ -2964,7 +2968,7 @@
       "executable": false
     },
     "src/pantry/custom-reports/routes.ts": {
-      "sha256": "8efc7b256f18eec064d7f23c1bb9b2a99f7ef96464f32bb87ede029a8f461c19",
+      "sha256": "584253d07d906202008781f6cf2e73bb69234d176c5a4fcf5bd7e76d38129728",
       "executable": false
     },
     "src/pantry/custom-reports/store.ts": {
@@ -4000,7 +4004,7 @@
       "executable": false
     },
     "src/ui/custom-reports.tsx": {
-      "sha256": "95dd204a03539ba918e2a66ea5fd01276eb835838f8cdd0c726d592e73e18405",
+      "sha256": "349eab3956155058b03155a8d3aebc6da27e7bbebc52beeefa333fa5f8fce29d",
       "executable": false
     },
     "src/ui/customer-history.tsx": {
@@ -4248,7 +4252,7 @@
       "executable": false
     },
     "tests/api/custom-reports.test.mjs": {
-      "sha256": "2e00b68536d7e7869eebd0c858a2b79b77ac7d63923f743dd8aff3e677805b00",
+      "sha256": "d2bee6fd1a0bf12bb46230a1e0c60a2c4042d33b6ab93ce456d70fd70c144e0c",
       "executable": false
     },
     "tests/api/customer-delivery.test.mjs": {
@@ -4380,7 +4384,7 @@
       "executable": false
     },
     "tests/app/custom-reports.test.mjs": {
-      "sha256": "6ab7219bfac742d58290793acdc95e1d6850842fadd06803a9630d42af161e93",
+      "sha256": "e147613c2375a16691161cee54b507ef87c731e568982a5782cb54b8668abce5",
       "executable": false
     },
     "tests/app/customer-record.test.mjs": {

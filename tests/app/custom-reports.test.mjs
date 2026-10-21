@@ -5,7 +5,7 @@ import { chromium } from '@playwright/test'
 import { TOKEN } from './worker.mjs'
 import { providerWorker } from './provider-worker.mjs'
 
-test('REPORT-005 / REPORT-006 build and reopen a role-shared gross-margin layout, choose bases and export a combined management PDF at 1440 and 390', async t => {
+test('REPORT-005 / REPORT-006 / REPORT-007 build and reopen a role-shared gross-margin layout, choose bases and export a combined management PDF at 1440 and 390', async t => {
   const evidence = process.env.PANTRY_EVIDENCE_DIR || '/tmp/sx-pantry-r17'
   await (await import('node:fs/promises')).mkdir(evidence, { recursive: true })
   const app = await providerWorker({ bindings: {}, outbound: async request => assert.fail(`Unexpected provider ${new URL(request.url).hostname}`) }); t.after(() => app.close())
@@ -131,6 +131,16 @@ test('REPORT-005 / REPORT-006 build and reopen a role-shared gross-margin layout
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
     await page.screenshot({ path: `/tmp/sx-pantry-r12-report-result-${width}.png`, fullPage: true })
     await page.locator('.card').filter({ has: page.getByRole('heading', { name: new RegExp(`^${name} Accrual basis`) }) }).screenshot({ path: `/tmp/sx-pantry-r12-report-card-${width}.png` })
+    const csvLink = page.getByRole('link', { name: 'Download custom report CSV · accrual', exact: true })
+    const [csvDownload] = await Promise.all([page.waitForEvent('download'), csvLink.click()])
+    assert.equal(await csvDownload.failure(), null)
+    const csvText = await readFile(await csvDownload.path(), 'utf8')
+    assert.ok(csvText.includes('"USD","8000.00"'))
+    assert.ok(csvText.includes('"percent","66.67"'))
+    assert.ok(csvText.includes('"Accrual basis","2026-09-01","2026-09-30"'))
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.screenshot({ path: `${evidence}/report-csv-${width}.png`, fullPage: true })
+    await csvDownload.saveAs(`${evidence}/custom-report-${width}.csv`)
     // The custom report shows its range and opens its source report on the same basis and range.
     const resultCard = page.locator('.card').filter({ has: page.getByRole('heading', { name: new RegExp(`^${name} Accrual basis`) }) })
     await resultCard.getByText(/^2026-09-01 to 2026-09-30/).waitFor()
@@ -165,6 +175,16 @@ test('REPORT-005 / REPORT-006 build and reopen a role-shared gross-margin layout
     await page.getByText('Strong recurring design demand.', { exact: true }).waitFor()
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
     await page.screenshot({ path: `/tmp/sx-pantry-r12-package-result-${width}.png`, fullPage: true })
+    const packageCsv = page.getByRole('link', { name: 'Download management package CSV', exact: true })
+    const [packageDownload] = await Promise.all([page.waitForEvent('download'), packageCsv.click()])
+    assert.equal(await packageDownload.failure(), null)
+    const packageText = await readFile(await packageDownload.path(), 'utf8')
+    assert.ok(packageText.includes('"USD","8000.00"'))
+    assert.ok(packageText.includes('"Accrual basis"') && packageText.includes('"Cash basis"'))
+    assert.ok(packageText.includes('Strong recurring design demand.'))
+    await packageDownload.saveAs(`${evidence}/management-package-${width}.csv`)
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.screenshot({ path: `${evidence}/package-csv-${width}.png`, fullPage: true })
     const link = page.getByRole('link', { name: 'Download management package PDF', exact: true })
     const response = await context.request.get(new URL(await link.getAttribute('href'), app.origin).href)
     assert.equal(response.status(), 200)

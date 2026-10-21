@@ -1,3 +1,4 @@
+import { customReportsCsv } from './csv'
 import type { Hono, Context as HonoContext } from 'hono'
 import type { Bindings } from '../../auth.server'
 import type { Context } from '../context'
@@ -12,6 +13,9 @@ import type { CalculatedCustomReport, CustomReportLayoutRow } from './types'
 type C = HonoContext<{ Bindings: Bindings }>
 const pdfResponse = (bytes: Uint8Array<ArrayBuffer>, name: string) => new Response(bytes, { headers: {
   'content-type': 'application/pdf', 'content-disposition': `attachment; filename="${name}.pdf"`, 'cache-control': 'no-store',
+} })
+const csvResponse = (csv: string, name: string) => new Response(csv, { headers: {
+  'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${name}.csv"`, 'cache-control': 'no-store',
 } })
 const sharingNote = (saved: Data) => saved.shared_roles.length
   ? `Sharing: ${saved.shared_roles.join(', ')} (read/export only); creator and owner can read/edit.`
@@ -38,6 +42,13 @@ export function registerCustomReportRoutes(api: Hono<{ Bindings: Bindings }>, re
   api.get('/api/pantry/custom-reports/:id/figures', async c => c.json(await customReportFigure(await reader(c), c.req.param('id'), { row: c.req.query('row'), column: c.req.query('column'), node: c.req.query('node') })))
   api.get('/api/pantry/custom-reports/:id/render', async c => c.json(await renderSavedReport(await reader(c), c.req.param('id'))))
   api.get('/api/pantry/custom-reports/:id/export.json', async c => jsonResponse(await savedReport(await reader(c), c.req.param('id')), 'pantry-custom-report'))
+  api.get('/api/pantry/custom-reports/:id/export.csv', async c => {
+    const ctx = await reader(c), rendered = await renderSavedReport(ctx, c.req.param('id'))
+    const csv = customReportsCsv([exportReport(rendered)])
+    await savedReport(ctx, rendered.saved.id)
+    await assertReportRead(ctx)
+    return csvResponse(csv, 'pantry-custom-report')
+  })
   api.get('/api/pantry/custom-reports/:id/export.pdf', async c => {
     const ctx = await reader(c), rendered = await renderSavedReport(ctx, c.req.param('id'))
     const business = await one(ctx.db, 'SELECT legal_name FROM pt_entity WHERE id = 1')
@@ -52,6 +63,15 @@ export function registerCustomReportRoutes(api: Hono<{ Bindings: Bindings }>, re
   api.get('/api/pantry/management-packages/:id/export.json', async c => {
     const ctx = await reader(c), rendered = await renderSavedPackage(ctx, c.req.param('id'))
     return jsonResponse({ ...rendered.saved, reports: rendered.reports.map(report => report.saved) }, 'pantry-management-package')
+  })
+  api.get('/api/pantry/management-packages/:id/export.csv', async c => {
+    const ctx = await reader(c), rendered = await renderSavedPackage(ctx, c.req.param('id'))
+    const csv = customReportsCsv(rendered.reports.map(exportReport), rendered.saved.name,
+      [rendered.saved.cover, ...rendered.saved.commentary, sharingNote(rendered.saved)].filter(Boolean))
+    for (const report of rendered.reports) await savedReport(ctx, report.saved.id)
+    await savedReport(ctx, rendered.saved.id, 'package')
+    await assertReportRead(ctx)
+    return csvResponse(csv, 'pantry-management-package')
   })
   api.get('/api/pantry/management-packages/:id/export.pdf', async c => {
     const ctx = await reader(c), rendered = await renderSavedPackage(ctx, c.req.param('id'))

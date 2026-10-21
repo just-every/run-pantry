@@ -30,8 +30,9 @@ function SavedReport({ id, onEdit }: { id: string; onEdit: (saved: D) => void })
   return <div className="stack"><div className="row-actions">
     {data.saved.can_edit && <button type="button" className="btn btn-secondary" onClick={() => onEdit(data.saved)}>Edit custom report</button>}
     <a className="btn btn-primary" href={`/api/pantry/custom-reports/${id}/export.pdf`} download>Download custom report PDF · {data.report.basis}</a>
+    <a className="btn btn-secondary" href={`/api/pantry/custom-reports/${id}/export.csv`} download>Download custom report CSV · {data.report.basis}</a>
     <a className="btn btn-secondary" href={`/api/pantry/custom-reports/${id}/export.json`} download>Export report definition</a>
-  </div><CustomReportPreview report={data.report} /></div>
+  </div><p className="hint">CSV lists the calculated cells with their units, basis and date ranges.</p><CustomReportPreview report={data.report} /></div>
 }
 
 function PackageEditor({ saved, reports, onDone, onCancel }: { saved?: D; reports: D[]; onDone: (saved: D) => Promise<void>; onCancel: () => void }) {
@@ -57,8 +58,9 @@ function SavedPackage({ id, onEdit }: { id: string; onEdit: (saved: D) => void }
   return <div className="stack"><Card title={data.saved.name} actions={<>
     {data.saved.can_edit && <button className="btn btn-secondary" type="button" onClick={() => onEdit(data.saved)}>Edit management package</button>}
     <a className="btn btn-primary" href={`/api/pantry/management-packages/${id}/export.pdf`} download>Download management package PDF</a>
+    <a className="btn btn-secondary" href={`/api/pantry/management-packages/${id}/export.csv`} download>Download management package CSV</a>
     <a className="btn btn-secondary" href={`/api/pantry/management-packages/${id}/export.json`} download>Export package definition</a>
-  </>}><p>{data.saved.cover}</p>{data.saved.commentary.map((p: string, i: number) => <p key={i}>{p}</p>)}</Card>
+  </>}><p className="hint">CSV keeps each report’s calculated cells, units, basis and dates in package order.</p><p>{data.saved.cover}</p>{data.saved.commentary.map((p: string, i: number) => <p key={i}>{p}</p>)}</Card>
     {data.reports.map((r: D) => <CustomReportPreview key={r.saved.id} report={r.report} />)}
   </div>
 }
