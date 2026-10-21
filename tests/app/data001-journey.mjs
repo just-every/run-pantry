@@ -47,7 +47,7 @@ export async function data001Browser(t) {
       await reader.screenshot({path:`${dir}/data-model-off-${width}.png`})
       if(process.env.PANTRY_STRIPE_KEY) {
         const stripe=page.getByRole('heading',{name:'Online payments (Stripe)',exact:true}).locator('../..')
-        await stripe.getByText('Replace Stripe key',{exact:true}).click()
+        await stripe.locator('summary').filter({hasText:'Replace Stripe key'}).click()
         await stripe.getByLabel('Replacement Stripe secret key',{exact:true}).fill(process.env.PANTRY_STRIPE_KEY)
         await stripe.getByRole('button',{name:'Replace Stripe key',exact:true}).click()
         await page.waitForFunction(()=>document.querySelector('input[name="secretKey"]')?.value==='')
