@@ -12,6 +12,7 @@ import { bill } from '../payables'
 import { trialBalance } from '../reports'
 import { reportBasis } from '../basis'
 import { identify } from './credentials'
+import { integrationOpenApi } from './openapi'
 import { idempotent, type Prepared } from './idempotency'
 import { payment } from './payments'
 import { prepareBill, prepareContact, prepareDocument, prepareInvoice, prepareJournal, preparePayment, prepareReadiness } from './postings'
@@ -37,6 +38,9 @@ integrations.use('*', async (c, next) => {
       .bind(uid(), credential.id, now(), c.req.method, new URL(c.req.url).pathname, status).run()
   }
 })
+
+// Keep schema discovery behind the transport's existing credential and audit middleware.
+integrations.get('/openapi.json', c => c.json(integrationOpenApi))
 
 function context(c: C, scope: string): Context & { actor: Integration } {
   const credential = c.get('integration')

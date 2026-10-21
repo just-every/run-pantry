@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "23fb579634271be69038a9794cf44559a486575d1cadf4294663df06bc425b7e",
+      "sha256": "7f783ef92a77d95172fc880d0eb8af1d20693441e5e2a3546f83ca6b6e5b6f3b",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -68,7 +68,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "059db514494b95c9cfe1e384dc4b27ae992ae03d4e2a605a8536d478f7ef26dc",
+      "sha256": "70bebbfb2f471ceb85df02b642209d715c869eb45c2207957cf4643355a7ade1",
       "executable": false
     },
     "base-copies.json": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "b35009e289d3e04fc5a547dfad4cf1b97b626a09b99cdff31bfae96dd1172e38",
+      "sha256": "37e936cdf639139ddb473b37623d3dcf50611e35e17e3f5e2ec3d9578571cc5d",
       "executable": false
     },
     "DEMO.md": {
@@ -140,7 +140,7 @@
       "executable": false
     },
     "docs/integrations.md": {
-      "sha256": "34d5d2081c5fd6f0ae4aa3e6b93b7d9c2e5bf3d1a4233628636da7ebf23494b0",
+      "sha256": "b9e66670ebd19972f32690cb6a8205861334c2ca9d7fcb1bbc6e2b45322f27cf",
       "executable": false
     },
     "docs/journals.md": {
@@ -640,11 +640,11 @@
       "executable": false
     },
     "package.json": {
-      "sha256": "3d39157741bbc8c0f40559e83af716a2b0532489978bc4ce724ea1477aaa11da",
+      "sha256": "d1835a21ee24ebe59f6766285ec2fe4c9f00b6f709458a06d1760855e838c4c1",
       "executable": false
     },
     "pnpm-lock.yaml": {
-      "sha256": "c1742de06df6e261be2c2f6d7c8cccf707cc057a5f34722db72c0b2b1c2aa6db",
+      "sha256": "775f3b0961fcada0e0d8ac9b742cbe55bf3c9838934f67a9ace0bf595ae56998",
       "executable": false
     },
     "public/apple-touch-icon.png": {
@@ -3131,6 +3131,10 @@
       "sha256": "cfb8c0c46af87c3310724de24a94ea958c517227fde7d1712cd8a85f7d5240fb",
       "executable": false
     },
+    "src/pantry/integrations/openapi.ts": {
+      "sha256": "199de4c5b7546fdb6c6e642c809e4b19ac8f2da74eab913e7c21175907d74f5c",
+      "executable": false
+    },
     "src/pantry/integrations/payments.ts": {
       "sha256": "4a4e8635e52f7693682859ea9b7b006a65c3fafc732af583e295ee077289c7a4",
       "executable": false
@@ -3140,7 +3144,7 @@
       "executable": false
     },
     "src/pantry/integrations/routes.ts": {
-      "sha256": "b53d2e3235dc27da7ee4fa8ab99502b7df701b35f82cc380dde35c33dcd86143",
+      "sha256": "cfbf2c9537992a23c11cc60da5764e4201d8fb369cd104b1099f284c7009c42b",
       "executable": false
     },
     "src/pantry/invoice-documents.ts": {
@@ -4248,7 +4252,7 @@
       "executable": false
     },
     "tests/api/integrations.test.mjs": {
-      "sha256": "d4fe3a7854ec1c59822791d0789f401c9ffb82bb12a8c75176a277f2aa293250",
+      "sha256": "988d5edcbbe459e2b10024a799a515daebb822f6a3d3af5b99c095d051704ece",
       "executable": false
     },
     "tests/api/invoices-out.test.mjs": {

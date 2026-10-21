@@ -179,3 +179,11 @@ The inbound integration API does not need Pantry to make an outbound provider ca
 RER Managed has no outbound provider connection for seed integrations and no relay. Provider calls there say plainly that they are not available yet. On a self-hosted Pantry, configured provider connections can make those calls. This is separate from access to the inbound integration API.
 
 This page covers these scoped endpoints. It does not promise webhooks or the wider API-001 surface. People and proposal-only agent access are described separately in the repository's `API.md`.
+
+## Machine-readable API description (API-001)
+
+Fetch `GET /api/pantry/integration/v1/openapi.json` with the same bearer credential. The OpenAPI 3.1 document uses this installation's relative server URL, lists every current scoped v1 read/write route, request schemas, filters, pagination, the idempotency header, error responses and per-operation scope requirements. `x-pantry-scopes` describes the existing record scopes; it is not an OAuth scope grant. Schema discovery uses the existing credential/revocation checks and call log. It contains no business records, credential values or provider settings.
+
+Record responses keep native fields (including integer cents); their schemas allow additional fields. Native accounting validation, approvals and locked periods still apply. POST success is `200`. Replays return the current record, including payments applied since the original write. A key is unique across paths for one credential; changing the path or body returns `409`. JSON object key order does not matter; array order does. Every list uses an exclusive stable record-ID cursor, a default page size of 100 and a maximum of 100. Filters match exact values. Payment `billId` takes precedence when both allocation filters are supplied.
+
+There is no application request-per-minute quota on these routes today; host/provider capacity limits can still apply. API-001 remains partial for documented enforced rate limits, record types beyond this surface, and signed created/approved/posted/paid/matched/locked outbound webhooks with retries and a delivery log. The integration call audit is a request log, not webhook-delivery evidence.

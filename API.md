@@ -59,6 +59,8 @@ Writes: `POST /api/pantry/command/:action` with a JSON object.
 
 ## Sibling integrations: `/api/pantry/integration/v1/`
 
+The machine-readable OpenAPI 3.1 document is `GET /api/pantry/integration/v1/openapi.json`, using the same scoped bearer credential. It describes the currently implemented integration routes; the broader API-001 record surface and outbound webhook delivery remain partial.
+
 See [Sibling integrations](docs/integrations.md) for owner-created scoped credentials, idempotent writes, record reads, bill readiness and a complete `curl` example. Integration credentials use this separate API and cannot sign in as people or use the proposal-only agent API.
 
 Financial reports and `/api/pantry/reports/:kind/export?from=&to=&basis=&format=pdf|csv` use the declared tax method when basis is omitted, or the explicit cash/accrual choice. The scoped integrations trial balance uses the same choice/default under its existing `reports:read` scope. Open-item ageing remains accrual, 1099 reports use payment basis, and indirect cash flow starts from accrual net income.
