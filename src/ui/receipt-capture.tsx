@@ -70,9 +70,9 @@ export function CaptureButtons({ target, onDone, compact = false }: { target?: {
     } finally { lock.current = false; setBusy(false) }
   }
   return <div className={`capture${compact ? ' capture-compact' : ''}`} style={{ minWidth: 0 }}>
-    {!compact && <fieldset disabled={busy} style={{ width: '100%', minWidth: 0 }}><legend>Capture mode</legend>
-      <label><input type="radio" name={`${id}-mode`} checked={mode === 'single'} onChange={() => setMode('single')} /> One receipt per file</label>{' '}
-      <label><input type="radio" name={`${id}-mode`} checked={mode === 'split'} onChange={() => setMode('split')} /> Split receipts in a photo</label>
+    {!compact && <fieldset className="choices" disabled={busy} style={{ width: '100%', minWidth: 0, maxWidth: 720, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}><legend>Capture mode</legend>
+      <label className={`choice${mode === 'single' ? ' picked' : ''}`}><input type="radio" name={`${id}-mode`} checked={mode === 'single'} onChange={() => setMode('single')} /> One receipt per file</label>
+      <label className={`choice${mode === 'split' ? ' picked' : ''}`}><input type="radio" name={`${id}-mode`} checked={mode === 'split'} onChange={() => setMode('split')} /> Split receipts in a photo</label>
     </fieldset>}
     <label className={`btn ${compact ? 'btn-secondary btn-small' : 'btn-primary'}`} htmlFor={`${id}-camera`} aria-disabled={busy}><Icon name="camera" /> {compact ? 'Photo' : 'Take a photo'}</label>
     <input id={`${id}-camera`} className="sr-only" type="file" accept={mode === 'split' ? 'image/jpeg,image/png' : 'image/*'} capture="environment" disabled={busy} onChange={e => { const files = Array.from(e.currentTarget.files ?? []); e.currentTarget.value = ''; void send(files, 'camera') }} />
