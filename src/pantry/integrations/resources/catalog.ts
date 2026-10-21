@@ -19,12 +19,16 @@ export const catalogResources = [
 ]
 
 // History consent covers contact activity metadata, not full sibling records or hosted links.
-const history = `(
+const financialHistory = `(
  SELECT 'invoice:' || id AS id,customer_id AS contact_id,'invoice' AS kind,id AS record_id,issue_date AS date,number AS reference,status,total_cents AS amount_cents,credit_for AS related_id FROM pt_invoices
  UNION ALL SELECT 'bill:' || id,vendor_id,'bill',id,bill_date,reference,status,total_cents,NULL FROM pt_bills
  UNION ALL SELECT 'payment:' || id,contact_id,'payment',id,payment_date,reference,CASE WHEN reversal_id IS NULL THEN 'recorded' ELSE 'reversed' END,amount_cents,reversal_id FROM pt_payments
  UNION ALL SELECT 'credit:' || id,vendor_id,'vendor-credit',id,credit_date,reference,'posted',amount_cents,NULL FROM pt_vendor_credits
- UNION ALL SELECT 'delivery:' || d.id,i.customer_id,'delivery',d.id,d.at,d.subject,d.status,NULL,i.id FROM pt_deliveries d JOIN pt_invoices i ON i.id=d.invoice_id
+ )`
+const correspondenceHistory = `(
+ SELECT 'delivery:' || d.id AS id,i.customer_id AS contact_id,'delivery' AS kind,d.id AS record_id,d.at AS date,d.subject AS reference,d.status,NULL AS amount_cents,i.id AS related_id FROM pt_deliveries d JOIN pt_invoices i ON i.id=d.invoice_id
  UNION ALL SELECT 'exemption:' || id,customer_id,'exemption',id,valid_from,certificate_number,CASE WHEN active=1 THEN 'active' ELSE 'retired' END,NULL,document_id FROM pt_exemption_certificates
 )`
+// D1 bounds each compound SELECT; keep the financial and correspondence sets bounded.
+const history = `(SELECT * FROM ${financialHistory} UNION ALL SELECT * FROM ${correspondenceHistory})`
 export const contactHistoryResource = resource('contact-history', 'contacts:read', history, 'id,contact_id,kind,record_id,date,reference,status,amount_cents,related_id', { contactId: 'contact_id', kind: 'kind', date: 'date', recordId: 'record_id' }, 'Complete paginated contact activity: invoices, credits, bills, payments, email outcomes and certificates. Full records require their own scope; no delivery detail, tokens or provider headers.')

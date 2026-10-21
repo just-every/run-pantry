@@ -14,7 +14,7 @@ export const recordResources = [...catalogResources, contactHistoryResource, ...
 // Every distinct native parent record type is a separate owner selection. Child
 // occurrences and nested references inherit only their named parent record consent.
 export const READ_SCOPES = [
-  ...['contacts', 'invoices', 'bills', 'journals', 'documents'].map(family => ({ id: family + ':read', label: family[0].toUpperCase() + family.slice(1) + ' readback', help: 'Read projected ' + family + ' records without write or posting permission.' })),
+  ...['contacts', 'invoices', 'bills', 'journals', 'documents'].map(family => ({ id: family + ':read', label: family[0].toUpperCase() + family.slice(1) + ' readback', help: family==='contacts'?'Read contact details, aliases, delivery outcomes and linked business history metadata. Full linked records need their own scope.':'Read projected ' + family + ' records without write or posting permission.' })),
   { id: 'year-end:read', label: 'Year-end readiness', help: 'Read native fiscal-year close readiness; no financial statement or filing detail snapshots.' },
   ...[...new Map([...recordResources].reverse().filter(spec => !['contacts:read', 'journals:read'].includes(spec.scope)).map(spec => [spec.scope, {
     id: spec.scope, label: spec.scope.replace(':read', '').replaceAll('-', ' ') + ' readback', help: spec.description,
