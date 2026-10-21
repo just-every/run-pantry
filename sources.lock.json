@@ -4412,7 +4412,7 @@
       "executable": false
     },
     "tests/api/security.test.mjs": {
-      "sha256": "7cb5a2009dbb611c6b3afa80d791c9c2efcd7f9b17ee1cf04294ae0cbd405596",
+      "sha256": "de6704be1ecef5d260fda93cea2c2968064719ad4bb105fed2b6343134d28d0c",
       "executable": false
     },
     "tests/api/statement-provider.mjs": {
@@ -4528,7 +4528,7 @@
       "executable": false
     },
     "tests/app/worker.mjs": {
-      "sha256": "ab18d7f683ca122da042cebeee73885782bb5ec3abc3122716e4b302a5b528ea",
+      "sha256": "b3875109216d82ce71ad75d5d082bcf06bec6da952daa68dc751435a65ae6842",
       "executable": false
     },
     "tests/app/year-end.test.mjs": {
