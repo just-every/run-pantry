@@ -1,6 +1,7 @@
 // Receivables: draft → approved → issued invoices, and credits that reduce them.
 // A line without a decided tax treatment stops the invoice at review; Pantry
 // never assumes zero tax.
+import { withinLimit } from './issuing-limits'
 import { authority, who } from './access'
 import { addDays, date, list, now, optionalText, quantity, requireThat, scale, text, uid, cents, type Data } from './core'
 import { all, approval, assertOpen, audit, changed, one, periodOpen, q, run, type AuditActor, type Sql } from './db'
@@ -142,18 +143,27 @@ const saveDraft: Command = { need: 'record', async run(c, b) {
   return invoice(c.db, id)
 } }
 
+async function approvalChecks(db: D1Database, current: Data) {
+  const certificateGuards = await assertInvoiceExemption(db, current)
+  const untaxed = current.lines.filter((l: Data) => !l.tax_code)
+  requireThat(!untaxed.length, `Tax treatment needed before approval: line ${untaxed.map((l: Data) => l.line_no).join(', ')}`, 409)
+  requireThat(!current.discounts.length || current.discount_account_id, 'No discounts account was chosen when this draft was saved: ask your accountant to choose one in Settings, then save the draft again', 409)
+  const refusal = await offerRefusal(db, current.early_offer)
+  requireThat(!refusal, refusal!, 409)
+  await assertOpen(db, current.issue_date)
+  return certificateGuards
+}
+
 const approve: Command = { need: 'post', async run(c, b) {
   const current = await invoice(c.db, text(b.id, 'Invoice'))
   requireThat(current.status === 'draft', 'Only a draft is approved', 409)
   requireThat(current.revision === b.revision, 'Invoice changed since you reviewed it; review it again', 409)
   requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || current.prepared_by !== c.actor.email), 'Someone other than the preparer approves this invoice', 403)
-  const certificateGuards = await assertInvoiceExemption(c.db, current)
-  const untaxed = current.lines.filter((l: Data) => !l.tax_code)
-  requireThat(!untaxed.length, `Tax treatment needed before approval: line ${untaxed.map((l: Data) => l.line_no).join(', ')}`, 409)
-  requireThat(!current.discounts.length || current.discount_account_id, 'No discounts account was chosen when this draft was saved: ask your accountant to choose one in Settings, then save the draft again', 409)
-  const refusal = await offerRefusal(c.db, current.early_offer)
-  requireThat(!refusal, refusal!, 409)
-  await assertOpen(c.db, current.issue_date)
+  if (current.kind === 'credit' && c.actor.kind === 'person' && c.actor.role !== 'owner') {
+    const target = await invoice(c.db, current.credit_for)
+    requireThat(!target.self_approval || JSON.parse(target.self_approval).person !== c.actor.email, 'A second person must approve a correction of your self-approved invoice', 403)
+  }
+  const certificateGuards = await approvalChecks(c.db, current)
   const revision = uid()
   await run(c.db, [authority(c.actor, 'post'), ...certificateGuards, ...treatmentFence(current.early_offer), periodOpen(current.issue_date), approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
     q("UPDATE pt_invoices SET status = 'approved', approved_by = ?, approved_revision = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'draft'", c.actor.email, revision, revision, current.id, b.revision), changed(),
@@ -215,7 +225,22 @@ const issue: Command = { need: 'record', async run(c, b) {
   return invoice(c.db, current.id)
 } }
 
+const approveIssue: Command = { need: 'post', async run(c, b) {
+  const current = await invoice(c.db, text(b.id, 'Invoice'))
+  requireThat(current.status === 'draft' && current.revision === b.revision, 'Draft changed; reload the current revision', 409)
+  const self = await withinLimit(c.db, c.actor, current, b.limitRevision)
+  const certificates = await approvalChecks(c.db, current)
+  const approvedRevision = uid()
+  const issued = await issueStatements(c.db, { ...current, revision: approvedRevision } as Issuable, who(c.actor), current.prepared_by)
+  await run(c.db, [...self.fences, ...certificates, ...treatmentFence(current.early_offer), periodOpen(current.issue_date),
+    approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', JSON.stringify(self.detail)),
+    q("UPDATE pt_invoices SET status = 'approved', approved_by = ?, approved_revision = ?, revision = ?, self_approval = ? WHERE id = ? AND revision = ? AND status = 'draft'", c.actor.email, approvedRevision, approvedRevision, JSON.stringify(self.detail), current.id, b.revision), changed(),
+    audit(who(c.actor), `${current.kind}.approve`, current.kind, current.id, self.detail), ...issued.statements])
+  return invoice(c.db, current.id)
+} }
+
 export const invoiceCommands: Record<string, Command> = {
+  'invoice.approve-issue': approveIssue,
   'invoice.save-draft': saveDraft,
   'invoice.approve': approve,
   'invoice.issue': issue,

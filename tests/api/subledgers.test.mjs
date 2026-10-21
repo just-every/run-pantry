@@ -323,3 +323,8 @@ test('REPORT-005 / BILL-001 captured bill visits every lifecycle state, credits 
   assert.ok(audit.some(a => a.action === 'bill.submit'))
   assert.ok(audit.some(a => a.action === 'bill.payment-planned' && JSON.parse(a.detail).movesMoney === false))
 })
+
+test('ACCESS-003 owner limits, exact atomic self-issue, second-person corrections, templates and discount authority through HTTP', async t => {
+  const h = await harness(); t.after(() => h.close())
+  await (await import('./access003-journey.mjs')).access003Journey(h)
+})

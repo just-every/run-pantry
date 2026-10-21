@@ -1,3 +1,4 @@
+import { withinLimit } from './issuing-limits'
 // Price revisions have their own approval: scheduling one never revokes the
 // original template's authority for occurrences before its effective date.
 import { authority, who } from './access'
@@ -49,14 +50,14 @@ const approve: Command = { need: 'post', async run(c, b) {
   requireThat(t.status !== 'ended' && t.mode === 'send' && t.approved_revision === t.revision, 'Approve the sending template before its price change', 409)
   requireThat(price.revision === b.revision && t.revision === b.templateRevision, 'Recurring invoice or price changed since you reviewed it; review it again', 409)
   requireThat(price.approved_revision !== price.revision || price.template_revision !== t.revision, 'This price change is already approved', 409)
-  requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || price.prepared_by !== c.actor.email), 'Someone other than the preparer approves this price change', 403)
+  const self = c.actor.kind === 'person' && c.actor.role !== 'owner' && price.prepared_by === c.actor.email ? await withinLimit(c.db, c.actor, { ...price, kind: 'invoice' }, b.limitRevision) : null
   const p = await parseInvoice(c.db, { customerId: t.customer_id, issueDate: price.effective_date, lines: JSON.parse(price.lines), memo: t.memo, discounts: t.discounts, deposit: t.deposit })
-  requireThat(amountSnapshot(p) === price.amount_snapshot, 'The price amounts changed; schedule the current amounts before approval', 409)
-  await run(c.db, [authority(c.actor, 'post'),
+  requireThat(p.total === price.total_cents && amountSnapshot(p) === price.amount_snapshot, 'The price amounts changed; schedule the current amounts before approval', 409)
+  await run(c.db, [authority(c.actor, 'post'), ...(self?.fences ?? []),
     guard("EXISTS (SELECT 1 FROM pt_recurring WHERE id = ? AND revision = ? AND approved_revision = revision AND status <> 'ended')", t.id, t.revision),
     q('UPDATE pt_recurring_prices SET approved_by = ?, approved_revision = revision, template_revision = ? WHERE id = ? AND revision = ?', c.actor.email, t.revision, price.id, b.revision), changed(),
-    approval(who(c.actor), 'recurring-price', price.id, price.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
-    audit(who(c.actor), 'recurring.price-approve', 'recurring', t.id, { price: price.id, effectiveDate: price.effective_date })])
+    approval(who(c.actor), 'recurring-price', price.id, price.revision, 'approve', 'approved', self ? JSON.stringify(self.detail) : optionalText(b.note, 'Note', 500)),
+    audit(who(c.actor), 'recurring.price-approve', 'recurring', t.id, { price: price.id, effectiveDate: price.effective_date, ...(self?.detail ?? {}) })])
   return { ...(await one(c.db, 'SELECT * FROM pt_recurring_prices WHERE id = ?', price.id)), lines: JSON.parse(price.lines) }
 } }
 

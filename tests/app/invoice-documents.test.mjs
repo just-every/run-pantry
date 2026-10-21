@@ -167,3 +167,7 @@ test('INVOICE-001 owner edits branded templates and sequence, previews real invo
     await context.close()
   }
 })
+
+test('ACCESS-003 owner sets limits, bookkeeper self-issues or waits, removed limits refuse, recurring prices and daily Activity at 1440 and 390', async t => {
+  await (await import('./access003-journey.mjs')).access003Browser(t)
+})

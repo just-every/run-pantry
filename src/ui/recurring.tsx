@@ -1,6 +1,7 @@
 // Recurring invoices: templates with their schedule and next date, what each
 // occurrence becomes, approval for templates that send on their own, and the
 // runs so far (with the reason for any that failed).
+import { canSelfApprove } from './issuing-limits'
 import { useState } from 'react'
 import { Action, Card, Chip, command, contactOptions, Field, Table, day, today, usd, useShared, useWho, type D } from './kit'
 import { blank, lineTotals, ServiceLines, type Line } from './invoice-editor'
@@ -40,7 +41,7 @@ function Editor({ t, priceOnly = false, onDone, onCancel }: { t?: D; priceOnly?:
             <Field label="First invoice date" name="startDate" type="date" defaultValue={t?.start_date ?? today()} required hint="Later invoices fall on the same day of the period; a month-end date stays at month end" />
             <Field label="Last invoice date (optional)" name="endDate" type="date" defaultValue={t?.end_date ?? ''} hint="Blank repeats until you end it" />
             <Field label="Payment terms (days)" name="termsDays" type="number" min={0} max={365} defaultValue={t?.terms_days ?? ''} hint="Blank uses the customer's terms" />
-            <Field label="Each invoice" name="mode" defaultValue={t?.mode ?? 'draft'} required options={[{ value: 'draft', label: 'Is created as a draft for approval' }, { value: 'send', label: 'Is issued and emailed automatically' }]} hint="Automatic sending starts once someone other than you, with the posting grant, approves this template" />
+            <Field label="Each invoice" name="mode" defaultValue={t?.mode ?? 'draft'} required options={[{ value: 'draft', label: 'Is created as a draft for approval' }, { value: 'send', label: 'Is issued and emailed automatically' }]} hint="Automatic sending starts after approval with the posting grant; the preparer may approve within an owner-set issuing limit" />
           </div>
         </Card>}
         <ServiceLines lines={lines} setLines={setLines} />
@@ -56,7 +57,7 @@ function Editor({ t, priceOnly = false, onDone, onCancel }: { t?: D; priceOnly?:
 
 function Panel({ t, onChange, onEdit }: { t: D; onChange: () => Promise<void>; onEdit: (priceOnly?: boolean) => void }) {
   const { state } = useShared(), who = useWho(), [label, tone] = STATUS[t.status]
-  const mayApprove = state.actor.can.post && (state.actor.role === 'owner' || t.prepared_by !== state.actor.email)
+  const mayApprove = state.actor.can.post && (state.actor.role === 'owner' || t.prepared_by !== state.actor.email || canSelfApprove(state, t))
   const status = (to: string) => async () => { await command('recurring.status', { id: t.id, status: to }); await onChange() }
   return <Card title={<>{t.customer_name} — {t.number}</>} actions={<Chip tone={tone}>{label}</Chip>}>
     <p>{scheduleLabel(t)} from {day(t.start_date)}{t.end_date ? <> until {day(t.end_date)}</> : ''}, originally {usd(t.total_cents)} each. {t.mode === 'send' ? 'Approved amounts are issued and emailed automatically; changed prices wait for approval.' : 'Each invoice is created as a draft for approval.'}</p>
@@ -67,7 +68,7 @@ function Panel({ t, onChange, onEdit }: { t: D; onChange: () => Promise<void>; o
       {t.mode === 'send' && <div><dt>Approved by</dt><dd>{t.approved_by ? who(t.approved_by) : 'Not yet: the owner, or someone else with the posting grant'}</dd></div>}
     </dl>
     <div className="row-actions">
-      {t.status === 'awaiting-approval' && (mayApprove ? <Action tone="primary" run={async () => { await command('recurring.approve', { id: t.id, revision: t.revision }); await onChange() }}>Approve automatic sending</Action> : <span className="hint">Approval needs the posting grant and a different person from the preparer.</span>)}
+      {t.status === 'awaiting-approval' && (mayApprove ? <Action tone="primary" run={async () => { await command('recurring.approve', { id: t.id, revision: t.revision, limitRevision: state.settings.issuingLimits?.effective?.revision }); await onChange() }}>Approve automatic sending</Action> : <span className="hint">Approval needs the posting grant and a different person, unless your issuing limit covers this occurrence.</span>)}
       {state.actor.can.record && t.status !== 'ended' && <>
         <button type="button" className="btn btn-secondary" onClick={() => onEdit()}>Edit</button>
         <button type="button" className="btn btn-secondary" onClick={() => onEdit(true)}>Change price from a date</button>
@@ -80,12 +81,12 @@ function Panel({ t, onChange, onEdit }: { t: D; onChange: () => Promise<void>; o
       <ul className="send-log">
         {t.prices.map((p: D) => {
           const approved = p.approved_revision === p.revision && p.template_revision === t.revision
-          const mayApprovePrice = state.actor.can.post && (state.actor.role === 'owner' || p.prepared_by !== state.actor.email)
+          const mayApprovePrice = state.actor.can.post && (state.actor.role === 'owner' || p.prepared_by !== state.actor.email || canSelfApprove(state, p))
           return <li key={p.id}><span><strong>From {day(p.effective_date)}</strong> · {usd(p.total_cents)}</span>
             {p.lines.map((l: D, i: number) => <small key={i} className="sub block">{l.description}: {l.quantity} × {usd(Math.round(Number(l.rate) * 100))}{l.taxCode === 'exempt' ? ' (exempt)' : ''}</small>)}
           <div className="row-actions">{approved ? <Chip tone="good">Approved by {who(p.approved_by)}</Chip> : <>
             <Chip tone="warn">Invoices wait for approval</Chip>
-            {t.mode === 'send' && t.approved_revision === t.revision && mayApprovePrice && t.status !== 'ended' && <Action run={async () => { await command('recurring.approve-price', { id: p.id, revision: p.revision, templateRevision: t.revision }); await onChange() }}>Approve this price</Action>}
+            {t.mode === 'send' && t.approved_revision === t.revision && mayApprovePrice && t.status !== 'ended' && <Action run={async () => { await command('recurring.approve-price', { id: p.id, revision: p.revision, templateRevision: t.revision, limitRevision: state.settings.issuingLimits?.effective?.revision }); await onChange() }}>Approve this price</Action>}
           </>}</div></li>
         })}
       </ul>

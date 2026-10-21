@@ -15,6 +15,7 @@ import { contactCommands } from './contacts'
 import { journalCommands, journalView } from './journal'
 import { invoiceDocumentCommands, invoiceDocumentsView, registerInvoiceDocumentRoutes } from './invoice-documents'
 import { invoiceCommands, invoicesView } from './invoices'
+import { issuingLimitCommands, selfApprovedDocuments } from './issuing-limits'
 import { discountAccounts, discountCommands, discountSettings } from './discounts'
 import { earlyPaymentCommands, treatmentsView } from './early-payment'
 import { billLifecycleCommands, capturedBillInbox } from './bill-lifecycle'
@@ -90,7 +91,7 @@ import { customReportCommands } from './custom-reports/commands'
 import { registerCustomReportRoutes } from './custom-reports/routes'
 
 const commands: Record<string, Command> = {
-  ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -159,6 +160,7 @@ view('proposals', async ctx => ({ proposals: await proposalsView(ctx.db) }))
 view('questions/record', async (ctx, c) => ({ questions: await questionThreads(ctx.db, (await all(ctx.db, 'SELECT * FROM pt_questions WHERE subject_kind = ? AND subject_id = ? ORDER BY asked_at', c.req.query('kind') ?? '', c.req.query('id') ?? '')).map(parseQuestion)) }))
 view('questions', async (ctx, c) => questionsView(ctx, c.req.query('q') || undefined))
 view('move-in', async ctx => moveInView(ctx))
+view('self-approved', async (ctx, c) => { must(ctx.actor, 'owner'); return { documents: await selfApprovedDocuments(ctx.db, day(c, 'day'), c.req.query('person') ?? '') } })
 view('activity', async (ctx, c) => activity(ctx.db, c.req.query()))
 view('exemptions', async ctx => exemptionView(ctx.db))
 view('sales-tax/nexus', async ctx => nexusWatch(ctx.db))

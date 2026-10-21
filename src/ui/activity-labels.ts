@@ -72,8 +72,9 @@ export function recordLabel(kind: string, id?: string) {
 export function detailFacts(detail: string | null | undefined): Record<string, string> {
   const d = detail ? JSON.parse(detail) : {}
   const facts: Record<string, string> = {}
-  for (const [key, label] of [['name', 'Name'], ['file', 'File'], ['memo', 'Memo'], ['task', 'Task'], ['reason', 'Reason'], ['summary', 'Summary'], ['reference', 'Reference'], ['vendor', 'Vendor']] as const)
+  for (const [key, label] of [['label', 'Approval'], ['limitId', 'Limit'], ['limitRevision', 'Limit revision'], ['name', 'Name'], ['file', 'File'], ['memo', 'Memo'], ['task', 'Task'], ['reason', 'Reason'], ['summary', 'Summary'], ['reference', 'Reference'], ['vendor', 'Vendor']] as const)
     if (typeof d[key] === 'string' && d[key].trim()) facts[label] = d[key]
+  if (typeof d.limit === 'number') facts['Limit amount (USD)'] = (d.limit / 100).toFixed(2)
   if (Array.isArray(d.added) && d.added.length) facts.Tasks = d.added.join(', ')
   return facts
 }

@@ -3,6 +3,7 @@
 // Pantry, every delivery, and the customers and vendors behind them.
 import { useState } from 'react'
 import { Action, Card, Chip, command, contactOptions, Details, Field, Form, Loading, Metrics, PageHead, Table, Tabs, accountOptions, day, today, usd, useShared, useView, useWho, type D } from './kit'
+import { canSelfApprove } from './issuing-limits'
 import { Bills } from './bills'
 import { InvoiceTemplates } from './invoice-templates'
 import { InvoiceEditor } from './invoice-editor'
@@ -24,6 +25,7 @@ function invoiceStatus(i: D): [string, 'good' | 'warn' | 'info' | 'neutral'] {
 function InvoicePanel({ i, data, onChange, onEdit, onCredit }: { i: D; data: D; onChange: () => Promise<void>; onEdit: () => void; onCredit: () => void }) {
   const { state } = useShared(), who = useWho(), [label, tone] = invoiceStatus(i)
   const mayApprove = state.actor.can.post && (state.actor.role === 'owner' || i.prepared_by !== state.actor.email)
+  const selfAllowed = canSelfApprove(state, i) && !(i.kind === 'credit' && data.invoices.some((target: D) => target.id === i.credit_for && target.self_approval && JSON.parse(target.self_approval).person === state.actor.email))
   const untaxed = i.lines.filter((l: D) => !l.tax_code).length
   return <Card title={<>{i.customer_name} — {i.number}</>} actions={<Chip tone={tone}>{label}</Chip>}>
     <p>{i.kind === 'credit' ? 'Credit' : 'Invoice'} for {usd(i.total_cents)}{i.kind === 'invoice' && i.status === 'issued' ? `, ${usd(i.open_cents)} open, due ` : ', due '}{day(i.due_date)}.</p>
@@ -32,7 +34,9 @@ function InvoicePanel({ i, data, onChange, onEdit, onCredit }: { i: D; data: D; 
     {i.lines.length > 0 && <Table heads={['Description', 'Quantity', 'Amount', 'Tax']} figures={[1, 2, 3]}>{i.lines.map((l: D) => <tr key={l.id}><td>{l.description}</td><td className="fig">{l.quantity_milli / 1000}</td><td className="fig">{usd(l.amount_cents)}</td><td className="fig">{l.tax_code === 'exempt' ? 'Exempt' : l.tax_code ? usd(l.tax_cents) : 'Needed'}</td></tr>)}</Table>}
     <div className="row-actions">
       {i.status !== 'issued' && state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit</button>}
-      {i.status === 'draft' && (mayApprove ? <Action tone="primary" run={async () => { await command('invoice.approve', { id: i.id, revision: i.revision }); await onChange() }}>Approve</Action> : <span className="hint">Approval needs the posting grant and a different person from the preparer.</span>)}
+      {i.self_approval && <p className="hint">Self-approved within limit · {usd(JSON.parse(i.self_approval).limit)} · {JSON.parse(i.self_approval).source}</p>}
+      {i.status === 'draft' && selfAllowed && <Action tone="primary" run={async () => { await command('invoice.approve-issue', { id: i.id, revision: i.revision, limitRevision: state.settings.issuingLimits.effective.revision }); await onChange() }}>Approve and issue within limit</Action>}
+      {i.status === 'draft' && (mayApprove ? <Action tone="primary" run={async () => { await command('invoice.approve', { id: i.id, revision: i.revision }); await onChange() }}>Approve</Action> : <span className="hint">Approval needs the posting grant and a different person from the preparer, unless an issuing limit permits self-approval.</span>)}
       {i.status === 'approved' && state.actor.can.record && <Action tone="primary" run={async () => { await command('invoice.issue', { id: i.id }); await onChange() }}>Issue</Action>}
       {i.kind === 'invoice' && i.status === 'issued' && !i.opening && state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={onCredit}>Issue a credit</button>}
     </div>

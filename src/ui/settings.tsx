@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { Action, Card, Chip, command, Details, Field, Form, PageHead, ROLE_LABEL, Table, day, placeholderEmail, useShared, type D } from './kit'
 import { Icon } from './icons'
+import { IssuingLimits } from './issuing-limits'
 import { ReceiptSettings } from './receipt-settings'
 import { InvoicingSettings } from './invoicing-settings'
 import { ConnectedSettings } from './connected-settings'
@@ -120,6 +121,6 @@ export function Settings() {
     <PageHead title="People & settings" lead="The business these books belong to, invoice sending and online payments, Stripe payouts and Gusto payroll, who works in them, agent access, and how receipts are read and received." />
     <Business />
     {state.settings.entity && <><InvoicingSettings /><ConnectedSettings /></>}
-    {state.actor.can.owner && <><Owner /><People /><Agents /><IntegrationSettings /><ReceiptSettings /><Hosting /></>}
+    {state.actor.can.owner && <><Owner /><People /><IssuingLimits /><Agents /><IntegrationSettings /><ReceiptSettings /><Hosting /></>}
   </>
 }

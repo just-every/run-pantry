@@ -1,6 +1,7 @@
 // Business setup, people and agents: owner-only work.
 import { operatorAuth, runtimeBindings } from '../auth.server'
 import { authority, who } from './access'
+import { limitsView } from './issuing-limits'
 import { date, now, optionalText, requireThat, sha256, text, uid, Fault, type Data } from './core'
 import { all, audit, changed, one, q, run } from './db'
 import type { Command, Context } from './context'
@@ -153,6 +154,7 @@ export const settingsCommands: Record<string, Command> = {
 export async function settingsView(c: Context): Promise<Data> {
   const owner = c.actor.kind === 'person' && c.actor.role === 'owner'
   return {
+    issuingLimits: await limitsView(c.db, c.actor),
     entity: await entity(c.db),
     members: owner ? await all(c.db, 'SELECT email, name, role, can_post, can_lock, can_reopen, active FROM pt_members ORDER BY email') : [],
     agents: owner ? await all(c.db, 'SELECT id, name, created_by, created_at, active FROM pt_agents ORDER BY created_at') : [],
