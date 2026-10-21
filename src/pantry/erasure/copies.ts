@@ -71,13 +71,14 @@ export async function eraseCopies(db: D1Database, input: Input) {
   const statements: Sql[] = [], counts: Record<string, Data> = {}, removed: { table: string; key: Record<string, unknown> }[] = []
   const tables = await all<{ name: string }>(db, "SELECT name FROM sqlite_master WHERE type='table' AND name GLOB 'pt_*' ORDER BY name")
   const schema = new Map<string, Column[]>()
-  const receiptDocuments = new Set<string>()
+  const receiptDocuments = new Set<string>(), affectedRecordIds = new Set<string>()
   await Promise.all(tables.map(async t => { schema.set(t.name, await all<Column>(db, `PRAGMA table_info(${quote(t.name)})`)) }))
   const note = (table: string, field: string, n: number) => { counts[table] ??= {}; counts[table][field] = (counts[table][field] ?? 0) + n }
   const update = (table: string, row: Data, set: Data) => {
     const keys = schema.get(table)!.filter(c => c.pk).map(c => c.name)
     const fields = Object.keys(set).filter(k => set[k] !== row[k])
     if (!fields.length) return
+    if (row.id) affectedRecordIds.add(row.id)
     const before = [...new Set([...keys, ...fields])]
     statements.push(q(`UPDATE ${quote(table)} SET ${fields.map(k => `${quote(k)}=?`).join(',')} WHERE ${before.map(k => `${quote(k)} IS ?`).join(' AND ')}`, ...fields.map(k => set[k]), ...before.map(k => row[k])), changed())
     note(table, 'rowsReplaced', 1); note(table, 'fieldsReplaced', fields.length)
@@ -157,6 +158,7 @@ export async function eraseCopies(db: D1Database, input: Input) {
       continue
     }
     if (!graphGuarded) { statements.unshift(...books.guards); graphGuarded = true }
+    affectedRecordIds.add(row.id)
     const parts = await all(db, 'SELECT seq,length(content) AS bytes FROM pt_document_parts WHERE document_id=? ORDER BY seq', row.id)
     statements.push(guard('(SELECT count(*) FROM pt_document_parts WHERE document_id=?)=?', row.id, parts.length),
       q("INSERT INTO pt_erasure_scope VALUES (?,'pt_documents',?,'expire')", input.erasureId, row.id),
@@ -166,5 +168,5 @@ export async function eraseCopies(db: D1Database, input: Input) {
     note('pt_document_parts', 'rowsRemoved', parts.length)
     for (const part of parts) removed.push({ table: 'pt_document_parts', key: { document_id: row.id, seq: part.seq } })
   }
-  return { statements, counts, removed }
+  return { statements, counts, removed, affectedRecordIds: [...affectedRecordIds] }
 }

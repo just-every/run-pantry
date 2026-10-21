@@ -64,7 +64,7 @@ async function attach(h, id, entry, vendor, amount) {
 }
 
 export async function captureSplitJourney(t) {
-  const h = await harness(); t.after(() => h.close())
+  const h = await harness({ outbound: async () => new Response(null, { status: 503 }) }); t.after(() => h.close())
   const original = photo(1), crops = [photo(2), photo(3)]
   const viewer = await h.member('synthetic-pantry-4@example.test', 'viewer')
   let before = await counts(h)
@@ -75,6 +75,8 @@ export async function captureSplitJourney(t) {
     await source(h, original, invalid, { status: 400 })
   assert.deepEqual(await counts(h), before, 'invalid regions and unauthorized sources write nothing')
 
+  await h.command('webhook.create', { destination: 'https://capture.example.com/hooks', events: ['created'] })
+  const pendingNotices = async ids => Number((await h.db.prepare("SELECT count(*) AS n FROM pt_webhook_deliveries d JOIN pt_webhook_events e ON e.id=d.event_id WHERE d.state IN ('pending','sending') AND e.record_id IN (SELECT value FROM json_each(?))").bind(JSON.stringify(ids)).first()).n)
   const capture = await source(h, original)
   await download(h, capture.originalDocumentId, original)
   const stored = at((await h.view('documents')).documents, row => row.id === capture.originalDocumentId)
@@ -158,7 +160,10 @@ export async function captureSplitJourney(t) {
   await h.command('retention.erase', { ids: [capture.originalDocumentId], revision: protectedState.revision, confirm: 'ERASE' }, h.owner, 409)
   await download(h, capture.originalDocumentId, original)
   state = await h.command('retention.save', { years: 1, revision: protectedState.revision })
+  assert.ok(await pendingNotices([capture.originalDocumentId]) > 0)
   const expired = await h.command('retention.erase', { ids: [capture.originalDocumentId], revision: state.revision, confirm: 'ERASE' })
+  assert.equal(await pendingNotices([capture.originalDocumentId]), 0, 'confirmed source expiry cancels its queued webhook notice')
+  assert.ok(expired.counts.pt_webhook_deliveries.attemptsCancelled > 0)
   assert.equal(at(expired.erased, row => row.id === capture.originalDocumentId).sha256, sha(original))
   assert.equal((await h.send('/api/pantry/documents/' + capture.originalDocumentId, undefined, { cookie: h.owner })).status, 410)
   before = await counts(h)
@@ -176,6 +181,7 @@ export async function captureSplitJourney(t) {
   const receipt = await review(h, crop.id)
   await h.command('receipt.vendor-confirm', { id: crop.id, revision: receipt.revision, vendorId: lead.id, vendorRevision: lead.revision, confirm: true })
   await eraseContact(h, lead.id)
+  assert.equal(await pendingNotices([pending.originalDocumentId, receipt.document_id, receipt.id]), 0, 'unposted subject erasure cancels source, crop and receipt notices')
   for (const id of [pending.originalDocumentId, receipt.document_id])
     assert.equal((await h.send('/api/pantry/documents/' + id, undefined, { cookie: h.owner })).status, 410)
   before = await counts(h)

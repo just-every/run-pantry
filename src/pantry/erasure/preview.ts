@@ -57,14 +57,14 @@ export async function erasurePreview(c: Context, input: Data) {
     classes.push({table:'pt_contacts',action:posted?'replaced':'removed',count:1,reason:posted?'Legal name and posted bookkeeping retained':'No posted transactions'},
       {table:'pt_journal_entries',action:'retained',count:entries.filter(e=>e.status==='posted').length,reason:'Posted accounting entries, amounts, numbers, dates and coding are unchanged'})
   } else classes.push({table:'pt_members',action:'replaced',count:1,reason:'One random Former member label preserves attribution'}, {table:'oa_operators',action:'removed',reason:'Sign-in identity, sessions, links and passkeys removed'})
-  const pendingWebhooks=await pendingErased(c.db,id)
-  if(pendingWebhooks)classes.push({table:'pt_webhook_deliveries',action:'replaced',count:pendingWebhooks,reason:`${pendingWebhooks} pending webhook notices cancelled as record_erased; body-free history retained`})
   const retained = member ? [] : await retentionItems(c.db,id)
   if(person) {classes.splice(0,1,{table:'pt_contacts.contacts_json',action:'removed',count:1,reason:'Only this contact person is removed; the business and other contacts remain'})}
   classes.push(...retained.map((item: Data)=>({...item,action:'retained'})), {table:'pt_audit',action:'replaced',reason:'Entries and bookkeeping retained; declared personal values replaced'},
     {table:'pt_approvals',action:'replaced',reason:'Approval chronology and decisions retained'})
   const values=person?[subject.name,subject.email,subject.phone].filter(Boolean):await erasureValues(c.db,subject,member,posted)
   const copies=await eraseCopies(c.db,{id,member:member||person,posted,values,marker:MARKER,erasureId:'preview',at:new Date().toISOString()})
+  const pendingWebhooks=await pendingErased(c.db,id,copies.affectedRecordIds)
+  if(pendingWebhooks)classes.push({table:'pt_webhook_deliveries',action:'replaced',count:pendingWebhooks,reason:`${pendingWebhooks} pending webhook notices cancelled as record_erased; body-free history retained`})
   const immutable=await immutableCopies(c.db,{values,marker:MARKER,member,erasureId:'preview'})
   if(!member&&!person&&!posted)for(const [table,counts] of Object.entries((await unpostedDependents(c.db,id)).counts))classes.push({table,action:'removed',reason:'Dormant records without posted transactions',counts})
   const listed=new Set(classes.map(r=>r.table))

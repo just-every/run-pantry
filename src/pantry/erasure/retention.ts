@@ -5,6 +5,7 @@ import { audit, changed, guard, one, q, run, type Sql } from '../db'
 import { who } from '../access'
 import { fenceStatements } from './fence'
 import { ownerSession } from './owner'
+import { cancelErased } from '../webhooks/erasure'
 import { invoicePdf, type InvoiceDocument } from '../invoice-pdf'
 import { erasureView, retainedState, itemKey, stateRevision, expiry, expired, type RetentionItem } from './retention-items'
 export { erasureView, retentionItems, retainStatements } from './retention-items'
@@ -59,6 +60,7 @@ const erase: Command = { need: 'owner', async run(c, b) {
   })
   requireThat(new Set(selected.map(itemKey)).size === selected.length, 'Choose each retained item once')
   const id = uid(), at = now(), counts: Record<string, { itemsErased: number; bytesRemoved: number; fieldsReplaced: number }> = {}
+  const cancelled = await cancelErased(c.db, '', selected.map(i => i.id))
   const mutations = (await Promise.all(selected.map(i => expiryStatements(c.db, i, id, at)))).flat()
   for (const item of selected) {
     const count = counts[item.table] ??= { itemsErased: 0, bytesRemoved: 0, fieldsReplaced: 0 }
@@ -69,13 +71,13 @@ const erase: Command = { need: 'owner', async run(c, b) {
     }
     if (item.table === 'pt_invoice_documents') count.bytesRemoved += Number((await one(c.db, `SELECT length(pdf_base64)*3/4-CASE WHEN substr(pdf_base64,-2)='==' THEN 2 WHEN substr(pdf_base64,-1)='=' THEN 1 ELSE 0 END AS n FROM pt_invoice_documents WHERE invoice_id=?`, item.id))?.n ?? 0)
   }
-  const receipt = { id, at, action: 'retention.expire', counts, retained: state.items.filter(i => !selected.some(s => itemKey(s) === itemKey(i))).map(i => ({ table: i.table, id: i.id, expires: i.expires })),
+  const receipt = { id, at, action: 'retention.expire', counts: {...counts,pt_webhook_deliveries:{attemptsCancelled:cancelled.count}}, retained: state.items.filter(i => !selected.some(s => itemKey(s) === itemKey(i))).map(i => ({ table: i.table, id: i.id, expires: i.expires })),
     erased: selected.map(i => ({ table: i.table, id: i.id, clock: i.clock, expires: i.expires, ...(i.sha256 ? { sha256: i.sha256 } : {}) })),
     exclusions: ['posted-entry free text', 'connected services', 'downloaded files', 'earlier backups'] }
   await run(c.db, [...auth, ...state.guards,
     guard('EXISTS(SELECT 1 FROM pt_retention_settings WHERE id=1 AND revision=?)', state.settings.revision),
     q('INSERT INTO pt_erasure_journal(id,subject_digest,at,receipt) VALUES(?,?,?,?)', id, await sha256(selected.map(itemKey).sort().join('\n')), at, JSON.stringify(receipt)),
-    ...await fenceStatements(c.db), ...mutations,
+    ...await fenceStatements(c.db), ...cancelled.statements, ...mutations,
     ...selected.map(i => q('UPDATE pt_retained_items SET clock=?,expires=?,erased_at=? WHERE table_name=? AND row_id=? AND erased_at IS NULL', i.clock, i.expires, at, i.table, i.id)),
     q('DELETE FROM pt_erasure_scope WHERE erasure_id=?', id),
     audit(who(c.actor), 'retention.erase', 'erasure', id, { count: selected.length }),

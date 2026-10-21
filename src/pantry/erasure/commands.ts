@@ -25,10 +25,10 @@ const execute: Command = {need:'owner',async run(c,b) {
   requireThat(['email','phone','in-person','other'].includes(channel),'Request channel is email, phone, in-person or other')
   const id = uid(), at = now(), member = p.kind==='member', person=p.kind==='contact-person', label = member ? `Former member ${crypto.randomUUID().replaceAll('-','').slice(0,8)}` : MARKER
   const values = person?[p.subject.name,p.subject.email,p.subject.phone].filter(Boolean):await erasureValues(c.db,p.subject,member,p.posted)
-  const cancelled=await cancelErased(c.db,p.id)
   const history = await historyStatements(c.db,values,id,at,member?{email:p.id,label}:undefined)
-  const counts: Record<string,Data> = {pt_webhook_deliveries:{attemptsCancelled:cancelled.count},pt_audit:{valuesReplaced:history.counts.pt_audit},pt_approvals:{valuesReplaced:history.counts.pt_approvals}}
   const copies = await eraseCopies(c.db,{id:p.id,member:member||person,posted:p.posted,values,marker:label,erasureId:id,at})
+  const cancelled=await cancelErased(c.db,p.id,copies.affectedRecordIds)
+  const counts: Record<string,Data> = {pt_webhook_deliveries:{attemptsCancelled:cancelled.count},pt_audit:{valuesReplaced:history.counts.pt_audit},pt_approvals:{valuesReplaced:history.counts.pt_approvals}}
   const immutable = await immutableCopies(c.db,{values,marker:label,member,erasureId:id})
   for (const [table,count] of Object.entries({...copies.counts,...immutable.counts})) counts[table]={...counts[table],...count}
   const writes: Sql[] = [], removed: {table:string;key:Record<string,unknown>}[] = []
