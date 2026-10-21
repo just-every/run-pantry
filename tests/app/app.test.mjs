@@ -428,3 +428,8 @@ test('CLOSE-003 custom task assignment, due dates, revision review and month loc
     } finally { await context.close() }
   }
 })
+
+test('ERASURE-001 owner preview, receipt, retention confirmation and Activity at 1440 and 390', async t => {
+  const {erasureJourney}=await import('./erasure-journey.mjs')
+  await erasureJourney(t)
+})

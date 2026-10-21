@@ -21,8 +21,9 @@ export async function documentStatements(by: string, input: NewDocument) {
 
 /** The document's exact bytes, joined from its parts when it has them. */
 export async function documentFile(db: D1Database, id: string) {
-  const doc = await one<{ name: string; media_type: string; size: number; sha256: string; content: ArrayBuffer }>(db, 'SELECT name, media_type, size, sha256, content FROM pt_documents WHERE id = ?', id)
+  const doc = await one<{ name: string; media_type: string; size: number; sha256: string; content: ArrayBuffer; erased_at: string|null }>(db, 'SELECT name, media_type, size, sha256, content, erased_at FROM pt_documents WHERE id = ?', id)
   if (!doc) return null
+  requireThat(!doc.erased_at, 'This document’s bytes were erased after retention expiry', 410)
   let bytes = new Uint8Array(doc.content as ArrayBuffer)
   if (bytes.length !== doc.size) {
     const parts = await all<{ content: ArrayBuffer }>(db, 'SELECT content FROM pt_document_parts WHERE document_id = ? ORDER BY seq', id)

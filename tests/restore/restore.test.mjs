@@ -12,6 +12,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { chromium } from '@playwright/test'
+import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { books } from '../app/books.mjs'
 
 const source = resolve(fileURLToPath(new URL('../..', import.meta.url)))
@@ -113,7 +114,7 @@ async function snapshot(context, origin, docName) {
   }
 }
 
-test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006 the immutable audit, report definitions and sharing and books come back from an export into a fresh install and after starting over, and a restore over books is refused with the next step', async t => {
+test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts restore, occupied books stay protected, and known erasures fence older archives', async t => {
   t.after(async () => { for (const server of [...running]) await server.stop(); for (const root of roots) await rm(root, { recursive: true, force: true }) })
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
 
@@ -144,6 +145,16 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006 the immutable audit, report defi
   await command('bill.schedule', { id: bill.id, revision: bill.revision, date: '2026-09-24', note: 'Bank transfer outside Pantry' })
   await command('recurring-bill.save', { name: 'Archived rent', vendorId: vendor.id, startDate: '2026-06-30', endDate: '2026-08-30', every: 1, unit: 'month', termsDays: 15, lines: [{ description: 'Monthly rent', amount: '1200.00', accountId: rent }] })
   await command('recurring-bill.generate', { through: '2026-09-30' })
+  const lead = await command('contact.save', { kind: 'customer', name: 'Synthetic Pantry Lead', email: 'synthetic-pantry-lead@example.test', internalNotes: 'Synthetic lead private note' })
+  const latestCustomer = (await (await context.request.get(`${server.origin}/api/pantry/state`)).json()).contacts.find(c => c.id === customer.id)
+  await command('contact.save', { id: customer.id, revision: latestCustomer.revision, kind: 'customer', email: 'synthetic-pantry-customer@example.test', phone: 'synthetic-pantry-phone', billingAddress: 'Synthetic Pantry Address', internalNotes: 'Synthetic Pantry private note', contacts: [{ name: 'Synthetic Pantry Billing', email: 'synthetic-pantry-billing@example.test', roles: ['billing'] }] })
+  // Erasure refuses unresolved balances. Settle through the same payment door
+  // a person uses before capturing the pre-erasure backup and book totals.
+  const salesBeforeBackup = await (await context.request.get(`${server.origin}/api/pantry/sales`)).json()
+  for (const invoice of salesBeforeBackup.invoices.filter(i => i.customer_id === customer.id && i.kind === 'invoice' && i.open_cents > 0)) {
+    const amount = (invoice.open_cents / 100).toFixed(2)
+    await command('payment.record', { direction: 'received', contactId: customer.id, date: '2026-09-30', amount, bankAccountId: invoiceState.bankAccounts[0].id, allocations: [{ targetId: invoice.id, amount }] })
+  }
   const before = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(before.bytes, pdf)
   await context.close(); await server.stop()
@@ -153,7 +164,9 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006 the immutable audit, report defi
   const second = await fresh(), port2 = await freePort()
   await mkdir(join(second, 'exports'), { recursive: true })
   await copyFile(join(first, 'exports/pantry-books.rer'), join(second, 'exports/pantry-books.rer'))
-  await ok(second, ['import', '--input', 'exports/pantry-books.rer', '--yes'])
+  const unverified = await ok(second, ['import', '--input', 'exports/pantry-books.rer', '--yes'])
+  assert.match(unverified, /ask the source owner/i)
+  assert.match(unverified, /erasure history unverified/i)
   await ok(second, ['setup', '--owner-email', 'you@dev.localhost', '--port', String(port2), '--non-interactive'])
   server = await dev(second, port2); context = await signIn(browser, server)
   const restored = await snapshot(context, server.origin, 'acme-a-778.pdf')
@@ -175,5 +188,51 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006 the immutable audit, report defi
   const again = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(again.view, before.view, 'starting over brings the same books back')
   assert.deepEqual(again.bytes, pdf)
+
+  // The same public erase operation removes a lead and redacts a posted
+  // customer. Their source-bound fence and value-free receipts must travel.
+  const receipts = []
+  for (const id of [lead.id, customer.id]) {
+    const preview = await command('erasure.preview', { kind: 'contact', id })
+    receipts.push(await command('erasure.execute', { kind: 'contact', id, fingerprint: preview.fingerprint, requester: 'Synthetic Pantry request', channel: 'email', reason: 'Synthetic Pantry privacy request', confirm: 'ERASE' }))
+  }
+  const erasedState = (await (await context.request.get(`${server.origin}/api/pantry/state`)).json()).contacts
+  assert.ok(!erasedState.some(c => c.id === lead.id), 'the transaction-free lead is gone')
+  const retainedCustomer = erasedState.find(c => c.id === customer.id)
+  assert.equal(retainedCustomer.name, customer.name, 'posted books retain the legal name')
+  const personal = JSON.stringify([retainedCustomer.email, retainedCustomer.phone, retainedCustomer.billing_address, retainedCustomer.internal_notes, retainedCustomer.contacts_json])
+  for (const value of ['synthetic-pantry-customer@example.test', 'synthetic-pantry-phone', 'Synthetic Pantry Address', 'Synthetic Pantry private note', 'synthetic-pantry-billing@example.test']) assert.ok(!personal.includes(value), 'the retained customer no longer exposes a private field')
+  const afterErasure = await snapshot(context, server.origin, 'acme-a-778.pdf')
+  for (const field of ['invoices', 'bills', 'trialBalance', 'pl']) assert.deepEqual(afterErasure.view[field], before.view[field], `erasure preserves ${field}`)
+  assert.deepEqual(afterErasure.bytes, pdf, 'supporting posted evidence is retained')
+  await context.close(); await server.stop()
+  await ok(first, ['export', '--output', 'exports/pantry-after-erasure.rer'])
+  const journal = []
+  for await (const record of fileRecords(join(first, 'exports/pantry-after-erasure.rer'))) if (record.kind === 'part') {
+    for (const item of record.items) if (item.kind === 'row' && item.table === 'pt_erasure_journal') journal.push(item.row)
+  }
+  for (const receipt of receipts) assert.ok(journal.some(row => row.id === receipt.id), 'the post-erasure archive carries each receipt')
+
+  const sameStore = await rer(first, ['import', '--input', 'exports/pantry-books.rer', '--yes'])
+  assert.equal(sameStore.code, 4)
+  assert.match(sameStore.log, /restore refused \((erasure_epoch|erased_row)\)/i)
+  assert.match(sameStore.log, /erasure journal/i)
+
+  // A reset has no local erasure knowledge. The owner's later source archive
+  // supplies it, so even this empty destination refuses the pre-erasure backup.
+  await ok(second, ['reset', '--yes'])
+  await copyFile(join(first, 'exports/pantry-after-erasure.rer'), join(second, 'exports/pantry-after-erasure.rer'))
+  const oldArchive = await rer(second, ['import', '--input', 'exports/pantry-books.rer', '--journal', 'exports/pantry-after-erasure.rer', '--yes'])
+  assert.equal(oldArchive.code, 4)
+  assert.match(oldArchive.log, /restore refused \((erasure_epoch|erased_row)\)/i)
+  for (const receipt of receipts) assert.ok(oldArchive.log.includes(receipt.id), 'the refusal names known erasure receipts')
+  await ok(second, ['import', '--input', 'exports/pantry-after-erasure.rer', '--journal', 'exports/pantry-after-erasure.rer', '--yes'])
+  await ok(second, ['setup', '--owner-email', 'you@dev.localhost', '--port', String(port2), '--non-interactive'])
+  server = await dev(second, port2); context = await signIn(browser, server)
+  const anonymous = await snapshot(context, server.origin, 'acme-a-778.pdf')
+  assert.deepEqual(anonymous.view, afterErasure.view, 'the post-erasure books and receipts restore without resurrecting the lead')
+  assert.deepEqual(anonymous.bytes, pdf)
+  const restoredContacts = (await (await context.request.get(`${server.origin}/api/pantry/state`)).json()).contacts
+  assert.deepEqual(restoredContacts.find(c => c.id === customer.id), retainedCustomer, 'retained personal fields stay redacted after restore')
   await context.close(); await server.stop()
 })

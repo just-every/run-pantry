@@ -81,7 +81,7 @@ const saveContractor: Command = { need: 'record', async run(c, b) {
   const statements: Sql[] = [authority(c.actor, 'record'), q('UPDATE pt_contacts SET is_1099 = ?, revision = ? WHERE id = ?', is1099 ? 1 : 0, uid(), vendor.id), changed()]
   const current = await one(c.db, 'SELECT * FROM pt_contractor_tax WHERE contact_id = ?', vendor.id)
   const details = ['legalName', 'tin', 'address', 'city', 'state', 'zip'].some(k => typeof b[k] === 'string' && b[k].trim())
-  let last4 = current?.tin.slice(5) ?? null
+  let last4 = current?.tin?.slice(5) ?? null
   if (details) {
     const raw = typeof b.tin === 'string' ? b.tin.replace(/[\s-]/g, '') : ''
     requireThat(raw || current, 'Enter the TIN from the W-9')

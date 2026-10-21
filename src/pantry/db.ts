@@ -27,18 +27,18 @@ export function faultFrom(error: unknown): Fault | null {
   return null
 }
 
+export async function batchStatements(db: D1Database, statements: Sql[]): Promise<Sql[]> {
+  const enriched = await Promise.all(statements.map(s => s.auditEvent ? auditStatement(db, s.auditEvent) : s))
+  const events = enriched.filter(s => s.auditEvent)
+  const before = events.flatMap(s => s.auditBefore ? [s.auditBefore] : [])
+  const writes = enriched.filter(s => !s.auditEvent)
+  const history = events.flatMap(s => s.auditVersion ? [s.auditVersion, s] : [s])
+  const cleanup = events.filter(s => s.auditBefore).map(s => q('DELETE FROM pt_audit_before WHERE event_id = ?', s.auditEvent!.id))
+  return [...before, ...writes, ...history, ...cleanup, q('DELETE FROM pt_guard')]
+}
 export async function run(db: D1Database, statements: Sql[]) {
-  try {
-    const enriched = await Promise.all(statements.map(s => s.auditEvent ? auditStatement(db, s.auditEvent) : s))
-    const events = enriched.filter(s => s.auditEvent)
-    const before = events.flatMap(s => s.auditBefore ? [s.auditBefore] : [])
-    const writes = enriched.filter(s => !s.auditEvent)
-    const history = events.flatMap(s => s.auditVersion ? [s.auditVersion, s] : [s])
-    const cleanup = events.filter(s => s.auditBefore).map(s => q('DELETE FROM pt_audit_before WHERE event_id = ?', s.auditEvent!.id))
-    return await db.batch([...before, ...writes, ...history, ...cleanup, q('DELETE FROM pt_guard')].map(s => db.prepare(s.sql).bind(...s.params)))
-  } catch (error) {
-    throw faultFrom(error) ?? error
-  }
+  try { return await db.batch((await batchStatements(db,statements)).map(s => db.prepare(s.sql).bind(...s.params))) }
+  catch (error) { throw faultFrom(error) ?? error }
 }
 
 export async function all<T = Data>(db: D1Database, sql: string, ...params: unknown[]): Promise<T[]> {

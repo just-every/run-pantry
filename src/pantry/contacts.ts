@@ -12,6 +12,7 @@ import { documentCaptureStatements, decideDocumentDuplicate } from './receipts/d
 export async function contact(db: D1Database, id: string, kind?: 'customer' | 'vendor') {
   const row = await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', id)
   requireThat(row, 'Customer or vendor not found', 404)
+  requireThat(!row.erased_at, 'This contact was erased; its retained bookkeeping cannot receive new personal data', 409)
   requireThat(!kind || row.kind === kind, `Choose a ${kind}`)
   return row
 }

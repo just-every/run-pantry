@@ -6,6 +6,7 @@ import { IssuingLimits } from './issuing-limits'
 import { ReceiptSettings } from './receipt-settings'
 import { InvoicingSettings } from './invoicing-settings'
 import { ConnectedSettings } from './connected-settings'
+import { ErasureSettings } from './erasure-settings'
 import { IntegrationSettings } from './integration-settings'
 
 const ENTITY_LABEL: Record<string, string> = { 'sole-proprietorship': 'Sole proprietorship', 'single-member-llc': 'Single-member LLC', 'multi-member-llc': 'Multi-member LLC', 's-corporation': 'S corporation', 'c-corporation': 'C corporation', partnership: 'Partnership' }
@@ -121,6 +122,6 @@ export function Settings() {
     <PageHead title="People & settings" lead="The business these books belong to, invoice sending and online payments, Stripe payouts and Gusto payroll, who works in them, agent access, and how receipts are read and received." />
     <Business />
     {state.settings.entity && <><InvoicingSettings /><ConnectedSettings /></>}
-    {state.actor.can.owner && <><Owner /><People /><IssuingLimits /><Agents /><IntegrationSettings /><ReceiptSettings /><Hosting /></>}
+    {state.actor.can.owner && <><Owner /><People /><IssuingLimits /><Agents /><IntegrationSettings /><ErasureSettings /><ReceiptSettings /><Hosting /></>}
   </>
 }

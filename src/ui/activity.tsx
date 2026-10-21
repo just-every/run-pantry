@@ -5,7 +5,7 @@ import { actionLabel, approvalLabel, detailFacts, recordLabel } from './activity
 function Evidence({ event }: { event: D }) {
   const detail = JSON.parse(event.detail || '{}'), facts = detailFacts(event.detail)
   return <details><summary>Inspect history</summary>
-    <dl><dt>Record</dt><dd>{event.subject_kind} · {event.subject_id}</dd><dt>Revision</dt><dd>{event.subject_revision || 'Legacy event without a recorded revision'}{event.subject_revision === event.id ? ' (history snapshot)' : ''}</dd>
+    <>{detail.erasure?.notice && <p className="callout">{detail.erasure.notice}</p>}</><dl><dt>Record</dt><dd>{event.subject_kind} · {event.subject_id}</dd><dt>Revision</dt><dd>{event.subject_revision || 'Legacy event without a recorded revision'}{event.subject_revision === event.id ? ' (history snapshot)' : ''}</dd>
       <dt>Actor</dt><dd>{event.actor_email} · {event.origin_kind || event.actor_kind}</dd><dt>Time</dt><dd>{event.at}</dd>
       {event.authority_id && <><dt>Standing authority</dt><dd>{recordLabel(event.authority_kind)} · {event.authority_id} · revision {event.authority_revision || 'unversioned'}</dd></>}
       {event.approval && <><dt>Approval relied on</dt><dd>{event.approval.actor_email} · {event.approval.at} · {event.approval.subject_kind} {event.approval.subject_id} · revision {event.approval.subject_revision}{event.approval.note ? ` · ${event.approval.note}` : ''}</dd></>}

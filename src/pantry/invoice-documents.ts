@@ -63,6 +63,7 @@ export async function issuedDocumentStatements(db: D1Database, inv: Data, revisi
 export async function issuedDocument(db: D1Database, invoiceId: string) {
   let row = await one(db, 'SELECT * FROM pt_invoice_documents WHERE invoice_id = ?', invoiceId)
   requireThat(row, 'This invoice has no issued document. Issue the approved revision before sharing its PDF.', 409)
+  requireThat(!row.erased_at, 'This issued document’s bytes were erased after retention expiry; its number, totals, revision and SHA-256 remain', 410)
   const document = JSON.parse(row.document) as InvoiceDocument
   // Upgrade snapshots are already immutable. Materialize their bytes once,
   // using only that saved presentation, before any output door can share them.
@@ -84,6 +85,7 @@ export function documentSelectionStatements(id: string, parsed: Data): Sql[] {
 export function registerInvoiceDocumentRoutes(api: Hono<{ Bindings: Bindings }>, reader: (c: any) => Promise<Context>) {
   api.get('/api/pantry/invoice-documents/:id/preview', async c => {
     const ctx = await reader(c), inv = await documentInvoice(ctx.db, c.req.param('id')), template = c.req.query('templateId')
+    requireThat(!await one(ctx.db, 'SELECT 1 FROM pt_invoice_documents WHERE invoice_id=? AND erased_at IS NOT NULL', inv.id), 'This issued document was erased after retention expiry', 410)
     if (inv.status === 'issued' && !template) {
       const saved = await issuedDocument(ctx.db, inv.id)
       return c.json({ document: saved.document, pdfBase64: bytesBase64(saved.pdf), sha256: saved.sha256, issuedRevision: saved.revision, basis: saved.basis })
@@ -93,6 +95,7 @@ export function registerInvoiceDocumentRoutes(api: Hono<{ Bindings: Bindings }>,
   })
   api.get('/api/pantry/invoice-documents/:id/pdf', async c => {
     const ctx = await reader(c), inv = await documentInvoice(ctx.db, c.req.param('id')), template = c.req.query('templateId')
+    requireThat(!await one(ctx.db, 'SELECT 1 FROM pt_invoice_documents WHERE invoice_id=? AND erased_at IS NOT NULL', inv.id), 'This issued document was erased after retention expiry', 410)
     const pdf = inv.status === 'issued' && !template ? (await issuedDocument(ctx.db, inv.id)).pdf : invoicePdf(await buildInvoiceDocument(ctx.db, inv, undefined, template))
     return new Response(pdf, { headers: { 'content-type': 'application/pdf', 'content-disposition': `inline; filename="${inv.number.replace(/[^\w.-]+/g, '_')}.pdf"`, 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; sandbox" } })
   })
