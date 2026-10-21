@@ -312,4 +312,4 @@ Owner/member/auth/session/passkey/agent/integration/provider credentials, erasur
 
 ## Webhook receivers
 
-The native owner manages webhooks in Settings, independently of integration credentials. [API.md](../API.md) documents exact payload bytes, HMAC verification, the five-minute timestamp limit, 24-hour rotation overlap, retry schedule, consent cancellation and safe restore behavior. The settings data declaration lists only destination hosts, selected event types and the thin payload fields. Record details require their own granular read grant.
+The native owner manages webhooks in Settings, independently of integration credentials. [API.md](https://github.com/just-every/run-pantry/blob/main/API.md) documents exact payload bytes, HMAC verification, the five-minute timestamp limit, 24-hour rotation overlap, retry schedule, consent cancellation and safe restore behavior. The settings data declaration lists only destination hosts, selected event types and the thin payload fields. Record details require their own granular read grant.
