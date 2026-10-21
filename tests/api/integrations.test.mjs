@@ -604,3 +604,8 @@ test('API-001 webhook retries persist every delay, stop after six attempts, rota
 test('API-001 record-type readers expose bounded native records with granular consent and safe projections',async t=>{
  const {journey}=await import('./resources-journey.mjs');await journey(t)
 })
+
+
+test('API-001 webhook transport times out a slow receiver without reading its response',async t=>{
+ const {webhookTimeout}=await import('./webhook-journey.mjs');await webhookTimeout(t)
+})

@@ -115,7 +115,7 @@ for (const spec of [
 ]) integrations.get('/' + spec.path + '/:id', async c => {
   const ctx = context(c, readScope(c, spec.path))
   await run(ctx.db, [authority(ctx.actor, 'read')])
-  return c.json(nativeRecord(spec.path, await spec.read(ctx.db, c.req.param('id'))))
+  return c.json(nativeRecord(spec.path, await spec.read(ctx.db, c.req.param('id')!)))
 })
 
 integrations.get('/documents', async c => {

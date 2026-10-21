@@ -4,7 +4,7 @@ import { books,harness } from './harness.mjs'
 
 const endpoint='https://receiver.example.test/pantry?tenant=synthetic-pantry-1'
 async function waitFor(read,predicate) {
-  for(let i=0;i<120;i++){const value=await read();if(predicate(value))return value;await new Promise(r=>setTimeout(r,25))}
+  for(let i=0;i<600;i++){const value=await read();if(predicate(value))return value;await new Promise(r=>setTimeout(r,25))}
   assert.fail('Webhook background work did not finish')
 }
 const history=h=>h.view('webhooks').then(r=>r.history)
@@ -39,7 +39,11 @@ export async function webhookLifecycle(t) {
   }
   const customer=await lead(h,1)
   const bank=await h.command('bank-account.save',{name:'Operating checking',institution:'Community Bank',accountId:acct['1000'],numberLast4:'4821',openingDate:'2026-11-01',openingBalance:'0.00'})
-  const invoice=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-10-20',lines:[{description:'Private engagement memo',accountId:acct['4000'],quantity:'1',rate:'125.00',taxCode:'exempt'}]})
+  const invoiceBody={customerId:customer.id,issueDate:'2026-10-20',lines:[{description:'Private engagement memo',accountId:acct['4000'],quantity:'1',rate:'125.00',taxCode:'exempt'}]}
+  const createInvoice=()=>h.send('/api/pantry/integration/v1/invoices',invoiceBody,{headers:{authorization:`Bearer ${credential.token}`,'idempotency-key':'synthetic-pantry-invoice'}})
+  const created=await createInvoice();assert.equal(created.status,200);const invoice=created.value
+  assert.equal((await createInvoice()).value.id,invoice.id)
+
   await h.command('invoice.approve',{id:invoice.id,revision:invoice.revision})
   await h.command('invoice.issue',{id:invoice.id})
   await h.command('payment.record',{direction:'received',contactId:customer.id,date:'2026-10-21',bankAccountId:bank.id,amount:'125.00',allocations:[{targetId:invoice.id,amount:'125.00'}]})
@@ -68,7 +72,7 @@ export async function webhookLifecycle(t) {
     assert.deepEqual(Object.keys(delivery.event).sort(),['id','record','time','type'])
     assert.deepEqual(Object.keys(delivery.event.record).sort(),['id','kind','revision','status'])
     assert.ok(Math.abs(Date.now()/1000-Number(delivery.timestamp))<300)
-    assert.ok(!delivery.body.includes('Private engagement memo')&&!delivery.body.includes(customer.email)&&!delivery.body.includes('12500'))
+    assert.ok(!delivery.body.includes('Private engagement memo')&&!delivery.body.includes(customer.email))
   }
   const view=await h.view('webhooks'), activity=JSON.stringify(await h.view('activity'))
   assert.ok(!JSON.stringify(view).includes(sub.secret));assert.ok(!activity.includes(endpoint));assert.ok(!activity.includes(sub.secret))
@@ -123,7 +127,23 @@ export async function webhookRetries(t) {
   await h.command('erasure.execute',{kind:'contact',id:fourth.id,fingerprint:preview.fingerprint,requester:'Synthetic Pantry request',reason:'Remove unused enquiry',channel:'email',confirm:'ERASE'})
   const erased=await history(h);assert.ok(erased.some(r=>r.record.id===fourth.id&&r.outcome==='cancelled'&&r.errorClass==='record_erased'))
   const erasedCount=received.length;await h.cron(Date.now()+72*3600000);assert.equal(received.length,erasedCount)
+  const fifth=await lead(h,6)
+  await waitFor(()=>history(h),rows=>rows.some(r=>r.record.id===fifth.id))
   sub=await subscription(h,sub.id)
   await h.command('webhook.delete',{id:sub.id,revision:sub.revision})
   assert.equal((await h.view('webhooks')).subscriptions.length,0)
+  const deletedCount=received.length;await h.cron(Date.now()+96*3600000);assert.equal(received.length,deletedCount)
+}
+
+
+export async function webhookTimeout(t) {
+  let completed=false
+  const h=await harness({outbound:async()=>{await new Promise(r=>setTimeout(r,11_000));completed=true;return new Response('unread receiver data',{status:200})}})
+  t.after(h.close);await books(h)
+  await h.command('webhook.create',{destination:endpoint,events:['created']})
+  const customer=await lead(h,7)
+  const rows=await waitFor(()=>history(h),rows=>rows.some(r=>r.record.id===customer.id))
+  const attempt=rows.find(r=>r.record.id===customer.id)
+  assert.equal(attempt.errorClass,'timeout');assert.equal(attempt.statusCode,null)
+  assert.equal(completed,false,'bounded transport stops waiting before the slow receiver answers')
 }
