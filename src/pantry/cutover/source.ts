@@ -1,4 +1,4 @@
-// What every move-in source (QuickBooks Online, Xero) hands the shared kit:
+// What every move-in source hands the shared kit:
 // its files, and those files parsed into one record per row in the same shapes,
 // so the tie-outs, the import plan and the sign-off are the same for both.
 import { sha256 } from '../../modules/import-kit/src/d1/index'
@@ -17,13 +17,17 @@ export type Parsed = {
   accountNames: Map<string, Account>
   /** Source-specific tie-outs, beside the shared ones. */
   extraChecks: Checks
+  nativeIds?: Record<string, string>
+  snapshots?: Record<string, string>
+  nativeValues?: Record<string, Data>
+  listOnly?: boolean
   notImported: Left[]
 }
 
-export type Package = { files: Record<string, { name: string; content: string }>; banks: Data[]; cutoverDate?: string }
+export type Package = { files: Record<string, { name: string; content: string; base64?: string }>; banks: Data[]; cutoverDate?: string }
 
 export type Source = {
-  key: 'quickbooks-online' | 'xero'
+  key: 'quickbooks-online' | 'xero' | 'spreadsheet'
   name: string
   /** Prefix of every imported row's id, and the import kit's namespace and mapping version. */
   prefix: string

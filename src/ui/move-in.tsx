@@ -2,20 +2,23 @@
 // refusals, tie-outs and what will not come in, import as staged records, then
 // the accountant signs off (posting the opening balances) or the import is
 // undone. After a Xero import, its attachments can be carried over.
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Action, Card, Chip, command, Details, Field, Loading, PageHead, Table, Tabs, day, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
 import { COUNT_LABEL, SOURCES, sourceName, type SourceKey } from './move-in-sources'
+import { MoveInSpreadsheets } from './move-in-spreadsheets'
 import { XeroAttachments } from './move-in-xero'
 
 type Bank = { account: string; institution: string; last4: string; statementBalance: string }
+const moveInName = (key: string) => key === 'spreadsheet' ? 'Spreadsheet' : sourceName(key)
+const countLabel = (key: string) => key === 'items' ? 'Items' : COUNT_LABEL[key]
 const blank = (): Bank => ({ account: '', institution: '', last4: '', statementBalance: '' })
 
 /** What came in (or will), and what did not, each with why. */
 function Outcome({ counts, left }: { counts: D; left: D[] }) {
   return <div className="split even">
     <Card title="What came in">
-      <Table heads={['Record', 'Count']} figures={[1]}>{Object.entries(counts).map(([k, v]) => <tr key={k}><td>{COUNT_LABEL[k]}</td><td className="fig">{typeof v === 'number' ? v : v.accepted}</td></tr>)}</Table>
+      <Table heads={['Record', 'Count']} figures={[1]}>{Object.entries(counts).map(([k, v]) => <tr key={k}><td>{countLabel(k)}</td><td className="fig">{typeof v === 'number' ? v : v.accepted}</td></tr>)}</Table>
     </Card>
     <Card title="What did not come in, and why">
       <Table heads={['What', 'Count', 'Why']} figures={[1]} empty="Everything in the files comes in.">{left.map(l => <tr key={l.what}><td>{l.what}</td><td className="fig">{l.count || '—'}</td><td>{l.why}</td></tr>)}</Table>
@@ -25,10 +28,11 @@ function Outcome({ counts, left }: { counts: D; left: D[] }) {
 
 export function MoveIn() {
   const shared = useShared(), who = useWho(), status = useView<D>('move-in'), inputs = useRef<Record<string, HTMLInputElement | null>>({})
-  const [source, setSource] = useState<SourceKey>('quickbooks-online')
+  const [source, setSource] = useState<SourceKey | 'spreadsheet'>('quickbooks-online')
   const [banks, setBanks] = useState<Bank[]>([blank()])
   const [preview, setPreview] = useState<D | null>(null), [pkg, setPkg] = useState<D | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false)
-  const kit = SOURCES.find(s => s.key === source)!
+  useEffect(() => { if (status.data?.jobs.some((j: D) => j.source === 'spreadsheet' && ['queued', 'applying', 'failed', 'undoing'].includes(j.state))) setSource('spreadsheet') }, [status.data])
+  const kit = SOURCES.find(s => s.key === source) ?? SOURCES[0]
   const read = async () => {
     const files: D = {}
     for (const [key, label] of kit.files) { const f = inputs.current[`${source}-${key}`]?.files?.[0]; if (!f) throw new Error(`Choose the ${label} export`); files[key] = { name: f.name, content: await f.text() } }
@@ -43,20 +47,21 @@ export function MoveIn() {
   const bank = (i: number, key: keyof Bank) => (e: any) => setBanks(bs => bs.map((x, j) => j === i ? { ...x, [key]: e.target.value } : x))
   return <>
     <PageHead title="Move in" lead="Bring your books from QuickBooks Online or Xero. Preview the exports before anything changes; imported records stay staged until someone signs off the trial balance, open items and bank balances." />
-    {status.data && cut && <Card title={`Cutover from ${sourceName(cut.source)}`} actions={accepted ? <Chip tone="good">Signed off</Chip> : <Chip tone="warn">Waiting for sign-off</Chip>}>
+    {status.data && cut && <Card title={`Cutover from ${moveInName(cut.source)}`} actions={accepted ? <Chip tone="good">Signed off</Chip> : <Chip tone="warn">Waiting for sign-off</Chip>}>
       <p>{cut.summary}.</p>
       {accepted ? <p>Signed off by {who(accepted.accepted_by)} on {day(accepted.accepted_at)}. Corrections now go through reversing or adjusting entries; the import can no longer be undone.</p> : <>
         <p>The opening entry is a draft. Signing off checks again that open invoices equal receivables, unpaid bills equal payables and each bank balance equals its statement, then posts it.</p>
         <div className="row-actions">
           {shared.state.actor.can.post ? <Action tone="primary" run={async () => { await command('move-in.accept', { id: staged.id, revision: staged.revision }); await refresh() }}>Accountant sign-off</Action> : <span className="hint">Sign-off needs the posting grant.</span>}
-          {job && shared.state.actor.can.post && <Action tone="danger" run={async () => { await command('move-in.undo', { jobId: job.id }); setPreview(null); await refresh() }}>Undo import</Action>}
+          {job && shared.state.actor.can.post && <Action tone="danger" run={async () => { let result = await command('move-in.undo', { jobId: job.id }); while (result.job.state === 'undoing') result = await command('move-in.undo', { jobId: job.id }); setPreview(null); await refresh() }}>Undo import</Action>}
         </div></>}
       <p className="hint">{status.data.history} history lines kept read-only for reference.</p>
     </Card>}
     {status.data && cut && report && <Outcome counts={report.cameIn} left={report.leftOut} />}
     {status.data && cut?.source === 'xero' && <XeroAttachments xero={status.data.xero} reload={refresh} />}
-    {!status.data ? <Loading error={status.error} what="move-in" /> : !cut && <>
-      <Tabs tabs={SOURCES.map(s => s.name)} current={kit.name} onChange={name => { setSource(SOURCES.find(s => s.name === name)!.key); setPreview(null); setError('') }} />
+    {!status.data ? <Loading error={status.error} what="move-in" /> : !cut && <Tabs tabs={[...SOURCES.map(s => s.name), 'Spreadsheet']} current={source === 'spreadsheet' ? 'Spreadsheet' : kit.name} onChange={name => { setSource(name === 'Spreadsheet' ? 'spreadsheet' : SOURCES.find(s => s.name === name)!.key); setPreview(null); setError('') }} />}
+    {status.data && !accepted && (source === 'spreadsheet' || cut?.source === 'spreadsheet') && <MoveInSpreadsheets status={status.data} reload={refresh} />}
+    {status.data && !cut && source !== 'spreadsheet' && <>
       <div className="split split-wide-left">
         <Card title={`1. ${kit.name} exports`}>
           <p className="hint">{kit.intro}</p>
@@ -76,8 +81,8 @@ export function MoveIn() {
       </div>
     </>}
     {preview && !cut && <>
-      <Card title={`Import summary — ${sourceName(preview.source)}, cutover ${preview.cutoverDate}`}>
-        <div className="counts">{Object.entries(preview.counts).map(([k, v]: [string, any]) => <div key={k} className="count"><strong>{v.accepted}</strong><span>{COUNT_LABEL[k]}</span>{v.refused ? <Chip tone="bad">{v.refused} refused</Chip> : <Chip tone="good">ready</Chip>}</div>)}</div>
+      <Card title={`Import summary — ${moveInName(preview.source)}, cutover ${preview.cutoverDate}`}>
+        <div className="counts">{Object.entries(preview.counts).map(([k, v]: [string, any]) => <div key={k} className="count"><strong>{v.accepted}</strong><span>{countLabel(k)}</span>{v.refused ? <Chip tone="bad">{v.refused} refused</Chip> : <Chip tone="good">ready</Chip>}</div>)}</div>
       </Card>
       <div className="split even">
         <Card title="Tie-outs" actions={preview.checks.every((c: D) => c.ok) ? <Chip tone="good">All match</Chip> : <Chip tone="bad">Not yet</Chip>}>
@@ -98,7 +103,7 @@ export function MoveIn() {
       {error && <p role="alert" className="error">{error}</p>}
     </>}
     {status.data && status.data.jobs.length > 0 && <Card title="Import journal">
-      <Table heads={['Import', 'From', 'State', 'Records', 'Error']} figures={[3]}>{status.data.jobs.map((j: D) => <tr key={j.id}><td><code>{j.id.slice(0, 8)}</code></td><td>{sourceName(j.source)}</td><td>{j.state === 'completed' ? <Chip tone="good">Imported</Chip> : j.state === 'undone' ? <Chip>Undone</Chip> : <Chip tone="warn">{j.state}</Chip>}</td><td className="fig">{j.checkpoint} of {j.total}</td><td>{j.error ?? '—'}</td></tr>)}</Table>
+      <Table heads={['Import', 'From', 'State', 'Records', 'Error']} figures={[3]}>{status.data.jobs.map((j: D) => <tr key={j.id}><td><code>{j.id.slice(0, 8)}</code></td><td>{moveInName(j.source)}</td><td>{j.state === 'completed' ? <Chip tone="good">Imported</Chip> : j.state === 'undone' ? <Chip>Undone</Chip> : <Chip tone="warn">{j.state}</Chip>}</td><td className="fig">{j.checkpoint} of {j.total}</td><td>{j.error ?? '—'}</td></tr>)}</Table>
     </Card>}
   </>
 }

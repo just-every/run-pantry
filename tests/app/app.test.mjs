@@ -1,3 +1,4 @@
+import { moveInJourney } from './move-in-journey.mjs'
 import { captureJourney } from './capture-journey.mjs'
 import { data001Browser } from './data001-journey.mjs'
 // The built app in a browser, on the emitted Worker and its own migrated D1: the owner
@@ -9,6 +10,8 @@ import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
 import { vendorCreditJourney } from './vendor-credit-journey.mjs'
+
+test('MIGRATE-007 spreadsheet mapping, preview, undo, reimport and sign-off at 1440 and 390', moveInJourney)
 
 test('DATA-001 owner inventories data, paths, prices and unavailable brokers, rotates Stripe and removes the model at 1440 and 390', data001Browser)
 

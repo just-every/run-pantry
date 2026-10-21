@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { at, fixture, harness } from './harness.mjs'
 import { fakeXero, xeroExports } from './xero.mjs'
+import { spreadsheetPackage, spreadsheetWorkbook } from '../app/move-in-journey.mjs'
 
 const FILES = { accounts: 'account-list.csv', customers: 'customer-contact-list.csv', vendors: 'vendor-contact-list.csv', trialBalance: 'trial-balance.csv', openInvoices: 'open-invoices.csv', unpaidBills: 'unpaid-bills.csv', generalLedger: 'general-ledger.csv' }
 async function cutoverPackage(overrides = {}) {
@@ -148,4 +149,106 @@ test('XERO-001 Xero exports are previewed, imported, carry their attachments ove
   // Disconnecting ends Pantry's access at Xero.
   await h.command('move-in.xero.disconnect', {}, bea)
   assert.deepEqual(xero.state.revoked, [xero.token.refresh_token])
+})
+
+export async function finishSpreadsheet(h, result, cookie = h.owner) {
+  let job = result.job
+  for (let requests = 0; job.state !== 'completed' && requests < 100; requests++) job = (await h.command('move-in.continue', { jobId: job.id }, cookie)).job
+  assert.equal(job.state, 'completed', JSON.stringify(job)); return job
+}
+async function undoSpreadsheet(h, jobId, cookie) {
+  let result = await h.command('move-in.undo', { jobId }, cookie)
+  for (let requests = 0; result.job.state !== 'undone' && requests < 100; requests++) result = await h.command('move-in.undo', { jobId }, cookie)
+  assert.equal(result.job.state, 'undone')
+}
+
+test('MIGRATE-007 spreadsheet import of lists and open items', async t => {
+  const h = await harness(); t.after(() => h.close())
+  await h.command('entity.save', { legalName: 'Synthetic Pantry', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'accrual', booksStart: '2026-09-01' })
+  const bea = await h.member('spreadsheet-bookkeeper@example.test', 'bookkeeper'), ann = await h.member('spreadsheet-accountant@example.test', 'accountant', { canPost: true })
+  const pkg = await spreadsheetPackage()
+  const mappings = { customers: { externalId: 'client_key', name: 'Client label', email: 'Mail box', termsDays: 'Days credit' }, vendors: { externalId: 'Vendor key', name: 'Trading name', email: 'Email address' } }
+  for (const [dataset, columns] of Object.entries(mappings)) {
+    const inspect = await h.command('move-in.spreadsheet.inspect', { dataset, file: pkg.files[dataset] }, bea)
+    assert.ok(inspect.headers.includes(columns.name)); assert.ok(inspect.rows >= 10)
+    await h.command('move-in.spreadsheet.mapping', { dataset, columns }, bea)
+    assert.deepEqual((await h.view('move-in')).spreadsheetMappings[dataset], columns)
+  }
+  // Mappings can be edited and are used on the next upload without being sent.
+  await h.command('move-in.spreadsheet.mapping', { dataset: 'customers', columns: { ...mappings.customers, email: '' } }, bea)
+  assert.equal((await h.view('move-in')).spreadsheetMappings.customers.email, '')
+  await h.command('move-in.spreadsheet.mapping', { dataset: 'customers', columns: mappings.customers }, bea)
+  for (const dataset of Object.keys(pkg.files)) {
+    const template = await h.command('move-in.spreadsheet.template', { dataset }, bea)
+    const inspect = await h.command('move-in.spreadsheet.inspect', { dataset, file: { name: template.name, content: template.content } }, bea)
+    assert.equal(inspect.rows, 1); assert.ok(inspect.headers.length >= 3)
+  }
+  const formulaPreview = await h.command('move-in.preview', { source: 'spreadsheet', cutoverDate: pkg.cutoverDate, files: { vendors: { name: 'formula-vendors.xlsx', base64: await spreadsheetWorkbook([['Vendor key', 'Trading name', 'Email address'], ['synthetic-pantry-1', 'Formula vendor', 'vendor@example.test']], { B2: 'UPPER("Formula vendor")' }) } } }, bea)
+  assert.equal(formulaPreview.rows.length, 1)
+  assert.match(formulaPreview.refused[0].reason, /Formula cell/)
+  await h.command('move-in.spreadsheet.inspect', { dataset: 'vendors', file: { name: 'broken.xlsx', base64: Buffer.from('broken').toString('base64') } }, bea, 400)
+  await h.send('/api/pantry/command/move-in.spreadsheet.mapping', { dataset: 'customers', columns: mappings.customers }).then(r => assert.equal(r.status, 401))
+  const preview = await h.command('move-in.preview', pkg, bea)
+  assert.deepEqual([preview.counts.customers.accepted, preview.counts.vendors.accepted, preview.counts.accounts.accepted, preview.counts.openInvoices.accepted, preview.counts.unpaidBills.accepted, preview.counts.items.accepted], [200, 10, 40, 25, 10, 1])
+  assert.equal(preview.refused.length, 3)
+  assert.ok(preview.refused.some(r => /Duplicate name/.test(r.reason)))
+  assert.ok(preview.refused.some(r => /Unknown account/.test(r.reason)))
+  assert.ok(preview.refused.some(r => /Missing tax decision/.test(r.reason)))
+  assert.equal(preview.rows.length, 292, 'every source data row is previewed, including refused rows')
+  assert.ok(preview.checks.every(c => c.ok), JSON.stringify(preview.checks))
+  assert.equal((await h.view('state')).contacts.length, 0, 'preview changes no native records')
+  await h.command('move-in.spreadsheet.mapping', { dataset: 'customers', columns: { ...mappings.customers, email: '' } }, bea)
+  await h.command('move-in.commit', { ...pkg, fingerprint: preview.fingerprint, leaveRefusedOut: true }, bea, 409)
+  await h.command('move-in.spreadsheet.mapping', { dataset: 'customers', columns: mappings.customers }, bea)
+  const off = structuredClone(pkg); off.files.trialBalance.content = off.files.trialBalance.content.replace('1500.00', '1499.00')
+  const offPreview = await h.command('move-in.preview', off, bea)
+  assert.ok(offPreview.refused.some(r => /Unbalanced opening/.test(r.reason)))
+  await h.command('move-in.commit', { ...off, fingerprint: offPreview.fingerprint, leaveRefusedOut: true }, bea, 409)
+  await h.command('move-in.commit', { ...pkg, fingerprint: preview.fingerprint }, bea, 409)
+  const first = await finishSpreadsheet(h, await h.command('move-in.commit', { ...pkg, fingerprint: preview.fingerprint, leaveRefusedOut: true }, bea), bea)
+  const sourceHash = createHash('sha256').update(Buffer.from(pkg.files.vendors.base64, 'base64')).digest('hex')
+  assert.equal((await h.db.prepare('SELECT sha256 FROM ik_originals WHERE job_id = ? AND name = ?').bind(first.id, 'vendors.xlsx').first()).sha256, sourceHash)
+  const imported = await h.view('state'), sales = await h.view('sales')
+  assert.deepEqual([imported.contacts.length, imported.accounts.length, sales.invoices.length, sales.bills.length], [210, 40, 25, 10])
+  assert.equal((await h.view('reports/trial-balance?to=2026-08-31&basis=accrual')).rows.length, 0)
+  const customer = at(imported.contacts, c => c.name === 'Customer 0')
+  await undoSpreadsheet(h, first.id, ann)
+  assert.deepEqual([(await h.view('state')).contacts.length, (await h.view('state')).accounts.length, (await h.view('sales')).invoices.length], [0, 0, 0])
+  assert.deepEqual((await h.view('move-in')).spreadsheetMappings.customers, mappings.customers, 'undo keeps the reusable mapping')
+  pkg.files.customers.content = pkg.files.customers.content.replace('customer0@example.test', 'changed@example.test')
+  const secondPreview = await h.command('move-in.preview', pkg, bea)
+  await finishSpreadsheet(h, await h.command('move-in.commit', { ...pkg, fingerprint: secondPreview.fingerprint, leaveRefusedOut: true }, bea), bea)
+  const again = await h.view('state')
+  assert.equal(again.contacts.length, 210)
+  assert.equal(at(again.contacts, c => c.id === customer.id).email, 'changed@example.test')
+  pkg.files.customers.content = pkg.files.customers.content.replace('changed@example.test', 'full-update@example.test')
+  const fullUpdate = await h.command('move-in.preview', pkg, bea)
+  await finishSpreadsheet(h, await h.command('move-in.commit', { ...pkg, fingerprint: fullUpdate.fingerprint, leaveRefusedOut: true }, bea), bea)
+  assert.deepEqual([(await h.view('state')).contacts.length, (await h.view('state')).accounts.length, (await h.view('sales')).invoices.length, (await h.view('sales')).bills.length], [210, 40, 25, 10])
+  assert.equal(at((await h.view('state')).contacts, c => c.id === customer.id).email, 'full-update@example.test')
+  // A further re-import while staged updates the existing external identity,
+  // including a rename, instead of producing another native contact.
+  const rename = { ...pkg, files: { customers: { ...pkg.files.customers, content: pkg.files.customers.content.split('\r\n').slice(0, 2).join('\r\n').replace('Customer 0', 'Renamed customer').replace('full-update@example.test', 'updated@example.test') } } }
+  const update = await h.command('move-in.preview', rename, bea)
+  assert.equal(update.rows[0].status, 'update')
+  const renamedJob = await finishSpreadsheet(h, await h.command('move-in.commit', { ...rename, fingerprint: update.fingerprint }, bea), bea)
+  const updated = await h.view('state')
+  assert.equal(updated.contacts.length, 210)
+  assert.deepEqual([at(updated.contacts, c => c.id === customer.id).name, at(updated.contacts, c => c.id === customer.id).email], ['Renamed customer', 'updated@example.test'])
+  // Name matching also works when a list has no external-id column.
+  const nameOnly = { ...rename, mappings: { customers: { name: 'Client label', email: 'Mail box' } } }
+  nameOnly.files.customers = { ...rename.files.customers, content: rename.files.customers.content.replace('updated@example.test', 'by-name@example.test') }
+  const named = await h.command('move-in.preview', nameOnly, bea)
+  const namedJob = await finishSpreadsheet(h, await h.command('move-in.commit', { ...nameOnly, fingerprint: named.fingerprint }, bea), bea)
+  assert.equal((await h.view('state')).contacts.length, 210)
+  assert.equal(at((await h.view('state')).contacts, c => c.id === customer.id).email, 'by-name@example.test')
+  await undoSpreadsheet(h, namedJob.id, ann)
+  assert.equal(at((await h.view('state')).contacts, c => c.id === customer.id).email, 'updated@example.test', 'undo of an update restores its before-image')
+  assert.equal((await h.view('state')).contacts.length, 210)
+  const staged = at((await h.view('move-in')).cutovers, c => c.status === 'staged')
+  await h.command('move-in.accept', { id: staged.id, revision: staged.revision }, bea, 403)
+  await h.command('move-in.accept', { id: staged.id, revision: staged.revision }, ann)
+  const tb = await h.view('reports/trial-balance?to=2026-08-31&basis=accrual'), ar = await h.view('reports/receivables?to=2026-08-31'), ap = await h.view('reports/payables?to=2026-08-31')
+  assert.deepEqual([tb.balanced, tb.debit, tb.credit, ar.itemsTotal, ar.agrees, ap.itemsTotal, ap.agrees], [true, 250000, 250000, 250000, true, 100000, true])
+  await h.command('move-in.undo', { jobId: renamedJob.id }, ann, 409)
 })

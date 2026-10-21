@@ -1,6 +1,6 @@
-# Move in from QuickBooks Online or Xero
+# Move in from QuickBooks Online, Xero or spreadsheets
 
-Pantry has two move-in kits on one shared core (`src/pantry/cutover/`): QuickBooks Online (`qbo.ts`) and Xero (`xero.ts`). Each parses its exports into the same records, so the tie-outs, the import plan, undo and sign-off (`plan.ts`, `commands.ts`) are one code path. A preview names its `source` (`quickbooks-online`, the default, or `xero`).
+Pantry has three move-in kits on one shared core (`src/pantry/cutover/`): QuickBooks Online (`qbo.ts`), Xero (`xero.ts`) and generic spreadsheets (`spreadsheet.ts`). Each parses its exports into the same records, so the tie-outs, the import plan, undo and sign-off (`plan.ts`, `commands.ts`) are one code path. A preview names its `source` (`quickbooks-online`, the default, `xero` or `spreadsheet`).
 
 ## QuickBooks Online
 
@@ -67,3 +67,29 @@ The synthetic files in [`fixtures/xero`](fixtures/xero) are written in these lay
 4. **Accountant sign-off** (post grant). Re-checks that open invoices still equal opening receivables, unpaid bills equal payables and each bank's opening statement balance equals its opening book balance, records the approval of that exact cutover version, and posts the opening entry. From then on, corrections are reversing or adjusting entries; undo is refused.
 
 Keep the old system and its full archive available until a real close in Pantry is accepted by the accountant. The QuickBooks Online kit does not read QBO's separate attachments .zip: upload the source documents for open items in Documents.
+
+## Spreadsheets (CSV and Excel)
+
+The **Spreadsheet** tab accepts any selection of customers, vendors, items, chart of accounts, open invoices, open bills and opening trial balance files. CSV files use a header row followed by values; Excel `.xlsx` files use the first worksheet (the API also accepts `sheet` to name another). Each upload is at most 2 MB (the combined JSON request, including workbook base64, must stay below 8 MB), with at most 10,000 data rows and 100 columns; expanded workbooks are bounded to 12 MB. Formulas and Excel error cells are refused by row: replace formulas with values first. Password-protected workbooks, legacy `.xls`, macros and external worksheet relationships are not imported. Shared strings, inline strings, numeric cells and formatted Excel dates are supported. Use ISO dates or US `MM/DD/YYYY` dates, and decimal dollar amounts with at most two fractional digits.
+
+Download a CSV template beside each list. The columns shown by each template are:
+
+| List | Fields |
+| --- | --- |
+| Customers / vendors | `externalId`, `name`, `email`, `termsDays` |
+| Chart | `externalId`, `name`, `code`, `type`, `subtype`, `description` |
+| Items | `externalId`, `name`, `kind`, `sku`, `description`, `rate`, `account`, `taxDecision`, `taxCode` |
+| Open invoices / bills | `externalId`, `number`, `party`, `date`, `due`, `open`, `original`, `account`, `taxDecision` |
+| Opening trial balance | `account`, `debit`, `credit` |
+
+Headers may have any names: choose their matching fields under **Map columns**. Pantry saves a separate editable mapping for each list; saving a mapping and undoing an import are independent operations. An upload with unchanged headers uses that mapping again. Preview also saves the mappings selected on the page. Optional fields can be left unmapped.
+
+Names, chart codes and account types are required. Chart types are `asset`, `liability`, `equity`, `income` or `expense`; `subtype` is `other` (the default), `bank`, `receivable`, `payable`, `tax` or `retained`. References to an account can use its name or code. Open items name an existing/imported customer or vendor and the relevant receivable/payable control account. Items require an income account, `service` or `non-inventory` kind, a rate, and an explicit `taxable` or `non-taxable` decision. A taxable item may also name an active Pantry tax-code ID. Open amounts already include any tax: explicitly choose `included` or `non-taxable`; importing the opening item does not charge tax again. Open amounts must be positive and no larger than the original amount.
+
+Every data row appears in the dry run, with values, its source row, and whether it is ready, unchanged, an update, or refused. Duplicate names/IDs, unknown accounts and missing tax decisions carry their own reasons. An unbalanced opening is also refused. Correct the files or explicitly choose to leave refused rows out; that acknowledgement never overrides a failed tie-out. The opening must balance, accepted open invoices must equal receivables, accepted bills must equal payables, and each bank account must agree with its entered reconciled statement balance. Lists can be imported on their own. An open-items import must include its opening trial balance.
+
+Accepted rows use the same staged import journal, original-byte retention, undo and accountant sign-off as the other kits. Large files advance over bounded requests; **Continue spreadsheet import** resumes the stored job after an interrupted browser session. Refused rows remain in its retained import plan and are listed in the import outcome. Undo removes newly imported rows, or restores the exact prior native values when a staged re-import updated them. Its saved header mappings remain available. A partially completed undo has a **Continue undo** action.
+
+Before sign-off, another file updates matching records by external ID, or by name when no ID is supplied. Matching is case-insensitive. External IDs let a record be renamed without creating a second record. Invoices match by number, and bills by vendor plus number. Conflicting names and external IDs are refused. Re-importing a financial opening uses the same cutover date and requires the full open-item lists behind that trial balance; importing only a changed customer/vendor/item/chart list does not replace the opening entry. Existing posted books and other sources' cutovers are refused. After sign-off, make corrections through the normal accounting flows.
+
+The HTTP commands are `move-in.spreadsheet.inspect` (`dataset`, `file`), `move-in.spreadsheet.mapping` (`dataset`, `columns`), and `move-in.spreadsheet.template` (`dataset`). For `move-in.preview` / `move-in.commit`, send `source: "spreadsheet"`, `cutoverDate`, `files`, optional `mappings` keyed by list, and optional `banks`. CSV files are `{name, content}`; workbooks are `{name, base64, sheet?}`. The commit requires the reviewed `fingerprint` and, when applicable, explicit `leaveRefusedOut: true`. A returned job in `applying` is continued with `move-in.continue` and its `jobId` until `completed`. Repeat `move-in.undo` while its returned job is `undoing`. All these commands use native Pantry authentication and the existing record/post grants.

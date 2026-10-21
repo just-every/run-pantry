@@ -1,6 +1,7 @@
 // A source's parsed records → the reviewed import plan: the tie-outs a person
 // and accountant review, the import kit's source bundle with the exact uploaded
 // bytes, and the native rows each accepted record becomes.
+import { Buffer } from 'node:buffer'
 import { canonicalJson, sha256, type SourceBundle, type ImportMapping } from '../../modules/import-kit/src/d1/index'
 import { requireThat, text, usd, type Data } from '../core'
 import { idsFor, type Package, type Parsed, type Rec, type Source } from './source'
@@ -45,16 +46,16 @@ export function checks(r: Parsed): Checks {
 /** Records into the kit's source bundle, with the exact uploaded bytes as artifacts. */
 export function bundle(source: Source, p: Package, list: Rec[]): SourceBundle {
   // The bank details typed at review are an input too, kept beside the export files.
-  const inputs = [...source.files.map(f => ({ key: f, name: p.files[f].name, bytes: new TextEncoder().encode(p.files[f].content) })),
+  const inputs = [...Object.entries(p.files).map(([f, file]) => ({ key: f, name: file.name, bytes: file.base64 ? Buffer.from(file.base64, 'base64') : new TextEncoder().encode(file.content) })),
     { key: 'banks', name: 'bank-details-entered-at-review.json', bytes: new TextEncoder().encode(canonicalJson(p.banks as any)) }]
-  const artifacts = inputs.map(a => ({ ...a, sha256: sha256(a.bytes), base64: btoa(Array.from(a.bytes, x => String.fromCharCode(x)).join('')) }))
+  const artifacts = inputs.map(a => ({ ...a, sha256: sha256(a.bytes), base64: btoa(Array.from(a.bytes as Uint8Array, x => String.fromCharCode(x)).join('')) }))
   const by = Object.fromEntries(artifacts.map(a => [a.key, a]))
-  const order = ['account', 'customer', 'vendor', 'bank', 'invoice', 'bill', 'trial-balance', 'cutover', 'history']
+  const order = ['account', 'customer', 'vendor', 'item', 'bank', 'invoice', 'bill', 'trial-balance', 'cutover', 'history']
   const records = [...list].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind)).map(r => ({
     namespace: source.namespace, kind: r.kind, sourceId: r.sourceId, payload: r.payload as any, payloadHash: sha256(canonicalJson(r.payload as any)),
     artifactHash: by[r.artifact].sha256, location: { artifact: by[r.artifact].name, row: r.row } as any,
   }))
-  return { records, diagnostics: [], artifacts: artifacts.map(a => ({ name: a.name, sha256: a.sha256, size: a.bytes.length, original: { status: 'available' as const, base64: a.base64 } })) }
+  return { records, diagnostics: [], artifacts: artifacts.filter((a, i) => artifacts.findIndex(b => b.name === a.name && b.sha256 === a.sha256) === i).map(a => ({ name: a.name, sha256: a.sha256, size: a.bytes.length, original: { status: 'available' as const, base64: a.base64 } })) }
 }
 
 export const mappingVersion = (source: Source, day: string) => `${source.prefix}-cutover-v1:${day}`

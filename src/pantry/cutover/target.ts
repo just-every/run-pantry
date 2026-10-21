@@ -14,6 +14,8 @@ const KINDS: Record<string, Kind> = {
   // Kind names avoid the kit's login-access words: these are ledger accounts and trading parties.
   chart: { table: 'pt_accounts', columns: ['code', 'name', 'type', 'subtype', 'description', 'active'] },
   counterparty: { table: 'pt_contacts', columns: ['kind', 'name', 'email', 'terms_days', 'external_ref', 'active'] },
+  item: { table: 'pt_items', columns: ['name', 'kind', 'sku', 'description', 'rate_cents', 'income_account_id', 'tax_category', 'tax_code', 'active', 'created_at'] },
+  'spreadsheet-key': { table: 'pt_spreadsheet_keys', columns: ['dataset', 'external_id', 'name'] },
   bank: { table: 'pt_bank_accounts', columns: ['name', 'account_id', 'institution', 'number_last4', 'routing', 'opening_date', 'opening_cents'] },
   invoice: { table: 'pt_invoices', columns: ['kind', 'number', 'customer_id', 'issue_date', 'due_date', 'status', 'memo', 'credit_for', 'subtotal_cents', 'tax_cents', 'total_cents', 'opening', 'journal_id', 'prepared_by', 'approved_by', 'approved_revision', 'issued_by', 'created_at'] },
   bill: { table: 'pt_bills', columns: ['vendor_id', 'reference', 'bill_date', 'due_date', 'status', 'memo', 'total_cents', 'opening', 'evidence_waived', 'journal_id', 'prepared_by', 'created_at'] },
@@ -47,9 +49,11 @@ function cutoverParts(row: TargetRow | null, id: string): D1Sql[] {
 }
 const conjunction = (parts: D1Sql[]): D1Sql => ({ sql: parts.map(p => `(${p.sql})`).join(' AND '), params: parts.flatMap(p => p.params ?? []) })
 
-/** The adapter for one source's rows: every id it writes starts with the source's prefix. */
+/** A source's native adapter. Prefixes bound its inventory; a reviewed generic
+ * spreadsheet may also update an explicitly matched existing native id. */
 export function targetsFor(prefix: string): D1TargetAdapter {
   const IMPORTED = `id LIKE '${prefix}-%'`
+  const kinds = Object.entries(KINDS).filter(([kind]) => prefix === 'sheet' || !['item', 'spreadsheet-key'].includes(kind))
   return {
     async read(db, destination, kind, id) {
       if (kind === 'cutover') return readCutover(db, destination, id)
@@ -71,13 +75,14 @@ export function targetsFor(prefix: string): D1TargetAdapter {
       const v = row.value as any
       if (row.targetKind === 'cutover') {
         return [
-          sql(`INSERT INTO pt_journal_entries (${ENTRY.join(', ')}, revision) VALUES (${ENTRY.map(() => '?').join(', ')}, ?)`, ...ENTRY.map(c => v.entry[c] ?? null), row.revision),
+          sql("DELETE FROM pt_journal_lines WHERE entry_id = ?", v.entry.id),
+          sql(`INSERT INTO pt_journal_entries (${ENTRY.join(', ')}, revision) VALUES (${ENTRY.map(() => '?').join(', ')}, ?) ON CONFLICT(id) DO UPDATE SET ${ENTRY.filter(c => c !== 'id').map(c => `${c} = excluded.${c}`).join(', ')}, revision = excluded.revision`, ...ENTRY.map(c => v.entry[c] ?? null), row.revision),
           ...v.lines.map((l: any) => sql(`INSERT INTO pt_journal_lines (id, entry_id, ${LINE.join(', ')}) VALUES (?, ?, ${LINE.map(() => '?').join(', ')})`, `${v.entry.id}-${l.line_no}`, v.entry.id, ...LINE.map(c => l[c] ?? null))),
-          sql(`INSERT INTO pt_cutovers (id, ${CUTOVER.join(', ')}, revision) VALUES (?, ${CUTOVER.map(() => '?').join(', ')}, ?)`, row.targetId, ...CUTOVER.map(c => v.cutover[c] ?? null), row.revision),
+          sql(`INSERT INTO pt_cutovers (id, ${CUTOVER.join(', ')}, revision) VALUES (?, ${CUTOVER.map(() => '?').join(', ')}, ?) ON CONFLICT(id) DO UPDATE SET ${CUTOVER.map(c => `${c} = excluded.${c}`).join(', ')}, revision = excluded.revision`, row.targetId, ...CUTOVER.map(c => v.cutover[c] ?? null), row.revision),
         ]
       }
       const k = KINDS[row.targetKind]
-      return [sql(`INSERT INTO ${k.table} (id, ${k.columns.join(', ')}, revision) VALUES (?, ${k.columns.map(() => '?').join(', ')}, ?) ON CONFLICT(id) DO UPDATE SET ${k.columns.map(c => `${c} = excluded.${c}`).join(', ')}, revision = excluded.revision`, row.targetId, ...k.columns.map(c => v[c] ?? null), row.revision), ...(row.targetKind === 'invoice' ? importedInvoiceDocument(row.targetId) : [])]
+      return [sql(`INSERT INTO ${k.table} (id, ${k.columns.join(', ')}, revision) VALUES (?, ${k.columns.map(() => '?').join(', ')}, ?) ON CONFLICT(id) DO UPDATE SET ${k.columns.map(c => `${c} = excluded.${c}`).join(', ')}, revision = excluded.revision`, row.targetId, ...k.columns.map(c => v[c] ?? null), row.revision), ...(row.targetKind === 'invoice' ? [...(prefix === 'sheet' ? [sql("DELETE FROM pt_invoice_documents WHERE invoice_id = ? AND basis = 'import'", row.targetId)] : []), ...importedInvoiceDocument(row.targetId)] : [])]
     },
     remove(_destination, kind, id) {
       if (kind === 'cutover') return [
@@ -89,7 +94,7 @@ export function targetsFor(prefix: string): D1TargetAdapter {
     },
     async list(db, destination) {
       const rows: TargetRow[] = []
-      for (const [kind, k] of Object.entries(KINDS)) {
+      for (const [kind, k] of kinds) {
         const found = (await db.prepare(`SELECT * FROM ${k.table} WHERE ${IMPORTED}`).all<Record<string, unknown>>()).results
         rows.push(...found.map(r => ({ destination, targetKind: kind, targetId: String(r.id), revision: String(r.revision), value: pick(r, k.columns) as any })))
       }
@@ -97,7 +102,7 @@ export function targetsFor(prefix: string): D1TargetAdapter {
       return rows
     },
     matchesCount(count) {
-      return sql(`(${[...Object.values(KINDS).map(k => `(SELECT COUNT(*) FROM ${k.table} WHERE ${IMPORTED})`), `(SELECT COUNT(*) FROM pt_cutovers WHERE ${IMPORTED})`].join(' + ')}) = ?`, count)
+      return sql(`(${[...kinds.map(([, k]) => `(SELECT COUNT(*) FROM ${k.table} WHERE ${IMPORTED})`), `(SELECT COUNT(*) FROM pt_cutovers WHERE ${IMPORTED})`].join(' + ')}) = ?`, count)
     },
   }
 }
