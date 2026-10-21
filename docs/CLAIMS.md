@@ -54,11 +54,11 @@ Branch `br/page` on just-every/run-pantry, 18 October 2026: the homepage rebuilt
 | 48 | Click any number. | Aging tab | code | Receivables and payables aging in `src/ui/reports.tsx`. |
 | 49 | Click any number. | 1099-NEC · 2026: "W-9 on file", "under $2,000" | code | 1099 contractors with legal name, TIN and address on file, payments per calendar year and the tax year's threshold ($2,000 for 2026): `src/pantry/contractors.ts`, `src/ui/contractors.tsx`; `tests/api/reports.test.mjs` TAXFORM-002. Collecting the W-9 online is TAXFORM-001, partly. |
 | 50 | Interlude | "Books up to date · Oct 31" | code | As row 16. |
-| 51 | Closing | "Open source accounting for US small businesses" / "Free and open source, MIT licensed" | code | USD-only US business books (`CONTRACT.md`), `LICENSE`. |
+| 51 | Closing | "Open source accounting for US small businesses" / "Free and open source, MIT licensed" | partly | USD-only US books and MIT licensing ship (`CONTRACT.md`, `LICENSE`), with ownership and archive proof in `tests/restore/restore.test.mjs`. This row follows OWN-001's partial status: the promised provider-fee inventory on DATA-001's settings page is still absent; the free/open-source homepage wording itself is backed. |
 
 ## Summary
 
-51 claims: **47 code**, **3 partly**, **1 contract, not yet in code**. Remaining homepage work: asking by text (AGENT-002, NOTIFY-001; rows 15 and 40), tracing payroll differences inside Gusto (AGENT-004; row 39), and QuickBooks Online attachments plus live Xero attachment acceptance on move-in (MIGRATE-001, MIGRATE-002; row 19). Invited-accountant questions and feed-gap notifications with close exceptions ship. Feeds, Stripe, Gusto and receipt reading run on self-hosted installations with their own keys; on RER Managed they say "not available yet".
+51 claims: **46 code**, **4 partly**, **1 contract, not yet in code**. Remaining homepage work: asking by text (AGENT-002, NOTIFY-001; rows 15 and 40), tracing payroll differences inside Gusto (AGENT-004; row 39), and QuickBooks Online attachments plus live Xero attachment acceptance on move-in (MIGRATE-001, MIGRATE-002; row 19). Invited-accountant questions and feed-gap notifications with close exceptions ship. Feeds, Stripe, Gusto and receipt reading run on self-hosted installations with their own keys; on RER Managed they say "not available yet".
 
 "Try the demo" links `https://demo.run-pantry.com/`, Pantry's hosted demo (`deploy-demo.json`, `DEMO.md`).
 

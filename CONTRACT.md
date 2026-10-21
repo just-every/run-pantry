@@ -651,7 +651,7 @@ Every capability claimed on the homepage rebuilt on the owner-approved page stru
 | 48 | Click any number. | Aging tab | REPORT-004 | done |
 | 49 | Click any number. | 1099-NEC · 2026, "W-9 on file", "under $2,000" | TAXFORM-001, TAXFORM-002 | done for tracking at the tax year's threshold; the online W-9 request is partial |
 | 50 | Interlude | "Books up to date · Oct 31" | PAN-13 | done |
-| 51 | Closing | "Open source accounting for US small businesses" / "Free and open source, MIT licensed" | OWN-001 | done |
+| 51 | Closing | "Open source accounting for US small businesses" / "Free and open source, MIT licensed" | OWN-001 | partial; ownership and MIT licensing ship, provider-fee disclosure remains DATA-001 |
 
 ## Status
 
@@ -670,8 +670,8 @@ The 21 October CLOSE-004 round moves Continuous checks to done from `tests/api/c
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 44 | 45 | 31 | 120 |
-| All | 63 | 45 | 31 | 139 |
+| Target and push further | 43 | 46 | 31 | 120 |
+| All | 62 | 46 | 31 | 139 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -795,7 +795,7 @@ The 21 October CLOSE-004 round moves Continuous checks to done from `tests/api/c
 | `MOBILE-001` | Every screen works on a phone browser | target | done | `src/ui/`, `tests/app/app.test.mjs` |  |
 | `MOBILE-002` | Native iOS and Android apps | target | missing |  | No implementation. |
 | `NOTIFY-001` | Notifications people control | target | partial | `src/pantry/feeds/notifications.ts`, `src/pantry/questions/mail.ts`, `tests/api/feeds.test.mjs`, `tests/api/questions.test.mjs` | Feed incidents email the owner once with visible outcomes; questions email the owner or assigned invited accountant and support replies through the Pantry address. Local mail suppression is explicit. Notification preferences by channel, SMS consent/provider delivery, push and wider notification types remain absent. |
-| `OWN-001` | Owned, free and open source | target | done | `LICENSE`, `package.json`, `OPERATIONS.json`, `tests/restore/restore.test.mjs` |  |
+| `OWN-001` | Owned, free and open source | target | partial | `LICENSE`, `package.json`, `OPERATIONS.json`, `tests/restore/restore.test.mjs` | MIT licensing, the pinned one-line/local install, own-account Cloudflare deployment and portable books/document bytes ship without a Pantry account or subscription. The clause's promised listing of each chosen provider's fees on DATA-001's settings page is not implemented; that fee/data/path inventory remains partial. Existing ownership and archive journeys do not prove fee disclosure. |
 | `OWN-002` | A hosted installation without a terminal | target | partial | `deploy.json`, `wrangler.jsonc`, `src/auth.server.ts` | A hosted Cloudflare deployment with a Cron trigger and an RER Managed owner claim by email are wired, but deploying to the business's own Cloudflare account needs `rer deploy` from a terminal; the browser-only route from the homepage, the timed and counted run, the laptop notice, updates from settings and feeds on RER Managed do not exist. |
 | `ACCESS-001` | Narrower roles and approval limits | target | partial | `src/pantry/access.ts`, `tests/api/ledger.test.mjs` | Owner, bookkeeper, accountant, viewer and agent with post/lock/reopen grants ship; ACCESS-003 issuing/credit limits ship; sales and payables-clerk roles, bill/payment/journal amount limits, account visibility and masking do not. |
 | `ACCESS-003` | Issuing limits for invoices, credits and sales | target | done | `src/pantry/issuing-limits.ts`, `src/pantry/invoices.ts`, `src/pantry/recurring.ts`, `src/pantry/recurring-prices.ts`, `src/ui/issuing-limits.tsx`, `tests/api/subledgers.test.mjs`, `tests/api/access003-journey.mjs`, `tests/app/invoice-documents.test.mjs`, `tests/app/access003-journey.mjs` › ACCESS-003 | Current bookkeeper/accountant/person doors satisfy ct scope55; ACCESS-001, SALES-001/002, INVOICE-008 and CURRENCY-001 inherit before shipping. No provider, legal or accounting acceptance claimed. |
