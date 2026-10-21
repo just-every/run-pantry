@@ -50,14 +50,14 @@ export async function captureJourney(t) {
       page.on('pageerror', e => errors.push(String(e)))
       await page.goto(`${origin}/app/receipts`)
       await page.getByRole('radio', { name: 'Split receipts in a photo', exact: true }).waitFor()
-      await page.screenshot({ path: `${dir}/capture-mode-${width}.png`, fullPage: true })
+      await page.locator('.capture').screenshot({ path: `${dir}/capture-mode-${width}.png` })
       const image = { name: `synthetic-pantry-${base}.png`, mimeType: 'image/png', buffer: await receiptPhoto(page, base) }
       await page.getByRole('radio', { name: 'Split receipts in a photo', exact: true }).check()
       // File selection is explicitly split only after the owner chooses that mode.
       await page.getByLabel('Upload a file', { exact: true }).setInputFiles(image)
       await page.getByAltText('Original photo for choosing separate receipt regions').waitFor()
       assert.equal(await page.getByRole('button', { name: 'Save 0 separate receipts' }).isDisabled(), true)
-      await page.screenshot({ path: `${dir}/capture-empty-editor-${width}.png`, fullPage: true })
+      await page.locator('section[aria-label^="Split "]').screenshot({ path: `${dir}/capture-empty-editor-${width}.png` })
       await page.getByRole('button', { name: 'Cancel split', exact: true }).click()
       if (width === 1440) await drop(page, image)
       else await page.getByLabel('Take a photo', { exact: true }).setInputFiles(image)
@@ -76,7 +76,7 @@ export async function captureJourney(t) {
       if (width === 390) for (const [field, value] of [['left', '7'], ['top', '5.56'], ['width', '38'], ['height', '87.77']]) await page.getByLabel(`Receipt 1 ${field} (%)`, { exact: true }).fill(value)
       await page.getByRole('button', { name: 'Add receipt region', exact: true }).click()
       for (const [field, value] of [['left', '55'], ['top', '5.56'], ['width', '38'], ['height', '87.77']]) await page.getByLabel(`Receipt 2 ${field} (%)`, { exact: true }).fill(value)
-      await page.screenshot({ path: `${dir}/capture-regions-${width}.png`, fullPage: true })
+      await page.locator('section[aria-label^="Split "]').screenshot({ path: `${dir}/capture-regions-${width}.png` })
       // A dropped network connection must leave the first receipt and the original intact.
       let failures = 0
       const failPart = async route => { if (failures++ === 0) await route.abort('failed'); else await route.continue() }
@@ -88,13 +88,13 @@ export async function captureJourney(t) {
       await page.getByRole('button', { name: 'Retry receipt 2', exact: true }).waitFor()
       await page.getByText('Receipt 1: Saved for review', { exact: true }).waitFor()
       await unchanged(context.request, origin, capture.originalDocumentId, image.buffer)
-      await page.screenshot({ path: `${dir}/capture-partial-${width}.png`, fullPage: true })
+      await page.locator('section[aria-label^="Split "]').screenshot({ path: `${dir}/capture-partial-${width}.png` })
       const afterFailure = await (await context.request.get(`${origin}/api/pantry/receipts`)).json()
       assert.equal(afterFailure.review.filter(r => r.capture?.id === capture.id).length, 1)
       await page.unroute('**/api/pantry/receipts/captures/*/parts/1', failPart)
       await page.getByRole('button', { name: 'Retry receipt 2', exact: true }).click()
       await page.getByRole('button', { name: 'Done splitting', exact: true }).waitFor()
-      await page.screenshot({ path: `${dir}/capture-saved-${width}.png`, fullPage: true })
+      await page.locator('section[aria-label^="Split "]').screenshot({ path: `${dir}/capture-saved-${width}.png` })
       await page.getByRole('button', { name: 'Done splitting', exact: true }).click()
       const split = (await (await context.request.get(`${origin}/api/pantry/receipts`)).json()).review.filter(r => r.capture?.id === capture.id).sort((a, b) => a.capture.index - b.capture.index)
       assert.equal(split.length, 2); assert.deepEqual(split.map(r => r.capture.index), [0, 1])
@@ -122,7 +122,7 @@ export async function captureJourney(t) {
         const originalLink = card.getByRole('link', { name: /Original capture/ })
         await originalLink.waitFor()
         assert.ok((await originalLink.getAttribute('href')).includes(capture.originalDocumentId))
-        await page.screenshot({ path: `${dir}/capture-derived-${index + 1}-${width}.png`, fullPage: true })
+        await card.screenshot({ path: `${dir}/capture-derived-${index + 1}-${width}.png` })
       }
       assert.notEqual(digest(cropBodies[0]), digest(cropBodies[1]), 'two regions contain different images')
       // Repeating the same part request is idempotent, through the actual public API.
@@ -138,7 +138,7 @@ export async function captureJourney(t) {
       await page.getByRole('list', { name: 'File upload progress' }).getByText(`${pdfName}: Saved for review`, { exact: true }).waitFor()
       await page.getByRole('list', { name: 'File upload progress' }).getByText(`${heicName}: Saved for review`, { exact: true }).waitFor()
       await page.getByRole('list', { name: 'File upload progress' }).getByText('synthetic-pantry-invalid.bin: Failed', { exact: true }).waitFor()
-      await page.screenshot({ path: `${dir}/capture-multiple-files-${width}.png`, fullPage: true })
+      await page.locator('.capture').screenshot({ path: `${dir}/capture-multiple-files-${width}.png` })
       const receipts = (await (await context.request.get(`${origin}/api/pantry/receipts`)).json()).review
       for (const [name, bytes] of [[heicName, heic], [pdfName, pdf]]) {
         const matching = receipts.filter(r => r.file_name === name)
