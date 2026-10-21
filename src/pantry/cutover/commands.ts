@@ -32,7 +32,7 @@ function sourceOf(b: Data) {
 }
 
 function context(c: Context, source: Source, version: string, need: Need): D1ImportContext {
-  return { destination: 'books', namespace: source.namespace, mappingVersion: version, storage: { database: c.db, targets: targetsFor(source.prefix) }, ...(source === spreadsheets ? { batchSize: 20, maxBatches: 1, maxBatchBytes: 2 * 1024 * 1024 } : { batchSize: 50, maxBatches: 40 }),
+  return { destination: 'books', namespace: source.namespace, mappingVersion: version, storage: { database: c.db, targets: targetsFor(source.prefix) }, ...(source === spreadsheets ? { batchSize: 10, maxBatches: 1, maxBatchBytes: 8 * 1024 * 1024 } : { batchSize: 50, maxBatches: 40 }),
     authorization: { principalId: PRINCIPAL, predicate: action => { const allowed = authorityCondition(c.actor as Actor, need); return source === spreadsheets && action !== 'plan' && action !== 'read' ? { sql: `(${allowed.sql}) AND NOT EXISTS (SELECT 1 FROM pt_journal_entries WHERE status = 'posted') AND NOT EXISTS (SELECT 1 FROM pt_cutovers WHERE status = 'accepted')`, params: allowed.params } : allowed as any } } }
 }
 
@@ -75,8 +75,11 @@ const commit: Command = { need: 'record', async run(c, b) {
   requireThat(b.fingerprint === plan.fingerprint, 'The files or bank details changed since your preview; review the preview again', 409)
   const prior = await one(c.db, "SELECT COUNT(*) AS n FROM ik_jobs WHERE destination = 'books' AND namespace = ? AND fingerprint = ? AND state IN ('undone', 'rolled_back')", source.namespace, plan.fingerprint)
   const ctx = { ...context(c, source, plan.mappingVersion, 'record'), reviewedFingerprint: plan.fingerprint, operationKey: `${plan.fingerprint}:${Number(prior?.n ?? 0)}` }
-  const job = await applyD1ImportBatches(await createD1ImportJob(plan, ctx), ctx)
-  requireThat(job.state === 'completed' || (source === spreadsheets && job.state === 'applying'), `Import stopped in state ${job.state}: ${job.error ?? ''}`, 409)
+  // Creating the reviewed job and applying its first records use separate
+  // requests for spreadsheets, each with a fresh measured D1 budget.
+  const created = await createD1ImportJob(plan, ctx)
+  const job = source === spreadsheets ? created : await applyD1ImportBatches(created, ctx)
+  requireThat(job.state === 'completed' || (source === spreadsheets && ['queued', 'applying'].includes(job.state)), `Import stopped in state ${job.state}: ${job.error ?? ''}`, 409)
   const cameIn = Object.fromEntries(Object.entries(preview.counts).map(([k, v]) => [k, v.accepted]))
   await run(c.db, [authority(c.actor, 'record'),
     q('INSERT INTO pt_move_in_reports (job_id, source, cutover_date, came_in, left_out, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', job.id, source.key, preview.cutoverDate, JSON.stringify(cameIn), JSON.stringify(preview.notImported), c.actor.email, now()),
