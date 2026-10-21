@@ -65,3 +65,7 @@ Branch `br/page` on just-every/run-pantry, 18 October 2026: the homepage rebuilt
 ## Sibling payment API evidence
 
 The 18 October integration extension is separate from the homepage claims above. `src/pantry/integrations/` records external payments using `payments:write` plus `post`, through native payment and allocation statements with the existing authority and period checks. Writes and replays return allocations; payment reads accept exact references, and payment-scoped `state` reads expose existing bank accounts for owner mapping. `tests/api/integrations.test.mjs` covers duplicate delivery, invoice balance, response recovery, missing grants, locked periods and revoked credentials. This extension does not establish a live Pier-to-Pantry Stripe journey; that requires the sibling client and build-round verification.
+
+## Erasure evidence
+
+ERASURE-001 is implemented separately from the homepage claims. The native owner previews and confirms contact or deactivated-member erasure; personal values become markers while posted facts, audit chronology and approvals remain. TINs and supporting documents expire only after owner confirmation of the recomputed retention clock. `tests/api/security.test.mjs`, the ERASURE-001 browser journey in `tests/app/app.test.mjs`, and `tests/restore/restore.test.mjs` prove the corresponding contact/member/retention, 1440/390 and archive-fence points. A fresh destination without the later source archive is explicitly unverified; downloaded files, prior backups and connected services remain outside erasure.
