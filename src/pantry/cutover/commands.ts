@@ -32,7 +32,7 @@ function sourceOf(b: Data) {
 }
 
 function context(c: Context, source: Source, version: string, need: Need): D1ImportContext {
-  return { destination: 'books', namespace: source.namespace, mappingVersion: version, storage: { database: c.db, targets: targetsFor(source.prefix) }, batchSize: 50, maxBatches: 40, ...(source === spreadsheets ? { maxBatchBytes: 8 * 1024 * 1024 } : {}),
+  return { destination: 'books', namespace: source.namespace, mappingVersion: version, storage: { database: c.db, targets: targetsFor(source.prefix) }, ...(source === spreadsheets ? { batchSize: 20, maxBatches: 1, maxBatchBytes: 2 * 1024 * 1024 } : { batchSize: 50, maxBatches: 40 }),
     authorization: { principalId: PRINCIPAL, predicate: action => { const allowed = authorityCondition(c.actor as Actor, need); return source === spreadsheets && action !== 'plan' && action !== 'read' ? { sql: `(${allowed.sql}) AND NOT EXISTS (SELECT 1 FROM pt_journal_entries WHERE status = 'posted') AND NOT EXISTS (SELECT 1 FROM pt_cutovers WHERE status = 'accepted')`, params: allowed.params } : allowed as any } } }
 }
 

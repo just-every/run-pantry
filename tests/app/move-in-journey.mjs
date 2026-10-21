@@ -46,7 +46,7 @@ export async function spreadsheetPackage() {
 export async function moveInJourney(t) {
   const { default: assert } = await import('node:assert/strict')
   const { mkdir } = await import('node:fs/promises')
-  const { chromium, expect } = await import('@playwright/test')
+  const { chromium } = await import('@playwright/test')
   const { worker, TOKEN } = await import('./worker.mjs')
   const dir = process.env.PANTRY_SCREENSHOTS ?? '/tmp/sx-pantry-c30'
   await mkdir(dir, { recursive: true })
@@ -93,7 +93,7 @@ export async function moveInJourney(t) {
     await page.getByRole('heading', { name: 'Every row (292)', exact: true }).locator('../..').screenshot({ path: `${dir}/move-in-rows-${width}.png` })
     await page.getByLabel('Leave the 3 refused rows out of this import', { exact: true }).check()
     await page.getByRole('button', { name: 'Import spreadsheet records as staged', exact: true }).click()
-    await page.waitForFunction(() => [...document.querySelectorAll('h2')].some(h => h.textContent === 'Cutover from Spreadsheet') || document.querySelector('[role=alert]'), { timeout: 180000 })
+    await page.waitForFunction(() => [...document.querySelectorAll('h2')].some(h => h.textContent === 'Cutover from Spreadsheet') || document.querySelector('[role=alert]'), null, { timeout: 180000 })
     assert.equal(await page.getByRole('alert').count(), 0, `${await page.getByRole('alert').allTextContents()}\n${app.logs().slice(-8000)}`)
     // A cutover is written last; wait for the completed job so undo is offered.
     await page.getByRole('button', { name: 'Undo import', exact: true }).waitFor({ timeout: 180000 })
