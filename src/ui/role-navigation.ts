@@ -7,6 +7,6 @@ export function roleScreen(role: string, path: string, banksLimited = false) {
   return true
 }
 
-export function customReportsOnly(actor: { role: string; policy?: { bankAccounts?: string[] | null } }) {
+export function customReportsOnly(actor: Record<string, any>) {
   return actor.role !== 'owner' && (['sales', 'payables-clerk', 'time-only'].includes(actor.role) || actor.policy?.bankAccounts != null)
 }
