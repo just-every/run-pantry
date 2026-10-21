@@ -47,7 +47,7 @@ export async function webhookJourney(t) {
       await card.getByRole('button', { name: 'Create webhook', exact: true }).click()
       await secret.waitFor()
       assert.equal(await secret.locator('code').evaluate(node => node.textContent.length > 30), true)
-      await card.getByRole('cell', { name: 'receiver.example.test', exact: true }).waitFor()
+      await card.getByText('receiver.example.test', { exact: true }).waitFor()
       await shot('created')
       const subscriptions = await view()
       assert.equal(subscriptions.subscriptions.length, 1)
@@ -55,7 +55,7 @@ export async function webhookJourney(t) {
       const subscriptionId = subscriptions.subscriptions[0].id
 
       await page.reload()
-      await card.getByRole('cell', { name: 'receiver.example.test', exact: true }).waitFor()
+      await card.getByText('receiver.example.test', { exact: true }).waitFor()
       assert.equal(await secret.count(), 0)
       await shot('reloaded')
       await card.getByRole('button', { name: 'Rotate secret', exact: true }).click()
