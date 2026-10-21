@@ -2,6 +2,7 @@
 // clones of the committed checkout: export, restore into a fresh install (import before
 // setup), start over in the same folder, and a restore refused because books are there.
 // Set PANTRY_RER_HOME to run the rer processes under another HOME.
+import '../browser-home.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'

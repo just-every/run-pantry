@@ -1,3 +1,4 @@
+import '../browser-home.mjs'
 import { execFileSync, spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 import { mkdtemp, rm } from 'node:fs/promises'
