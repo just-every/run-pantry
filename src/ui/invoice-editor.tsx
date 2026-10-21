@@ -67,7 +67,7 @@ export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCan
           <p className="hint">The selected template is saved with this draft. Preview the saved draft before approval.</p>
         </Card>
         {invoice?.id && <InvoiceDocumentPreview invoiceId={invoice.id} />}
-        {certificate && <div className="callout" role="status"><strong>Certificate {certificate.certificate_number} applies in {destination}</strong><span>Exempt through {certificate.expires_on}. <a href={`/api/pantry/documents/${certificate.document_id}`}>View certificate</a>. Your line tax choices below are kept for when the certificate no longer applies.</span></div>}
+        {certificate && <div className="callout" role="status"><strong>{state.actor.role === 'sales' ? 'Customer certificate' : `Certificate ${certificate.certificate_number}`} applies in {destination}</strong><span>Exempt through {certificate.expires_on}. {state.actor.role !== 'sales' && <><a href={`/api/pantry/documents/${certificate.document_id}`}>View certificate</a>. </>}Your line tax choices below are kept for when the certificate no longer applies.</span></div>}
         {invoice?.exemption && !certificate && <div className="callout callout-warn" role="status"><strong>Review tax treatment</strong><span>The earlier certificate no longer applies to these details. Saving uses your original line tax choices.</span></div>}
         <ServiceLines lines={lines} setLines={setLines} />
         <Card title="Memo"><Field label="Memo on the invoice" name="memo" type="textarea" defaultValue={invoice?.memo} wide /></Card>
