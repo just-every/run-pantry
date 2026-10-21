@@ -172,5 +172,7 @@ export const IMAGE_TYPE = /^image\/(png|jpeg|webp|gif)$/
 
 /** A stored file by name, led by a small picture of it when it is a photo. */
 export function FileLink({ id, name, mediaType }: { id: string; name: string; mediaType?: string | null }) {
+  const shared = useContext(SharedState), policy = shared?.state.actor.policy
+  if (policy?.maskTin || policy?.maskBank) return <span>{name} · original restricted</span>
   return <a className="file-link" href={`/api/pantry/documents/${id}`}>{mediaType && IMAGE_TYPE.test(mediaType) && <img className="file-thumb" src={`/api/pantry/documents/${id}?view=1`} alt="" loading="lazy" />}<span>{name}</span></a>
 }

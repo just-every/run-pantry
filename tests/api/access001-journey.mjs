@@ -83,6 +83,9 @@ export async function access001Journey(h) {
   }
   assert.equal(taxValues(activity).some(value => value.includes('6789')), false)
   assert.equal(JSON.stringify(activity).includes('123456789'), false)
+  const original = await h.command('document.upload', { name: 'synthetic-pantry-27.txt', mediaType: 'text/plain', base64: Buffer.from('TIN 123456789; bank account 987654321').toString('base64') })
+  await h.view(`documents/${original.id}`, maskedReader, 403)
+  await h.view('package/2026-10', maskedReader, 403)
 
   const time = await h.member(timeEmail, 'time-only', { journalLimit: '5000' })
   const service = await h.command('item.save', { name: 'synthetic-pantry-15', kind: 'service', rate: '125', accountId: acct['4000'], taxCategory: 'non-taxable' })

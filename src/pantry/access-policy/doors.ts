@@ -24,6 +24,8 @@ export async function assertDoor(c: Context, path: string, body?: Data) {
   if (actor.kind !== 'person' || actor.role === 'owner') return
   const url = new URL(path, c.request.url), door = url.pathname.replace(/^\/api\/pantry\//, '').replace(/^\//, '')
   const op = door.startsWith('command/') ? door.slice(8) : null
+  // Original bytes and full accountant packages cannot be field-masked.
+  if ((actor.policy?.maskTin || actor.policy?.maskBank) && /^(documents|package)\//.test(door)) requireThat(false, 'Original files and accountant packages require unmasked access; ask the owner', 403)
   if (narrow(actor)) {
     if (op) {
       const permitted = actor.role === 'time-only' ? op === 'time.save' : actor.role === 'sales' ? saleCommands.has(op) : payableCommands.has(op)
