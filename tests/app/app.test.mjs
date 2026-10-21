@@ -396,6 +396,7 @@ test('CLOSE-003 custom task assignment, due dates, revision review and month loc
       const month = board.getByRole('row').filter({ has: page.getByRole('link', { name: period.endsWith('09') ? 'September 2026' : 'October 2026', exact: true }) })
       await month.getByText('0 of 2 done', { exact: true }).waitFor()
       await first.getByRole('button', { name: 'Mark done', exact: true }).click()
+      await first.getByText('Done', { exact: true }).waitFor()
       await first.getByRole('button', { name: 'Edit Confirm insurance renewal', exact: true }).click()
       await first.getByLabel('Task title', { exact: true }).fill('Confirm renewed insurance')
       await first.getByLabel('Task due date', { exact: true }).fill('2026-11-07')

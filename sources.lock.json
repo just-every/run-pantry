@@ -3972,7 +3972,7 @@
       "executable": false
     },
     "src/ui/close-workflow.tsx": {
-      "sha256": "b37ba5db497129661265dbbb5028728a665c2e5a7474d2d5c5cd898d70a696a6",
+      "sha256": "aa9a5d84b26565b8d674737930800bbea7b2e3dbb92f860b7f628078c37fcb0e",
       "executable": false
     },
     "src/ui/close.tsx": {
@@ -4352,7 +4352,7 @@
       "executable": false
     },
     "tests/app/app.test.mjs": {
-      "sha256": "0867626cb25175b3c66eb15911637b130ecef94da7edd2c0ec3ebfb6f42661f9",
+      "sha256": "c45818cdf3d8f53c36ad33f795e4038ea0236213cc8cd49064dacfde5063ce8f",
       "executable": false
     },
     "tests/app/bank-rules.test.mjs": {
