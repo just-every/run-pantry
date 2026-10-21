@@ -44,6 +44,9 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
   preview=await h.command('erasure.preview',{kind:'contact',id:customer.id})
   assert.ok(preview.blockers.some(r=>r.id===i.id&&r.reason==='open balance'))
   await h.command('erasure.execute',request(preview),h.owner,409)
+  await h.command('invoice.send',{id:i.id})
+  const customerLink='/i/'+(await h.view('sales')).invoices.find(r=>r.id===i.id).link_token
+  assert.equal((await h.send(customerLink)).status,200)
   await h.command('payment.record',{direction:'received',contactId:customer.id,date:'2026-09-05',amount:'100.00',bankAccountId:checking.id,allocations:[{targetId:i.id,amount:'100.00'}]})
   const recurring=await h.command('recurring.save',{customerId:customer.id,startDate:'2030-01-01',every:1,unit:'month',mode:'draft',lines:[{description:'Future retainer',accountId:acct['4000'],quantity:'1',rate:'100.00',taxCode:'exempt'}]})
   const recurringPreview=await h.command('erasure.preview',{kind:'contact',id:customer.id})
@@ -69,6 +72,8 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
   assert.ok(after.some(e=>JSON.parse(e.detail).erasure?.id===receipt.id))
   assert.equal((await h.view(`invoice-documents/${i.id}/preview`)).sha256,pdf.sha256)
   assert.equal((await h.view('sales')).invoices.find(r=>r.id===i.id).link_token,null)
+  assert.equal(receipt.counts.pt_invoices.linksRevoked,1)
+  for(const path of [customerLink,customerLink+'/invoice.pdf',customerLink+'/pay'])assert.equal((await h.send(path)).status,404)
   await h.command('contact.save',{kind:'customer',id:customer.id,revision:retained.revision,name:retained.name,email:'restore@example.test'},h.owner,409)
   await assert.rejects(h.db.prepare("UPDATE pt_audit SET detail='{}' WHERE id=?").bind(history[0].id).run(),/IMMUTABLE/)
   assert.ok(!JSON.stringify(receipt).includes(customer.email))

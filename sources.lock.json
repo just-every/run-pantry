@@ -4424,7 +4424,7 @@
       "executable": false
     },
     "tests/api/security.test.mjs": {
-      "sha256": "0a21357801c512b28a06314b7e9b48d96a81151fbd814d1b660b8157dd8b9ced",
+      "sha256": "d64af689bba42f4b31437be932f5253d6775cc2f1391bca251cb54125cf9f31a",
       "executable": false
     },
     "tests/api/statement-provider.mjs": {
