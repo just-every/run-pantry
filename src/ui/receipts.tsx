@@ -19,6 +19,7 @@ function Preview({ r }: { r: D }) {
   return <div className="receipt-preview">
     {shownId ? <a href={`/api/pantry/documents/${shownId}?view=1`} target="_blank" rel="noreferrer"><img src={`/api/pantry/documents/${shownId}?view=1`} alt={`Receipt ${r.file_name}`} /></a>
       : <a className="receipt-file" href={`/api/pantry/documents/${r.document_id}`}><Icon name="receipt" /><span>{r.file_name}</span></a>}
+    {r.capture && <p className="hint" style={{ overflowWrap: 'anywhere' }}>Derived receipt {r.capture.index + 1} · <a href={`/api/pantry/documents/${r.capture.originalDocumentId}`}>Original capture · download whole photograph</a><br /><small>Original SHA-256: {r.capture.originalSha256}</small></p>}
     <small className="sub">{r.source === 'email' ? <>Emailed by {r.sender || 'unknown sender'}{r.subject ? <> · “{r.subject}”</> : null}</> : r.source === 'camera' ? 'Photo' : 'Uploaded'} · {day(r.received_at)}</small>
   </div>
 }
@@ -145,7 +146,7 @@ export function Receipts() {
         <Table heads={['Date', 'Vendor', 'Total', 'Attached to', 'By', 'Receipt']} figures={[2]} empty="No receipts attached yet.">
           {data.attached.map((r: D) => <tr key={r.id} id={`receipt-${r.id}`}><td>{day(r.receipt_date ?? r.decided_at)}</td><td>{r.vendor ?? '—'}{r.duplicate_reason && <small className="sub"> · Kept both · {r.duplicate_reason}</small>}</td><td className="fig">{r.total_cents ? money(r.total_cents, r.currency) : '—'}</td>
             <td>{r.linked_kind && r.linked_id ? <Link to="/app/reports" search={{ record: `${r.linked_kind === 'journal' ? 'entry' : r.linked_kind}:${r.linked_id}` } as any}>{r.linked_label ?? 'Record'}</Link> : '—'}</td>
-            <td>{r.rule_id ? <Chip tone="agent">Rule</Chip> : who(r.decided_by)}</td><td><FileLink id={r.document_id} name={r.file_name} mediaType={r.media_type} /></td></tr>)}
+            <td>{r.rule_id ? <Chip tone="agent">Rule</Chip> : who(r.decided_by)}</td><td><FileLink id={r.document_id} name={r.file_name} mediaType={r.media_type} />{r.capture && <small className="sub"><a href={`/api/pantry/documents/${r.capture.originalDocumentId}`}>Original capture</a></small>}</td></tr>)}
         </Table>
       </Card>
       {data.skipped?.length > 0 && <Card title="Skipped duplicates">

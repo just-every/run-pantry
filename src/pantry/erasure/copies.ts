@@ -130,6 +130,10 @@ export async function eraseCopies(db: D1Database, input: Input) {
     }
   }
 
+  if (receiptDocuments.size) {
+    for (const part of await all(db, 'SELECT p.document_id,s.document_id AS original_id FROM pt_capture_parts p JOIN pt_capture_sources s ON s.id=p.source_id'))
+      if (receiptDocuments.has(part.document_id)) receiptDocuments.add(part.original_id)
+  }
   const books = await supportingBooks(db), retained = input.member ? [] : await retentionItems(db, input.id)
   const keep = new Set(retained.filter(i => i.table === 'pt_documents').map(i => i.id))
   const metadata = ['name', 'note', 'capture_vendor', 'capture_invoice_number', 'duplicate_reason']

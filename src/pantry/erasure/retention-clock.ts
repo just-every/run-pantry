@@ -20,6 +20,8 @@ const SOURCES: Record<string, string[]> = {
   pt_receipts: ['id', 'document_id', 'file_document_id', 'vendor_id', 'target_kind', 'target_id', 'linked_kind', 'linked_id'],
   pt_exemption_certificates: ['id', 'customer_id', 'document_id'],
   pt_xero_attachments: ['id', 'item_id', 'item_kind', 'document_id'],
+  pt_capture_sources: ['id', 'document_id', 'revision'],
+  pt_capture_parts: ['source_id', 'part_index', 'receipt_id', 'document_id'],
   pt_documents: ['id', 'linked_kind', 'linked_id', 'requested_linked_kind', 'requested_linked_id', 'duplicate_of', 'erased_at'],
 }
 
@@ -75,6 +77,14 @@ export async function supportingBooks(db: D1Database) {
       copy(documents, id, record(r.target_kind, r.target_id)); copy(documents, id, record(r.linked_kind, r.linked_id))
       add(directContacts, id, r.vendor_id)
     }
+  }
+  // A whole photograph supports every receipt cropped from it. Its clock is
+  // the latest supporting event across all children, including corrections.
+  const captureSources = new Map(tables.pt_capture_sources.map(s => [s.id, s.document_id]))
+  for (const part of tables.pt_capture_parts) {
+    const original = captureSources.get(part.source_id)
+    copy(documents, original, documents.get(part.document_id) ?? [])
+    copy(directContacts, original, directContacts.get(part.document_id) ?? [])
   }
   for (const r of tables.pt_xero_attachments) copy(documents, r.document_id, record(r.item_kind, r.item_id))
   for (const c of tables.pt_exemption_certificates) {

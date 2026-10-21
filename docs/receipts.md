@@ -5,9 +5,17 @@
 Open **More › Receipts**.
 
 - **Take a photo** opens your phone's camera. Photograph the receipt flat and in good light.
-- **Upload a file** takes a photo, a PDF or a saved email (`.eml`).
+- **Upload a file** accepts several photos, PDFs or saved emails (`.eml`) at once. You can also drop several files into the receipt drop zone. Each file has its own progress and error, so one failure does not discard the others. JPEG, PNG, HEIC and multi-page PDFs are accepted up to 25 MB per original. A multi-page PDF stays one document.
 
 Pantry keeps the original exactly as you sent it, with its fingerprint (SHA-256). A large phone photo also gets a smaller copy made on the phone for reading; the original is what Pantry keeps.
+
+## Several receipts in one photograph
+
+Choose **Split receipts in a photo**, then take a photo or upload a JPEG or PNG. Draw a rectangle around each receipt, or add regions and enter their percentages. Choose **Save separate receipts**. Each selected region becomes its own JPEG receipt for review. The interface identifies it as a derived receipt and links to the **Original capture**: your whole photograph, unchanged, with its SHA-256. A HEIC photo can be retained as one file; convert it to JPEG or PNG on your device before choosing regions.
+
+If a part fails to upload, choose its **Retry receipt** button. Already saved parts stay saved; retrying a part does not create a second receipt. Capturing never approves a bill or posts a financial entry. Existing receipt rules still apply after capture.
+
+The original photograph has the same signed-in financial access as other receipt evidence. A full archive keeps both original and derived documents and their provenance. When it supports posted entries for several receipts, ERASURE-001 retains it until the latest supporting transaction or correction across all those receipts plus the owner's retention period, followed by explicit owner confirmation of expiry. No public link is created.
 
 ## Forward receipts by email
 

@@ -51,6 +51,7 @@ export async function readingColumns(db: D1Database, r: ReadOutcome) {
 export type Arrival = {
   by: AuditActor; source: 'upload' | 'camera' | 'email'; sender?: string; subject?: string
   original: NewDocument; file?: NewDocument | null; read: ReceiptInput | string; guards?: Sql[]
+  publication?: (receiptId: string, documentId: string) => Sql[]
 }
 
 /** Store, read and file one receipt for review; returns its id. A reading made elsewhere (the demo's) is passed as `read`. */
@@ -64,6 +65,7 @@ export async function receive(db: D1Database, env: Bindings, a: Arrival, read?: 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'review', ?, ?, ?, ?, ?, ?, ?, ?)`,
       id, original.id, file?.id ?? null, a.source, (a.sender ?? '').slice(0, 254), (a.subject ?? '').slice(0, 300), cols.read_status, cols.read_note, cols.read_model, cols.read_at,
       cols.read_vendor, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, a.by.email, now(), uid(), vendorKey(cols.read_vendor), cols.read_invoice_number, cols.read_vendor_details, cols.read_draft_fields, cols.read_match_fields),
+    ...(a.publication?.(id, original.id) ?? []),
     audit(a.by, 'receipt.receive', 'receipt', id, { source: a.source, file: a.original.name, sha256: original.sha256, read: outcome.status })])
   await flagDuplicate(db, (await receipt(db, id))!)
   return { id, outcome }

@@ -20,19 +20,12 @@ import { requiresOwner } from './draft-approval'
 import { documentDraftProposal } from './draft-proposal'
 import { receiptVendorCommands } from './vendor-confirm'
 import { receiptVendorProposal } from './vendor-match'
+import { bytesOf, MEDIA } from './upload'
+import { captureRoutes, captureProvenance } from './captures'
 
 export const receiptCommands: Record<string, Command> = { ...cashReceiptCommands, ...readerCommands, ...mailCommands, ...reviewCommands, ...receiptVendorCommands, ...captureDraftCommands }
 
-const MEDIA = /^(application\/pdf|image\/(png|jpeg|webp|gif|heic|heif)|text\/plain|message\/rfc822)$/
 const TARGETS = ['bankline', 'bill', 'payment', 'journal']
-
-async function bytesOf(value: FormDataEntryValue | null, max: number, label: string) {
-  if (!value || typeof value === 'string') return null
-  requireThat(value.size > 0 && value.size <= max, `${label} is 1 byte to ${Math.round(max / 1_000_000)} MB`, 413)
-  // Some browsers send a saved email or a PDF with no type; the file name says what it is.
-  const byName = /\.eml$/i.test(value.name) ? 'message/rfc822' : /\.pdf$/i.test(value.name) ? 'application/pdf' : /\.jpe?g$/i.test(value.name) ? 'image/jpeg' : 'application/octet-stream'
-  return { name: value.name || 'receipt', mediaType: value.type && value.type !== 'application/octet-stream' ? value.type : byName, bytes: new Uint8Array(await value.arrayBuffer()) }
-}
 
 // A deliberate Keep both may attach to the original's transaction, which the
 // ordinary matching list omits because it already has its receipt.
@@ -81,12 +74,14 @@ export async function receiptsView(c: Context): Promise<Data> {
       LEFT JOIN pt_receipts original ON original.id = r.duplicate_of
       JOIN pt_documents od ON od.id = COALESCE(original.document_id, r.duplicate_document_id)
     WHERE r.status = 'dismissed' ORDER BY r.decided_at DESC LIMIT 100`)
+  await captureProvenance(c.db, [...review, ...attached, ...skipped])
   const rules = await all(c.db, 'SELECT r.*, a.code, a.name AS account_name FROM pt_receipt_rules r JOIN pt_accounts a ON a.id = r.account_id WHERE r.active = 1 ORDER BY r.created_at')
   const reader = await readerView(c)
   return { approvalRules: await all(c.db, 'SELECT * FROM pt_capture_approval_rules ORDER BY minimum_cents'), review, attached, skipped, duplicateDocuments: await documentDuplicates(c.db), rules, accounts: await categories(c.db), reader: { unavailable: reader.unavailable, missing: reader.missing, model: reader.saved?.model ?? null }, inbox: await inboxView(c) }
 }
 
 export function receiptRoutes(api: Hono<{ Bindings: Bindings }>) {
+  captureRoutes(api)
   api.post('/api/pantry/receipts/capture', async c => {
     const actor = await person(c.req.raw, c.env)
     must(actor, 'record')

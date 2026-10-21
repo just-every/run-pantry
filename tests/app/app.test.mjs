@@ -1,3 +1,4 @@
+import { captureJourney } from './capture-journey.mjs'
 // The built app in a browser, on the emitted Worker and its own migrated D1: the owner
 // signs in with the setup token, the books are made through the public API, and then a
 // person clicks through what a stranger did. Run after `pnpm run build`.
@@ -438,3 +439,5 @@ test('ERASURE-001 owner preview, receipt, retention confirmation and Activity at
 test('API-001 owner webhook lifecycle, data declaration and delivery history at 1440 and 390', async t => {
   const {webhookJourney}=await import('./webhook-journey.mjs'); await webhookJourney(t)
 })
+
+test('CAPTURE-001 camera split, HEIC, multi-page PDF and multi-file drop keep original evidence at 1440 and 390', captureJourney)
