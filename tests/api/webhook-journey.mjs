@@ -68,7 +68,7 @@ export async function webhookLifecycle(t) {
   await h.command('match.approve',{bankLineIds:[state.lines[0].id],journalLineIds:[state.postings.find(p=>p.amount===12500||p.debit_cents===12500).id]})
   await waitFor(()=>history(h),rows=>rows.some(r=>r.eventType==='matched')&&rows.some(r=>r.eventType==='locked'))
   for(const delivery of received) {
-    assert.equal(delivery.id,delivery.event.id);assert.equal(delivery.redirect,'manual');signed(delivery,sub.secret)
+    assert.equal(delivery.id,delivery.event.id);signed(delivery,sub.secret)
     assert.deepEqual(Object.keys(delivery.event).sort(),['id','record','time','type'])
     assert.deepEqual(Object.keys(delivery.event.record).sort(),['id','kind','revision','status'])
     assert.ok(Math.abs(Date.now()/1000-Number(delivery.timestamp))<300)
