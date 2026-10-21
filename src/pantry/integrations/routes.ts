@@ -13,6 +13,7 @@ import { trialBalance } from '../reports'
 import { reportBasis } from '../basis'
 import { identify } from './credentials'
 import { integrationOpenApi } from './openapi'
+import { integrationBudget } from './rate-limit'
 import { idempotent, type Prepared } from './idempotency'
 import { payment } from './payments'
 import { prepareBill, prepareContact, prepareDocument, prepareInvoice, prepareJournal, preparePayment, prepareReadiness } from './postings'
@@ -27,6 +28,15 @@ integrations.use('*', async (c, next) => {
   let status = 500
   try {
     requireThat(!credential.revoked, 'This integration credential was revoked; ask the owner for a new one', 401)
+    const budget = await integrationBudget(c.env.DB, credential.id)
+    c.header('X-RateLimit-Limit', String(budget.limit))
+    c.header('X-RateLimit-Remaining', String(budget.remaining))
+    c.header('X-RateLimit-Reset', String(budget.reset))
+    if (!budget.allowed) {
+      c.header('Retry-After', String(budget.retryAfter))
+      status = 429
+      return c.json({ error: 'Integration request limit reached; retry after the current UTC minute' }, 429)
+    }
     c.set('integration', credential)
     await next()
     status = c.res.status
