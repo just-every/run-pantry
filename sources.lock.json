@@ -40,7 +40,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "93629b306ee4a0a8ac6987201e4347ed8aa5cac1aa02912a98a9f924116ca245",
+      "sha256": "97f929dd58cd10274b8294e5b5f37c7838afbc11cfeda045dcc2d881dffcda23",
       "executable": false
     },
     ".gitignore": {
@@ -648,7 +648,7 @@
       "executable": false
     },
     "package.json": {
-      "sha256": "d1835a21ee24ebe59f6766285ec2fe4c9f00b6f709458a06d1760855e838c4c1",
+      "sha256": "7e67caa7eee85c3ba191338485f472fb9ef9aab03b153c699075d7cc4e6650fc",
       "executable": false
     },
     "pnpm-lock.yaml": {
@@ -985,6 +985,10 @@
     },
     "scripts/pantry-agent.mjs": {
       "sha256": "57d12157919c8acc722001e9c9dc7600e7c8736eb0e66c3bfc90b58cf47a7f64",
+      "executable": false
+    },
+    "scripts/verify.mjs": {
+      "sha256": "6edf98a2a82b6404eb7d21f6136fe2077b429f775a31dd2f54020dc198834ef1",
       "executable": false
     },
     "SEED-COMMAND-CONTRACT.md": {

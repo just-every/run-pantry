@@ -9,12 +9,18 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  checks:
+    name: Checks (${{ matrix.shard }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [source, api-1, api-2, api-3, app-1, app-2, app-3]
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
+      VERIFY_SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
         with:
@@ -26,17 +32,23 @@ jobs:
       - name: Check edition source lock freshness
         # Technical foundation exports use composition.lock.json or reference-export.json.
         # Edition-owned seeds must commit both edition.json and sources.lock.json.
-        if: ${{ hashFiles('edition.json', 'sources.lock.json') != '' }}
+        if: ${{ matrix.shard == 'source' && hashFiles('edition.json', 'sources.lock.json') != '' }}
         run: node scripts/edition-authoring/cli.mjs check
       - run: npm install --global pnpm@10.12.4
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm run verify
+      # rer verify adds hosted-output and hydration checks after verify:app.
+      - name: Verify source, emitted runtime, site and hosted hydration
+        if: ${{ matrix.shard == 'source' }}
+        run: pnpm run verify
+      - name: Verify test shard
+        if: ${{ matrix.shard != 'source' }}
+        run: pnpm run verify:app
   # Backup and restore as the docs give them, through rer on fresh clones; beside the main job.
   restore:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 15
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
@@ -53,3 +65,15 @@ jobs:
       - run: pnpm run deps
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run test:restore
+  # Preserve the required check name and reject failed, cancelled or skipped work.
+  verify:
+    if: ${{ always() }}
+    needs: [checks, restore]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Require every verification shard and the restore journey
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          RESTORE_RESULT: ${{ needs.restore.result }}
+        run: test "$CHECKS_RESULT" = success && test "$RESTORE_RESULT" = success

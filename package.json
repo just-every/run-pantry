@@ -18,7 +18,7 @@
     "test:runtime": "node tests/runtime.mjs",
     "onboard": "node scripts/install.mjs",
     "build:app": "vite build",
-    "verify:app": "pnpm run build && pnpm run typecheck && pnpm run test:typecheck && pnpm run test:pantry && pnpm run test:site && pnpm run test:runtime && pnpm run test:app",
+    "verify:app": "node scripts/verify.mjs",
     "reset": "rer reset",
     "export": "rer export",
     "import": "rer import",
