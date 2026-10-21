@@ -4444,7 +4444,7 @@
       "executable": false
     },
     "tests/app/vendor-credit-journey.mjs": {
-      "sha256": "e226506e3eb0e8dddecd809c70be08581da209496b22dadadf9155baea614313",
+      "sha256": "f39c9bae03078d692e38545358a6e5fe41bb9da545fc38f17ea7489f62e51b27",
       "executable": false
     },
     "tests/app/worker.mjs": {
