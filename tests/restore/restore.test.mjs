@@ -217,6 +217,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   assert.equal(sameStore.code, 4)
   assert.match(sameStore.log, /restore refused \((erasure_epoch|erased_row)\)/i)
   assert.match(sameStore.log, /erasure journal/i)
+  for (const receipt of receipts) assert.ok(sameStore.log.includes(receipt.id), 'same-store refusal names the known erasure')
 
   // A reset has no local erasure knowledge. The owner's later source archive
   // supplies it, so even this empty destination refuses the pre-erasure backup.

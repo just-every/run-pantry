@@ -5,6 +5,7 @@ import { selectLocalState } from '@runeditrun/rer/local/state';
 import { commandAdapter as createCommandAdapter } from '@runeditrun/rer/adapter';
 import { ownerDeploy } from '@runeditrun/rer/deploy';
 import { localPortability } from '@runeditrun/rer/portability';
+import { knownErasureIds } from './erasure-history.mjs';
 import { fileRecords } from '@runeditrun/rer/modules/portability/files';
 import * as model from './ui/seed.mjs';
 
@@ -20,14 +21,14 @@ const explainedPortability = { ...portability, async import(context) {
  if (!context.journal) context.store.report('Before restoring, ask the source owner for their latest archive made after any erasures, and supply it with --journal. A fresh or reset destination cannot know about erasures made after this backup.');
  try {
   const receipt = await portability.import(context);
-  if (!context.journal) context.store.report('Erasure history unverified: no later source archive was supplied. The archive and any destination erasure journal were checked, but erasures made after this backup may be unknown.');
+  if (!context.journal) context.store.report('erasure history unverified: supply your latest archive as the journal. The archive and any destination erasure journal were checked, but erasures made after this backup may be unknown.');
   return receipt;
  } catch (error) {
   const code = error?.message?.match(/\((erasure_epoch|erased_row|later_journal|invalid_journal)\b/)?.[1];
   if (code) {
    // Base has already validated the supplied later archive in full. Only its
    // value-free receipt ids enter this diagnostic, never rows or personal data.
-   const ids = [];
+   const ids = await knownErasureIds(context.root);
    if (context.journal) for await (const record of fileRecords(context.journal)) {
     if (record.kind !== 'part') continue;
     for (const item of record.items) if (item.kind === 'row' && item.table === 'pt_erasure_journal' && /^[A-Za-z0-9_-]{1,100}$/.test(item.row.id ?? '')) ids.push(item.row.id);

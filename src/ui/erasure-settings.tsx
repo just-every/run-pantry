@@ -1,4 +1,5 @@
 // Deliberate, previewed erasure and owner-confirmed retention expiry.
+import { ErasureReceipt } from './erasure-receipt'
 import { useState } from 'react'
 import { Card, Field, Form, Loading, Table, command, useShared, useView, type D } from './kit'
 
@@ -24,7 +25,7 @@ export function ErasureSettings() {
           <Field label="Reason for erasure" name="reason" type="textarea" required /><Field label="Type ERASE to confirm" name="confirm" required />
         </Form>}
       </section>}
-      {receipt&&<section role="status"><h3>Erasure receipt · {receipt.id}</h3><p>Erasure completed. The journal prevents older archives from restoring erased values when its history is known.</p><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{JSON.stringify(receipt,null,2)}</pre></section>}
+      {receipt&&<ErasureReceipt receipt={receipt} />}
     </Card>
     <Card title="Retention and ready to erase">
       <p>TINs and supporting documents are retained from the latest posted transaction they support, including corrections and reversals. Expiry proposes removal; it never deletes automatically. No legal adequacy is asserted.</p>

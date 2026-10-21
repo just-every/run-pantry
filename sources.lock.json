@@ -971,8 +971,12 @@
       "sha256": "ce9c6eb4f127e88b32d538655a3fb3a2dc9fc3e83e48782fd56ffd3377da16fd",
       "executable": false
     },
+    "scripts/installer/erasure-history.mjs": {
+      "sha256": "28cc6c7b3ced2da9ba934e17ac832b719e42763a9b6e100dbeb14583a56b57e2",
+      "executable": false
+    },
     "scripts/installer/local.mjs": {
-      "sha256": "d9407cd94d0e7151c307d1111ef73fbd27aa1180cc1854952dca6b8253499116",
+      "sha256": "2eb9fec30f5737436ad207c5db3c9efefb816830cc29e23e0662663e432c13cb",
       "executable": false
     },
     "scripts/installer/portability.mjs": {
@@ -3120,7 +3124,7 @@
       "executable": false
     },
     "src/pantry/erasure/personal.ts": {
-      "sha256": "13f14a84727ab14f182ba603f9fee91eae9dfae5b6f05a6a7d417c7f72809780",
+      "sha256": "0a15628141541adb8be0149ed000ef40ee5568e645cd541e6bd34c8950118f9a",
       "executable": false
     },
     "src/pantry/erasure/preview.ts": {
@@ -4095,8 +4099,12 @@
       "sha256": "e5d6daf743901c8ef0ca23e42bde6fac8b171db375fa9a10d59a88f6eb3515cf",
       "executable": false
     },
+    "src/ui/erasure-receipt.tsx": {
+      "sha256": "b1a291418b07346cb14070092d14a70376f0847d9f8d984413796eafbed7d97b",
+      "executable": false
+    },
     "src/ui/erasure-settings.tsx": {
-      "sha256": "84dd9ceb984ad50d24386ef601f91a044d13487df3cf97e1709ad2b04bd7ce0e",
+      "sha256": "0f1bc43f7ba5eec052093d01c2da5f31f75cc3ada472d7fb99404203d2809101",
       "executable": false
     },
     "src/ui/exemption-certificates.tsx": {
@@ -4484,7 +4492,7 @@
       "executable": false
     },
     "tests/app/erasure-journey.mjs": {
-      "sha256": "8af156ea87f61a5e2619ef99c768bfe98b833b85b16978ddacd261c75217333e",
+      "sha256": "2a1164cecabb933bf572c43d0bf36940ed8f07aa79942840d163c82c919d9a41",
       "executable": false
     },
     "tests/app/feed-history.test.mjs": {
@@ -4560,7 +4568,7 @@
       "executable": false
     },
     "tests/restore/restore.test.mjs": {
-      "sha256": "19ce51ed41d6a1294525d1eaf11d824c9b75a5f7a867003bc1abcf980bebd878",
+      "sha256": "aad562aedcbe4a050a5521ab18d977474fa09518e2bca69180f94c3dd495d304",
       "executable": false
     },
     "tests/runtime.mjs": {
