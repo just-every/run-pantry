@@ -3,9 +3,9 @@ import { Log, LogLevel } from 'miniflare'
 import { books, harness } from './harness.mjs'
 
 export async function data001Journey(t) {
-  const secrets=['synthetic-pantry-1001','synthetic-pantry-1002','synthetic-pantry-2001','synthetic-pantry-2002','synthetic-pantry-3001','synthetic-pantry-3002','synthetic-pantry-4001','synthetic-pantry-4002']
+  const secrets=['synthetic-pantry-1001','synthetic-pantry-1002','synthetic-pantry-2001','synthetic-pantry-2002','synthetic-pantry-3001','synthetic-pantry-3002','synthetic-pantry-4001','synthetic-pantry-4002','synthetic-pantry-7001','synthetic-pantry-7002']
   const calls=[], logs=[]
-  let stripeFailure=false, modelFailure=false
+  let stripeFailure=false, modelFailure=false, oauth=0
   class CapturedLog extends Log { log(message){logs.push(message)} }
   const h=await harness({log:new CapturedLog(LogLevel.INFO),bindings:{PLAID_CLIENT_ID:secrets[4],PLAID_SECRET:secrets[5],PLAID_ENV:'sandbox',GUSTO_CLIENT_ID:secrets[6],GUSTO_CLIENT_SECRET:secrets[7]},outbound:async request=>{
     const u=new URL(request.url), body=request.method==='POST'?await request.json():null
@@ -17,7 +17,7 @@ export async function data001Journey(t) {
       if(u.pathname==='/item/remove')return Response.json({request_id:'synthetic-pantry-remove'})
     }
     if(u.host==='api.gusto-demo.com') {
-      if(u.pathname==='/oauth/token')return Response.json({access_token:secrets[6],refresh_token:secrets[7],expires_in:7200})
+      if(u.pathname==='/oauth/token'){oauth++;return Response.json({access_token:secrets[oauth===1?6:8],refresh_token:secrets[oauth===1?7:9],expires_in:7200})}
       if(u.pathname==='/v1/token_info')return Response.json({resource:{type:'Company',uuid:'synthetic-pantry-company'}})
       if(u.pathname==='/v1/companies/synthetic-pantry-company')return Response.json({uuid:'synthetic-pantry-company',name:'Rivera Studio Payroll'})
     }
@@ -53,6 +53,7 @@ export async function data001Journey(t) {
   const second=await h.command('gusto.connect',{})
   assert.equal((await h.send('/api/pantry/gusto/callback?'+new URLSearchParams({state:new URL(second.url).searchParams.get('state'),code:'synthetic-pantry-6002'}),undefined,{cookie:h.owner})).status,303)
   assert.notEqual((await h.db.prepare('SELECT access_sealed FROM pt_gusto').first()).access_sealed,oldOAuth)
+  assert.deepEqual(calls.filter(c=>c.path==='/v1/token_info').map(c=>c.auth),[secrets[6],secrets[8]].map(s=>'Bearer '+s))
   const address=await h.command('receipt-address.create',{mailbox:'receipts@rivera.example'})
   const tag=(await h.db.prepare('SELECT tag_sealed FROM pt_receipt_inbox').first()).tag_sealed
   await h.command('receipt-address.create',{mailbox:'receipts@rivera.example'})
