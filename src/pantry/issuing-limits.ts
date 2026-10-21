@@ -28,7 +28,8 @@ export async function withinLimit(db: D1Database, actor: Actor, document: Data, 
     guard('EXISTS (SELECT 1 FROM pt_issuing_limits WHERE id = ? AND revision = ? AND issuing_cents = ? AND credit_cents = ?)', limit.id, limit.revision, limit.issuing_cents, limit.credit_cents)]
   if (limit.id.startsWith('role:')) fences.push(guard('NOT EXISTS (SELECT 1 FROM pt_issuing_limits WHERE id = ?)', `person:${actor.email}`))
   if (document.kind === 'credit') fences.push(guard("NOT EXISTS (SELECT 1 FROM pt_invoices WHERE id = ? AND json_extract(self_approval, '$.person') = ?)", document.credit_for, actor.email))
-  return { detail, fences }
+  const note = `${detail.label}: $${(amount / 100).toFixed(2)} ${detail.source} limit ${detail.limitId}, revision ${detail.limitRevision}`
+  return { detail, fences, note }
 }
 
 const save: Command = { need: 'owner', async run(c, b) {

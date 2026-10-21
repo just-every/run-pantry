@@ -3168,11 +3168,11 @@
       "executable": false
     },
     "src/pantry/invoices.ts": {
-      "sha256": "32a1df0952e2dfd3adc7aea4bee1c7a1cd7f63a5774db611a3727076f92b242c",
+      "sha256": "44838d0d2d738110bb359429c75e8d2c6ffd010cf5950452677fcdd96a70c1b6",
       "executable": false
     },
     "src/pantry/issuing-limits.ts": {
-      "sha256": "04739035b0f18e49d72aa38a9899344d4faab296f656f80eeba446024e31f6c8",
+      "sha256": "fb871dd4807b6a765aa397676aa8dd61b9a41f258da45a25a21f10e0566bf85d",
       "executable": false
     },
     "src/pantry/items/commands.ts": {
@@ -3424,11 +3424,11 @@
       "executable": false
     },
     "src/pantry/recurring-prices.ts": {
-      "sha256": "632f45c1acef8ec08bd61b52b3e06d856779a7aced78ef0340857009b2d08478",
+      "sha256": "27963ef56cc705261eda1dfa3a09d0ae1be0fc1aa4b0f6666be6b0329ccf3abc",
       "executable": false
     },
     "src/pantry/recurring.ts": {
-      "sha256": "ff44f1abb6a85e6e362daac43f6287f37cf066d12249097650aff4b999a39c65",
+      "sha256": "b81a00f850e19d9e215d1908be78a44a56ce61c250df181909baaf6ba060e447",
       "executable": false
     },
     "src/pantry/report-export.ts": {
@@ -4028,7 +4028,7 @@
       "executable": false
     },
     "src/ui/issuing-limits.tsx": {
-      "sha256": "35d731c07250f1dd8111dc8e0924b2046c54b9a1bb149e2861bc144845dbc0f9",
+      "sha256": "428eb6302b39ce5393421eec7ec5af42e80d4b711cd29680f7c6eb30202567ef",
       "executable": false
     },
     "src/ui/items.tsx": {
@@ -4192,7 +4192,7 @@
       "executable": false
     },
     "tests/api/access003-journey.mjs": {
-      "sha256": "a0b8025acad4fe43b29a7296c0498412a13cb89a0eedaab55b859689692e48bb",
+      "sha256": "e960e859926f6c3d4c76bb08a82b568e09c6cd48bec48e001c7a3fcc9bfacd3b",
       "executable": false
     },
     "tests/api/agent.test.mjs": {
@@ -4316,7 +4316,7 @@
       "executable": false
     },
     "tests/app/access003-journey.mjs": {
-      "sha256": "93d3d1770b6f82bf111b7f781d9ab4af13cef9e8a5e53439cb0094d6c2d5bf54",
+      "sha256": "cbbd8beb57368a3c75738b1c6461699943f453118b026378281c003b06f25329",
       "executable": false
     },
     "tests/app/app.test.mjs": {

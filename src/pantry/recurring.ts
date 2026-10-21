@@ -104,7 +104,7 @@ const approve: Command = { need: 'post', async run(c, b) {
   requireThat(!refusal, refusal!, 409)
   requireThat(treatmentRevisions(p.offer) === current.early_treatments, 'An early-payment treatment changed since this template was saved; edit and review it again', 409)
   requireThat(p.total === current.total_cents && p.tax === current.tax_cents && (!current.amount_snapshot || amountSnapshot(p) === current.amount_snapshot), 'The template amounts changed; edit and review it again', 409)
-  await run(c.db, [authority(c.actor, 'post'), ...(self?.fences ?? []), approval(who(c.actor), 'recurring', current.id, current.revision, 'approve', 'approved', self ? JSON.stringify(self.detail) : optionalText(b.note, 'Note', 500)),
+  await run(c.db, [authority(c.actor, 'post'), ...(self?.fences ?? []), approval(who(c.actor), 'recurring', current.id, current.revision, 'approve', 'approved', self ? self.note : optionalText(b.note, 'Note', 500)),
     q("UPDATE pt_recurring SET status = 'active', approved_by = ?, approved_revision = revision, amount_snapshot = ? WHERE id = ? AND revision = ? AND status = 'awaiting-approval'", c.actor.email, amountSnapshot(p), current.id, b.revision), changed(),
     audit(who(c.actor), 'recurring.approve', 'recurring', current.id, self?.detail ?? {})])
   return template(c.db, current.id)

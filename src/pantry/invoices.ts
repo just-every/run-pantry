@@ -233,7 +233,7 @@ const approveIssue: Command = { need: 'post', async run(c, b) {
   const approvedRevision = uid()
   const issued = await issueStatements(c.db, { ...current, revision: approvedRevision } as Issuable, who(c.actor), current.prepared_by)
   await run(c.db, [...self.fences, ...certificates, ...treatmentFence(current.early_offer), periodOpen(current.issue_date),
-    approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', JSON.stringify(self.detail)),
+    approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', self.note),
     q("UPDATE pt_invoices SET status = 'approved', approved_by = ?, approved_revision = ?, revision = ?, self_approval = ? WHERE id = ? AND revision = ? AND status = 'draft'", c.actor.email, approvedRevision, approvedRevision, JSON.stringify(self.detail), current.id, b.revision), changed(),
     audit(who(c.actor), `${current.kind}.approve`, current.kind, current.id, self.detail), ...issued.statements])
   return invoice(c.db, current.id)

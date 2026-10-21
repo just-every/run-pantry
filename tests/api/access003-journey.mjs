@@ -83,6 +83,14 @@ export async function access003Journey(h) {
     const price = await h.command('recurring.price', { id: within.id, revision: within.revision, effectiveDate, lines: [line(amount)] }, book)
     await h.command('recurring.approve-price', { id: price.id, revision: price.revision, templateRevision: within.revision, limitRevision: (await limit()).revision }, book, status)
   }
+  // A valid standing template approval survives a later limit change; schedules do not spend a person's limit.
+  const scheduled = await h.command('recurring.save', { customerId: c.id, startDate: day, endDate: day, every: 1, unit: 'month', mode: 'send', lines: [line('1800')] }, book)
+  await h.command('recurring.approve', { id: scheduled.id, revision: scheduled.revision, limitRevision: (await limit()).revision }, book)
+  await saveLimit('role:bookkeeper', '0', '0')
+  await h.cron()
+  const occurrence = at((await h.view('sales')).invoices, i => i.recurring_id === scheduled.id)
+  assert.equal(occurrence.status, 'issued'); assert.equal(occurrence.approved_by, 'bea@example.test')
+  assert.equal(occurrence.self_approval, null, 'the run relies on template approval, not a fresh use of a limit')
   const changes = (await h.view('activity?kind=issuing-limit')).audit.map(x => JSON.parse(x.detail))
   assert.ok(changes.some(x => x.before?.issuing_cents === 250000 && x.after?.issuing_cents === 200000))
 }

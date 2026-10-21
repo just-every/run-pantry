@@ -56,7 +56,7 @@ const approve: Command = { need: 'post', async run(c, b) {
   await run(c.db, [authority(c.actor, 'post'), ...(self?.fences ?? []),
     guard("EXISTS (SELECT 1 FROM pt_recurring WHERE id = ? AND revision = ? AND approved_revision = revision AND status <> 'ended')", t.id, t.revision),
     q('UPDATE pt_recurring_prices SET approved_by = ?, approved_revision = revision, template_revision = ? WHERE id = ? AND revision = ?', c.actor.email, t.revision, price.id, b.revision), changed(),
-    approval(who(c.actor), 'recurring-price', price.id, price.revision, 'approve', 'approved', self ? JSON.stringify(self.detail) : optionalText(b.note, 'Note', 500)),
+    approval(who(c.actor), 'recurring-price', price.id, price.revision, 'approve', 'approved', self ? self.note : optionalText(b.note, 'Note', 500)),
     audit(who(c.actor), 'recurring.price-approve', 'recurring', t.id, { price: price.id, effectiveDate: price.effective_date, ...(self?.detail ?? {}) })])
   return { ...(await one(c.db, 'SELECT * FROM pt_recurring_prices WHERE id = ?', price.id)), lines: JSON.parse(price.lines) }
 } }
