@@ -26,13 +26,13 @@ async function freePort() {
 export const fixture = (path) => readFile(new URL(`../../fixtures/${path}`, import.meta.url), 'utf8')
 
 /** `bindings` extend the Worker's; `outbound` answers any request not bound for the mail provider; `entry` swaps the Worker entry. */
-export async function harness({ bindings = {}, outbound, entry = 'tests/api/worker.ts' } = {}) {
+export async function harness({ bindings = {}, outbound, log, entry = 'tests/api/worker.ts' } = {}) {
   const port = await freePort(), origin = `http://127.0.0.1:${port}`
   const dir = await mkdtemp(join(tmpdir(), 'pantry-test-'))
   const mail = []
   const bundle = await build({ entryPoints: [entry], bundle: true, write: false, format: 'esm', platform: 'neutral', conditions: ['workerd', 'worker', 'browser'], external: ['node:*', 'cloudflare:*'], target: 'es2023', logLevel: 'error' })
   const mf = new Miniflare({ ...convertV4MiniflareOptions({
-    host: '127.0.0.1', port, modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'],
+    host: '127.0.0.1', port, modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], ...(log ? { log } : {}),
     d1Databases: { DB: 'pantry' }, unsafeTriggerHandlers: true,
     bindings: { AUTH_ORIGIN: origin, AUTH_LOCAL: 'true', OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: 'local-test-secret-not-production-0123456789', SETUP_TOKEN: BOOTSTRAP, MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'test-resend-key', MAIL_FROM: 'Pantry <pantry@example.test>', ...bindings },
     async outboundService(request) {

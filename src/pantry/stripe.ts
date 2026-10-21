@@ -63,7 +63,9 @@ export async function nextCode(db: D1Database, from: number) {
 const connect: Command = { need: 'owner', async run(c, b) {
   requireThat(!managedInstall(c.env), 'RER Managed installs cannot reach Stripe yet, so online payment cannot be connected here', 409)
   const key = text(b.secretKey, 'Stripe secret key', 300)
-  requireThat(/^(sk|rk)_(test|live)_[A-Za-z0-9]{16,}$/.test(key), 'Paste a Stripe secret key (sk_live_… or sk_test_…) or restricted key (rk_…)')
+  // Stripe authenticates the credential. Local prefix guesses reject valid
+  // credential formats without adding security; the account read is the check.
+  requireThat(!/\s/.test(key), 'Paste one Stripe API key without spaces')
   const account = await stripeCall(key, 'GET', '/account')
   const existing = await stripeSettings(c.db), origin = runtimeBindings(c.env).AUTH_ORIGIN
   if (existing?.webhook_id) await stripeCall(await unseal(c.env, existing.key_sealed), 'DELETE', `/webhook_endpoints/${existing.webhook_id}`).catch(() => null)
@@ -89,7 +91,7 @@ const connect: Command = { need: 'owner', async run(c, b) {
   const name = account.settings?.dashboard?.display_name || account.business_profile?.name || account.email || account.id
   statements.push(q(`INSERT INTO pt_stripe (id, key_sealed, key_hint, livemode, account_id, account_name, settlement_currency, country, webhook_id, webhook_secret_sealed, card, ach, bank_account_id, fee_account_id, connected_by, connected_at, revision)
       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET key_sealed = excluded.key_sealed, key_hint = excluded.key_hint, livemode = excluded.livemode, account_id = excluded.account_id, account_name = excluded.account_name, settlement_currency = excluded.settlement_currency, country = excluded.country, ach = excluded.ach, webhook_id = excluded.webhook_id, webhook_secret_sealed = excluded.webhook_secret_sealed, connected_by = excluded.connected_by, connected_at = excluded.connected_at, revision = excluded.revision`,
-    await seal(c.env, key), `${key.slice(0, 8)}…${key.slice(-4)}`, key.includes('_live_') ? 1 : 0, account.id, String(name), String(account.default_currency ?? 'usd').toLowerCase(), country, hook?.id ?? null, hook ? await seal(c.env, hook.secret) : null, us ? 1 : 0, bankId, feeId, c.actor.email, now(), uid()),
+    await seal(c.env, key), `…${key.slice(-4)}`, key.includes('_live_') ? 1 : 0, account.id, String(name), String(account.default_currency ?? 'usd').toLowerCase(), country, hook?.id ?? null, hook ? await seal(c.env, hook.secret) : null, us ? 1 : 0, bankId, feeId, c.actor.email, now(), uid()),
     audit(who(c.actor), 'stripe.connect', 'stripe', '1', { account: account.id, livemode: key.includes('_live_'), webhook: !!hook }))
   await run(c.db, statements)
   return stripeView(c.env, c.db)

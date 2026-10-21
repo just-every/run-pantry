@@ -37,7 +37,7 @@ async function reach(url: string, init: RequestInit) {
 async function token(env: Bindings, body: Record<string, string>): Promise<Tokens & { authEventId: string }> {
   const r = await reach(`${IDENTITY}/token`, { method: 'POST', headers: { authorization: `Basic ${btoa(`${env.XERO_CLIENT_ID}:${env.XERO_CLIENT_SECRET}`)}`, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(body) })
   const v: any = await r.json().catch(() => ({}))
-  if (!r.ok || !v.access_token) throw new Fault(v.error === 'invalid_grant' ? 409 : 502, v.error === 'invalid_grant' ? 'Xero no longer accepts this sign-in; connect Xero again' : `Xero refused the sign-in: ${v.error ?? `HTTP ${r.status}`}`)
+  if (!r.ok || !v.access_token) throw new Fault(v.error === 'invalid_grant' ? 409 : 502, v.error === 'invalid_grant' ? 'Xero no longer accepts this sign-in; connect Xero again' : `Xero refused the sign-in (HTTP ${r.status})`)
   // The access token is a JWT; its authentication_event_id names the tenants this sign-in just authorised.
   let authEventId = ''
   try { authEventId = JSON.parse(atob(v.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).authentication_event_id ?? '' } catch { /* not a JWT: every connection is a candidate */ }
@@ -67,7 +67,7 @@ export async function accounting(access: string, tenantId: string, path: string,
   if (r.status === 429) throw new XeroWait(Math.max(1, Number(r.headers.get('retry-after') ?? 60)))
   if (r.status === 401) throw new Fault(409, 'Xero no longer accepts Pantry’s sign-in; connect Xero again')
   if (r.status === 404) return null
-  if (!r.ok) { const v: any = await r.json().catch(() => ({})); throw new Fault(502, `Xero refused ${path.split('?')[0]}: ${v.Detail ?? v.Title ?? `HTTP ${r.status}`}`) }
+  if (!r.ok) throw new Fault(502, `Xero refused the request (HTTP ${r.status}); check the connection and its permissions in Xero`)
   return r
 }
 

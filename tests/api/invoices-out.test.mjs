@@ -339,12 +339,12 @@ test('PAY-004 invoice-named deposits clear automatically, amount-only wires awai
 })
 
 test('PAY-001 customers pay by card or ACH from the invoice link through the business\'s own Stripe; the payment is recorded and allocated and the fee booked; without online payment the customer is told how to pay, and RER Managed refuses to connect', async t => {
-  const KEY = 'sk_test_' + 'A1b2C3d4E5f6G7h8I9j0K1l2'
+  const KEY = 'synthetic-pantry-1001'
   const sessions = new Map()
   const outbound = async request => {
     const url = new URL(request.url)
     assert.equal(url.host, 'api.stripe.com', `unexpected outbound ${request.method} ${request.url}`)
-    assert.equal(request.headers.get('authorization'), `Bearer ${KEY}`)
+    if (request.headers.get('authorization') !== `Bearer ${KEY}`) return Response.json({error:{message:'Invalid credential'}},{status:401})
     assert.match(request.headers.get('stripe-version') ?? '', /^\d{4}-\d{2}-\d{2}\.\w+$/, 'every call names the Stripe API version Pantry is written for, not the account default')
     if (request.method === 'GET' && url.pathname === '/v1/account') return Response.json({ id: 'acct_1Test', country: 'US', default_currency: 'usd', settings: { dashboard: { display_name: 'Juniper Lane Design' } } })
     if (request.method === 'POST' && url.pathname === '/v1/checkout/sessions') {
@@ -369,9 +369,9 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
   assert.doesNotMatch(before, /Pay by card/, 'no online payment before Stripe is connected')
   assert.match(before, /How to pay/); assert.doesNotMatch(before, /Stripe/, 'the customer is not told how the business is set up')
 
-  await h.command('stripe.connect', { secretKey: 'pk_test_not-a-secret' }, h.owner, 400)
+  await h.command('stripe.connect', { secretKey: 'synthetic-pantry-1000' }, h.owner, 400)
   const settings = (await h.command('stripe.connect', { secretKey: KEY })).connected
-  assert.deepEqual([settings.account, settings.keyHint, settings.livemode, settings.webhook], ['Juniper Lane Design', 'sk_test_…K1l2', false, false])
+  assert.deepEqual([settings.account, settings.keyHint, settings.livemode, settings.webhook], ['Juniper Lane Design', '…1001', false, false])
   const page = await h.send(cardPage)
   assert.match(page.value, /Pay by card/); assert.match(page.value, /Pay by bank account \(ACH\)/)
 
@@ -519,7 +519,7 @@ test('INVOICE-010 discounts, delivery charges and deposits on the invoice: tax o
 })
 
 test('INVOICE-010 early-payment terms (with SALESTAX-001/002/004, INVOICE-001/003/005, PAY-001/002/004) and REPORT-005: per-code treatment, the offer approved with the invoice, an all-or-nothing linked discount credit in the window, reversal, Stripe and PAY-004, sales-tax columns and refusals', async t => {
-  const KEY = 'sk_test_' + 'A1b2C3d4E5f6G7h8I9j0K1l2', sessions = new Map()
+  const KEY = 'synthetic-pantry-1001', sessions = new Map()
   const outbound = async request => {
     const url = new URL(request.url)
     if (request.method === 'GET' && url.pathname === '/v1/account') return Response.json({ id: 'acct_1Test', country: 'US', default_currency: 'usd', settings: { dashboard: { display_name: 'Juniper Lane Design' } } })

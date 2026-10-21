@@ -102,8 +102,7 @@ export async function readReceipt(c: ReaderConfig, input: ReceiptInput, categori
   } finally { clearTimeout(timer) }
   const body: any = await response.json().catch(() => null)
   if (!response.ok) {
-    const said = String(body?.error?.message ?? body?.message ?? '').slice(0, 200)
-    throw new ReaderError(response.status === 401 || response.status === 403 ? `The AI provider refused the key (${response.status}). Check the key in AI reading.` : `The AI provider answered ${response.status}${said ? `: ${said}` : ''}.`)
+    throw new ReaderError(response.status === 401 || response.status === 403 ? `The AI provider refused the key (${response.status}). Check the key in AI reading.` : `The AI provider answered ${response.status}.`)
   }
   const answer = request.answer(body)
   if (!answer || typeof answer !== 'object') throw new ReaderError('The AI model gave no reading.')

@@ -1,4 +1,5 @@
 import { captureJourney } from './capture-journey.mjs'
+import { data001Browser } from './data001-journey.mjs'
 // The built app in a browser, on the emitted Worker and its own migrated D1: the owner
 // signs in with the setup token, the books are made through the public API, and then a
 // person clicks through what a stranger did. Run after `pnpm run build`.
@@ -8,6 +9,8 @@ import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
 import { vendorCreditJourney } from './vendor-credit-journey.mjs'
+
+test('DATA-001 owner inventories data, paths, prices and unavailable brokers, rotates Stripe and removes the model at 1440 and 390', data001Browser)
 
 test('REPORT-001 statement column modes persist, reconcile and download on cash and accrual at 1440 and 390', async t => {
   const app = await worker(); t.after(() => app.close())

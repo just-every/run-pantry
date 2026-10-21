@@ -1,6 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {books,harness} from './harness.mjs'
+import {data001Journey} from './data001-journey.mjs'
+
+test('DATA-001 actual service inventory, encrypted credential replacement, safe diagnostics and disconnected manual capture',data001Journey)
 
 const request = (p,extra={})=>({kind:p.kind,id:p.id,fingerprint:p.fingerprint,requester:'privacy-request@example.test',channel:'email',reason:'Requested removal of obsolete personal details',confirm:'ERASE',...extra})
 async function invoice(h,acct,customer,date='2026-09-02') {

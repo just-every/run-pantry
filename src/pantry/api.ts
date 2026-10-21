@@ -90,6 +90,7 @@ import { erasureCommands, erasureSettings } from './erasure/commands'
 import { ownerSession } from './erasure/owner'
 import { webhookCommands, webhookSettings } from './webhooks/commands'
 import { runWebhooks } from './webhooks/deliver'
+import { dataFlows } from './data-flows'
 
 const commands: Record<string, Command> = {
   ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
@@ -123,6 +124,7 @@ async function reader(c: C): Promise<Context> {
 const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => c.json(await build(await reader(c), c)))
 api.route('/api/pantry/integration/v1', integrations)
 view('webhooks', async ctx => webhookSettings(ctx))
+view('data-flows', async ctx => dataFlows(ctx))
 view('erasure', async ctx => { await ownerSession(ctx); return erasureSettings(ctx.db) })
 view('integrations', async (ctx, c) => { must(ctx.actor, 'owner'); return integrationSettings(ctx, c.req.query('cursor')) })
 const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10)) => date(c.req.query(name) ?? fallback, name)

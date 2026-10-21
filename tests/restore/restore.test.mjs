@@ -148,6 +148,15 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   await command('recurring-bill.save', { name: 'Archived rent', vendorId: vendor.id, startDate: '2026-06-30', endDate: '2026-08-30', every: 1, unit: 'month', termsDays: 15, lines: [{ description: 'Monthly rent', amount: '1200.00', accountId: rent }] })
   await command('recurring-bill.generate', { through: '2026-09-30' })
   const captured = await captureForRestore(context, server.origin)
+  // Configure real installation-local credentials through the same public
+  // settings doors. No model call is made. A held Stripe key, when injected
+  // for the local acceptance run, is authenticated by Stripe itself.
+  const modelKey='synthetic-pantry-9001', rotatedModelKey='synthetic-pantry-9002'
+  await command('reader.save',{provider:'anthropic',key:modelKey})
+  await command('reader.save',{provider:'anthropic',key:rotatedModelKey})
+  const archivedAgent=await command('agent.create',{name:'Archive-local agent'})
+  const archivedIntegration=await command('integration.create',{name:'Archive-local API',scopes:['invoices:read']})
+  if(process.env.PANTRY_STRIPE_KEY)await command('stripe.connect',{secretKey:process.env.PANTRY_STRIPE_KEY})
   const lead = await command('contact.save', { kind: 'customer', name: 'Synthetic Pantry Lead', email: 'synthetic-pantry-lead@example.test', internalNotes: 'Synthetic lead private note' })
   const latestCustomer = (await (await context.request.get(`${server.origin}/api/pantry/state`)).json()).contacts.find(c => c.id === customer.id)
   await command('contact.save', { id: customer.id, revision: latestCustomer.revision, kind: 'customer', email: 'synthetic-pantry-customer@example.test', phone: 'synthetic-pantry-phone', billingAddress: 'Synthetic Pantry Address', internalNotes: 'Synthetic Pantry private note', contacts: [{ name: 'Synthetic Pantry Billing', email: 'synthetic-pantry-billing@example.test', roles: ['billing'] }] })
@@ -163,13 +172,22 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   const before = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(before.bytes, pdf)
   await context.close(); await server.stop()
-  await ok(first, ['export', '--output', 'exports/pantry-books.rer'])
+  const exported=await ok(first, ['export', '--output', 'exports/pantry-books.rer'])
+  const credentials=[modelKey,rotatedModelKey,archivedAgent.token,archivedIntegration.token,process.env.PANTRY_STRIPE_KEY].filter(Boolean)
+  for(const credential of credentials)assert.ok(!exported.includes(credential),'export diagnostics exclude credentials')
   const archivedSubscriptions=[]
+  let manifest
   for await(const record of fileRecords(join(first,'exports/pantry-books.rer')))if(record.kind==='part')for(const item of record.items)if(item.kind==='row') {
-    assert.ok(!['pt_webhook_secrets','pt_webhook_events','pt_webhook_deliveries','pt_webhook_attempts'].includes(item.table),'secrets and pending deliveries are absent from the archive')
+    assert.ok(!['pt_webhook_secrets','pt_webhook_events','pt_webhook_deliveries','pt_webhook_attempts','pt_reader','pt_stripe','pt_gusto','pt_gusto_states','pt_xero_connection','pt_receipt_inbox'].includes(item.table),'credential-only rows and pending deliveries are absent from the archive')
     assert.ok(!JSON.stringify(item.row).includes(webhook.secret),'plaintext signing secret is absent')
+    for(const credential of credentials)assert.ok(!JSON.stringify(item.row).includes(credential),'every archived row excludes credentials')
+    if(item.table==='pt_feed_items')assert.deepEqual([item.row.access_token,item.row.status],['','disconnected'])
+    if(item.table==='pt_agents')assert.equal(item.row.active,0)
+    if(item.table==='pt_integrations')assert.equal(item.row.revoked_at,'restored')
     if(item.table==='pt_webhook_subscriptions')archivedSubscriptions.push(item.row)
   }
+  for await(const record of fileRecords(join(first,'exports/pantry-books.rer')))if(record.kind==='manifest')manifest=record
+  for(const name of ['pt_reader','pt_stripe','pt_gusto','pt_xero_connection','pt_receipt_inbox'])assert.ok(manifest.excludedTables.includes(name),'the actual CLI archive excludes provider credential tables')
   assert.equal(archivedSubscriptions.find(row=>row.id===webhook.id).enabled,0)
 
 
@@ -186,6 +204,10 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   assert.deepEqual(restored.view, before.view, 'the fresh install holds the same books')
   assert.deepEqual(restored.bytes, pdf, 'the document comes back byte for byte')
   await assertCaptureRestored(context, server.origin, captured)
+  const dataFlows=await (await context.request.get(`${server.origin}/api/pantry/data-flows`)).json()
+  assert.ok(dataFlows.services.filter(s=>s.id!=='mail').every(s=>!s.connected),'restored books have no live provider connection')
+  assert.equal((await context.request.get(`${server.origin}/api/pantry/integration/v1/invoices`,{headers:{authorization:`Bearer ${archivedIntegration.token}`}})).status(),401)
+  assert.equal((await context.request.get(`${server.origin}/api/pantry/agent/context`,{headers:{authorization:`Bearer ${archivedAgent.token}`}})).status(),401)
   const restoredWebhooks=await (await context.request.get(`${server.origin}/api/pantry/webhooks`)).json()
   const restoredSubscription=restoredWebhooks.subscriptions.find(row=>row.id===webhook.id)
   assert.equal(restoredSubscription.enabled,false);assert.deepEqual(restoredWebhooks.history,[])

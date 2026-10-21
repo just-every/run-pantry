@@ -46,8 +46,7 @@ export function gusto(env: Bindings) {
     }
     const value: any = await response.json().catch(() => null)
     if (!response.ok) {
-      const detail = value?.error_description ?? value?.errors?.[0]?.message ?? value?.message ?? value?.error ?? `HTTP ${response.status}`
-      throw new GustoError(`Gusto refused the request: ${detail}`, response.status)
+      throw new GustoError(`Gusto refused the request (HTTP ${response.status}); check the connection and its permissions in Gusto`, response.status)
     }
     return value as T
   }

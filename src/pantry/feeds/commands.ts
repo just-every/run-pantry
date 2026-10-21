@@ -34,7 +34,7 @@ async function plaidCall<T>(work: () => Promise<T>): Promise<T> {
   }
 }
 
-const linkToken: Command = { need: 'record', async run(c, b) {
+const linkToken: Command = { need: 'owner', async run(c, b) {
   const client = plaid(c.env)
   let accessToken: string | undefined
   if (b.itemId) {
@@ -46,7 +46,7 @@ const linkToken: Command = { need: 'record', async run(c, b) {
   return { linkToken: r.link_token, expiration: r.expiration, environment: client.environment }
 } }
 
-const connect: Command = { need: 'record', async run(c, b) {
+const connect: Command = { need: 'owner', async run(c, b) {
   const client = plaid(c.env)
   const exchanged = await plaidCall(() => client.exchange(text(b.publicToken, 'Public token', 300)))
   const found = await plaidCall(() => client.accounts(exchanged.access_token))
@@ -54,7 +54,7 @@ const connect: Command = { need: 'record', async run(c, b) {
   const id = uid(), sealed = await seal(c.env.SESSION_SECRET, exchanged.access_token)
   const name = String(institution.name ?? '').trim().slice(0, 120) || 'Bank'
   // Not due until the person chooses where its accounts go.
-  await run(c.db, [authority(c.actor, 'record'),
+  await run(c.db, [authority(c.actor, 'owner'),
     q("INSERT INTO pt_feed_items (id, provider, item_id, institution_id, institution_name, access_token, status, sync_due_at, connected_by, connected_at, revision, consent_expires_at) VALUES (?, 'plaid', ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)",
       id, exchanged.item_id, String(institution.institution_id ?? found.item.institution_id ?? '').slice(0, 60), name, sealed, '9999-12-31T00:00:00Z', c.actor.email, now(), uid(), found.item.consent_expiration_time ?? null),
     ...found.accounts.map(a => q('INSERT INTO pt_feed_accounts (id, item_id, provider_account_id, name, mask, kind, balance_cents, balance_as_of, balance_observed_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -114,13 +114,13 @@ const syncNow: Command = { need: 'record', async run(c, b) {
   return { sync, connection: await connectionView(c.db, row.id), history: await historyView(c.db) }
 } }
 
-const disconnect: Command = { need: 'record', async run(c, b) {
+const disconnect: Command = { need: 'owner', async run(c, b) {
   const row = await item(c, b.itemId)
   requireThat(row.status !== 'disconnected', 'Already disconnected', 409)
   const token = await open(c.env.SESSION_SECRET, row.access_token)
   // Plaid forgets the connection; an item Plaid no longer knows is already gone.
   if (token) await plaidCall(() => plaid(c.env).remove(token).catch(e => { if (e instanceof PlaidError && e.code === 'ITEM_NOT_FOUND') return null; throw e }))
-  await run(c.db, [authority(c.actor, 'record'),
+  await run(c.db, [authority(c.actor, 'owner'),
     q("UPDATE pt_feed_items SET status = 'disconnected', access_token = '', revision = ? WHERE id = ?", uid(), row.id),
     q('DELETE FROM pt_feed_pending WHERE feed_account_id IN (SELECT id FROM pt_feed_accounts WHERE item_id = ?)', row.id),
     q('UPDATE pt_feed_accounts SET bank_account_id = NULL WHERE item_id = ?', row.id),

@@ -92,7 +92,7 @@ export function gustoRoutes(api: Hono<{ Bindings: Bindings }>) {
     const pending = await one(db, 'SELECT * FROM pt_gusto_states WHERE state = ?', state)
     await run(db, [q('DELETE FROM pt_gusto_states WHERE state = ?', state)])
     if (!pending || pending.started_by !== actor.email || Date.parse(pending.started_at) < Date.now() - STATE_MS) return fail('That Gusto sign-in expired or was not started here; connect Gusto again.')
-    if (c.req.query('error')) return fail(`Gusto did not connect: ${c.req.query('error_description') ?? c.req.query('error')}`)
+    if (c.req.query('error')) return fail('Gusto sign-in was declined; connect again when ready.')
     try {
       const client = gusto(c.env)
       const tokens = await client.exchange(text(c.req.query('code'), 'Authorization code', 500))

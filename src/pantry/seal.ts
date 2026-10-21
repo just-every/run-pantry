@@ -1,6 +1,6 @@
 // Secrets an owner enters on a page (an AI model key, the private tag of the
 // Pantry address) are kept sealed with AES-GCM under a key derived from the
-// install's SESSION_SECRET, so the database and its exports hold ciphertext only.
+// install's SESSION_SECRET. The credential rows are excluded from archives.
 const encoder = new TextEncoder()
 
 async function key(secret: string, purpose: string) {

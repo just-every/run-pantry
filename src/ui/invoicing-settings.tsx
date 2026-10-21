@@ -38,6 +38,7 @@ function Stripe({ st, onDone }: { st: D; onDone: () => Promise<void> }) {
       {c.country === 'US' ? <label className="check"><input type="checkbox" name="ach" defaultChecked={c.ach} /> ACH bank debit (US bank accounts; takes a few business days to clear)</label>
         : <p className="hint">ACH bank debit is not offered: Stripe provides it only to US Stripe accounts, and this one is in {c.country}.</p>}
     </Form>}
+    {owner && <details className="details"><summary>Replace Stripe key</summary><p>Pantry checks the new key before replacing the saved connection. Revoke the old key in Stripe after this succeeds.</p><Form label="Replace Stripe key" submit={b=>command('stripe.connect',b)} onDone={onDone}><Field label="Replacement Stripe secret key" name="secretKey" type="password" autoComplete="off" required /></Form></details>}
     {owner && <Action tone="danger" run={async () => { await command('stripe.disconnect', {}); await onDone() }}>Disconnect Stripe</Action>}
   </Card>
   return <Card title="Online payments (Stripe)">

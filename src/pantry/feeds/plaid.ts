@@ -18,7 +18,13 @@ export function relinkMessage(code: string, display?: string | null) {
 }
 
 export class PlaidError extends Error {
-  constructor(public code: string, public type: string, message: string, public status: number, public display = '') { super(message) }
+  constructor(public code: string, public type: string, _message: string, public status: number, public display = '') {
+    super(`Plaid refused the request (HTTP ${status})`)
+    // Never retain provider prose: an authentication error can echo a key.
+    if(!RELINK_CODES.has(code)&&!['ITEM_NOT_FOUND','INVALID_API_KEYS','INVALID_PUBLIC_TOKEN','RATE_LIMIT_EXCEEDED','PRODUCT_NOT_READY','INTERNAL_SERVER_ERROR'].includes(code))this.code='PROVIDER_ERROR'
+    this.type='PLAID_ERROR'
+    this.display=RELINK_CODES.has(this.code)?relinkMessage(this.code):''
+  }
   get relink() { return RELINK_CODES.has(this.code) }
 }
 

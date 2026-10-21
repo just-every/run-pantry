@@ -30,7 +30,8 @@ export async function stripeCall(key: string, method: 'GET' | 'POST' | 'DELETE',
     throw new Fault(502, 'Pantry could not reach Stripe; try again in a minute')
   }
   const value = await response.json().catch(() => ({})) as Data
-  if (!response.ok) throw new Fault(response.status === 401 || response.status === 403 ? 400 : 502, `Stripe refused the request: ${value.error?.message ?? `HTTP ${response.status}`}`)
+  // Provider diagnostics may echo the submitted credential. Keep only status.
+  if (!response.ok) throw new Fault(response.status === 401 || response.status === 403 ? 400 : 502, `Stripe refused the request (HTTP ${response.status}); check the key and its permissions in Stripe`)
   return value
 }
 

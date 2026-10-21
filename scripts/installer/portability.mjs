@@ -3,16 +3,23 @@
 // (a restored installation's owner signs in afresh and the books keep their
 // people by email). A staged archive whose books do not balance is refused.
 // Migrations seed one settings row each in the replaceable tables; the
-// archive's rows take their place.
+// archive's rows take their place. Connections never travel with the books.
+const disabled = (table,row) => {
+ if(table==='pt_webhook_subscriptions')return {...row,enabled:0,owner_id:''}
+ if(table==='pt_feed_items')return {...row,access_token:'',status:'disconnected',claim_id:null,claim_until:null}
+ if(table==='pt_agents')return {...row,active:0}
+ if(table==='pt_integrations')return {...row,revoked_at:'restored'}
+ return row
+}
 export default {
  product: 'just-every/pantry',
  // Receipts travel with the books; Base's source-bound portability journal
  // carries the restore fence. Neither journal contains erased field values.
  includeTables: ['pt_erasure_journal'],
- excludeTables: ['pt_webhook_secrets','pt_webhook_events','pt_webhook_deliveries','pt_webhook_attempts'],
- exportRow: (table,row) => table==='pt_webhook_subscriptions'?{...row,enabled:0,owner_id:''}:row,
- importSafety: {pt_webhook_subscriptions:{enabled:[0],owner_id:['']}},
- importRow: (table,row) => table==='pt_webhook_subscriptions'?{...row,enabled:0,owner_id:''}:row,
+ excludeTables: ['pt_webhook_secrets','pt_webhook_events','pt_webhook_deliveries','pt_webhook_attempts','pt_reader','pt_stripe','pt_gusto','pt_gusto_states','pt_xero_connection','pt_receipt_inbox'],
+ exportRow: (table,row) => disabled(table,['pt_agents','pt_integrations'].includes(table)?{...row,token_hash:`disabled:${row.id}`}:row),
+ importSafety: {pt_webhook_subscriptions:{enabled:[0],owner_id:['']},pt_feed_items:{access_token:[''],status:['disconnected'],claim_id:[null],claim_until:[null]},pt_agents:{active:[0]},pt_integrations:{revoked_at:['restored']}},
+ importRow: disabled,
  replaceableTables: ['pt_retention_settings', 'pt_sending', 'pt_due_work', 'pt_books_agent', 'pt_invoice_document_settings', 'pt_invoice_templates'],
  requiredConfiguration: ['OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN', 'AUTH_ORIGIN', 'MAIL_PROVIDER', 'MAIL_FROM'],
  validateStaged: async ({ read }) => {

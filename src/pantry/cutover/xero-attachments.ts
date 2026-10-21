@@ -154,7 +154,7 @@ export function xeroRoutes(api: Hono<{ Bindings: Bindings }>) {
       available(c.env)
       const l = await link(c.env.DB), state = c.req.query('state') ?? ''
       requireThat(l?.state && l.state === state && l.state_by === actor.email && Date.parse(l.state_at) > Date.now() - STATE_MINUTES * 60_000, 'This Xero sign-in was not started here or has expired; connect Xero again', 409)
-      requireThat(!c.req.query('error'), `Xero did not connect: ${c.req.query('error_description') ?? c.req.query('error')}`, 409)
+      requireThat(!c.req.query('error'), 'Xero sign-in was declined; connect again when ready.', 409)
       const t = await exchangeCode(c.env, text(c.req.query('code'), 'Xero code', 2000))
       const chosen = (await connections(t.access)).filter(x => x.tenantType === 'ORGANISATION' && (!t.authEventId || x.authEventId === t.authEventId))
       requireThat(chosen.length === 1, chosen.length ? 'Choose one Xero organization when Xero asks, then connect again' : 'Xero connected no organization; choose the one you moved from', 409)
