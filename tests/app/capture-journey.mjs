@@ -9,10 +9,12 @@ const digest = value => createHash('sha256').update(value).digest('hex')
 const dir = '/tmp/sx-pantry-c29-capture'
 const headersFor = origin => ({ origin })
 
-async function drop(page, file) {
-  const transfer = await page.evaluateHandle(({ name, mimeType, bytes }) => {
-    const data = new DataTransfer(); data.items.add(new File([new Uint8Array(bytes)], name, { type: mimeType })); return data
-  }, { ...file, bytes: Array.from(file.buffer) })
+async function drop(page, files) {
+  const transfer = await page.evaluateHandle(files => {
+    const data = new DataTransfer()
+    for (const { name, mimeType, bytes } of files) data.items.add(new File([new Uint8Array(bytes)], name, { type: mimeType }))
+    return data
+  }, [files].flat().map(file => ({ ...file, bytes: Array.from(file.buffer) })))
   try { await page.getByRole('region', { name: 'Receipt file drop zone' }).dispatchEvent('drop', { dataTransfer: transfer }) }
   finally { await transfer.dispose() }
 }
@@ -146,6 +148,17 @@ export async function captureJourney(t) {
         assert.equal(matching[0].sha256, digest(bytes)); await unchanged(context.request, origin, matching[0].document_id, bytes)
       }
       assert.equal(receipts.filter(r => r.capture?.id === capture.id || [heicName, pdfName].includes(r.file_name)).length, 4)
+      const dropped = [
+        { name: `synthetic-pantry-drop-${width}.png`, mimeType: 'image/png', buffer: image.buffer },
+        { name: `synthetic-pantry-drop-${width}.pdf`, mimeType: 'application/pdf', buffer: pdf },
+      ]
+      await drop(page, dropped)
+      for (const file of dropped) {
+        await page.getByRole('list', { name: 'File upload progress' }).getByText(`${file.name}: Saved for review`, { exact: true }).waitFor()
+        const saved = (await (await context.request.get(`${origin}/api/pantry/receipts`)).json()).review.find(r => r.file_name === file.name)
+        assert.ok(saved); await unchanged(context.request, origin, saved.document_id, file.buffer)
+      }
+      await page.locator('.capture').screenshot({ path: `${dir}/capture-multi-drop-${width}.png` })
       const afterBooks = await (await context.request.get(`${origin}/api/pantry/journal`)).json()
       assert.deepEqual(afterBooks.entries, initialBooks.entries, 'capture never posts a financial entry')
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `capture fits ${width}`)
