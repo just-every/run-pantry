@@ -1,3 +1,4 @@
+import { captureSplitJourney } from './capture-split-journey.mjs'
 import { captureSizeJourney } from './capture-size-journey.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -618,3 +619,5 @@ test('CAPTURE-004 delayed receipt matching, vendor/card identity, tip and FX bou
 })
 
 test('CAPTURE-001 native multipart keeps a 25 MB original and its 4 MB reading copy byte for byte', captureSizeJourney)
+
+test('CAPTURE-001 / ERASURE-001 split captures preserve provenance, scoped custody and shared-source retention', captureSplitJourney)
