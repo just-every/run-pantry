@@ -70,6 +70,6 @@ export function Contacts() {
       </Card>
       {state.actor.can.record && (editing && !editingOpen ? <Card title={editing.name}><p>{editing.kind === 'customer' ? 'Customer history, balances and preferences are below.' : 'Vendor contact details are saved in your books.'}</p><button type="button" className="btn btn-secondary" onClick={() => setEditingOpen(true)}>Edit contact details</button></Card> : <ContactEditor key={`${editing?.id ?? 'new'}-${editing?.revision ?? added}`} editing={editing} onCancel={clear} onDone={async c => { await reload(); setAdded(n => n + 1); choose(c) }} />)}
     </div>
-    {editing?.kind === 'customer' ? <CustomerHistory key={editing.id + editing.revision} customerId={editing.id} /> : <ExemptionCertificates />}
+    {editing?.kind === 'customer' ? <CustomerHistory key={editing.id + editing.revision} customerId={editing.id} /> : !['sales', 'payables-clerk'].includes(state.actor.role) && <ExemptionCertificates />}
   </>
 }

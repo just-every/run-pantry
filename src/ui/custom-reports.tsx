@@ -4,9 +4,12 @@ import { Card, Chip, command, Field, Form, Loading, Table, Tabs, usd, useShared,
 import { CustomReportEditor } from './custom-report-editor'
 import { Sharing } from './report-layout-editor'
 import { CustomReportDrill } from './custom-report-drill'
+import { customReportsOnly } from './role-navigation'
+
+const canManageCustomReports = (actor: D) => !!actor.can.record && !customReportsOnly(actor)
 
 export function CustomReportPreview({ report }: { report: D }) {
-  const search = useSearch({ from: '/app/reports' })
+  const search = useSearch({ from: '/app/reports' }), { state } = useShared()
   const [figure, setFigure] = useState(() => search.customId === report.id && search.row && search.column ? `custom-reports/${encodeURIComponent(report.id)}/figures?${new URLSearchParams({ row: search.row, column: search.column, ...(search.node ? { node: search.node } : {}) })}` : '')
   const value = (row: D, column: D) => {
     const amount = row.values[column.id]
@@ -16,7 +19,7 @@ export function CustomReportPreview({ report }: { report: D }) {
     return unit === 'money' ? usd(amount) : unit === 'percent' ? `${amount.toFixed(2)}%` : `${amount.toFixed(2)} ratio`
   }
   return <><Card title={<>{report.name} <Chip tone="info">{report.basisLabel}</Chip></>}>
-    <p>{report.range} · <a href={`/app/reports?${new URLSearchParams({ report: report.source, from: report.from, to: report.to, basis: report.basis })}`}>Open source report</a></p>
+    <p>{report.range}{!customReportsOnly(state.actor) && <> · <a href={`/app/reports?${new URLSearchParams({ report: report.source, from: report.from, to: report.to, basis: report.basis })}`}>Open source report</a></>}</p>
     <Table heads={report.columns.map((c: D) => c.label)} figures={report.columns.map((c: D, i: number) => c.unit === 'text' ? -1 : i).filter((i: number) => i >= 0)}>
       {report.rows.map((r: D) => r.kind === 'note' ? <tr key={r.id}><td colSpan={report.columns.length}>{r.text}</td></tr> : <tr key={r.id} className={r.kind === 'section' || r.kind === 'formula' ? 'total' : ''}>{report.columns.map((c: D) => <td key={c.id} className={c.unit === 'text' ? '' : 'fig'}>{c.unit === 'text' ? value(r, c) : <button className="btn btn-link" type="button" aria-label={`Open ${r.name} ${c.label}`} onClick={() => setFigure(`custom-reports/${encodeURIComponent(report.id)}/figures?${new URLSearchParams({ row: r.id, column: c.id })}`)}>{value(r, c)}</button>}</td>)}</tr>)}
     </Table>
@@ -25,10 +28,10 @@ export function CustomReportPreview({ report }: { report: D }) {
 }
 
 function SavedReport({ id, onEdit }: { id: string; onEdit: (saved: D) => void }) {
-  const { data, error } = useView<D>(`custom-reports/${id}/render`)
+  const { state } = useShared(), { data, error } = useView<D>(`custom-reports/${id}/render`)
   if (!data) return <Loading error={error} what="saved report" />
   return <div className="stack"><div className="row-actions">
-    {data.saved.can_edit && <button type="button" className="btn btn-secondary" onClick={() => onEdit(data.saved)}>Edit custom report</button>}
+    {canManageCustomReports(state.actor) && data.saved.can_edit && <button type="button" className="btn btn-secondary" onClick={() => onEdit(data.saved)}>Edit custom report</button>}
     <a className="btn btn-primary" href={`/api/pantry/custom-reports/${id}/export.pdf`} download>Download custom report PDF · {data.report.basis}</a>
     <a className="btn btn-secondary" href={`/api/pantry/custom-reports/${id}/export.xlsx`} download>Download custom report Excel · {data.report.basis}</a>
     <a className="btn btn-secondary" href={`/api/pantry/custom-reports/${id}/export.csv`} download>Download custom report CSV · {data.report.basis}</a>
@@ -54,10 +57,10 @@ function PackageEditor({ saved, reports, onDone, onCancel }: { saved?: D; report
 }
 
 function SavedPackage({ id, onEdit }: { id: string; onEdit: (saved: D) => void }) {
-  const { data, error } = useView<D>(`management-packages/${id}/render`)
+  const { state } = useShared(), { data, error } = useView<D>(`management-packages/${id}/render`)
   if (!data) return <Loading error={error} what="management package" />
   return <div className="stack"><Card title={data.saved.name} actions={<>
-    {data.saved.can_edit && <button className="btn btn-secondary" type="button" onClick={() => onEdit(data.saved)}>Edit management package</button>}
+    {canManageCustomReports(state.actor) && data.saved.can_edit && <button className="btn btn-secondary" type="button" onClick={() => onEdit(data.saved)}>Edit management package</button>}
     <a className="btn btn-primary" href={`/api/pantry/management-packages/${id}/export.pdf`} download>Download management package PDF</a>
     <a className="btn btn-secondary" href={`/api/pantry/management-packages/${id}/export.xlsx`} download>Download management package Excel</a>
     <a className="btn btn-secondary" href={`/api/pantry/management-packages/${id}/export.csv`} download>Download management package CSV</a>
@@ -71,15 +74,15 @@ export function CustomReports() {
   const { state } = useShared(), { data, error, reload } = useView<D>('custom-reports'), packages = useView<D>('management-packages')
   const search = useSearch({ from: '/app/reports' })
   const [tab, setTab] = useState('Saved reports'), [selected, setSelected] = useState(search.customId ?? ''), [editing, setEditing] = useState<D | null>(null)
-  const packageTab = tab === 'Management packages'
+  const packageTab = tab === 'Management packages', canManage = canManageCustomReports(state.actor)
   if (!data || !packages.data) return <Loading error={error || packages.error} what="custom reports" />
   const done = async (saved: D) => { await reload(); await packages.reload(); setEditing(null); setSelected(saved.id) }
-  if (editing) return packageTab ? <PackageEditor saved={editing.id ? editing : undefined} reports={data.reports} onDone={done} onCancel={() => setEditing(null)} /> : <CustomReportEditor saved={editing.id ? editing : undefined} onDone={done} onCancel={() => setEditing(null)} />
+  if (editing && canManage) return packageTab ? <PackageEditor saved={editing.id ? editing : undefined} reports={data.reports} onDone={done} onCancel={() => setEditing(null)} /> : <CustomReportEditor saved={editing.id ? editing : undefined} onDone={done} onCancel={() => setEditing(null)} />
   const rows = packageTab ? packages.data.packages : data.reports
   return <div className="stack">
     <p className="hint">Personal reports and packages are visible to you and the owner. The owner can view and edit all definitions. Sharing gives the chosen roles read and export access, with their own current financial permissions.</p>
     <Tabs tabs={['Saved reports', 'Management packages']} current={tab} onChange={t => { setTab(t); setSelected('') }} pick="Custom report view" />
-    <Card title={tab} actions={state.actor.can.record && <button type="button" className="btn btn-primary" onClick={() => setEditing({})}>{packageTab ? 'New management package' : 'New custom report'}</button>}>
+    <Card title={tab} actions={canManage && <button type="button" className="btn btn-primary" onClick={() => setEditing({})}>{packageTab ? 'New management package' : 'New custom report'}</button>}>
       <Table heads={['Name', 'Shared with', 'Actions']} empty={packageTab ? 'No management packages yet.' : 'No saved reports yet.'}>
         {rows.map((r: D) => <tr key={r.id}><td>{r.name}</td><td>{r.shared_roles.length ? r.shared_roles.join(', ') : 'Personal · owner access'}</td><td><button className="btn btn-link" type="button" onClick={() => setSelected(r.id)}>Open {r.name}</button></td></tr>)}
       </Table>

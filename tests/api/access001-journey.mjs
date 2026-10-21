@@ -34,6 +34,11 @@ export async function access001Journey(h) {
   assert.equal((await h.view('sales', clerk)).invoices.length, 0)
   await salesLimits(h, { acct, customer, sales, salesEmail, day })
 
+  const certificate = await h.command('exemption.save', { customerId: customer.id, certificateNumber: 'synthetic-pantry-26', states: ['NY'], validFrom: '2026-01-01', expiresOn: '2099-12-31', name: 'synthetic-pantry-27.txt', mediaType: 'text/plain', base64: Buffer.from('synthetic-pantry-28').toString('base64') })
+  const validity = at((await h.view('exemptions', sales)).certificates, c => c.id === certificate.id)
+  assert.deepEqual(validity, { id: certificate.id, customer_id: customer.id, states: ['NY'], valid_from: '2026-01-01', expires_on: '2099-12-31', active: 1 })
+  await h.view(`documents/${certificate.document_id}`, sales, 403)
+
   // A shared definition is never authority to read a disallowed source.
   const financial = await h.command('custom-report.save', { definition: { name: 'synthetic-pantry-13', source: 'profit-and-loss', from: '2026-10-01', to: '2026-10-31', columns: ['name', 'amount'] }, sharedRoles: ['sales', 'payables-clerk', 'accountant', 'time-only'] })
   const pkg = await h.command('management-package.save', { name: 'synthetic-pantry-14', reportIds: [financial.id], sharedRoles: ['sales', 'payables-clerk', 'accountant', 'time-only'] })
@@ -42,6 +47,7 @@ export async function access001Journey(h) {
     assert.equal((await h.view('management-packages', cookie)).packages.some(r => r.id === pkg.id), false)
     for (const door of [...exports('custom-reports', financial.id), ...exports('management-packages', pkg.id)]) await h.view(door, cookie, 404)
   }
+  await sharedSourceReports(h, sales, clerk)
   // Existing bank accounts, monetary writes and full-book exports all obey
   // the named person's account visibility, including a saved record's ids.
   await h.command('member.save', { email: accountantEmail, name: 'synthetic-pantry-3', role: 'accountant', canPost: true, bankAccounts: [bank.id], billLimit: '5000', paymentLimit: '5000', journalLimit: '5000' })
@@ -78,14 +84,17 @@ export async function access001Journey(h) {
   assert.equal(taxValues(activity).some(value => value.includes('6789')), false)
   assert.equal(JSON.stringify(activity).includes('123456789'), false)
 
-  const time = await h.member(timeEmail, 'time-only')
+  const time = await h.member(timeEmail, 'time-only', { journalLimit: '5000' })
   const service = await h.command('item.save', { name: 'synthetic-pantry-15', kind: 'service', rate: '125', accountId: acct['4000'], taxCategory: 'non-taxable' })
   const project = await h.command('time-project.save', { customerId: customer.id, name: 'synthetic-pantry-16' })
   const entry = { customerId: customer.id, projectId: project.id, itemId: service.id, date: day, hours: '4', note: 'synthetic-pantry-17' }
   const recorded = await h.command('time.save', entry, time)
   assert.equal(recorded.minutes, 240)
   assert.equal(recorded.person_email, timeEmail)
-  assert.equal(JSON.stringify(await h.view('state', time)).includes('rate_cents'), false)
+  const timeMetadata = await h.view('state', time)
+  assert.equal(JSON.stringify(timeMetadata).includes('rate_cents'), false)
+  assert.equal(Object.hasOwn(timeMetadata.actor, 'policy'), false)
+  assert.equal(/journalLimit|journal_limit|billLimit|paymentLimit/.test(JSON.stringify(timeMetadata)), false)
   const timeState = await h.view('time', time)
   assert.deepEqual(timeState.services, [{ id: service.id, name: service.name }])
   assert.equal(timeState.entries.length, 1)
@@ -109,6 +118,37 @@ export async function access001Journey(h) {
   await h.command('member.save', { email: timeEmail, name: 'synthetic-pantry-4', role: 'time-only', timePeople: [] })
   await h.command('time.save', { ...entry, personEmail: salesEmail }, time, 403)
   assert.equal((await h.view('time', time)).entries.some(e => e.id === delegated.id), false)
+}
+
+async function sharedSourceReports(h, sales, clerk) {
+  const sharedRoles = ['sales', 'payables-clerk']
+  const report = (name, source) => h.command('custom-report.save', { definition: { name, source, from: '2026-10-01', to: '2026-10-31', basis: 'accrual', columns: ['name', 'amount'] }, sharedRoles })
+  const salesReport = await report('synthetic-pantry-29', 'sales-by-customer'), expenseReport = await report('synthetic-pantry-30', 'expenses-by-vendor')
+  const pack = (name, reportIds) => h.command('management-package.save', { name, reportIds, sharedRoles })
+  const salesPackage = await pack('synthetic-pantry-31', [salesReport.id]), expensePackage = await pack('synthetic-pantry-32', [expenseReport.id]), mixedPackage = await pack('synthetic-pantry-33', [salesReport.id, expenseReport.id])
+  for (const [cookie, allowed, denied, allowedPackage, deniedPackage, recordKind] of [[sales, salesReport, expenseReport, salesPackage, expensePackage, 'invoice'], [clerk, expenseReport, salesReport, expensePackage, salesPackage, 'bill']]) {
+    const list = (await h.view('custom-reports', cookie)).reports, packages = (await h.view('management-packages', cookie)).packages
+    assert.equal(at(list, r => r.id === allowed.id).can_edit, false)
+    assert.equal(list.some(r => r.id === denied.id), false)
+    assert.equal(at(packages, p => p.id === allowedPackage.id).can_edit, false)
+    assert.equal(packages.some(p => [deniedPackage.id, mixedPackage.id].includes(p.id)), false)
+    for (const door of [...exports('custom-reports', allowed.id).filter(p => !p.includes('/figures')), ...exports('management-packages', allowedPackage.id)]) await h.view(door, cookie)
+    const rendered = await h.view(`custom-reports/${allowed.id}/render`, cookie)
+    assert.equal(rendered.saved.can_edit, false)
+    const row = at(rendered.report.rows, r => typeof r.values.amount === 'number' && r.values.amount > 0)
+    const packaged = await h.view(`management-packages/${allowedPackage.id}/render`, cookie)
+    assert.deepEqual(packaged.reports.map(r => r.report), [rendered.report])
+    const query = new URLSearchParams({ row: row.id, column: 'amount' })
+    const figure = await h.view(`custom-reports/${allowed.id}/figures?${query}`, cookie)
+    assert.ok(figure.rows.length > 0)
+    assert.equal(figure.rows.every(r => r.record.kind === recordKind && r.bank.length === 0 && r.documents.length === 0), true)
+    for (const format of ['json', 'csv']) await h.view(`custom-reports/${allowed.id}/figures/export?${query}&format=${format}`, cookie)
+    for (const door of [...exports('custom-reports', denied.id), ...exports('management-packages', deniedPackage.id), ...exports('management-packages', mixedPackage.id)]) await h.view(door, cookie, 404)
+    await h.command('custom-report.save', { definition: allowed.definition }, cookie, 403)
+    await h.command('custom-report.save', { id: allowed.id, revision: allowed.revision, definition: allowed.definition }, cookie, 403)
+    await h.command('management-package.save', { name: 'synthetic-pantry-34', reportIds: [allowed.id] }, cookie, 403)
+    await h.command('management-package.save', { id: allowedPackage.id, revision: allowedPackage.revision, name: allowedPackage.name, reportIds: [allowed.id] }, cookie, 403)
+  }
 }
 
 async function salesLimits(h, { acct, customer, sales, salesEmail, day }) {

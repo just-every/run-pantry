@@ -6,3 +6,7 @@ export function roleScreen(role: string, path: string, banksLimited = false) {
   if (banksLimited) return ['/app/sales', '/app/bank', '/app/time', '/app/reports'].some(p => path === p || path.startsWith(p + '/'))
   return true
 }
+
+export function customReportsOnly(actor: { role: string; policy?: { bankAccounts?: string[] | null } }) {
+  return actor.role !== 'owner' && (['sales', 'payables-clerk', 'time-only'].includes(actor.role) || actor.policy?.bankAccounts != null)
+}

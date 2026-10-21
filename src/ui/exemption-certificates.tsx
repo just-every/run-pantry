@@ -4,8 +4,8 @@ import { useRef, useState } from 'react'
 import { Action, Card, Chip, command, contactOptions, day, Field, FileLink, Form, Loading, readFileBase64, Table, useShared, useView, type D } from './kit'
 
 export function ExemptionCitation({ invoice }: { invoice: D }) {
-  const e = invoice.exemption
-  return e ? <p className="hint">Exempt in {invoice.destination_state}: certificate {e.certificateNumber}, valid through {day(e.expiresOn)}. <FileLink id={e.documentId} name={e.documentName} /></p> : invoice.destination_state ? <p className="hint">Ship-to / destination state: {invoice.destination_state}</p> : null
+  const { state } = useShared(), e = invoice.exemption
+  return e ? <p className="hint">Exempt in {invoice.destination_state}: certificate {e.certificateNumber}, valid through {day(e.expiresOn)}. {state.actor.role !== 'sales' && <FileLink id={e.documentId} name={e.documentName} />}</p> : invoice.destination_state ? <p className="hint">Ship-to / destination state: {invoice.destination_state}</p> : null
 }
 
 export function ExemptionCertificates({ customerId }: { customerId?: string }) {

@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { Card, Chip, FileLink, Loading, Table, day, usd, useView, type D } from './kit'
+import { customReportsOnly } from './role-navigation'
+import { Card, Chip, FileLink, Loading, Table, day, usd, useShared, useView, type D } from './kit'
 
 export const reportFigureValue = (value: number | null, unit: string) => value === null ? 'undefined' : unit === 'money' ? usd(value) : unit === 'percent' ? `${value.toFixed(2)}%` : `${value.toFixed(2)} ratio`
 const localPath = (href: string) => href.replace(/^\/api\/pantry\//, '')
 
 export function CustomReportDrill({ path, onClose }: { path: string; onClose: () => void }) {
+  const { state } = useShared(), restricted = customReportsOnly(state.actor)
   const [steps, setSteps] = useState([path])
   const { data: d, error } = useView<D>(localPath(steps.at(-1)!))
   const back = <div className="row-actions"><button className="btn btn-secondary" type="button" onClick={onClose}>Close figure</button>{steps.length > 1 && <button className="btn btn-secondary" type="button" onClick={() => setSteps(s => s.slice(0, -1))}>Back to operand</button>}</div>
@@ -23,7 +25,7 @@ export function CustomReportDrill({ path, onClose }: { path: string; onClose: ()
     {d.rows && <>
       <p><Chip tone={d.ties ? 'good' : 'bad'}>{d.ties ? 'Adds up to the report figure' : 'Does not add up to the report figure'}</Chip></p>
       <Table heads={['Date', 'Record', 'Account and description', 'Documents', 'Bank', 'Amount']} figures={[5]} empty="No posted lines behind this figure.">
-        {d.rows.map((r: D, i: number) => <tr key={`${r.key}-${i}`}><td>{day(r.date)}</td><td><a href={recordPath(r.record)}>{r.record.label}</a></td><td>{r.account.code} · {r.account.name}<small className="sub block">{r.description}</small>{r.settlement && <small className="sub block">Settled by <a href={recordPath(r.settlement.by)}>{r.settlement.by.label}</a> · {r.settlement.share}</small>}</td><td>{r.documents.map((doc: D) => <FileLink key={doc.id} id={doc.id} name={doc.name} />)}</td><td>{r.bank.map((b: D) => <p key={b.id}>{day(b.date)} · {b.description} · {usd(b.amount)}{b.statementDocumentId && <> · <a href={`/api/pantry/documents/${b.statementDocumentId}`}>Statement</a></>}</p>)}</td><td className="fig">{usd(r.amount)}</td></tr>)}
+        {d.rows.map((r: D, i: number) => <tr key={`${r.key}-${i}`}><td>{day(r.date)}</td><td>{restricted ? r.record.label : <a href={recordPath(r.record)}>{r.record.label}</a>}</td><td>{r.account.code} · {r.account.name}<small className="sub block">{r.description}</small>{r.settlement && <small className="sub block">Settled by {restricted ? r.settlement.by.label : <a href={recordPath(r.settlement.by)}>{r.settlement.by.label}</a>} · {r.settlement.share}</small>}</td><td>{r.documents.map((doc: D) => <FileLink key={doc.id} id={doc.id} name={doc.name} />)}</td><td>{r.bank.map((b: D) => <p key={b.id}>{day(b.date)} · {b.description} · {usd(b.amount)}{b.statementDocumentId && <> · <a href={`/api/pantry/documents/${b.statementDocumentId}`}>Statement</a></>}</p>)}</td><td className="fig">{usd(r.amount)}</td></tr>)}
         <tr className="total"><td>Total</td><td /><td /><td /><td /><td className="fig">{usd(d.total)}</td></tr>
       </Table>
     </>}

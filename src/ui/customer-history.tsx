@@ -1,10 +1,11 @@
-import { Action, Card, Chip, FileLink, Loading, Metrics, Table, day, usd, useView, type D } from './kit'
+import { Action, Card, Chip, FileLink, Loading, Metrics, Table, day, usd, useShared, useView, type D } from './kit'
 import { ExemptionCertificates } from './exemption-certificates'
 
 const KIND: Record<string, string> = { invoice: 'Invoice', credit: 'Credit', payment: 'Payment' }
 const METHOD: Record<string, string> = { card: 'Card', us_bank_account: 'Bank account (ACH)', offline: 'Offline payment instructions' }
 
 export function CustomerHistory({ customerId }: { customerId: string }) {
+  const { state } = useShared()
   const { data, error, reload } = useView<D>(`customers/${encodeURIComponent(customerId)}`)
   if (!data) return <Card title="Customer history"><Loading error={error} what="customer history" /></Card>
   const c = data.customer, s = data.summary
@@ -43,6 +44,6 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
         {data.deliveries.map((d: D) => <tr id={`delivery-${d.id}`} key={d.id}><td>{day(d.at)}</td><td><a href={`/app/reports?record=${encodeURIComponent(`invoice:${d.invoice_id}`)}`}>{d.number}</a></td><td>{d.recipient}</td><td><details className="details"><summary>{d.subject}</summary><p>{d.kind === 'reminder' ? 'Reminder' : 'Invoice'} · {d.provider || 'No provider'}{d.provider_message_id ? ` · ${d.provider_message_id}` : ''}</p><p>{d.detail || 'No additional outcome detail.'}</p></details></td><td><Chip>{d.status}</Chip></td></tr>)}
       </Table>
     </Card>
-    <ExemptionCertificates customerId={customerId} />
+    {state.actor.role !== 'sales' && <ExemptionCertificates customerId={customerId} />}
   </div>
 }

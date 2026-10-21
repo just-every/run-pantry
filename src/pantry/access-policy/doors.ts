@@ -34,7 +34,7 @@ export async function assertDoor(c: Context, path: string, body?: Data) {
     } else {
       const shared = ['state', 'time', 'sales'].includes(door)
       const custom = /^(custom-reports|management-packages)(\/|$)/.test(door)
-      const sale = actor.role === 'sales' && (/^customers\//.test(door) || door === 'invoice-documents' || /^invoice-documents\/[^/]+\/(pdf|preview)$/.test(door))
+      const sale = actor.role === 'sales' && (/^customers\//.test(door) || door === 'invoice-documents' || door === 'exemptions' || /^invoice-documents\/[^/]+\/(pdf|preview)$/.test(door))
       const payable = actor.role === 'payables-clerk' && (/^vendors\/[^/]+\/history$/.test(door) || /^documents\/[^/]+$/.test(door) && !!await one(c.db, "SELECT id FROM pt_documents WHERE id = ? AND linked_kind = 'bill'", door.slice(10)))
       requireThat(actor.role === 'time-only' ? door === 'state' || door === 'time' : shared || custom || sale || payable, 'This screen is not part of your role', 403)
     }
@@ -84,11 +84,12 @@ export async function projectAccess(c: Context, value: unknown, path = new URL(c
   const door = path.replace(/^\/api\/pantry\//, '').split('?')[0], v = value as Data
   let out: any = v
   if (door === 'state' && narrow(actor)) {
-    if (actor.role === 'time-only') return { actor: v.actor, names: { [actor.email]: actor.name }, settings: { entity: v.settings?.entity ? { legal_name: v.settings.entity.legal_name } : null }, accounts: [], contacts: [], bankAccounts: [], taxCodes: [], items: [], overview: null }
+    if (actor.role === 'time-only') return { actor: { email: v.actor.email, name: v.actor.name, role: v.actor.role, can: v.actor.can }, names: { [actor.email]: actor.name }, settings: { entity: v.settings?.entity ? { legal_name: v.settings.entity.legal_name } : null }, accounts: [], contacts: [], bankAccounts: [], taxCodes: [], items: [], overview: null }
     const sales = actor.role === 'sales'
     out = { ...v, contacts: v.contacts?.filter((r: Data) => r.kind === (sales ? 'customer' : 'vendor')), bankAccounts: [], accounts: v.accounts?.filter((r: Data) => sales ? r.type === 'income' : r.type === 'expense'), overview: null,
       settings: { entity: v.settings?.entity, issuingLimits: v.settings?.issuingLimits, members: [], agents: [], rolePrivacy: [], choices: v.settings?.choices } }
   }
+  if (door === 'exemptions' && actor.role === 'sales') out = { today: v.today, certificates: v.certificates.map((e: Data) => ({ id: e.id, customer_id: e.customer_id, states: e.states, valid_from: e.valid_from, expires_on: e.expires_on, active: e.active })) }
   if (door === 'sales' && narrow(actor)) {
     const sales = actor.role === 'sales'
     out = { ...v, invoices: sales ? v.invoices : [], recurring: sales ? v.recurring : [], deliveries: sales ? v.deliveries : [], reminders: sales ? v.reminders : [], onlinePayments: [], bills: sales ? [] : v.bills, capturedBills: sales ? [] : v.capturedBills, recurringBills: sales ? [] : v.recurringBills, approvalRules: [], vendorCredits: sales ? [] : v.vendorCredits, payments: [] }

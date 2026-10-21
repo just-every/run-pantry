@@ -1,11 +1,13 @@
 // Reports, all from the same ledger, on the cash or accrual basis, and the
 // accountant package download. Every figure on the statements, ledgers, grouped,
 // comparison, budget and 1099 reports opens to the records behind it (report-detail.tsx).
+import { useEffect } from 'react'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { Card, Chip, Field, Loading, PageHead, Table, Tabs, day, monthName, today, usd, useShared, useView, type D } from './kit'
 import { BASIS_NAME, FigureDetail, RecordView } from './report-detail'
 import { Budgets } from './budgets'
 import { CustomReports } from './custom-reports'
+import { customReportsOnly } from './role-navigation'
 import { SalesTax } from './sales-tax'
 import { Contractors } from './contractors'
 import { CashFlow, CashFlowDetail } from './cash-flow'
@@ -111,7 +113,11 @@ function Report({ slug, basis, from, to, columns }: { slug: string; basis: Basis
 export function Reports() {
   const search = useSearch({ from: '/app/reports' }), navigate = useNavigate({ from: '/app/reports' }), { state } = useShared()
   const set = (patch: ReportSearch) => navigate({ search: (s: ReportSearch) => ({ ...s, ...patch }), replace: !('report' in patch || 'line' in patch || 'record' in patch) })
-  const kind = KINDS.find(k => k[1] === search.report) ?? KINDS[0], [label, slug, based, ranged] = kind
+  const customOnly = customReportsOnly(state.actor), kinds = customOnly ? KINDS.filter(k => k[1] === 'custom') : KINDS
+  const kind = kinds.find(k => k[1] === search.report) ?? kinds[0], [label, slug, based, ranged] = kind
+  useEffect(() => {
+    if (customOnly && (search.report !== 'custom' || search.line || search.record)) void navigate({ search: (s: ReportSearch) => ({ ...s, report: 'custom', line: undefined, record: undefined }), replace: true })
+  }, [customOnly, search.report, search.line, search.record, navigate])
   const statement = slug === 'profit-and-loss' || slug === 'balance-sheet', columns = statement ? columnMode(search.columns, slug) : 'single'
   // The declared tax method picks the basis a report opens on; the switch changes only what is shown.
   const basis: Basis = search.basis === 'cash' || search.basis === 'accrual' ? search.basis : state.settings?.entity?.tax_method === 'cash' ? 'cash' : 'accrual'
@@ -125,9 +131,9 @@ export function Reports() {
   const exportQuery = library ? libraryQuery(slug, from, to, basis, search.account, search.payee) : `from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}${slug === 'general-ledger' && search.account ? `&account=${encodeURIComponent(search.account)}` : ''}`
   return <>
     <PageHead title="Reports" lead="Every report is calculated from the same posted ledger, on the cash or the accrual basis."
-      actions={<><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv${q}`} download>General ledger CSV · {basis === 'cash' ? 'cash' : 'accrual'}</a><a className="btn btn-primary" href={`/api/pantry/package/${period}/accountant-package.zip${q}`} download title="A ZIP of CSV reports, the close checklist and a README">Accountant package · {monthName(period)}</a></>} />
-    <Tabs tabs={KINDS.map(k => k[0])} current={label} onChange={t => set({ report: KINDS.find(k => k[0] === t)![1], line: undefined, record: undefined })} pick="Report" />
-    {search.record ? <RecordView record={search.record} reportLabel={label} /> : detail && slug === 'cash-flow' ? <CashFlowDetail line={search.line!} from={from} to={to} />
+      actions={!customOnly && <><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv${q}`} download>General ledger CSV · {basis === 'cash' ? 'cash' : 'accrual'}</a><a className="btn btn-primary" href={`/api/pantry/package/${period}/accountant-package.zip${q}`} download title="A ZIP of CSV reports, the close checklist and a README">Accountant package · {monthName(period)}</a></>} />
+    <Tabs tabs={kinds.map(k => k[0])} current={label} onChange={t => set({ report: kinds.find(k => k[0] === t)![1], line: undefined, record: undefined })} pick="Report" />
+    {customOnly ? <CustomReports /> : search.record ? <RecordView record={search.record} reportLabel={label} /> : detail && slug === 'cash-flow' ? <CashFlowDetail line={search.line!} from={from} to={to} />
       : detail ? <FigureDetail report={slug} line={search.line!} from={figureFrom} to={figureTo} basis={basis} reportLabel={label} />
       : slug === 'custom' ? <CustomReports /> : slug === 'contractors' ? <Contractors year={taxYear} onYear={y => set({ year: String(y) })} />
       : <Card className={library ? 'report-library' : undefined} title={<>{label} <Chip tone="info">{library ? libraryBasisLabel(slug, basis) : slug === 'cash-flow' ? 'Indirect method · accrual starting income' : based ? BASIS_NAME[basis] : 'Open items · accrual basis'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}
