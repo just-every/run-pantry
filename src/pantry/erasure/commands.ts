@@ -10,6 +10,7 @@ import { fenceStatements } from './fence'
 import { eraseCopies } from './copies'
 import { immutableCopies } from './immutable-copies'
 import { runErasure } from './custody'
+import { unpostedDependents } from './unposted'
 import { ownerSession } from './owner'
 import { retainStatements, retentionCommands, erasureView } from './retention'
 
@@ -22,7 +23,7 @@ const execute: Command = {need:'owner',async run(c,b) {
   const reason = text(b.reason,'Reason',1000), requester = text(b.requester,'Requester',254), channel = text(b.channel,'Request channel',40)
   requireThat(['email','phone','in-person','other'].includes(channel),'Request channel is email, phone, in-person or other')
   const id = uid(), at = now(), member = p.kind==='member', person=p.kind==='contact-person', label = member ? `Former member ${crypto.randomUUID().replaceAll('-','').slice(0,8)}` : MARKER
-  const values = person?[p.subject.name,p.subject.email,p.subject.phone].filter(Boolean):await erasureValues(c.db,p.subject,member)
+  const values = person?[p.subject.name,p.subject.email,p.subject.phone].filter(Boolean):await erasureValues(c.db,p.subject,member,p.posted)
   const history = await historyStatements(c.db,values,id,at,member?{email:p.id,label}:undefined)
   const counts: Record<string,Data> = {pt_audit:{valuesReplaced:history.counts.pt_audit},pt_approvals:{valuesReplaced:history.counts.pt_approvals}}
   const copies = await eraseCopies(c.db,{id:p.id,member:member||person,posted:p.posted,values,marker:label,erasureId:id,at})
@@ -45,6 +46,7 @@ const execute: Command = {need:'owner',async run(c,b) {
       writes.push(q(`UPDATE pt_contacts SET ${CONTACT_PERSONAL.map(k=>`${k}=?`).join(',')},contacts_json='[]',vendor_ein_hash='',active=0,erased_at=?,revision=? WHERE id=?`,...CONTACT_PERSONAL.map(()=>MARKER),at,uid(),p.id),changed())
       counts.pt_contacts={fieldsReplaced:CONTACT_PERSONAL.length+2}
     } else {
+      const dependents=await unpostedDependents(c.db,p.id);writes.push(...dependents.statements);Object.assign(counts,dependents.counts);removed.push(...dependents.removed)
       for (const [table,column] of [['pt_vendor_aliases','vendor_id'],['pt_integration_contacts','contact_id'],['pt_contractor_tax','contact_id']] as const) {
         const n = (await one(c.db,`SELECT count(*) AS n FROM ${table} WHERE ${column}=?`,p.id))!.n
         writes.push(q(`DELETE FROM ${table} WHERE ${column}=?`,p.id)); counts[table]={rowsRemoved:n}

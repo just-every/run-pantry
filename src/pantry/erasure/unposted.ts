@@ -1,0 +1,22 @@
+// Remove a transaction-free party's dormant, nonfinancial dependent rows.
+import {all,changed,q,type Sql} from '../db'
+import type {Data} from '../core'
+export async function unpostedDependents(db:D1Database,id:string) {
+  const statements:Sql[]=[],counts:Record<string,Data>={},removed:{table:string;key:Record<string,unknown>}[]=[]
+  const selections:[string,string,string[]][]=[
+    ['pt_recurring_runs','recurring_id IN (SELECT id FROM pt_recurring WHERE customer_id=?)',['recurring_id','occurrence']],
+    ['pt_recurring_prices','recurring_id IN (SELECT id FROM pt_recurring WHERE customer_id=?)',['id']],
+    ['pt_recurring','customer_id=?',['id']],
+    ['pt_recurring_bill_runs','recurring_id IN (SELECT id FROM pt_recurring_bills WHERE vendor_id=?)',['recurring_id','occurrence']],
+    ['pt_recurring_bills','vendor_id=?',['id']],
+    ['pt_exemption_reminders','certificate_id IN (SELECT id FROM pt_exemption_certificates WHERE customer_id=?)',['certificate_id']],
+    ['pt_exemption_certificates','customer_id=?',['id']],
+  ]
+  for(const [table,where,keys] of selections) {
+    const rows=await all(db,`SELECT ${keys.join(',')} FROM ${table} WHERE ${where}`,id)
+    if(!rows.length)continue
+    statements.push(q(`DELETE FROM ${table} WHERE ${where}`,id),changed(rows.length));counts[table]={rowsRemoved:rows.length}
+    removed.push(...rows.map(row=>({table,key:Object.fromEntries(keys.map(k=>[k,row[k]]))})))
+  }
+  return {statements,counts,removed}
+}

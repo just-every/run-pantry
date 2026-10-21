@@ -22,16 +22,17 @@ export function scrub(value: unknown, values: string[], marker = MARKER): unknow
 }
 
 /** Values in earlier declared personal-field revisions are erased as well. */
-export async function erasureValues(db: D1Database, subject: Data, member=false): Promise<string[]> {
+export async function erasureValues(db: D1Database, subject: Data, member=false, keepLegalName=true): Promise<string[]> {
   const {all}=await import('../db')
   const values=new Set(personalValues(subject,member)), ids=new Set([member?subject.email:subject.id])
+  if(!member&&!keepLegalName&&subject.name)values.add(subject.name)
   const rows=await all(db,"SELECT subject_id,detail FROM pt_audit WHERE subject_kind IN ('customer','vendor','member') ORDER BY at")
   for(let changed=true;changed;) {
     changed=false
     for(const row of rows) {
       const detail=JSON.parse(row.detail)
       if(!ids.has(row.subject_id) && !(member&&[detail.previousEmail,detail.before?.email,detail.after?.email].some(v=>ids.has(v))))continue
-      for(const snapshot of [detail.before,detail.after])if(snapshot&&typeof snapshot==='object')for(const value of personalValues(snapshot,member))values.add(value)
+      for(const snapshot of [detail.before,detail.after])if(snapshot&&typeof snapshot==='object'){for(const value of personalValues(snapshot,member))values.add(value);if(!member&&!keepLegalName&&snapshot.name)values.add(snapshot.name)}
       if(member)for(const id of [row.subject_id,detail.previousEmail,detail.before?.email,detail.after?.email].filter(Boolean))if(!ids.has(id)){ids.add(id);values.add(id);changed=true}
     }
   }
