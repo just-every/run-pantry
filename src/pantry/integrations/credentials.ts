@@ -12,7 +12,7 @@ export const SCOPES = [
   { id: 'documents:write', label: 'Documents', help: 'Read and attach source documents.' },
   { id: 'payments:read', label: 'Payments readback', help: 'Read payments, allocations and reversals; cannot move money.' },
   { id: 'payments:write', label: 'Record external payments', help: 'Read payments and record money already received or paid, with allocations. Also needs post; cannot move money.' },
-  { id: 'reports:read', label: 'Reports', help: 'Read the trial balance.' },
+  { id: 'reports:read', label: 'Reports', help: 'Read financial statements, ledgers, sales, tax, open items and financial report-library summaries.' },
   { id: 'post', label: 'Post approved sibling records', help: 'Post bills, journals and external payments and issue invoices. Bills, invoices and journals otherwise stay drafts; payments require this grant.' },
 ]
 

@@ -298,3 +298,58 @@ test('CAPTURE-004 phone and desktop receipt suggestions wait for their line, att
     await context.close()
   }
 })
+
+
+test('API-001 financial-report credential scope is explained, created, used and revoked at 1440 and 390', async t => {
+  const app = await worker(); t.after(() => app.close())
+  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
+  const owner = await browser.newContext(); t.after(() => owner.close())
+  assert.equal((await owner.request.post(`${app.origin}/auth/bootstrap`, { headers: { origin: app.origin }, data: { token: TOKEN, displayName: 'Rosa Rivera' }, maxRedirects: 0 })).status(), 303)
+  assert.equal((await owner.request.post(`${app.origin}/setup`, { headers: { origin: app.origin }, form: { confirm: 'yes' }, maxRedirects: 0 })).status(), 303)
+  const command = async (op, data) => {
+    const response = await owner.request.post(`${app.origin}/api/pantry/command/${op}`, { headers: { origin: app.origin }, data })
+    assert.equal(response.status(), 200, op + ': ' + await response.text()); return response.json()
+  }
+  await command('entity.save', { legalName: 'Rivera Design Studio LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2026-01-01', policies: '' })
+  await command('chart.start', {})
+  const state = await (await owner.request.get(`${app.origin}/api/pantry/state`)).json()
+  const acct = Object.fromEntries(state.accounts.map(a => [a.code, a.id]))
+  const journal = await command('journal.save-draft', { date: '2026-10-12', memo: 'Design fee received', lines: [{ accountId: acct['1000'], debit: '125.00' }, { accountId: acct['4000'], credit: '125.00' }] })
+  await command('journal.post', { id: journal.id, revision: journal.revision })
+  for (const width of [1440, 390]) {
+    const context = await browser.newContext({ storageState: await owner.storageState(), viewport: { width, height: width === 390 ? 844 : 1000 } })
+    const page = await context.newPage(), errors = []; page.on('pageerror', error => errors.push(String(error)))
+    await page.goto(`${app.origin}/app/settings`)
+    const scope = page.getByRole('checkbox', { name: /Reports reports:read/ })
+    await scope.waitFor()
+    await page.getByText('Read financial statements, ledgers, sales, tax, open items and financial report-library summaries.', { exact: true }).waitFor()
+    const name = 'Financial reporting ' + width
+    await page.getByLabel('Integration name', { exact: true }).fill(name)
+    await scope.check()
+    const create = page.waitForResponse(response => response.url().endsWith('/api/pantry/command/integration.create') && response.request().method() === 'POST')
+    await page.getByRole('button', { name: 'Create integration credential', exact: true }).click()
+    const response = await create; assert.equal(response.status(), 200)
+    const credential = await response.json()
+    assert.deepEqual(credential.scopes, ['reports:read'])
+    await page.getByRole('button', { name: 'I saved it', exact: true }).click()
+    // No credential value is retained in a screenshot or in test output.
+    assert.equal(await page.locator('code.token').count(), 0)
+    const headers = { authorization: `Bearer ${credential.token}` }
+    const report = await context.request.get(`${app.origin}/api/pantry/integration/v1/reports/profit-and-loss?from=2026-10-01&to=2026-10-31`, { headers })
+    assert.equal(report.status(), 200); assert.equal((await report.json()).netIncome, 12500)
+    await page.getByRole('button', { name: 'Refresh integrations', exact: true }).click()
+    const calls = page.getByRole('table', { name: 'Recent integration API calls', exact: true })
+    await calls.getByText('GET /api/pantry/integration/v1/reports/profit-and-loss', { exact: true }).first().waitFor()
+    const row = page.getByRole('table', { name: 'Integration credentials', exact: true }).getByRole('row').filter({ hasText: name })
+    await row.getByText('Active', { exact: true }).waitFor()
+    await scope.scrollIntoViewIfNeeded()
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'settings fit ' + width)
+    if (process.env.PANTRY_PROOF_DIR) await page.screenshot({ path: `${process.env.PANTRY_PROOF_DIR}/api001-settings-${width}.png`, fullPage: true })
+    await row.getByRole('button', { name: 'Revoke', exact: true }).click()
+    await row.getByText('Revoked', { exact: true }).waitFor()
+    assert.equal((await context.request.get(`${app.origin}/api/pantry/integration/v1/reports/profit-and-loss?to=2026-10-31`, { headers })).status(), 401)
+    if (process.env.PANTRY_PROOF_DIR) await page.screenshot({ path: `${process.env.PANTRY_PROOF_DIR}/api001-revoked-${width}.png`, fullPage: true })
+    assert.deepEqual(errors, [])
+    await context.close()
+  }
+})

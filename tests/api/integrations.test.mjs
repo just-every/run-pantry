@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { books, harness } from './harness.mjs'
 
+const financialReports = ['trial-balance', 'general-ledger', 'profit-and-loss', 'balance-sheet', 'sales-by-customer', 'expenses-by-vendor', 'sales-by-item', 'cash-flow', 'sales-tax', 'receivables', 'payables', 'receivables-summary', 'payables-summary', 'open-invoices', 'unpaid-bills', 'customer-balances', 'vendor-balances', 'transactions', 'journal', 'deposits', 'check-detail', 'reconciliations', 'contractor-summary']
+
 test('REPORT-002 / API-001 a scoped sibling posts once, readies its bill, reads payment after owner expiry, and loses access on revocation', async t => {
   const h = await harness(); t.after(h.close)
   const { acct } = await books(h)
@@ -135,6 +137,7 @@ test('API-001 OpenAPI discovery describes the implemented v1 doors and invoice-o
   const server = schema.servers[0].url
   assert.equal(server, base)
   assert.equal(schema.openapi, '3.1.0')
+  assert.equal(schema.paths['/reports/trial-balance'].get.operationId, 'getTrialBalance', 'existing discovery operation stays compatible')
   assert.deepEqual(schema.security, [{ integrationBearer: [] }])
   assert.match(schema.info.description, /remain unimplemented/)
   // The caller discovers paths and required headers from the public document.
@@ -176,7 +179,7 @@ test('API-001 OpenAPI discovery describes the implemented v1 doors and invoice-o
   assert.equal((await request(invoicePath + '?number=MAPLE')).value.invoices.length, 0, 'filters match the whole value')
   for (const limit of ['0', '101', '1.5', 'no']) assert.equal((await request(invoicePath + '?limit=' + limit)).status, 400)
   // The specification names each existing read and write door, without promising new record kinds.
-  assert.deepEqual(Object.keys(schema.paths).sort(), ['/openapi.json', '/state', '/contacts', '/bills', '/invoices', '/journals', '/documents', '/documents/{id}', '/payments', '/bills/{id}/readiness', '/reports/trial-balance'].sort())
+  assert.deepEqual(Object.keys(schema.paths).sort(), ['/openapi.json', '/state', '/contacts', '/bills', '/invoices', '/journals', '/documents', '/documents/{id}', '/payments', '/bills/{id}/readiness', ...financialReports.map(kind => '/reports/' + kind)].sort())
   const calls = (await h.view('integrations')).calls
   assert.ok(calls.some(c => c.path === base + '/openapi.json' && c.status === 200))
   assert.ok(calls.some(c => c.path === base + journalPath && c.status === 403))
@@ -278,4 +281,82 @@ test('API-001 documented per-credential UTC-minute limits are atomic, durable, i
   assert.equal(revoked.status, 401)
   assert.equal(revoked.headers.get('x-ratelimit-limit'), null, 'revocation precedes quota admission')
   assert.deepEqual(await budgetRow(), beforeRevoked)
+})
+
+
+test('API-001 / REPORT-002 scoped financial reports read native nonzero books, bases, columns and filters with no posting or cross-scope access', async t => {
+  const h = await harness(); t.after(h.close)
+  const { acct } = await books(h)
+  const bank = await h.command('bank-account.save', { name: 'Workshop checking', institution: 'Community Bank', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-01-01', openingBalance: '0.00' })
+  const customer = await h.command('contact.save', { kind: 'customer', name: 'Maple Street Workshop' })
+  const vendor = await h.command('contact.save', { kind: 'vendor', name: 'Cedar Office Supplies' })
+  const tax = await h.command('tax-code.save', { name: 'NY fixture tax', rate: '10', accountId: acct['2200'], state: 'NY' })
+  const invoice = await h.command('invoice.save-draft', { customerId: customer.id, number: 'MAPLE-REPORT-1', issueDate: '2026-10-05', lines: [{ description: 'Workshop design', rate: '1000.00', quantity: '1', accountId: acct['4000'], taxCode: tax.id }] })
+  await h.command('invoice.approve', { id: invoice.id, revision: invoice.revision })
+  await h.command('invoice.issue', { id: invoice.id })
+  await h.command('payment.record', { direction: 'received', contactId: customer.id, date: '2026-10-10', amount: '550.00', method: 'ach', bankAccountId: bank.id, allocations: [{ targetId: invoice.id, amount: '550.00' }] })
+  const bill = await h.command('bill.save', { vendorId: vendor.id, reference: 'CEDAR-REPORT-1', billDate: '2026-10-06', post: true, lines: [{ description: 'Supplies', accountId: acct['6300'], amount: '200.00' }] })
+  await h.command('payment.record', { direction: 'paid', contactId: vendor.id, date: '2026-10-11', amount: '50.00', method: 'check', bankAccountId: bank.id, allocations: [{ targetId: bill.id, amount: '50.00' }] })
+  const journal = await h.command('journal.save-draft', { date: '2026-10-12', memo: 'Workshop bank fee', lines: [{ accountId: acct['6400'], debit: '10.00' }, { accountId: acct['1000'], credit: '10.00' }] })
+  await h.command('journal.post', { id: journal.id, revision: journal.revision })
+  const reader = await h.command('integration.create', { name: 'Workshop financial reporting', scopes: ['reports:read'] })
+  const invoicesOnly = await h.command('integration.create', { name: 'Workshop invoices only', scopes: ['invoices:write'] })
+  const base = '/api/pantry/integration/v1'
+  const call = (path, token = reader.token) => h.send(base + path, undefined, { headers: { authorization: `Bearer ${token}` } })
+  const range = 'from=2026-10-01&to=2026-10-31'
+  const before = await h.view('journal')
+  const requestCount = await h.db.prepare('SELECT COUNT(*) AS n FROM pt_integration_requests').first()
+  for (const kind of financialReports) {
+    for (const basis of ['cash', 'accrual', undefined]) {
+      const query = range + (basis ? '&basis=' + basis : '')
+      const scoped = await call('/reports/' + kind + '?' + query)
+      assert.equal(scoped.status, 200, `${kind}/${basis}: ${JSON.stringify(scoped.value)}`)
+      assert.deepEqual(scoped.value, await h.view('reports/' + kind + '?' + query), `${kind}/${basis} matches the native public report`)
+      assert.equal(scoped.headers.get('x-ratelimit-limit'), '120')
+      assert.equal(scoped.headers.get('cache-control'), 'no-store')
+      if (kind === 'profit-and-loss') assert.equal(scoped.value.netIncome, basis === 'accrual' ? 79000 : 44000, 'part-paid documents differ on the declared cash default')
+      if (kind === 'receivables') assert.equal(scoped.value.basis, 'accrual', 'open items retain their actual semantic basis')
+      if (kind === 'contractor-summary') assert.equal(scoped.value.basisLabel, 'Payment basis')
+      if (kind === 'reconciliations') assert.equal(scoped.value.basis, 'accrual')
+    }
+    assert.equal((await call('/reports/' + kind + '?' + range, invoicesOnly.token)).status, 403, kind + ' requires the report scope')
+  }
+  for (const [kind, query] of [
+    ['general-ledger', '&account=' + acct['4000']],
+    ['transactions', '&account=' + acct['1000'] + '&payee=' + customer.id],
+    ['journal', '&account=' + acct['1000'] + '&payee=' + vendor.id],
+    ['profit-and-loss', '&columns=prior-period'],
+    ['profit-and-loss', '&columns=customer'],
+    ['balance-sheet', '&columns=months'],
+  ]) {
+    const path = 'reports/' + kind + '?' + range + '&basis=cash' + query
+    const scoped = await call('/' + path)
+    assert.equal(scoped.status, 200, JSON.stringify(scoped.value))
+    assert.deepEqual(scoped.value, await h.view(path), 'filter/column selection survives the scoped door: ' + path)
+    if (kind === 'general-ledger') assert.deepEqual(scoped.value.accounts.map(a => a.id), [acct['4000']])
+    if (kind === 'transactions' || kind === 'journal') assert.ok(scoped.value.rows.length > 0, 'filtered source rows are present')
+  }
+  // Date defaults, the declared tax method and an explicit choice use the native rules too.
+  assert.deepEqual((await call('/reports/profit-and-loss?to=2026-10-31')).value, await h.view('reports/profit-and-loss?to=2026-10-31'))
+  const entity = (await h.view('state')).settings.entity
+  await h.command('entity.save', { legalName: entity.legal_name, entityType: entity.entity_type, state: entity.state, fiscalYearStart: entity.fiscal_year_start, taxMethod: 'accrual', booksStart: entity.books_start, policies: entity.policies, revision: entity.revision })
+  assert.equal((await call('/reports/profit-and-loss?' + range)).value.netIncome, 79000)
+  assert.equal((await call('/reports/profit-and-loss?' + range + '&basis=cash')).value.netIncome, 44000)
+  for (const query of ['basis=other', 'to=2026-02-30', 'from=not-a-date', 'columns=unknown']) {
+    const params = new URLSearchParams(range), [key, value] = query.split('='); params.set(key, value)
+    assert.equal((await call('/reports/profit-and-loss?' + params)).status, 400, query)
+  }
+  for (const kind of ['audit-log', 'contractors', 'unknown', '__proto__']) assert.equal((await call('/reports/' + kind + '?' + range)).status, 404, 'only listed financial reports: ' + kind)
+  assert.equal((await h.send(base + '/reports/profit-and-loss?' + range, undefined, { cookie: h.owner })).status, 401)
+  assert.equal((await h.send('/api/pantry/reports/profit-and-loss?' + range, undefined, { headers: { authorization: `Bearer ${reader.token}` } })).status, 401)
+  assert.equal((await h.send(base + '/journals', { date: '2026-10-01', memo: 'Report reader cannot write', lines: [] }, { headers: { authorization: `Bearer ${reader.token}`, 'idempotency-key': 'report-reader-write' } })).status, 403)
+  assert.deepEqual(await h.view('journal'), before, 'reads never post or change journals')
+  assert.deepEqual(await h.db.prepare('SELECT COUNT(*) AS n FROM pt_integration_requests').first(), requestCount, 'reads never claim write idempotency keys')
+  const calls = (await h.view('integrations')).calls
+  assert.ok(calls.some(c => c.path.endsWith('/reports/profit-and-loss') && c.status === 200))
+  assert.ok(calls.some(c => c.path.endsWith('/reports/audit-log') && c.status === 404))
+  assert.ok(calls.some(c => c.path.endsWith('/reports/balance-sheet') && c.status === 403))
+  await h.command('integration.revoke', { id: reader.id })
+  assert.equal((await call('/reports/profit-and-loss?' + range)).status, 401)
+  assert.equal((await call('/reports/transactions?' + range)).status, 401)
 })

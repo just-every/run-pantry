@@ -1,5 +1,6 @@
 // API-001: the implemented scoped transport, not the larger target contract.
 // Schemas describe wire values; native parsers still enforce accounting rules.
+import { FINANCIAL_REPORTS } from '../report-reader'
 import { INTEGRATION_REQUESTS_PER_MINUTE } from './rate-limit'
 
 type Schema = Record<string, unknown>
@@ -44,7 +45,14 @@ for (const spec of [
 }
 paths['/documents/{id}'] = { get: { ...operation('downloadDocument', 'Download original document bytes', ['documents:write'], {}, [id]), responses: { 200: { description: 'Original bytes with the stored media type and attachment filename.', headers: rateHeaders, content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } } }, ...errors } } }
 paths['/bills/{id}/readiness'] = { post: operation('setBillReadiness', 'Record receipt and readiness of a posted bill', ['bills:write'], ref('Record'), [id, key], 'ReadinessInput', 'Both booleans are required. Ready requires received. This creates no payment; native period locks apply.') }
-paths['/reports/trial-balance'] = { get: operation('getTrialBalance', 'Read the trial balance on the chosen basis', ['reports:read'], object({ basis: { enum: ['cash', 'accrual'] }, rows: array(object({})) }), [query('to', day, 'Inclusive end date; defaults to today in UTC.'), query('basis', { enum: ['cash', 'accrual'] }, 'Defaults to the declared tax method, or accrual when undeclared. An explicit choice wins.')]) }
+for (const kind of FINANCIAL_REPORTS) paths[`/reports/${kind}`] = { get: operation(kind === 'trial-balance' ? 'getTrialBalance' : `getReport_${kind.replaceAll('-', '_')}`, `Read ${kind}`, ['reports:read'], kind === 'trial-balance' ? object({ basis: { enum: ['cash', 'accrual'] }, rows: array(object({})) }) : object({}), [
+  query('to', day, 'Inclusive end date; defaults to today in UTC.'),
+  query('from', day, 'Inclusive start date; defaults to the first day of the to month. As-of reports use to.'),
+  query('basis', { enum: ['cash', 'accrual'] }, 'Explicit choice wins; omitted basis uses the declared tax method, or accrual when undeclared. Open items/reconciliation remain accrual, contractor-summary uses payment basis, and indirect cash flow starts from accrual net income.'),
+  query('account', string, 'Ledger account filter for general-ledger, transactions and journal.'),
+  query('payee', string, 'Exact contact ID filter for transactions and journal.'),
+  query('columns', { enum: ['single', 'prior-period', 'prior-year', 'months', 'quarters', 'ytd', 'customer'] }, 'Statement column mode; customer columns apply to profit-and-loss only.'),
+], undefined, 'Returns the same native report fields, integer-cent figures, basis labels, source links and date-range semantics as the corresponding session-authenticated report. Links target the native app and retain its session requirements. This scope does not expose audit history, full TIN exports, custom-report shares, close packages or other native routes. No pagination applies to calculated report results.') }
 
 export const integrationOpenApi = {
   openapi: '3.1.0',

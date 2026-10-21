@@ -19,7 +19,7 @@ The credential cannot sign in as a person. It keeps working after the owner sign
 | `documents:write` | Read document records and upload documents. |
 | `payments:read` | Read payments and their allocations to bills or invoices. |
 | `payments:write` | Read payments and record external payments and their allocations, with the additional `post` grant. |
-| `reports:read` | Read the trial balance. |
+| `reports:read` | Read the 23 financial reports listed below, with native basis, range, column and filter semantics. |
 | `post` | In addition to a record's write scope, post bills, journals or external payments, or issue invoices and credits. |
 
 A `:write` scope includes reading that record type. It does not grant access to the other record types. The `post` scope alone grants no record access. Without `post`, created bills, invoices and journals stay drafts for a person to review and post or issue in Pantry.
@@ -61,6 +61,25 @@ All paths below follow `/api/pantry/integration/v1/`. List responses contain the
 Bill and invoice readbacks include `open_cents`. Read payment allocations to see which payment was applied to which record. A reversed payment has a `reversal_id`; its allocations no longer reduce the open balance, so the bill or invoice reopens for that amount. Do not infer payment from a bill's readiness flag.
 
 Each `bankAccounts` row contains `id`, `name`, `account_id`, `institution`, `number_last4`, `ledger_code` and `ledger_name`. Have the owner select the existing bank or Stripe clearing account that received the money, then use its `id` as `bankAccountId`. This route does not create accounts or expose routing details.
+
+### Financial reports (API-001 / REPORT-002)
+
+`GET reports/:kind` requires `reports:read`. It returns the corresponding native report object, with integer-cent figures and source links. Source links open the native app and still require a person's authorized session. The supported `kind` values are:
+
+| Group | Report kinds |
+| --- | --- |
+| Statements and ledger | `trial-balance`, `general-ledger`, `profit-and-loss`, `balance-sheet` |
+| Sales, expenses and tax | `sales-by-customer`, `expenses-by-vendor`, `sales-by-item`, `sales-tax` |
+| Cash and open items | `cash-flow`, `receivables`, `payables`, `receivables-summary`, `payables-summary`, `open-invoices`, `unpaid-bills`, `customer-balances`, `vendor-balances` |
+| Financial report library | `transactions`, `journal`, `deposits`, `check-detail`, `reconciliations`, `contractor-summary` |
+
+`to` defaults to today in UTC; `from` defaults to the first day of that month. Dates are inclusive; as-of reports use `to`. `basis=cash|accrual` overrides the declared tax method; an undeclared method defaults to accrual. Open items and reconciliations retain their accrual labels, the contractor summary uses payment basis, and indirect cash flow starts from accrual net income. Invalid bases are refused, including for fixed-basis reports.
+
+`general-ledger` accepts `account`. The `transactions` and `journal` library reports accept `account` and `payee` (an exact contact ID). Statements accept `columns=single|prior-period|prior-year|months|quarters|ytd`; profit-and-loss also accepts `customer`. These use the same validation and calculations as native reports. Calculated reports are not record lists and have no cursor pagination.
+
+For example, read `reports/profit-and-loss?from=2026-10-01&to=2026-10-31&basis=cash&columns=prior-period`. The OpenAPI document names every supported report path and its parameters. Reads use the same credential budget and call history as the other v1 routes. They create no journal or idempotency claim.
+
+This transport does not expose the native audit-history report, full-TIN filing CSV, custom-report shares, close packages or native export routes. A report credential cannot use the people API or write records. Wider record coverage and signed outbound webhooks with retries and delivery history remain API-001 gaps.
 
 ## Write records
 

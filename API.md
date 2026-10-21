@@ -63,7 +63,7 @@ The machine-readable OpenAPI 3.1 document is `GET /api/pantry/integration/v1/ope
 
 See [Sibling integrations](docs/integrations.md) for owner-created scoped credentials, idempotent writes, record reads, bill readiness and a complete `curl` example. Integration credentials use this separate API and cannot sign in as people or use the proposal-only agent API.
 
-Financial reports and `/api/pantry/reports/:kind/export?from=&to=&basis=&format=pdf|csv` use the declared tax method when basis is omitted, or the explicit cash/accrual choice. The scoped integrations trial balance uses the same choice/default under its existing `reports:read` scope. Open-item ageing remains accrual, 1099 reports use payment basis, and indirect cash flow starts from accrual net income.
+Financial reports and `/api/pantry/reports/:kind/export?from=&to=&basis=&format=pdf|csv` use the declared tax method when basis is omitted, or the explicit cash/accrual choice. The scoped integrations `reports/:kind` door exposes the 23 financial reports listed in [Sibling integrations](docs/integrations.md#financial-reports-api-001--report-002), with native range, filter, column and basis semantics under the existing `reports:read` scope. Its OpenAPI document names each supported report path. Audit history, full-TIN exports, custom-report shares, close packages and native export routes remain outside this scoped surface. Open-item ageing remains accrual, 1099 reports use payment basis, and indirect cash flow starts from accrual net income.
 
 ## Products and services (ITEM-001)
 

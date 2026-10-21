@@ -9,7 +9,7 @@ import { documentFile } from '../documents'
 import { invoice } from '../invoices'
 import { entry } from '../journal'
 import { bill } from '../payables'
-import { trialBalance } from '../reports'
+import { FINANCIAL_REPORTS, readReport } from '../report-reader'
 import { reportBasis } from '../basis'
 import { identify } from './credentials'
 import { integrationOpenApi } from './openapi'
@@ -119,10 +119,13 @@ integrations.get('/payments', async c => {
   await run(ctx.db, [authority(ctx.actor, 'read')])
   return c.json({ payments: await Promise.all(p.rows.map(p => payment(ctx.db, p.id))), nextCursor: p.nextCursor })
 })
-integrations.get('/reports/trial-balance', async c => {
-  const ctx = context(c, 'reports:read'), to = date(c.req.query('to') ?? new Date().toISOString().slice(0, 10))
+integrations.get('/reports/:kind', async c => {
+  const ctx = context(c, 'reports:read'), kind = c.req.param('kind')
+  requireThat(FINANCIAL_REPORTS.includes(kind), 'Unknown financial report', 404)
+  const to = date(c.req.query('to') ?? new Date().toISOString().slice(0, 10), 'to')
+  const from = date(c.req.query('from') ?? to.slice(0, 8) + '01', 'from')
   await run(ctx.db, [authority(ctx.actor, 'read')])
-  return c.json(await trialBalance(ctx.db, to, await reportBasis(ctx.db, c.req.query('basis'))))
+  return c.json(await readReport(ctx.db, kind, { from, to, basis: await reportBasis(ctx.db, c.req.query('basis')), account: c.req.query('account'), payee: c.req.query('payee'), columns: c.req.query('columns') }))
 })
 
 const document = (db: D1Database, id: string) => one(db, 'SELECT id,name,media_type,size,sha256,linked_kind,linked_id,note,uploaded_by,uploaded_at FROM pt_documents WHERE id = ?', id).then(r => r!)

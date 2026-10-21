@@ -31,17 +31,13 @@ import { continuousCheckCommands, continuousChecksView } from './continuous/run'
 import { proposalCommands, proposalsView, agentContext, fileProposal, proposal } from './proposals'
 import { moveInCommands, moveInView } from './cutover/commands'
 import { xeroRoutes } from './cutover/xero-attachments'
-import { ageing, balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports'
 import { basisOf, reportBasis, BASIS_LABEL } from './basis'
 import { reportFigure, type FigureQuery } from './report-figures'
 import { cashFlow, cashFlowCommands, cashFlowCsv, cashFlowDetail } from './cash-flow'
-import { contactTotals } from './contact-totals'
-import { statementColumns } from './statement-columns'
 import { reportExport } from './report-export'
 import { isLibrary, libraryReport } from './report-library'
 import { libraryExport } from './report-library/export'
 import { recordView } from './records'
-import { salesTax } from './sales-tax'
 import { contractorCommands, contractors, necCsv } from './contractors'
 import { accountantPackage, ledgerCsv } from './package'
 import { packageZip } from './package-files'
@@ -86,7 +82,7 @@ import { budgetReport, budgetCsv } from './budgets/report'
 import { checkCommands, checksView } from './checks/commands'
 import { checksRoutes } from './checks/routes'
 import { itemCommands } from './items/commands'
-import { salesByItem } from './items/report'
+import { readReport } from './report-reader'
 import { customReportCommands } from './custom-reports/commands'
 import { registerCustomReportRoutes } from './custom-reports/routes'
 
@@ -213,20 +209,8 @@ api.get('/api/pantry/reports/:kind/export', async c => {
   return reportExport(ctx.db, c.req.param('kind')!, from, to, await reportBasis(ctx.db, c.req.query('basis')), c.req.query('format') ?? 'pdf', c.req.query('columns'), c.req.query('account'))
 })
 view('reports/:kind', async (ctx, c) => {
-  const kind = c.req.param('kind')!, to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01'), basis = await reportBasis(ctx.db, c.req.query('basis'))
-  if (isLibrary(kind)) return libraryReport(ctx.db, kind, from, to, basis, c.req.query('account'), c.req.query('payee'))
-  const e = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
-  if (kind === 'sales-by-customer' || kind === 'expenses-by-vendor') return contactTotals(ctx.db, kind === 'sales-by-customer' ? 'customer' : 'vendor', from, to, basis)
-  if (kind === 'sales-by-item') return salesByItem(ctx.db, from, to, basis)
-  if (kind === 'cash-flow') return cashFlow(ctx.db, from, to)
-  if (kind === 'trial-balance') return trialBalance(ctx.db, to, basis)
-  if (kind === 'general-ledger') return generalLedger(ctx.db, from, to, c.req.query('account') || undefined, basis)
-  if ((kind === 'profit-and-loss' || kind === 'balance-sheet') && c.req.query('columns') && c.req.query('columns') !== 'single') return statementColumns(ctx.db, kind, c.req.query('columns')!, from, to, Number(e?.fiscal_year_start ?? 1), basis)
-  if (kind === 'profit-and-loss') return profitAndLoss(ctx.db, from, to, basis)
-  if (kind === 'balance-sheet') return balanceSheet(ctx.db, to, Number(e?.fiscal_year_start ?? 1), basis)
-  if (kind === 'sales-tax') return salesTax(ctx.db, from, to, basis)
-  if (kind === 'receivables' || kind === 'payables') return ageing(ctx.db, kind === 'receivables' ? 'receivable' : 'payable', to)
-  throw new Fault(404, 'Unknown report')
+  const to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
+  return readReport(ctx.db, c.req.param('kind')!, { from, to, basis: await reportBasis(ctx.db, c.req.query('basis')), account: c.req.query('account'), payee: c.req.query('payee'), columns: c.req.query('columns') })
 })
 
 // The 1099-NEC filing file carries full TINs: the owner or someone with the posting grant, audited.
