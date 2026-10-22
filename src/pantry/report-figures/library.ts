@@ -78,10 +78,10 @@ async function proofRows(db: D1Database, statementId: string, index: number, dim
     if(index===6)return {rows:selected.clearedRows,scopeNote}
     return {rows:[...(dimension.value===''?[statement('closing',selected.closing)]:[]),...less(selected.clearedRows,'cleared')],scopeNote}
   }
-  const book = await reportSourceRows(db, { accountId: state.bank.account_id, types: [], from: FIRST_DAY, to: state.statement.end_date, sign: 1 }, 'accrual')
+  const book = (await dimensionReconciliation(db,state)).bookRows
   const outstanding = new Set((proof.outstanding as Data[]).map(o => o.id))
   const cleared = book.filter(r => !outstanding.has(r.key))
-  const scopeNote = state.completed ? 'Saved proof of the completed reconciliation; ledger lines are read through the statement end date.' : 'Unfinished reconciliation: the current proof.'
+  const scopeNote = state.completed ? 'Saved proof of the completed reconciliation; ledger lines are read through the statement end date as of completion.' : 'Unfinished reconciliation: the current proof.'
   if (index === 2) return { rows: [statement('opening', proof.opening)], scopeNote }
   if (index === 3) return { rows: [statement('closing', proof.closing)], scopeNote }
   if (index === 4) return { rows: book, scopeNote }

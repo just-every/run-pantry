@@ -307,6 +307,10 @@ export async function dimensionReconciliationReports(t) {
  for(const index of whole.moneyColumns)assert.equal(pieces.reduce((n,r)=>n+r.rows[0].cells[index],0),whole.rows[0].cells[index])
  await post('7',tags)
  assert.deepEqual((await h.view('reports/reconciliations?'+new URLSearchParams({...q,dimension:'class',dimensionValue:'value:Studio'}))).rows[0].cells,pieces[0].rows[0].cells,'later backdated postings do not change the saved dimension contribution')
+ for(const index of whole.moneyColumns) {
+  const detail=await h.view('reports/detail?'+new URLSearchParams({...q,report:'reconciliations',line:JSON.stringify([imported.statement.id,String(index)])}))
+  assert.equal(detail.ties,true);assert.equal(detail.figure,whole.rows[0].cells[index],'whole saved proof source figures also exclude later backdated postings')
+ }
 
 
 }

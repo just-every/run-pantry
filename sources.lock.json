@@ -3224,7 +3224,7 @@
       "executable": false
     },
     "src/pantry/dimensions/reconciliation.ts": {
-      "sha256": "72da39a70343b7267eaec500b615c49d1d6d3b9f66301a46de3ca06d7470085d",
+      "sha256": "8a7fd1853efbc56cdd5f2812a89313046c3b8161dc76de68ca6d1a3185f73af5",
       "executable": false
     },
     "src/pantry/dimensions/report.ts": {
@@ -3880,7 +3880,7 @@
       "executable": false
     },
     "src/pantry/report-figures/library.ts": {
-      "sha256": "6c040142e356cfbb94785931f585410d2ee97cd57f362a401d77a3dc763eec38",
+      "sha256": "b253e65ce15f7230e75628193b96fd89341e93710de1fc20d2823de066fc6060",
       "executable": false
     },
     "src/pantry/report-figures/open-items.ts": {
@@ -4816,7 +4816,7 @@
       "executable": false
     },
     "tests/api/dimension-extensions.mjs": {
-      "sha256": "6f61fdb7e118c240cea04d90762b75b8c7421f91d8bef90981917695e06718ed",
+      "sha256": "64d7623c4a8915836409add26acd31075bf0fe171a73e89b21d7aceb6741bcc7",
       "executable": false
     },
     "tests/api/dimensions-journey.mjs": {
