@@ -3,6 +3,7 @@ import { Action, Card, Chip, command, Details, Loading, Metrics, Table, day, usd
 import { EstimateDocumentPreview, EstimateEditor } from './estimate-editor'
 import { EstimateProgress } from './estimate-progress'
 import { DeliveryChip } from './invoice-delivery'
+import { EstimateSiblings } from './estimate-siblings'
 
 function EstimatePanel({ estimate: e, deposits, onEdit, onChange }: { estimate: D; deposits: D[]; onEdit: () => void; onChange: () => Promise<void> }) {
   const { state } = useShared(), who = useWho(), [reviewed, setReviewed] = useState(false)
@@ -35,6 +36,7 @@ function EstimatePanel({ estimate: e, deposits, onEdit, onChange }: { estimate: 
       <Details facts={{ revision: e.revision, 'prepared by': who(e.prepared_by), sent: e.sent_at, 'PDF SHA-256': e.pdf_sha256 }} code={['revision', 'PDF SHA-256']} />
     </Card></div>
     <EstimateProgress key={e.id + e.revision + e.billed_cents} estimate={e} deposits={deposits} onDone={onChange} />
+    <EstimateSiblings estimate={e} onChange={onChange} />
     <Card title="Estimate email history">
       <p className="hint">Provider acceptance does not confirm delivery or reading. Local messages are suppressed.</p>
       <Table heads={['When', 'Recipient', 'Outcome', 'Details']} empty="This estimate has not been emailed.">

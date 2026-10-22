@@ -1,8 +1,9 @@
 import { all, one, q, guard, type Sql } from '../db'
 import { sha256, type Data } from '../core'
 import { supportingBooks } from './retention-clock'
+import { siblingCustodyRows } from '../estimates/siblings/custody'
 
-export type RetentionTable = 'pt_documents' | 'pt_invoice_documents' | 'pt_estimate_documents' | 'pt_contractor_tax'
+export type RetentionTable = 'pt_documents' | 'pt_invoice_documents' | 'pt_estimate_documents' | 'pt_estimate_sibling_links' | 'pt_contractor_tax'
 export type RetentionItem = { table: RetentionTable; id: string; clock: string; expires: string; action: 'retained'; reason: string; revision: string; sha256?: string }
 export const WARNING = 'IRS Publication 583: generally 3 years; employment-tax records 4 years; an omission of more than 25% of income 6 years; bad-debt or worthless-securities claims 7 years; indefinitely if no return was filed. No legal adequacy is asserted.'
 
@@ -21,12 +22,13 @@ export const itemKey = (item: Pick<RetentionItem, 'table' | 'id'>) => `${item.ta
 export const policy = (db: D1Database) => one<Data>(db, 'SELECT years,revision FROM pt_retention_settings WHERE id=1').then(p => p!)
 
 export async function subjectRetention(db: D1Database, contactId: string, years?: number, sharedBooks?: ReturnType<typeof supportingBooks>) {
-  const [books, settings, docs, invoices, tax, estimates] = await Promise.all([
+  const [books, settings, docs, invoices, tax, estimates, siblings] = await Promise.all([
     sharedBooks ?? supportingBooks(db), policy(db),
     all(db, 'SELECT id,sha256,linked_kind,linked_id,name,note,erased_at FROM pt_documents'),
     all(db, 'SELECT d.invoice_id AS id,d.issued_revision,d.sha256,d.erased_at,i.customer_id FROM pt_invoice_documents d JOIN pt_invoices i ON i.id=d.invoice_id'),
     one(db, 'SELECT contact_id AS id,revision,erased_at FROM pt_contractor_tax WHERE contact_id=?', contactId),
     all(db,"SELECT d.estimate_id||':'||d.revision AS id,d.estimate_id,d.revision,d.sha256,d.erased_at FROM pt_estimate_documents d JOIN pt_estimates e ON e.id=d.estimate_id WHERE e.customer_id=?",contactId),
+    siblingCustodyRows(db, contactId),
   ])
   const period = years ?? settings.years, subjectEvents = books.closure(books.contacts.get(contactId) ?? [])
   const items: RetentionItem[] = []
@@ -46,6 +48,7 @@ export async function subjectRetention(db: D1Database, contactId: string, years?
   }))
   await Promise.all(invoices.filter(i => i.customer_id === contactId).map(i => add('pt_invoice_documents', i, books.clock(books.record('invoice', i.id)))))
   await Promise.all(estimates.map(e=>add('pt_estimate_documents',e,books.clock(books.record('estimate',e.estimate_id)))))
+  await Promise.all(siblings.map(e=>add('pt_estimate_sibling_links',{...e,sha256:e.pdf_sha256??e.proof_sha256},books.clock(books.record('estimate',e.estimate_id)))))
   if (tax) {
     await add('pt_contractor_tax', tax, books.clock(subjectEvents))
     valueGuards.push(guard('EXISTS(SELECT 1 FROM pt_contractor_tax WHERE contact_id=? AND revision=? AND erased_at IS ?)', tax.id, tax.revision, tax.erased_at))

@@ -3,6 +3,8 @@ import { resource } from './model'
 // Owner-selected read scopes expose business records, never acceptance links,
 // IP addresses, retained document bytes or editable pricing/input snapshots.
 export const estimateResources = [
+  resource('estimate-sibling-links', 'estimate-sibling-links:read', 'pt_estimate_sibling_links', 'id,estimate_id,estimate_revision,provider,remote_revision,proof_sha256,pdf_sha256,attached_at,erased_at',
+    { estimateId: 'estimate_id', provider: 'provider' }, 'Owner-selected signature/proposal association and retained proof hashes only; excludes source origin, remote ID, personal summary, signed bytes and source credentials.'),
   resource('estimates', 'estimates:read', 'pt_estimates', 'id,number,customer_id,issue_date,due_date,status,total_cents,prepared_by,revision,created_at,sent_at,accepted_name,accepted_at,accepted_revision,erased_at',
     { customerId: 'customer_id', number: 'number', status: 'status', date: 'issue_date' }, 'Estimate identity, amount and typed-name acceptance metadata; no acceptance IP, customer bearer link or saved input.'),
   resource('estimate-conversions', 'estimates:read', 'pt_estimate_conversions', 'id,estimate_id,estimate_revision,invoice_id,mode,amount_cents,milestone,created_at',

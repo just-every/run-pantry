@@ -5,6 +5,7 @@ import type { Data } from '../core'
 import { scrub } from './personal'
 import { retentionItems } from './retention-items'
 import { estimateCopies } from '../estimates/erasure'
+import { siblingCopies } from '../estimates/siblings/erasure'
 import { timeCopies } from './time'
 import { supportingBooks } from './retention-clock'
 
@@ -54,7 +55,7 @@ const FIELDS: Record<string, string[]> = {
 const JSON_FIELDS = new Set(['facts', 'choices', 'pending', 'read_vendor_details', 'read_draft_fields', 'read_match_fields', 'payload', 'refs', 'evidence', 'document_template', 'document_values', 'self_approval', 'lines', 'splits', 'feed_snapshot', 'details', 'candidates', 'snapshot', 'left_out', 'definition', 'settings', 'recipients', 'setting'])
 // Their scoped trigger exceptions and metadata are owned by the caller. Never
 // attempt a generic update through an immutable accounting/history door.
-const CALLER_OWNED = new Set(['pt_contacts', 'pt_members', 'pt_audit', 'pt_approvals', 'pt_journal_entries', 'pt_journal_lines', 'pt_invoice_documents', 'pt_documents', 'pt_document_parts', 'pt_voided_reconciliations', 'pt_reconciliation_undos', 'pt_line_suggestion_decisions', 'pt_time_entries', 'pt_time_projects','pt_estimates','pt_estimate_documents'])
+const CALLER_OWNED = new Set(['pt_contacts', 'pt_members', 'pt_audit', 'pt_approvals', 'pt_journal_entries', 'pt_journal_lines', 'pt_invoice_documents', 'pt_documents', 'pt_document_parts', 'pt_voided_reconciliations', 'pt_reconciliation_undos', 'pt_line_suggestion_decisions', 'pt_time_entries', 'pt_time_projects','pt_estimates','pt_estimate_documents','pt_estimate_sibling_previews','pt_estimate_sibling_links','pt_estimate_sibling_attempts'])
 
 function replacement(value: unknown, column: string, input: Input): unknown {
   if (typeof value !== 'string') return value
@@ -174,6 +175,11 @@ export async function eraseCopies(db: D1Database, input: Input) {
     for (const part of parts) removed.push({ table: 'pt_document_parts', key: { document_id: row.id, seq: part.seq } })
   }
   const est=await estimateCopies(db,input)
+  const sibling = await siblingCopies(db,input)
+  statements.push(...sibling.statements)
+  removed.push(...sibling.removed)
+  for(const [table,values] of Object.entries(sibling.counts))counts[table]={...counts[table],...values}
+  for(const id of sibling.affectedRecordIds)affectedRecordIds.add(id)
   statements.push(...est.statements)
   for(const [table,values] of Object.entries(est.counts))counts[table]={...counts[table],...values}
   for(const id of est.affectedRecordIds)affectedRecordIds.add(id)

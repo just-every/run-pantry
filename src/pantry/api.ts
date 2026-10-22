@@ -93,6 +93,7 @@ import { runWebhooks } from './webhooks/deliver'
 import { dataFlows } from './data-flows'
 import { recordReportIssue } from './effects/issues'
 import { FIRST_DAY } from './report-sources'
+import { siblingCommands, siblingsView, siblingArtifact } from './estimates/siblings'
 import { assertDoor, projectAccess } from './access-policy/doors'
 import { accessPolicyCommands } from './access-policy/settings'
 import { timeCommands, timeView } from './time/commands'
@@ -100,6 +101,7 @@ import { estimateCommands, estimatesView, estimate, registerEstimateRoutes } fro
 import { customerDepositCommands, customerDepositsView } from './customer-deposits'
 
 const commands: Record<string, Command> = {
+  ...siblingCommands,
   ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
@@ -148,6 +150,11 @@ view('integrations', async (ctx, c) => { must(ctx.actor, 'owner'); return integr
 const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10)) => date(c.req.query(name) ?? fallback, name)
 
 registerEstimateRoutes(api, reader)
+view('estimates/:id/siblings', async (ctx, c) => siblingsView(ctx, c.req.param('id')!))
+api.get('/api/pantry/estimate-siblings/:id/document', async c => {
+  const document = await siblingArtifact(await reader(c), c.req.param('id'))
+  return new Response(document.bytes, { headers: { 'content-type': document.mediaType, 'content-disposition': `inline; filename="${document.name}"`, 'content-security-policy': "default-src 'none'; sandbox" } })
+})
 view('estimates', async ctx => estimatesView(ctx))
 view('estimates/:id', async (ctx, c) => estimate(ctx.db, c.req.param('id')!))
 view('customer-deposits', async ctx => customerDepositsView(ctx))

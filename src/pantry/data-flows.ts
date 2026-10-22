@@ -24,6 +24,8 @@ export async function dataFlows(c: Context) {
   ])
   const mailProvider=String(c.env.MAIL_PROVIDER??'development')
   const states: Record<string, { connected: boolean; detail: string; unavailable?: string }> = {
+    inkwell: { connected: false, detail: 'Owner-requested previews only; no saved credential or ongoing connection' },
+    platter: { connected: false, detail: 'Owner-requested previews only; no saved credential or ongoing connection' },
     hosting: {connected:c.env.AUTH_LOCAL!=='true',detail:c.env.AUTH_LOCAL==='true'?'Local Worker and database; no Cloudflare deployment connection':'Deployed Worker and database in the installation’s configured hosting account'},
     plaid: { connected: feeds.some(f=>f.status==='active'||f.status==='relink'), detail: feeds.map(f=>`${f.institution_name}: ${f.status}`).join('; ') || 'No bank connected', ...(!plaidAvailability(c.env).available ? {unavailable:'Application keys or this hosting path are unavailable; statement files still work.'}: {}) },
     stripe: { connected: !!stripe, detail: stripe?`${stripe.account_name} · ${stripe.country} account · settles ${String(stripe.settlement_currency).toUpperCase()}`:'No Stripe account connected', ...(managedInstall(c.env)?{unavailable:'This hosting path cannot reach Stripe.'}:{}) },

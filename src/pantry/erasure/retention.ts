@@ -7,6 +7,7 @@ import { fenceStatements } from './fence'
 import { ownerSession } from './owner'
 import { cancelErased } from '../webhooks/erasure'
 import { invoicePdf, type InvoiceDocument } from '../invoice-pdf'
+import { expireSiblingEvidence } from '../estimates/siblings/custody'
 import { erasureView, retainedState, itemKey, stateRevision, expiry, expired, type RetentionItem } from './retention-items'
 export { erasureView, retentionItems, retainStatements } from './retention-items'
 
@@ -25,6 +26,7 @@ const save: Command = { need: 'owner', async run(c, b) {
 } }
 
 async function expiryStatements(db: D1Database, item: RetentionItem, erasureId: string, at: string): Promise<Sql[]> {
+  if (item.table === 'pt_estimate_sibling_links') return expireSiblingEvidence(db, item.id, erasureId, at)
   const scoped = q("INSERT INTO pt_erasure_scope(erasure_id,table_name,row_id,operation) VALUES(?,?,?,'expire')", erasureId, item.table, item.id)
   if (item.table === 'pt_documents') return [scoped,
     guard('EXISTS(SELECT 1 FROM pt_documents WHERE id=? AND sha256=? AND erased_at IS NULL)', item.id, item.sha256),
@@ -68,6 +70,7 @@ const erase: Command = { need: 'owner', async run(c, b) {
   const mutations = (await Promise.all(selected.map(i => expiryStatements(c.db, i, id, at)))).flat()
   for (const item of selected) {
     const count = counts[item.table] ??= { itemsErased: 0, bytesRemoved: 0, fieldsReplaced: 0 }
+    if(item.table==='pt_estimate_sibling_links'){count.bytesRemoved+=Number((await one(c.db,'SELECT COALESCE(length(pdf_base64)*3/4,0)+length(proof) AS n FROM pt_estimate_sibling_links WHERE id=?',item.id))?.n??0);count.fieldsReplaced+=3}
     if(item.table==='pt_estimate_documents'){const [e,r]=item.id.split(':');count.bytesRemoved+=Number((await one(c.db,'SELECT length(pdf_base64)*3/4 AS n FROM pt_estimate_documents WHERE estimate_id=? AND revision=?',e,r))?.n??0);count.fieldsReplaced+=2}
     count.itemsErased++; count.fieldsReplaced += item.table === 'pt_contractor_tax' ? 1 : item.table === 'pt_invoice_documents' ? 2 : 0
     if (item.table === 'pt_documents') {
