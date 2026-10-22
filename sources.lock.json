@@ -3844,7 +3844,7 @@
       "executable": false
     },
     "src/pantry/report-figures/budget.ts": {
-      "sha256": "4dc8f33cf380210656807656f860888162f754637810ba97e3cdbb493584b2ca",
+      "sha256": "9715b743e8fc3e8a52ee1351d3050ded364f54d00cad1da43452b51ec49c6c7e",
       "executable": false
     },
     "src/pantry/report-figures/columns.ts": {
@@ -4384,7 +4384,7 @@
       "executable": false
     },
     "src/ui/budgets.tsx": {
-      "sha256": "e08ffd7ae9a7e7eebba6bab95f4d9b6ac9bde75b9db954c9582932f8ed4e3d14",
+      "sha256": "dbc3847c3a34999f23aa3f458bdd3391c4f64e891cef4913d57180ef38785d72",
       "executable": false
     },
     "src/ui/capture-approval-rules.tsx": {
@@ -4976,7 +4976,7 @@
       "executable": false
     },
     "tests/app/dimensions-journey.mjs": {
-      "sha256": "162a76d1deaa0f4094117dee26a5287c793197f664f52e3474a82c6941f83531",
+      "sha256": "720f6f1b800c5eb1a7737e52ff65c025c8165478e1d7d6c50583d10acded1505",
       "executable": false
     },
     "tests/app/effects-journey.mjs": {

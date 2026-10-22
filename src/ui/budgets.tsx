@@ -72,13 +72,14 @@ function Detail({ id, from, to, basis, edit }: { id: string; from: string; to: s
 }
 export function Budgets({ from, to, basis }: { from: string; to: string; basis: 'cash' | 'accrual' }) {
   const { data, error, reload } = useView<D>('budgets'), { state } = useShared()
-  const [selected, setSelected] = useState<string>(''), [editing, setEditing] = useState<{ budget?: D } | null>(null)
+  const search=useSearch({from:'/app/reports'}),navigate=useNavigate({from:'/app/reports'})
+  const [editing, setEditing] = useState<{ budget?: D } | null>(null)
   if (!data) return <Loading error={error} what="budgets" />
-  if (editing) return <Editor selected={editing.budget} cancel={() => setEditing(null)} done={async saved => { await reload(); setSelected(saved.id); setEditing(null) }} />
-  const id = selected || data.budgets[0]?.id
+  if (editing) return <Editor selected={editing.budget} cancel={() => setEditing(null)} done={async saved => { await reload(); await navigate({search:s=>({...s,budget:saved.id,line:undefined,record:undefined})});setEditing(null) }} />
+  const id = search.budget || data.budgets[0]?.id
   return <>
     <div className="row-actions">{state.actor.can.record && <button type="button" className="btn btn-primary" onClick={() => setEditing({})}>New annual budget</button>}
-      {data.budgets.length > 0 && <Field label="Annual budget" name="budget" value={id} onChange={(e: any) => setSelected(e.target.value)} options={data.budgets.map((b: D) => ({ value: b.id, label: b.name }))} />}</div>
+      {data.budgets.length > 0 && <Field label="Annual budget" name="budget" value={id} onChange={(e: any) => {void navigate({search:s=>({...s,budget:e.target.value,line:undefined,record:undefined})})}} options={data.budgets.map((b: D) => ({ value: b.id, label: b.name }))} />}</div>
     {id ? <Detail key={id} id={id} from={from} to={to} basis={basis} edit={budget => setEditing({ budget })} /> : <p>No budgets yet. Enter account/month amounts, copy prior-year actuals, or import a CSV or Easel plan.</p>}
   </>
 }
