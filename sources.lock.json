@@ -5112,7 +5112,7 @@
       "executable": false
     },
     "tests/restore/dimensions.mjs": {
-      "sha256": "886646c55509d7814d8a517d6bbed62af3767753728e58b2057f47e497c12b7d",
+      "sha256": "2143ccd31a2eb66a8901a1293a4b5fd5a280eae236b6512fdfc6dfaa08c4d530",
       "executable": false
     },
     "tests/restore/estimates.mjs": {

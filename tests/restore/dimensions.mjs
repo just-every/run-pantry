@@ -20,8 +20,11 @@ export async function dimensionsForRestore(context,origin){
  const plan=await command('budget.save',{name:'Archived dimension budget',startMonth:'2026-01',cells:[{accountId:acct['6200'],month:'2026-09',amount:'75',...tags}]})
  const vendor=await command('contact.save',{kind:'vendor',name:'Archive Dimension Vendor',defaultClass:tags.className,defaultLocation:tags.locationName,defaultProject:tags.projectName})
  const credit=await command('vendor-credit.record',{vendorId:vendor.id,reference:'Archived coded credit',date:'2026-09-21',amount:'10',accountId:acct['6200'],...tags})
+ const payment=await command('payment.record',{direction:'paid',contactId:vendor.id,date:'2026-09-22',amount:'5',bankAccountId:state.bankAccounts[0].id,method:'ach',...tags,allocations:[]})
+ const paymentLines=(await view('journal')).entries.find(e=>e.id===payment.journal_id).lines
+ assert.ok(paymentLines.every(l=>l.class_name===tags.className&&l.location_name===tags.locationName&&l.project_name===tags.projectName))
  const recurring=await command('recurring-bill.save',{vendorId:vendor.id,name:'Archived coded renewal',startDate:'2027-01-01',unit:'month',every:1,lines:[{description:'Archive recurring coding',accountId:acct['6200'],amount:'25',...tags}]})
- return {credit,recurring,vendorDefaults:[vendor.default_class,vendor.default_location,vendor.default_project],dimensions:await view('dimensions'),plan,expenseAccount:acct['6200'],vendor:vendor.id,journal:journal.id,historical:historical.id}
+ return {paymentJournal:payment.journal_id,paymentLines,credit,recurring,vendorDefaults:[vendor.default_class,vendor.default_location,vendor.default_project],dimensions:await view('dimensions'),plan,expenseAccount:acct['6200'],vendor:vendor.id,journal:journal.id,historical:historical.id}
 }
 export async function assertDimensionsRestored(context,origin,expected){
  const get=async(path)=>{const r=await context.request.get(origin+'/api/pantry/'+path);assert.equal(r.status(),200,await r.text());return r.json()}
@@ -34,6 +37,7 @@ export async function assertDimensionsRestored(context,origin,expected){
  const recurring=sales.recurringBills.find(r=>r.id===expected.recurring.id)
  assert.deepEqual(recurring.lines,expected.recurring.lines,'future recurring bill keeps dimension coding')
  const entries=(await get('journal')).entries
+ assert.deepEqual(entries.find(e=>e.id===expected.paymentJournal).lines,expected.paymentLines,'both sides of a coded recorded payment survive restore unchanged')
  assert.equal(entries.find(e=>e.id===expected.journal).lines[0].class_name,'Archive studio')
  assert.equal(entries.find(e=>e.id===expected.historical).lines[0].class_name,'Archive retired class','inactive historical coding is preserved')
  const refused=await context.request.post(origin+'/api/pantry/command/bill.save',{headers:{origin},data:{vendorId:expected.vendor,reference:'Archive required-dimension probe',billDate:'2026-09-20',lines:[{description:'Unclassified bill',amount:'1',accountId:expected.expenseAccount}]}})
