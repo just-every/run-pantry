@@ -31,6 +31,14 @@ export function DimensionSettings() {
     {KINDS.filter(([, ,flag])=>d.settings[flag]).map(([kind,label])=><Field key={kind} label={`Payroll ${kind}`} name={`${kind}Name`} empty="Unassigned" options={d.values.filter((v:D)=>v.kind===kind&&v.active).map((v:D)=>({value:v.name,label:v.name}))} />)}
    </Form>
   </details>
+  <details><summary>Processor line coding</summary>
+   <p className="hint">Selected coding applies to future Stripe sales, refunds, fees, clearing, bank and invoice receivable lines. Posted entries retain their original coding. Missing required values hold an item for review.</p>
+   <Table heads={['Processor line','Class','Location','Project']} empty="Processor coding is not set.">{d.processor.map((p:D)=><tr key={p.role}><td>{p.role}</td><td>{p.class_name||'Unassigned'}</td><td>{p.location_name||'Unassigned'}</td><td>{p.project_name||'Unassigned'}</td></tr>)}</Table>
+   <Form label="Save processor coding" submit={b=>command('dimension.processor',{...b,revision:d.processor.find((p:D)=>p.role===b.role)?.revision??''})} onDone={reload} className="grid-form">
+    <Field label="Processor line role" name="role" required options={['sales','refunds','fees','clearing','bank','receivable'].map(value=>({value,label:value}))} />
+    <DimensionFormFields label="Processor" />
+   </Form>
+  </details>
   <details><summary>Required dimensions by account</summary><p className="hint">Required values apply to new lines and postings while that dimension is enabled. Old posted records stay unchanged.</p>
    {state.accounts.filter((a:D)=>a.active).map((a:D)=><Form key={a.id+JSON.stringify(d.required)} label={`Save requirements for ${a.code}`} submit={b=>command('dimension.require',{accountId:a.id,kinds:KINDS.filter(([kind])=>b[kind]==='on').map(([kind])=>kind)})} onDone={reload}>
     <strong>{a.code} · {a.name}</strong>{KINDS.map(([kind,label])=><label className="check" key={kind}><input type="checkbox" name={kind} defaultChecked={d.required.some((r:D)=>r.account_id===a.id&&r.kind===kind)} /> Require {kind}</label>)}

@@ -1,3 +1,4 @@
+import { processorDimensions } from './dimensions/processor'
 // Card and ACH payment from the invoice link, through the business's own Stripe
 // account. The owner connects a key in Settings; Pantry creates its webhook and
 // two ledger accounts (the Stripe balance money lands in, and Stripe fees). A
@@ -184,6 +185,7 @@ async function recordSucceeded(env: Bindings, db: D1Database, row: Data, pi: Dat
   let bt = charge && typeof charge.balance_transaction === 'object' ? charge.balance_transaction : null
   if (!bt && charge && typeof charge.balance_transaction === 'string') bt = await stripeCall(key, 'GET', `/balance_transactions/${charge.balance_transaction}`)
   const inv = await invoice(db, row.invoice_id), day = bt?.created ? new Date(Number(bt.created) * 1000).toISOString().slice(0, 10) : businessDay((await sendingSettings(db)).time_zone)
+  const dimensions = await processorDimensions(db)
   const statements: Sql[] = []
   if (row.status !== 'succeeded') {
     const imported = await one(db, "SELECT id FROM pt_stripe_clearing_items WHERE payment_intent = ? AND status IN ('posted', 'legacy-covered') AND entry_id IS NOT NULL", pi.id)
@@ -193,7 +195,7 @@ async function recordSucceeded(env: Bindings, db: D1Database, row: Data, pi: Dat
       direction: 'received', contactId: inv.customer_id, date: day, amount: dollars(amount), bankAccountId: s.bank_account_id, reference: pi.id,
       memo: `Paid ${row.method === 'card' ? 'by card' : 'by ACH bank debit'} through the invoice link`,
       allocations: inv.open_cents > 0 ? [{ targetId: inv.id, amount: dollars(Math.min(amount, inv.open_cents)) }] : [],
-    }, { sessionCounts: !!row.early_window_end })
+    }, { sessionCounts: !!row.early_window_end, bankCoding:dimensions.coding('clearing'), controlCoding:dimensions.coding('receivable') })
     statements.push(guard("NOT EXISTS (SELECT 1 FROM pt_stripe_clearing_items WHERE payment_intent = ? AND status IN ('posted', 'legacy-covered') AND entry_id IS NOT NULL)", pi.id), ...p.statements, q("UPDATE pt_stripe_payments SET status = 'succeeded', payment_intent = ?, payment_id = ?, updated_at = ? WHERE id = ? AND status <> 'succeeded'", pi.id, p.id, now(), row.id), changed())
   }
   // Pantry keeps USD books. An account that settles in another currency reports its fee in that
@@ -203,10 +205,11 @@ async function recordSucceeded(env: Bindings, db: D1Database, row: Data, pi: Dat
     const feeEntry = uid(), fee = usdFee
     const converted = bt.currency === 'usd' ? '' : `, ${String(bt.currency).toUpperCase()} ${(Number(bt.fee) / 100).toFixed(2)} at Stripe's rate ${bt.exchange_rate}`
     statements.push(...entryStatements({ id: feeEntry, date: day, memo: `Stripe fee on invoice ${inv.number} (${usd(fee)}${converted})`, sourceKind: 'bank', sourceId: row.id, preparedBy: pantry('stripe').email, preparedKind: 'import', lines: [
-      { accountId: s.fee_account_id, debit: fee, credit: 0, memo: `Stripe fee ${pi.id}` }, { accountId: (await one(db, 'SELECT account_id FROM pt_bank_accounts WHERE id = ?', s.bank_account_id))!.account_id, debit: 0, credit: fee, memo: `Stripe fee ${pi.id}` }] }, pantry('stripe').email),
+      { ...dimensions.coding('fees'), accountId: s.fee_account_id, debit: fee, credit: 0, memo: `Stripe fee ${pi.id}` }, { ...dimensions.coding('clearing'), accountId: (await one(db, 'SELECT account_id FROM pt_bank_accounts WHERE id = ?', s.bank_account_id))!.account_id, debit: 0, credit: fee, memo: `Stripe fee ${pi.id}` }] }, pantry('stripe').email),
       q('UPDATE pt_stripe_payments SET fee_cents = ?, fee_entry_id = ?, updated_at = ? WHERE id = ? AND fee_entry_id IS NULL', fee, feeEntry, now(), row.id), changed())
   }
   if (!statements.length) return
+  statements.unshift(...dimensions.guards)
   statements.push(audit(pantry('stripe'), 'stripe.payment', 'invoice', inv.id, { session: row.id, paymentIntent: pi.id, method: row.method, amount: Number(pi.amount_received), fee: usdFee || null, feeCurrency: bt?.currency ?? null }))
   try { await run(db, statements) } catch (error) {
     // Another confirmation (return, webhook or due work) may have recorded it first.

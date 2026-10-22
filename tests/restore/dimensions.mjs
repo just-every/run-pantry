@@ -16,6 +16,7 @@ export async function dimensionsForRestore(context,origin){
  await command('journal.post',{id:historical.id,revision:historical.revision})
  await command('dimension.save',{...retired,active:false})
  await command('dimension.payroll',{role:'wages',...tags})
+ await command('dimension.processor',{role:'fees',...tags})
  const plan=await command('budget.save',{name:'Archived dimension budget',startMonth:'2026-01',cells:[{accountId:acct['6200'],month:'2026-09',amount:'75',...tags}]})
  const vendor=await command('contact.save',{kind:'vendor',name:'Archive Dimension Vendor',defaultClass:tags.className,defaultLocation:tags.locationName,defaultProject:tags.projectName})
  const credit=await command('vendor-credit.record',{vendorId:vendor.id,reference:'Archived coded credit',date:'2026-09-21',amount:'10',accountId:acct['6200'],...tags})
@@ -24,7 +25,7 @@ export async function dimensionsForRestore(context,origin){
 }
 export async function assertDimensionsRestored(context,origin,expected){
  const get=async(path)=>{const r=await context.request.get(origin+'/api/pantry/'+path);assert.equal(r.status(),200,await r.text());return r.json()}
- assert.deepEqual(await get('dimensions'),expected.dimensions,'enabled settings, catalogue, requirements and payroll mapping survive native restore')
+ assert.deepEqual(await get('dimensions'),expected.dimensions,'enabled settings, catalogue, requirements and payroll/processor mapping survive native restore')
  assert.deepEqual(await get(`budgets/${expected.plan.id}`),expected.plan,'detailed dimension budget cells and rollups survive restore')
  const state=await get('state'),vendor=state.contacts.find(c=>c.id===expected.vendor)
  assert.deepEqual([vendor.default_class,vendor.default_location,vendor.default_project],expected.vendorDefaults)

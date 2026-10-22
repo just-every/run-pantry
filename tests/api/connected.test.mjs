@@ -18,7 +18,7 @@ const lines = e => e.lines.map(l => [l.account_name, l.debit_cents, l.credit_cen
 
 test('REPORT-005 / PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees and refunds through clearing, transfers the payout, matches the deposit and never books twice', async t => {
   for (const invoiceFirst of [true, false]) {
-  const KEY = 'sk_test_' + 'Z9y8X7w6V5u4T3s2R1q0P9o8'
+  const KEY = 'synthetic-pantry-34'
   const payouts = await json('stripe/payouts.json'), items = await json('stripe/balance-transactions-po_1TestAutomatic.json')
   const calls = [], sessions = new Map()
   const outbound = async request => {
@@ -47,9 +47,15 @@ test('REPORT-005 / PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees
   const { acct } = await books(h)
   const bank = await h.command('bank-account.save', { name: 'Operating checking', institution: 'Chase', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-01-01', openingBalance: '0.00' })
 
+  const dimensionState=await h.view('dimensions')
+  await h.command('dimensions.settings',{revision:dimensionState.settings.revision,class:true,location:true,project:true})
+  for(const [kind,name] of [['class','Studio processor'],['class','Other processor'],['location','New York processor'],['project','Cedar processor']])await h.command('dimension.save',{kind,name})
+  const coding={className:'Studio processor',locationName:'New York processor',projectName:'Cedar processor'}
+  for(const role of ['sales','refunds','fees','clearing','bank','receivable'])await h.command('dimension.processor',{role,...coding})
+
   // One of the payout's 23 charges is an invoice the customer paid from its link, already in the books.
   const cedar = await h.command('contact.save', { kind: 'customer', name: 'Cedar Studio', email: 'ap@cedar.example', termsDays: 30 })
-  const draft = await h.command('invoice.save-draft', { customerId: cedar.id, issueDate: '2026-10-01', dueDate: '2026-10-31', lines: [{ description: 'Design services', quantity: '1', rate: '2400.00', accountId: acct['4000'], taxCode: 'exempt' }] })
+  const draft = await h.command('invoice.save-draft', { customerId: cedar.id, issueDate: '2026-10-01', dueDate: '2026-10-31', lines: [{ description: 'Design services', quantity: '1', rate: '2400.00', accountId: acct['4000'], taxCode: 'exempt',...coding }] })
   const inv = await h.command('invoice.issue', { id: (await h.command('invoice.approve', { id: draft.id, revision: draft.revision })).id })
   await h.command('invoice.send', { id: inv.id })
   const link = new URL(h.mail.at(-1).text.match(/http:\/\/[^\s]+\/i\/[A-Za-z0-9_-]{32}/)[0]).pathname
@@ -95,6 +101,16 @@ test('REPORT-005 / PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees
   }
 
   assert.ok(clearing.items.every(i=>['posted','adopted'].includes(i.status)))
+  const providerEntries=(await h.view('journal')).entries.filter(e=>['payment','bank'].includes(e.source_kind))
+  assert.ok(providerEntries.length)
+  for(const e of providerEntries)for(const l of e.lines)assert.deepEqual([l.class_name,l.location_name,l.project_name],Object.values(coding),'checkout receipt/fees and processor event/control lines use the reviewed mapping')
+  const feeMapping=(await h.view('dimensions')).processor.find(p=>p.role==='fees')
+  await h.command('dimension.processor',{role:'fees',...coding,className:'Other processor',revision:feeMapping.revision})
+  await h.command('dimension.processor',{role:'fees',...coding,revision:feeMapping.revision},h.owner,409)
+  await h.command('stripe.payouts-sync',{})
+  const replayed=(await h.view('journal')).entries
+  for(const e of providerEntries)assert.deepEqual(replayed.find(r=>r.id===e.id),e,'changing future mapping never recodes an existing provider posting')
+
   const charge = clearing.items.find(i => i.status === 'posted' && i.entryId)
   const chargeSource = await h.view(`reports/record/entry/${charge.entryId}`)
   assert.ok(chargeSource.providerEvents.some(e => e.kind === 'balance-transaction' && e.id === charge.id))
@@ -337,4 +353,45 @@ test('PROC-003 the owner activity start holds unowned historical events without 
   await h.command('stripe.payouts',{bankAccountId:bank.id,salesAccountId:acct['4000'],from:'2026-09-01'})
   const included=await h.view('stripe/clearing');assert.equal(included.ok,true);assert.equal(included.differenceCents,0)
   assert.equal((await h.view('journal')).entries.filter(e=>e.status==='posted').length,4,'only the two authorized source events were added')
+})
+
+test('DIM-001 processor dimension requirements hold named provider events until owner coding is supplied, without duplicate or partial postings',async t=>{
+ const provider=clearingProvider({missingRefund:false}),h=await harness({outbound:provider.outbound});t.after(()=>h.close())
+ const {acct}=await books(h),d=await h.view('dimensions')
+ await h.command('dimensions.settings',{revision:d.settings.revision,class:true,location:true,project:true})
+ for(const [kind,name] of [['class','Processor studio'],['location','Processor office'],['project','Processor project']])await h.command('dimension.save',{kind,name})
+ await h.command('dimension.require',{accountId:acct['4000'],kinds:['class']})
+ const bank=await h.command('bank-account.save',{name:'Processor bank',institution:'Synthetic bank',numberLast4:'3434',accountId:acct['1000'],openingDate:'2026-01-01',openingBalance:'0'})
+ await h.command('stripe.connect',{secretKey:'synthetic-pantry-35'})
+ const fee=(await h.view('state')).accounts.find(a=>a.name==='Stripe fees')
+ await h.command('dimension.require',{accountId:fee.id,kinds:['class']})
+ const first=await h.command('stripe.payouts',{bankAccountId:bank.id,salesAccountId:acct['4000'],from:'2026-09-01'})
+ const initial=(await h.view('journal')).entries.filter(e=>e.status==='posted')
+ const held=(await h.view('stripe/clearing')).items.filter(i=>i.status==='held')
+ assert.ok(held.some(i=>/dimension/i.test(i.reason)));assert.ok(held.every(i=>!i.entryId),'a refused provider item leaves no partial entry')
+ const viewer=await h.member('synthetic-pantry-processor-reader@example.test','viewer')
+ await h.command('dimension.processor',{role:'sales',className:'Processor studio'},viewer,403)
+ await h.command('dimension.processor',{role:'sales',className:'Unknown'},h.owner,409)
+ const coding={className:'Processor studio',locationName:'Processor office',projectName:'Processor project'}
+ for(const role of ['sales','refunds','fees','clearing','bank','receivable'])await h.command('dimension.processor',{role,...coding})
+ const results=await Promise.all([h.send('/api/pantry/command/stripe.payouts-sync',{}, {cookie:h.owner}),h.send('/api/pantry/command/stripe.payouts-sync',{}, {cookie:h.owner})])
+ assert.ok(results.some(r=>r.status===200));assert.ok(results.every(r=>r.status===200||r.status===409))
+ // The lease admits one reader; a concurrent request may either observe the
+ // completed first sync or be refused. Check books through the public read.
+ await h.command('stripe.payouts-sync',{})
+ const clearing=await h.view('stripe/clearing')
+ assert.equal(clearing.ok,true);assert.equal(clearing.differenceCents,0)
+ assert.ok(clearing.items.every(i=>['posted','adopted'].includes(i.status)))
+ const ids=clearing.items.map(i=>i.entryId);assert.equal(new Set(ids).size,ids.length)
+ const entries=(await h.view('journal')).entries.filter(e=>ids.includes(e.id))
+ for(const e of entries) {
+  const historical=initial.find(i=>i.id===e.id)
+  if(historical)assert.deepEqual(e,historical,'earlier permissible postings retain their original Unassigned coding')
+  else for(const l of e.lines)assert.deepEqual([l.class_name,l.location_name,l.project_name],Object.values(coding))
+ }
+ const split=await h.view('reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=accrual&columns=class')
+ assert.equal(split.totals.find(r=>r.id==='net-income').values[split.columns.findIndex(c=>c.label==='Processor studio')],96500)
+ assert.equal(split.totals.find(r=>r.id==='net-income').values.at(-1),86500)
+ await h.command('stripe.payouts-sync',{})
+ assert.deepEqual((await h.view('journal')).entries.filter(e=>ids.includes(e.id)),entries)
 })

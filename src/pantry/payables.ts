@@ -113,7 +113,7 @@ const allocationInsert = (actor: AuditActor, paymentId: string, kind: string, a:
 
 /** Statements recording one external payment and its allocations; used directly, from bank matching and by Pantry itself (Stripe, automatic matches).
  *  `sessionCounts` is Pantry's own word (never a client's) that a Stripe Checkout session qualified for an early-payment offer. */
-export async function paymentStatements(db: D1Database, actor: AuditActor, b: Data, opts: { sessionCounts?: boolean } = {}) {
+export async function paymentStatements(db: D1Database, actor: AuditActor, b: Data, opts: { sessionCounts?: boolean; bankCoding?: Data; controlCoding?: Data } = {}) {
   const direction = text(b.direction, 'Direction')
   requireThat(direction === 'received' || direction === 'paid', 'A payment is received or paid')
   const who_ = await contact(db, text(b.contactId, direction === 'received' ? 'Customer' : 'Vendor'), direction === 'received' ? 'customer' : 'vendor')
@@ -132,8 +132,8 @@ export async function paymentStatements(db: D1Database, actor: AuditActor, b: Da
   // An allocation that first meets an invoice's early-payment offer posts its discount first and is capped (INVOICE-010).
   const early = received ? await takeEarlyDiscounts(db, actor, allocated.list, day, { sessionCounts: opts.sessionCounts, payments: id }) : { allocations: allocated.list.map(a => ({ ...a, counted: false })), before: [], after: [] }
   const lines: Line[] = received
-    ? [{ accountId: bank.account_id, debit: amount, credit: 0, memo: `Received from ${who_.name}` }, { accountId: control.id, debit: 0, credit: amount, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }]
-    : [{ accountId: control.id, debit: amount, credit: 0, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }, { accountId: bank.account_id, debit: 0, credit: amount, memo: `Paid to ${who_.name}` }]
+    ? [{ ...opts.bankCoding, accountId: bank.account_id, debit: amount, credit: 0, memo: `Received from ${who_.name}` }, { ...opts.controlCoding, accountId: control.id, debit: 0, credit: amount, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }]
+    : [{ ...opts.controlCoding, accountId: control.id, debit: amount, credit: 0, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }, { ...opts.bankCoding, accountId: bank.account_id, debit: 0, credit: amount, memo: `Paid to ${who_.name}` }]
   const statements: Sql[] = [
     ...nativeApprovalAuthority(actor, 'payment', amount), ...bankAuthority(actor, [bank.id]),
     ...entryStatements({ id: journalId, date: day, memo: `${received ? 'Payment from' : 'Payment to'} ${who_.name}`, sourceKind: 'payment', sourceId: id, preparedBy: actor.email, preparedKind: actor.kind === 'system' ? 'import' : 'person', lines }, actor.email),

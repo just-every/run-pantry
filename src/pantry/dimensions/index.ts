@@ -1,3 +1,4 @@
+import { processorCoding } from './processor'
 import { authority, who } from '../access'
 import { optionalText, requireThat, text, uid, type Data } from '../core'
 import { all, audit, changed, guard, one, periodOpen, q, run } from '../db'
@@ -8,7 +9,7 @@ export type DimensionKind = typeof DIMENSIONS[number]
 export const dimensionTags = (b: Data) => ({className:optionalText(b.className??b.class_name,'Class',100),locationName:optionalText(b.locationName??b.location_name,'Location',100),projectName:optionalText(b.projectName??b.project_name,'Project',100)})
 export const dimensionValues = (b: Data) => { const d=dimensionTags(b); return [d.className,d.locationName,d.projectName] }
 export async function dimensionsView(db:D1Database) {
- return { payroll:await all(db,'SELECT * FROM pt_payroll_dimensions ORDER BY role'),settings:await one(db,'SELECT * FROM pt_dimension_settings WHERE id=1'), values:await all(db,'SELECT * FROM pt_dimensions ORDER BY kind,lower(name)'), required:await all(db,'SELECT * FROM pt_account_dimensions ORDER BY account_id,kind') }
+ return { processor:await all(db,'SELECT * FROM pt_processor_dimensions ORDER BY role'),payroll:await all(db,'SELECT * FROM pt_payroll_dimensions ORDER BY role'),settings:await one(db,'SELECT * FROM pt_dimension_settings WHERE id=1'), values:await all(db,'SELECT * FROM pt_dimensions ORDER BY kind,lower(name)'), required:await all(db,'SELECT * FROM pt_account_dimensions ORDER BY account_id,kind') }
 }
 const settings:Command={need:'owner',async run(c,b){
  const current=await one(c.db,'SELECT * FROM pt_dimension_settings WHERE id=1')
@@ -79,3 +80,5 @@ const payrollTags:Command={need:'owner',async run(c,b){
  return dimensionsView(c.db)
 }}
 dimensionCommands['dimension.payroll']=payrollTags
+
+dimensionCommands['dimension.processor']=processorCoding

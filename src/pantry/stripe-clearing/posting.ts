@@ -1,3 +1,4 @@
+import { processorDimensions } from '../dimensions/processor'
 import type { Bindings } from '../../auth.server'
 import { pantry } from '../access'
 import { Fault, now, uid, type Data } from '../core'
@@ -27,6 +28,7 @@ export async function postItem(db: D1Database, s: Data, bt: Data, balanceLedger:
   if (item.currency !== 'usd') return defer(`Stripe item is in ${item.currency.toUpperCase()}; Pantry keeps US-dollar books.`)
   if (!item.event_date) return defer('Stripe item has no event creation time.')
   if (item.amount_cents - item.fee_cents !== item.net_cents) return defer('Stripe amount less fees does not equal its net amount.')
+  const dimensions = await processorDimensions(db)
   const category = categoryOf(bt), source = sourceOf(bt), intent = intentOf(bt)
   const isCharge = category === 'charge' || bt.type === 'charge' || bt.type === 'payment'
   let payment: Data | null = null
@@ -48,15 +50,16 @@ export async function postItem(db: D1Database, s: Data, bt: Data, balanceLedger:
   const memo = `Stripe ${category.replace(/_/g, ' ')} ${bt.id}`
   if (isPayout(bt)) {
     if (!source || source.automatic !== true) return defer('Stripe itemizes only automatic payouts; review this manual payout as a transfer from Stripe balance.')
-    lines = [signedLine(balanceLedger, item.net_cents, memo), signedLine(bankLedger, -item.amount_cents, memo), signedLine(s.fee_account_id, item.fee_cents, memo)]
+    lines = [{...signedLine(balanceLedger, item.net_cents, memo),...dimensions.coding('clearing')}, {...signedLine(bankLedger, -item.amount_cents, memo),...dimensions.coding('bank')}, {...signedLine(s.fee_account_id, item.fee_cents, memo),...dimensions.coding('fees')}]
   } else if (isCharge || REFUNDS.has(category) || FEES.has(category) || REFUNDS.has(String(bt.type)) || FEES.has(String(bt.type))) {
     const counter = isCharge ? s.sales_account_id : REFUNDS.has(category) || REFUNDS.has(String(bt.type)) ? s.refunds_account_id : s.fee_account_id
-    lines = [signedLine(balanceLedger, item.net_cents, memo), signedLine(counter, -item.amount_cents, memo), signedLine(s.fee_account_id, item.fee_cents, memo)]
+    const role = isCharge ? 'sales' : counter === s.refunds_account_id ? 'refunds' : 'fees'
+    lines = [{...signedLine(balanceLedger, item.net_cents, memo),...dimensions.coding('clearing')}, {...signedLine(counter, -item.amount_cents, memo),...dimensions.coding(role)}, {...signedLine(s.fee_account_id, item.fee_cents, memo),...dimensions.coding('fees')}]
   } else return defer(`Unsupported Stripe item ${bt.id} (${category}); review before posting.`)
   lines = lines.filter(l => l.debit || l.credit)
   if (lines.length < 2) return defer('Stripe item has no nonzero balanced movement to post.')
   const entryId = uid(), by = pantry('stripe')
-  const statements = [guard('EXISTS (SELECT 1 FROM pt_stripe_clearing_items WHERE id = ? AND entry_id IS NULL)', bt.id),
+  const statements = [...dimensions.guards,guard('EXISTS (SELECT 1 FROM pt_stripe_clearing_items WHERE id = ? AND entry_id IS NULL)', bt.id),
     ...(isCharge && intent ? [guard('NOT EXISTS (SELECT 1 FROM pt_stripe_payments WHERE payment_intent = ?)', intent)] : []),
     ...entryStatements({ id: entryId, date: item.event_date, memo, sourceKind: 'bank', sourceId: isPayout(bt) && bt.type === 'payout' ? item.payout_id ?? bt.id : bt.id, preparedBy: by.email, preparedKind: 'import', lines }, by.email),
     q("UPDATE pt_stripe_clearing_items SET status = 'posted', reason = '', entry_id = ? WHERE id = ? AND entry_id IS NULL", entryId, bt.id), changed(),
@@ -68,13 +71,14 @@ export async function postItem(db: D1Database, s: Data, bt: Data, balanceLedger:
 }
 
 async function adoptInvoice(db: D1Database, s: Data, item: Data, payment: Data, balanceLedger: string) {
-  const by = pantry('stripe'), statements: Sql[] = []
+  const dimensions = await processorDimensions(db)
+  const by = pantry('stripe'), statements: Sql[] = [...dimensions.guards]
   let feeEntry = payment.fee_entry_id
   if (feeEntry && Number(payment.fee_cents) !== item.fee_cents) { await hold(db, item.id, 'Stripe fee differs from the fee already booked for this invoice.'); return false }
   if (!feeEntry && item.fee_cents !== 0) {
     feeEntry = uid()
     statements.push(...entryStatements({ id: feeEntry, date: item.event_date, memo: `Stripe invoice fee ${item.id}`, sourceKind: 'bank', sourceId: payment.id,
-      preparedBy: by.email, preparedKind: 'import', lines: [signedLine(s.fee_account_id, item.fee_cents, 'Stripe invoice fee'), signedLine(balanceLedger, -item.fee_cents, 'Stripe invoice fee')] }, by.email),
+      preparedBy: by.email, preparedKind: 'import', lines: [{...signedLine(s.fee_account_id, item.fee_cents, 'Stripe invoice fee'),...dimensions.coding('fees')}, {...signedLine(balanceLedger, -item.fee_cents, 'Stripe invoice fee'),...dimensions.coding('clearing')}] }, by.email),
     q('UPDATE pt_stripe_payments SET fee_entry_id = ?, fee_cents = ?, updated_at = ? WHERE id = ? AND fee_entry_id IS NULL', feeEntry, item.fee_cents, now(), payment.id), changed())
   }
   statements.push(q("UPDATE pt_stripe_clearing_items SET status = 'adopted', reason = '', entry_id = ?, fee_entry_id = ? WHERE id = ? AND entry_id IS NULL", payment.journal_id, feeEntry, item.id), changed(),
