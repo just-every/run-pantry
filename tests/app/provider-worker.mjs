@@ -29,6 +29,6 @@ export async function providerWorker({ bindings, outbound, clock = false }) {
     for (const file of (await readdir('migrations/core')).filter(f => f.endsWith('.sql')).sort())
       await db.batch(unstable_splitSqlQuery(await readFile('migrations/core/' + file, 'utf8')).map(sql => db.prepare(sql)))
     await mf.ready
-    return { origin, close }
+    return { origin, close, cron:async(scheduledTime=Date.now())=>(await mf.getWorker()).scheduled({cron:'*/30 * * * *',scheduledTime}) }
   } catch (error) { await close(); throw error }
 }

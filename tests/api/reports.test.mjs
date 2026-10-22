@@ -945,3 +945,6 @@ test('REPORT-007 weekly and monthly calendar deliveries retain formats, actual d
 test('REPORT-007 development report mail remains visibly suppressed',reportDeliverySuppression)
 test('REPORT-007 uncertain provider outcomes and removed outside recipients never resend automatically',reportDeliveryUncertain)
 test('REPORT-007 scheduled read authority stops when its creating owner identity is revoked',reportDeliveryRevokedOwner)
+
+import {reportExportParity} from './report-export-parity.mjs'
+test('REPORT-007 dedicated reports, close packages and audited filing data export tied PDF CSV and Excel values',reportExportParity)

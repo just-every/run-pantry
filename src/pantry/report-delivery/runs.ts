@@ -64,13 +64,15 @@ async function sendClaim(env:Bindings,s:Schedule,id:string,email:string,scope:st
   try {
     const result=await mailer.send({deliveryId:id,from:bindings.MAIL_FROM,to:[email],subject:`${s.name} · ${delivery.from} to ${delivery.to} · ${delivery.basis}`,
       text:`${delivery.name}\n${delivery.from} to ${delivery.to}\nBasis: ${delivery.basis}\nThe original report is attached.`,
-      attachments:[{filename:attachment.filename,contentType:attachment.contentType,content:attachment.bytes}]})
+      attachments:[{filename:attachment.filename,contentType:attachment.contentType.split(';',1)[0].trim(),content:attachment.bytes}]})
     const detail=result.status==='development'?'Development mail is suppressed; no email was sent':result.status==='uncertain'?'Provider outcome is uncertain; automatic resend is disabled':`Mail provider returned ${result.status}${result.code?` (${result.code})`:''}`
     await finish(db,id,result.status,detail,result)
   }catch(error) {
     // A thrown network error cannot prove the provider did not receive bytes.
     const validation=(error as Error)?.name==='MailValidationError'
-    await finish(db,id,validation?'rejected':'uncertain',validation?'Mail was refused before sending':'Provider outcome is uncertain after an error; automatic resend is disabled')
+    const rawCode=(error as {code?:unknown})?.code
+    const code=typeof rawCode==='string'&&/^[a-z][a-z0-9_]{0,63}$/.test(rawCode)?rawCode:'invalid_mail_input'
+    await finish(db,id,validation?'rejected':'uncertain',validation?`Mail was refused before sending (${code})`:'Provider outcome is uncertain after an error; automatic resend is disabled')
   }
 }
 async function blocked(env:Bindings,s:Schedule,o:Occurrence,detail:string) {
