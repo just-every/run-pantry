@@ -40,7 +40,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "f66a7e561d31585299c7ef7acaa30f5385a903105a2d303ed488c0165eac7f06",
+      "sha256": "64793c01e79faf6e96b5e384adab967d1c4aa87b327d18d6d1db274d3a8e0c18",
       "executable": false
     },
     ".gitignore": {
@@ -1084,7 +1084,7 @@
       "executable": false
     },
     "scripts/verify.mjs": {
-      "sha256": "da28b2dff5b68f071dfe945e5ce0a9c0a59276e5adbe79329f9cb038463faaaf",
+      "sha256": "c9f7856d91fd1b5cdbed25db3bad8b7456d8fa4cd514f0944c008a262067ca20",
       "executable": false
     },
     "SEED-COMMAND-CONTRACT.md": {
@@ -5140,7 +5140,7 @@
       "executable": false
     },
     "VERIFY-WORKFLOW.md": {
-      "sha256": "d49f70528fdb16387542177ab54a5da54fceb6152e35922b79801695b372c867",
+      "sha256": "68c93f72bf3e881098767f101274ec2410ae5bda94ef65923aad4e6347be8374",
       "executable": false
     },
     "vite.config.ts": {

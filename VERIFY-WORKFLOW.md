@@ -30,8 +30,9 @@ The action pins were checked against the official
 and [setup-node v7.1.0 release](https://github.com/actions/setup-node/releases/tag/v7.1.0).
 Their pinned `action.yml` files declare `runs.using: node24`.
 
-Pantry partitions verification in `scripts/verify.mjs`: source checks, three API
-file groups and eight browser jobs. Browser jobs 1–5 divide the literal top-level
+Pantry partitions verification in `scripts/verify.mjs`: source checks, five API
+file groups and eight browser jobs. The long move-in and report suites each get
+their own API job; the remaining API files divide across three more jobs. Browser jobs 1–5 divide the literal top-level
 journeys in `tests/app/app.test.mjs`; jobs 6–8 divide every other browser test
 file. New registrations and matching files are included automatically, exactly
 once. Each browser job builds the real Worker before its journeys. The
