@@ -26,7 +26,7 @@ export async function queueJourney(t){
  const tagged=posted.flatMap(e=>e.lines).find(l=>l.class_name==='Studio'&&l.account_id===acct['6100'])
  assert.deepEqual([tagged.debit_cents,tagged.memo,tagged.contact_id,tagged.location_name,tagged.project_name],[3000,'Reviewed split',vendor.id,'Albany','Cedar'])
  assert.equal(posted.flatMap(e=>e.lines).find(l=>l.account_id===acct['2200']).debit_cents,300)
- await h.command('match.approve',{bankLineIds:[transfer.id],create:[{type:'transfer',amount:'200',direction:'out',otherBankAccountId:card.id}]})
+ const transferMatch=await h.command('match.approve',{bankLineIds:[transfer.id],create:[{type:'transfer',amount:'200',direction:'out',otherBankAccountId:card.id}]})
  await h.command('bank-line.exclude',{id:personal.id,kind:'personal',reason:'Owner personal purchase, retained for review'})
  const excluded=(await lines()).find(l=>l.id===personal.id)
  assert.equal(excluded.excluded_reason,'Owner personal purchase, retained for review');assert.equal(excluded.excluded_by,'owner@example.test')
@@ -66,4 +66,15 @@ export async function queueJourney(t){
  const reversals=(await h.view('journal')).entries.filter(e=>e.source_kind==='reversal')
  assert.ok(reversals.some(e=>e.lines.some(l=>l.class_name==='Studio'&&l.credit_cents===3000)))
  assert.equal((await h.view('reports/trial-balance?to=2026-10-31&basis=accrual')).balanced,true)
+ // A transfer can have a match on each bank. Never reverse its shared entry
+ // while another bank's matching decision still relies on it.
+ await h.command('statement.import',{bankAccountId:card.id,fileName:'synthetic-pantry-32.csv',content:'Posting Date,Description,Amount\n10/15/2026,synthetic-pantry-32,200',opening:'0',closing:'200',start:day,end:day,confirmLast4:'3132'})
+ const otherLine=(await lines()).find(l=>l.bank_account_id===card.id)
+ const transferEntry=(await h.view('journal')).entries.find(e=>e.source_kind==='bank'&&!e.reversed_by_id&&e.lines.some(l=>l.account_id===acct['2100']))
+ const otherMatch=await h.command('match.approve',{bankLineIds:[otherLine.id],journalLineIds:[transferEntry.lines.find(l=>l.account_id===acct['2100']).id]})
+ await h.command('match.undo',{id:transferMatch.id},h.owner,409)
+ await h.command('match.undo',{id:otherMatch.id})
+ assert.equal((await h.view('journal')).entries.find(e=>e.id===transferEntry.id).reversed_by_id,null)
+ await h.command('match.undo',{id:transferMatch.id})
+ assert.ok((await h.view('journal')).entries.find(e=>e.id===transferEntry.id).reversed_by_id)
 }

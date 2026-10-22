@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "97ec2dbface0eb8c33d0923428bf49b047363486506208b219924af1ecd1ac2c",
+      "sha256": "c8c2e2efb801ee457c5c4b55486993b9558eb324d7e4147c5ed9d240e8cc55a3",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "0314f071ac7628eaca66c5a1d2eda6eea6676e560a053a793daf60c351c3a1e4",
+      "sha256": "196e53e4e9c3afb8af0b6b646f0de395e867d4d9745871f43f76e09b5e8a6dd2",
       "executable": false
     },
     "DEMO.md": {
@@ -3560,7 +3560,7 @@
       "executable": false
     },
     "src/pantry/matching.ts": {
-      "sha256": "8f93fc8ecf33b651c1cd3a02d04f2155a3975c9e1f5114fd9eeb65b973128d72",
+      "sha256": "f13631d502a64f7269b4d7e1105671dbc7667fd99872a7b63c5232f436ad86c6",
       "executable": false
     },
     "src/pantry/nexus-thresholds.ts": {
@@ -4800,7 +4800,7 @@
       "executable": false
     },
     "tests/api/queue-journey.mjs": {
-      "sha256": "b6c72407a9441e756da6a7aad89b8cdf32d6dbe6846fa780be0a8e805384d14b",
+      "sha256": "01f77c5dea2cc6425226d670752d5b927a1aae703f97bc10c2229338cea963fa",
       "executable": false
     },
     "tests/api/receipts.test.mjs": {

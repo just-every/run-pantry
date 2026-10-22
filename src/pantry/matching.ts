@@ -137,6 +137,9 @@ const undoMatch: Command = { need: 'record', async run(c, b) {
   }
   for(const record of created){
     const original=await entry(c.db,record.entry_id)
+    const otherMatch='NOT EXISTS(SELECT 1 FROM pt_match_postings mp JOIN pt_journal_lines l ON l.id=mp.journal_line_id WHERE l.entry_id=? AND mp.active=1 AND mp.match_id<>?)'
+    requireThat(await one(c.db,`SELECT 1 WHERE ${otherMatch}`,original.id,match.id),'Undo the other bank match before reversing this entry',409)
+    reversal.push(guard(otherMatch,original.id,match.id))
     const r=await reversalStatements(c.db,c.actor,original,original.entry_date,`Undo of a bank match: ${original.memo}`,{unmatching:true})
     reversal.push(...r.statements)
     if(record.payment_id)reversal.push(q('UPDATE pt_payments SET reversal_id=? WHERE id=? AND reversal_id IS NULL',r.id,record.payment_id),changed(),
