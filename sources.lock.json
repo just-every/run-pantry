@@ -4752,7 +4752,7 @@
       "executable": false
     },
     "tests/api/estimates-journey.mjs": {
-      "sha256": "f1741509f27669f7e7e8a59d7eb59f9db1ea88eb05c740285c119f22904b10e5",
+      "sha256": "b8e1d558b3ab7a234fc9b0066cfbe28fe1bc2ec8f21be9479631ebe287a7a8b5",
       "executable": false
     },
     "tests/api/feeds.test.mjs": {
@@ -4836,7 +4836,7 @@
       "executable": false
     },
     "tests/api/worker.ts": {
-      "sha256": "4ad964b41d3f39c38e65f9134881c3fcf2d7414a016af1835d5c655ecd762b26",
+      "sha256": "77f308300f0656192bfa95b36ca8ee29e71fabcafa573a70e07e189ebb5cb48d",
       "executable": false
     },
     "tests/api/xero.mjs": {

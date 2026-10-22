@@ -110,7 +110,7 @@ export async function estimateInheritedJourney(h,x){
  assert.equal((await h.send('/api/pantry/estimates')).status,401)
  let revised=await h.command('estimate.save-draft',{...body,lines:[{...body.lines[0],rate:'10.00'}]})
  revised=await h.command('estimate.send',{id:revised.id,revision:revised.revision})
- const noPeer=await h.send(revised.public_path+'/accept',undefined,{...form(revised.revision),headers:{...form(revised.revision).headers,'cf-connecting-ip':''}})
+ const noPeer=await h.send(revised.public_path+'/accept',undefined,{...form(revised.revision),headers:{...form(revised.revision).headers,'x-synthetic-pantry-peer':'absent'}})
  assert.equal(noPeer.status,409)
  const untouched=await h.view(`estimates/${revised.id}`)
  assert.equal(untouched.status,'sent');assert.equal(untouched.acceptance,null);assert.equal(untouched.accepted_pdf_sha256,null)
