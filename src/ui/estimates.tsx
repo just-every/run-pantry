@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from '@tanstack/react-router'
 import { Action, Card, Chip, command, Details, Loading, Metrics, Table, day, usd, useShared, useView, useWho, type D } from './kit'
 import { EstimateDocumentPreview, EstimateEditor } from './estimate-editor'
 import { EstimateProgress } from './estimate-progress'
@@ -48,8 +49,10 @@ function EstimatePanel({ estimate: e, deposits, onEdit, onChange }: { estimate: 
 }
 
 export function Estimates({ onChange }: { onChange: () => Promise<void> }) {
+  const search=useLocation({select:location=>location.searchStr})
   const { state } = useShared(), { data, error, reload } = useView<D>('estimates')
-  const [selected, setSelected] = useState<string | null>(() => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('estimate'))
+  const [selected, setSelected] = useState<string | null>(() => new URLSearchParams(search).get('estimate'))
+  useEffect(()=>{setSelected(new URLSearchParams(search).get('estimate'))},[search])
   const [editing, setEditing] = useState<D | null>(null)
   const { data: detail, error: detailError, reload: reloadDetail } = useView<D>(selected ? `estimates/${encodeURIComponent(selected)}` : null)
   const refresh = async () => { await Promise.all([reload(), reloadDetail(), onChange()]) }

@@ -1,7 +1,8 @@
 // Sales & bills: invoices and credits (sent, viewed, reminded, paid online),
 // recurring invoices, bills with their evidence, payments recorded from outside
 // Pantry, every delivery, and the customers and vendors behind them.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from '@tanstack/react-router'
 import { Action, Card, Chip, command, contactOptions, Details, Field, Form, Loading, Metrics, PageHead, Table, Tabs, accountOptions, day, today, usd, useShared, useView, useWho, type D } from './kit'
 import { canSelfApprove } from './issuing-limits'
 import { Bills } from './bills'
@@ -51,8 +52,10 @@ function InvoicePanel({ i, data, onChange, onEdit, onCredit }: { i: D; data: D; 
 }
 
 function Invoices({ data, reload }: { data: D; reload: () => Promise<void> }) {
+  const search=useLocation({select:location=>location.searchStr})
   const { state } = useShared()
-  const [selected, setSelected] = useState<string | null>(() => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('invoice')), [editing, setEditing] = useState<{ invoice?: D; creditFor?: D } | null>(null)
+  const [selected, setSelected] = useState<string | null>(() => new URLSearchParams(search).get('invoice')), [editing, setEditing] = useState<{ invoice?: D; creditFor?: D } | null>(null)
+  useEffect(()=>{setSelected(new URLSearchParams(search).get('invoice'))},[search])
   const invoices = data.invoices as D[], current = invoices.find(i => i.id === selected)
   const sum = (f: (i: D) => boolean) => invoices.filter(i => i.kind === 'invoice' && f(i)).reduce((s, i) => s + i.total_cents, 0)
   const count = (f: (i: D) => boolean) => invoices.filter(i => i.kind === 'invoice' && f(i)).length
@@ -172,11 +175,14 @@ function VendorCredits({ data, reload }: { data: D; reload: () => Promise<void> 
 
 export function Sales({ billId }: { billId?: string } = {}) {
   // Overview's Customers and vendors step opens this page at ?tab=contacts.
-  const [requestedTab, setTab] = useState(() => {
-    if (typeof window === 'undefined') return billId ? 'Bills' : 'Invoices'
-    const requested = new URLSearchParams(window.location.search).get('tab')
-    return ({ templates: 'Invoice templates', contacts: 'Customers & vendors', bills: 'Bills', estimates: 'Estimates', deposits: 'Customer deposits' } as Record<string, string>)[requested ?? ''] ?? (billId || window.location.hash.startsWith('#bill-') ? 'Bills' : 'Invoices')
-  }), { data, error, reload } = useView<D>('sales'), shared = useShared()
+  const location=useLocation()
+  const initialTab=(()=>{
+    const requested = new URLSearchParams(location.searchStr).get('tab')
+    return ({ templates: 'Invoice templates', contacts: 'Customers & vendors', bills: 'Bills', estimates: 'Estimates', deposits: 'Customer deposits' } as Record<string, string>)[requested ?? ''] ?? (billId || /^#?bill-/.test(location.hash) ? 'Bills' : 'Invoices')
+  })()
+  const [requestedTab,setTab]=useState(initialTab)
+  useEffect(()=>{setTab(initialTab)},[initialTab])
+  const { data, error, reload } = useView<D>('sales'), shared = useShared()
   const role = shared.state.actor.role
   const tabs = role === 'sales' ? ['Invoices', 'Estimates', 'Recurring', 'Deliveries', 'Customers & vendors'] : role === 'payables-clerk' ? ['Bills', 'Customers & vendors'] : ['Invoices', 'Invoice templates', ...(['owner', 'bookkeeper', 'accountant', 'viewer'].includes(role) ? ['Estimates'] : []), 'Recurring', 'Bills', 'Payments', ...(mayRecordDeposits(shared.state) ? ['Customer deposits'] : []), 'Deliveries', 'Customers & vendors', 'Products & services']
   const tab = tabs.includes(requestedTab) ? requestedTab : tabs[0]

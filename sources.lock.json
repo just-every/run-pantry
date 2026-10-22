@@ -3232,7 +3232,7 @@
       "executable": false
     },
     "src/pantry/erasure/copies.ts": {
-      "sha256": "45da9b905a297e1a855110d135afba6f9be13943951185c94d7e6b7fafe15403",
+      "sha256": "81572f2bfb486c1452fe5fb3bcf04938f8c7cb67312d3308a7c002e6c3494cde",
       "executable": false
     },
     "src/pantry/erasure/custody.ts": {
@@ -4324,7 +4324,7 @@
       "executable": false
     },
     "src/ui/bank-lines.tsx": {
-      "sha256": "7e84eb11147658158e80a375eeed2cc1f128fd195e8d59c29d4d1b7452b3b1c6",
+      "sha256": "70c9cd882ffeb57a259ac915695285d8fe37587cc7778344598ba08e1ff0bd18",
       "executable": false
     },
     "src/ui/bank-rules.tsx": {
@@ -4460,7 +4460,7 @@
       "executable": false
     },
     "src/ui/estimates.tsx": {
-      "sha256": "988dda8a04bbda4fed48e4da4444ab438a14afb0b9fef49a941512d9844f8e4c",
+      "sha256": "793623ada6176ea925da4708f83d696e9523e6105740430b02165fecb2a1a971",
       "executable": false
     },
     "src/ui/exemption-certificates.tsx": {
@@ -4656,7 +4656,7 @@
       "executable": false
     },
     "src/ui/sales.tsx": {
-      "sha256": "bf2ef29f7484a86fbd76a87673653bbb80ae483f1b6802f6de0603301730d128",
+      "sha256": "d3988d89f5e54427d4abc700fe89410187fd13ec80e36a99f4ea628d2641965e",
       "executable": false
     },
     "src/ui/settings.tsx": {
@@ -4936,7 +4936,7 @@
       "executable": false
     },
     "tests/app/estimates-journey.mjs": {
-      "sha256": "e063fb0cbd88a8cee4f1649984ab6980f560076c0b27994fb867b6b580c0c9bb",
+      "sha256": "dd28df61c1a04342f570717e71d2e2c7c7036ecde1d61670b1389186f390018f",
       "executable": false
     },
     "tests/app/feed-history.test.mjs": {

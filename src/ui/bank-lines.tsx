@@ -59,15 +59,16 @@ export function Transactions({ data, onDone, feeds }: { data: D | undefined; onD
   useEffect(()=>{setPicked([])},[filter,account])
   useEffect(()=>{
     const key=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){event.preventDefault();setPicked([]);return}
+      if(!state.actor.can.record)return
       if(event.ctrlKey||event.metaKey||event.altKey||(event.target as HTMLElement)?.closest('input,select,textarea,[contenteditable=true]'))return
       const lines=Array.from(document.querySelectorAll<HTMLElement>('[data-review-line]'))
       const index=lines.findIndex(row=>row.contains(document.activeElement)),k=event.key.toLowerCase()
       if(k==='j'||k==='k'){event.preventDefault();lines[Math.max(0,Math.min(lines.length-1,index+(k==='j'?1:-1)))]?.focus()}
       if(k==='x'&&index>=0){event.preventDefault();const id=lines[index].dataset.reviewLine!;setPicked(xs=>xs.includes(id)?xs.filter(x=>x!==id):[...xs,id])}
       if(k==='a'&&event.shiftKey){event.preventDefault();setPicked(lines.slice(0,50).map(row=>row.dataset.reviewLine!))}
-      if(event.key==='Escape')setPicked([])
     };document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key)
-  },[data,filter,account])
+  },[data,filter,account,state.actor.can.record])
   if (!data) return null
   const rows: D[] = [...data.pending.map((p: D) => ({ ...p, pending: true, filed_to: [] })), ...data.lines]
     .filter(l => !account || l.bank_account_id === account)

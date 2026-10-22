@@ -32,7 +32,7 @@ const FIELDS: Record<string, string[]> = {
   pt_recurring_journals: ['name', 'memo', 'lines'],
   pt_bank_rules: ['name', 'payee', 'description_contains', 'splits', 'memo'],
   pt_receipt_rules: ['vendor'],
-  pt_bank_lines: ['description', 'reference', 'payee', 'feed_snapshot'],
+  pt_bank_lines: ['description', 'reference', 'payee', 'feed_snapshot', 'excluded_reason'],
   pt_feed_history: ['description', 'details', 'reason', 'candidates'],
   pt_matches: ['note'],
   pt_reconciliations: ['snapshot'],
