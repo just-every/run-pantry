@@ -15,21 +15,15 @@ function PreviewReview({ preview: p, estimate, onAttached }: { preview: D; estim
   return <Card title={`Review ${providerName(p.provider)} record`} actions={<Chip tone={stale || expired ? 'warn' : 'info'}>{stale ? 'Estimate changed' : expired ? 'Preview expired' : p.status === 'attached' ? 'Attached' : 'Awaiting review'}</Chip>}>
     <p><strong>{s.title}</strong> · {s.status}</p>
     <p style={sourceStyle}><Source record={p} /></p>
-    <dl className="facts">
-      <div><dt>Customer in source</dt><dd>{s.customer_name}</dd></div>
+    <dl className="facts" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))' }}>
+      <div><dt>Matched customer</dt><dd>{estimate.customer_name}</dd></div>
       <div><dt>Contact in source</dt><dd>{s.contact_email}</dd></div>
-      <div><dt>Estimate customer</dt><dd>{estimate.customer_name}</dd></div>
-      <div><dt>Source total</dt><dd>{usd(s.total_cents)} · {s.currency}</dd></div>
       <div><dt>Estimate total</dt><dd>{usd(estimate.total_cents)}</dd></div>
-      <div><dt>Source deposit</dt><dd>{usd(s.deposit_cents)}</dd></div>
-      <div><dt>Estimate revision reviewed</dt><dd style={sourceStyle}>{p.estimate_revision}</dd></div>
-      <div><dt>Source revision reviewed</dt><dd style={sourceStyle}>{p.remote_revision}</dd></div>
-      {s.original_sha256 && <div><dt>Source original PDF SHA-256</dt><dd style={sourceStyle}>{s.original_sha256}</dd></div>}
-      {s.signed_sha256 && <div><dt>Signed PDF SHA-256</dt><dd style={sourceStyle}>{s.signed_sha256}</dd></div>}
-      {p.provider === 'inkwell' && <div><dt>Retained estimate PDF SHA-256</dt><dd style={sourceStyle}>{estimate.pdf_sha256}</dd></div>}
+      {p.provider === 'platter' && <><div><dt>Accepted proposal total</dt><dd>{usd(s.total_cents)} · {s.currency}</dd></div><div><dt>Requested proposal deposit</dt><dd>{usd(s.deposit_cents)} · not recorded as received</dd></div><div><dt>Accepted proposal revision</dt><dd>{p.remote_revision}</dd></div></>}
       {s.accepted_at && <div><dt>Accepted in source</dt><dd><time dateTime={s.accepted_at}>{new Date(s.accepted_at).toLocaleString()}</time></dd></div>}
       {s.completed_at && <div><dt>Completed in source</dt><dd><time dateTime={s.completed_at}>{new Date(s.completed_at).toLocaleString()}</time></dd></div>}
     </dl>
+    {p.provider === 'inkwell' && <p className="callout"><strong>Original PDF matches this estimate.</strong><span>The signed document was downloaded from Inkwell and its hash verified. Document hashes and exact revisions are available in Details.</span></p>}
     <Details facts={{ 'estimate revision': p.estimate_revision, 'source revision': p.remote_revision, 'proof SHA-256': p.proof_sha256, 'source original PDF SHA-256': s.original_sha256, 'signed PDF SHA-256': s.signed_sha256, 'retained estimate PDF SHA-256': estimate.pdf_sha256, 'attached PDF SHA-256': p.pdf_sha256, 'preview expires': p.expires_at }} code={['estimate revision', 'source revision', 'proof SHA-256', 'source original PDF SHA-256', 'signed PDF SHA-256', 'retained estimate PDF SHA-256', 'attached PDF SHA-256']} />
     {stale || expired ? <p className="callout callout-warn">Request another preview of the source record against the current estimate before attaching it.</p> : p.status === 'pending' && <>
       <p className="hint">Attach the retained proof reviewed here. This records the external link; it does not accept the estimate, create an invoice, record a deposit or charge the customer.</p>
