@@ -13,7 +13,7 @@ export function projectionFields(select: string) {
   parts.push(select.slice(start))
   return parts.map(part => (/\bAS\s+(\w+)\s*$/i.exec(part)?.[1] ?? part.trim().replace(/^\w+\./, '')))
 }
-const integers = new Set('active suspense rate_milli_percent number every months runs terms_days priority position automatic created_entry duplicate_count line_count late off_cycle charges refunds complete sequence reached_bp transactions fiscal_year_start'.split(' '))
+const integers = new Set('active suspense rate_milli_percent number every months runs minutes terms_days priority position automatic created_entry duplicate_count line_count late off_cycle charges refunds complete sequence reached_bp transactions fiscal_year_start'.split(' '))
 const nested: Record<string, string> = {
   bank_lines: 'bank_line_id,active', postings: 'journal_line_id,active', voided: 'id,statement_id,end_date,sequence',
   cells: 'account_id,month,amount_cents', messages: 'id,at,via,body',
