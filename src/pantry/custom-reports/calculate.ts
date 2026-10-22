@@ -116,6 +116,7 @@ async function sourceLines(db: D1Database, d: CustomReportDefinition, from: stri
 /** Reads native reports on the declared/default basis; nothing accepts stored totals. */
 export async function calculateCustomReport(db: D1Database, definition: CustomReportDefinition, drills?: CustomReportDrillGraph): Promise<CalculatedCustomReport> {
   const d = validateCustomReportDefinition(definition)
+  const dimensionRevision=['class','location','project'].includes(d.comparison??'')?await one(db,'SELECT COUNT(*) AS n,COALESCE(MAX(rowid),0) AS last FROM pt_audit'):null
   const [basis, entity, chart, contacts] = await Promise.all([reportBasis(db, d.basis), one(db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1'), all<Account>(db, 'SELECT id, code, name, type FROM pt_accounts ORDER BY code'), all<{ id: string; name: string }>(db, 'SELECT id, name FROM pt_contacts')])
   const accounts = new Map(chart.map(a => [a.id, a])), contactNames = new Map(contacts.map(c => [c.id, c.name]))
   const checkSelection = (selection?: AccountSelection) => {
@@ -269,5 +270,6 @@ export async function calculateCustomReport(db: D1Database, definition: CustomRe
     earlierLayout.add(row.id)
   }
   const range = ['balance-sheet', 'trial-balance'].includes(d.source) ? `As of ${d.to}` : `${d.from} to ${d.to}`
+  if(dimensionRevision)requireThat(JSON.stringify(await one(db,'SELECT COUNT(*) AS n,COALESCE(MAX(rowid),0) AS last FROM pt_audit'))===JSON.stringify(dimensionRevision),'The books changed while calculating dimension columns; run the report again',409)
   return { id: d.id ?? '', name: d.name, source: d.source, basis, basisLabel: BASIS_LABEL[basis], from: d.from, to: d.to, range, columns, rows: output, sourceQuery: { ...(dimension?{dimension:dimension.kind,dimensionValue:dimension.id}:{}), ...(comparison!=='single'?{columns:comparison}:{}) }, notes: [...(dimension ? [`Dimension filter: ${dimension.label}. Other sides may be coded elsewhere.`] : []), ...(d.notes ?? [])] }
 }

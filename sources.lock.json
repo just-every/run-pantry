@@ -3080,7 +3080,7 @@
       "executable": false
     },
     "src/pantry/custom-reports/calculate.ts": {
-      "sha256": "db429e6db42aa239d9386af9935b369ff857f6619aa548b7acf71d066773641d",
+      "sha256": "95ec7d9a62b1c5c02a41a559b5bb382c23df0b29b8edcccd60a362e738af7f4c",
       "executable": false
     },
     "src/pantry/custom-reports/commands.ts": {
