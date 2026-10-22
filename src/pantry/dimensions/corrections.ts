@@ -26,3 +26,9 @@ export async function documentComponentCoding(db:D1Database){
   return original?correctedTags(original,coding):dimensionTags(source)
  }
 }
+
+export async function documentCorrectionFence(db:D1Database):Promise<Sql>{
+ const expression='SELECT json_group_array(json_array(id,document_line_id,correcting_entry_id)) FROM (SELECT * FROM pt_reclassifications WHERE document_line_id IS NOT NULL ORDER BY id)'
+ const row=(await all(db,expression))[0]
+ return guard(`(${expression})=?`,Object.values(row)[0])
+}

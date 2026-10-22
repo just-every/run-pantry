@@ -51,7 +51,9 @@ const reclassify: Command = { need: 'post', async run(c, b) {
   for (const l of lines) {
     const documentLine=dimension?(l.document_line_id??(['invoice','credit','bill'].includes(l.source_kind)?l.id:null)):null
     if(documentLine){
-      const root=await one(c.db,'SELECT entry_id FROM pt_journal_lines WHERE id=?',documentLine)
+      const root=await one(c.db,'SELECT l.entry_id,e.reversed_by_id FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id WHERE l.id=?',documentLine)
+      requireThat(root&&!root.reversed_by_id,'The source document was reversed; its correction cannot be recoded',409)
+      statements.push(guard("EXISTS(SELECT 1 FROM pt_journal_entries WHERE id=? AND reversed_by_id IS NULL)",root.entry_id))
       for(const day of new Set(recognized.filter(r=>r.docJournalId===root?.entry_id).map(r=>r.date))){await assertOpen(c.db,day);statements.push(periodOpen(day))}
     }
     const id = uid(), revision = uid(), amount = l.debit_cents || l.credit_cents, debit = l.debit_cents > 0

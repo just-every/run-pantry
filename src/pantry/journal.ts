@@ -1,3 +1,4 @@
+import { documentCoding,documentCorrectionFence } from './dimensions/corrections'
 // The general journal: every posting in Pantry is a balanced entry written here.
 // Drafts may change; posted entries are immutable (the schema's triggers refuse
 // edits) and are corrected only by a linked reversal.
@@ -142,8 +143,10 @@ export async function reversalStatements(db: D1Database, actor: AuditActor, orig
   requireThat(!matched, 'This entry is matched to a bank statement line; undo the match first', 409)
   const id = uid()
   const paymentBanks=original.source_kind==='payment'?await all(db,'SELECT bank_account_id FROM pt_payments WHERE journal_id=?',original.id):[]
-  const lines: Line[] = original.lines.map((l: Data) => ({ accountId: l.account_id, debit: l.credit_cents, credit: l.debit_cents, memo: l.memo, contactId: l.contact_id, className:l.class_name,locationName:l.location_name,projectName:l.project_name }))
+  const coding=original.source_kind==='bill'?await documentCoding(db):new Map<string,Data>()
+  const lines: Line[] = original.lines.map((l: Data) => ({ ...dimensionTags(coding.get(l.id)??l),accountId: l.account_id, debit: l.credit_cents, credit: l.debit_cents, memo: l.memo, contactId: l.contact_id }))
   return { id, statements: [
+    ...(original.source_kind==='bill'?[await documentCorrectionFence(db)]:[]),
     ...bankAuthority(actor,paymentBanks.map(p=>p.bank_account_id)),
     ...nativeApprovalAuthority(actor, original.source_kind === 'bill' ? 'bill' : original.source_kind === 'payment' ? 'payment' : 'journal', lines.reduce((sum, l) => sum + l.debit, 0), original.source_kind === 'bank' ? 'record' : undefined),
     ...await ledgerBankAuthority(db, actor, lines.map(l => l.accountId), original.source_kind === 'manual' ? 'post' : 'record'),
