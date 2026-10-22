@@ -30,7 +30,7 @@ export async function dimensionCompletionBrowser(t){
  const proof=process.env.PANTRY_EVIDENCE_DIR||'/tmp/pantry-dimension-completion';await mkdir(proof,{recursive:true})
  for(const width of [1440,390]){
   const page=await owner.newPage();await page.setViewportSize({width,height:1000});const errors=[];page.on('pageerror',e=>errors.push(String(e)))
-  const shot=async(name,locator)=>{assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${name} fits ${width}`);if(locator)await locator.screenshot({path:`${proof}/completion-${name}-${width}.png`});else await page.screenshot({path:`${proof}/completion-${name}-${width}.png`})}
+  const shot=async(name,locator)=>{assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${name} fits ${width}`);if(locator)await locator.screenshot({path:`${proof}/completion-${name}-${width}.png`});else await page.screenshot({fullPage:true,path:`${proof}/completion-${name}-${width}.png`})}
   const submit=async(button,op)=>{const saved=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/pantry/command/'+op&&r.request().method()==='POST');await button.click();assert.equal((await saved).status(),200)}
   const report=async(slug,extra={})=>{await page.goto(origin+'/app/reports?'+new URLSearchParams({report:slug,from:'2026-09-01',to:'2026-09-30',basis:'cash',...extra}));await expect(page.getByRole('heading',{name:'Reports',exact:true})).toBeVisible()}
   await report('sales-by-customer');await page.getByLabel('Split by dimension',{exact:true}).selectOption('class')

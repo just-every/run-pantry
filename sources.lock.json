@@ -5052,7 +5052,7 @@
       "executable": false
     },
     "tests/app/dimension-completion.mjs": {
-      "sha256": "f426c779c2707a902124f04bd79410ed7e3d58f42cf65949979b43f3db89c106",
+      "sha256": "e095c8011d685cf89a216949ecbbbea7dac214f7e65cfbded289d7b9e13fb078",
       "executable": false
     },
     "tests/app/dimensions-journey.mjs": {
