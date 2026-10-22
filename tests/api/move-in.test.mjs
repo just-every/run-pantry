@@ -252,3 +252,6 @@ test('MIGRATE-007 spreadsheet import of lists and open items', async t => {
   assert.deepEqual([tb.balanced, tb.debit, tb.credit, ar.itemsTotal, ar.agrees, ap.itemsTotal, ap.agrees], [true, 250000, 250000, 250000, true, 100000, true])
   await h.command('move-in.undo', { jobId: renamedJob.id }, ann, 409)
 })
+
+import {dimensionOpening} from './dimension-opening.mjs'
+test('DIM-001 staged spreadsheet opening dimensions validate, sign off and split without losing account tie-outs',dimensionOpening)

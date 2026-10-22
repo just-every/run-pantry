@@ -153,7 +153,7 @@ export function Reports() {
             <Field label="Payee filter" name="payee" value={search.payee ?? ''} empty="All payees" options={state.contacts.map((c: D) => ({ value: c.id, label: c.name }))} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => set({ payee: e.target.value || undefined })} /></>}
           </div>}>
           {(library || based && !['budget-actual','project-profitability'].includes(slug)) && <p className="row-actions"><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=pdf`} download>Download PDF{based ? ` · ${basis}` : ''}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=csv`} download>Download CSV{based ? ` · ${basis}` : ''}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=xlsx`} download>Download Excel{based ? ` · ${basis}` : ''}</a></p>}
-          {search.split ? <DimensionSplits slug={slug} from={from} to={to} basis={basis} /> : library ? <ReportLibrary slug={slug} basis={basis} from={from} to={to} /> : <Report slug={slug} basis={basis} from={from} to={to} columns={columns} />}
+          {search.split&&!['budget-actual','project-profitability'].includes(slug) ? <DimensionSplits slug={slug} from={from} to={to} basis={basis} /> : library ? <ReportLibrary slug={slug} basis={basis} from={from} to={to} /> : <Report slug={slug} basis={basis} from={from} to={to} columns={columns} />}
         </Card>}
   </>
 }

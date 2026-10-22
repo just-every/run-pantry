@@ -23,7 +23,7 @@ export async function readSpreadsheets(c: Context, b: Data): Promise<Spreadsheet
     files[key] = { name: text(file.name, 'File name', 200), content: parsed.content, ...(parsed.base64 ? { base64: parsed.base64 } : {}) }
   }
   files.mapping = { name: 'column-mapping.json', content: canonicalJson(mappings as any) }
-  const tables = { chart: 'pt_accounts', counterparty: 'pt_contacts', item: 'pt_items', invoice: 'pt_invoices', bill: 'pt_bills', bank: 'pt_bank_accounts', cutover: 'pt_cutovers', 'spreadsheet-key': 'pt_spreadsheet_keys', tax: 'pt_tax_codes', entry: 'pt_journal_entries', line: 'pt_journal_lines' }
+  const tables = { dimensionSettings:'pt_dimension_settings',dimensions:'pt_dimensions',dimensionRequired:'pt_account_dimensions',chart: 'pt_accounts', counterparty: 'pt_contacts', item: 'pt_items', invoice: 'pt_invoices', bill: 'pt_bills', bank: 'pt_bank_accounts', cutover: 'pt_cutovers', 'spreadsheet-key': 'pt_spreadsheet_keys', tax: 'pt_tax_codes', entry: 'pt_journal_entries', line: 'pt_journal_lines' }
   const native = Object.fromEntries(await Promise.all(Object.entries(tables).map(async ([kind, table]) => [kind, await all(c.db, `SELECT * FROM ${table}${kind === 'line' ? ' ORDER BY entry_id, line_no' : ''}`)])))
   return { files, banks: Array.isArray(b.banks) ? b.banks : [], cutoverDate: date(b.cutoverDate, 'Cutover date'), spreadsheet: { sheets, mappings, keys: native['spreadsheet-key'], native } }
 }

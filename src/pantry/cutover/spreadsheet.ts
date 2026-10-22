@@ -102,6 +102,13 @@ function parse(p: SpreadsheetPackage): Parsed {
     requireThat(!(debit && credit), 'A trial balance row has a debit or a credit')
     const tags=dimensionTags(x),key=JSON.stringify([account.name,...Object.values(tags)])
     requireThat(!tbAccounts.has(key), `Duplicate name "${account.name}" in the opening trial balance`)
+    const accountId=nativeIds[ids.account(account.name)]
+    for(const [kind,flag]of [['class','classes_enabled'],['location','locations_enabled'],['project','projects_enabled']] as const){
+      if(!native.dimensionSettings[0]?.[flag])continue
+      const value=tags[`${kind}Name`]
+      requireThat(!value||native.dimensions.some(d=>d.kind===kind&&d.name===value&&d.active),`Choose an active ${kind}`)
+      requireThat(value||!native.dimensionRequired.some(d=>d.account_id===accountId&&d.kind===kind),`A required ${kind} is missing`)
+    }
     tbAccounts.add(key); const t = { ...tags,account: account.name, debit, credit, row }; tbRows.push(t); return t
   })
   for (const [key, kind, partyKind, role] of [['openInvoices', 'invoice', 'customer', 'receivable'], ['unpaidBills', 'bill', 'vendor', 'payable']] as const) rows(key, x => {
