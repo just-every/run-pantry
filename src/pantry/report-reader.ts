@@ -21,19 +21,19 @@ export const FINANCIAL_REPORTS = [
 type Options = { from: string; to: string; basis: Basis; account?: string; payee?: string; columns?: string;dimension?:string;dimensionValue?:string }
 
 export async function readReport(db: D1Database, kind: string, { from, to, basis, account, payee, columns,dimension,dimensionValue }: Options) {
-  requireThat(!dimension||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
+  requireThat(!dimension||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
   const scope=await dimensionScope(db,dimension,dimensionValue)
   if (isLibrary(kind)) return libraryReport(db, kind, from, to, basis, account, payee, scope)
   const e = await one(db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
   if (kind === 'sales-by-customer' || kind === 'expenses-by-vendor') return contactTotals(db, kind === 'sales-by-customer' ? 'customer' : 'vendor', from, to, basis, scope)
   if (kind === 'sales-by-item') return salesByItem(db, from, to, basis, scope)
-  if (kind === 'cash-flow') return cashFlow(db, from, to)
+  if (kind === 'cash-flow') return cashFlow(db, from, to, scope)
   if (kind === 'trial-balance') return trialBalance(db, to, basis,scope)
   if (kind === 'general-ledger') return generalLedger(db, from, to, account || undefined, basis,scope)
   if ((kind === 'profit-and-loss' || kind === 'balance-sheet') && columns && columns !== 'single') return statementColumns(db, kind, columns, from, to, Number(e?.fiscal_year_start ?? 1), basis, scope)
   if (kind === 'profit-and-loss') return profitAndLoss(db, from, to, basis, scope)
   if (kind === 'balance-sheet') return balanceSheet(db, to, Number(e?.fiscal_year_start ?? 1), basis, scope)
-  if (kind === 'sales-tax') return salesTax(db, from, to, basis)
+  if (kind === 'sales-tax') return salesTax(db, from, to, basis, scope)
   if (kind === 'receivables' || kind === 'payables') return ageing(db, kind === 'receivables' ? 'receivable' : 'payable', to)
   throw new Fault(404, 'Unknown report')
 }

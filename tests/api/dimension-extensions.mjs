@@ -113,3 +113,52 @@ export async function dimensionBudgets(t){
  await h.command('budget.save',{name:'Duplicate dimension cell',startMonth:'2026-01',cells:[cells[0],cells[0]]},h.owner,400)
  await h.command('budget.save',{name:'Unknown dimension',startMonth:'2026-01',cells:[{...cells[0],className:'Unknown'}]},h.owner,409)
 }
+
+export async function dimensionTaxAndCash(t) {
+ const {h,acct,bank,tags,other}=await seed(t)
+ const reader=await h.member('synthetic-pantry-tax-reader@example.test','viewer')
+ const customer=await h.command('contact.save',{kind:'customer',name:'Dimension taxable customer'})
+ const tax=await h.command('tax-code.save',{name:'Dimension NY',rate:'10',state:'NY',accountId:acct['2200']})
+ const draft=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-10-03',lines:[{description:'Studio taxable sale',quantity:'1',rate:'100',accountId:acct['4000'],taxCode:tax.id,...tags},{description:'Support taxable sale',quantity:'1',rate:'300',accountId:acct['4000'],taxCode:tax.id,...other}]})
+ await h.command('invoice.approve',{id:draft.id,revision:draft.revision});await h.command('invoice.issue',{id:draft.id})
+ await h.command('payment.record',{direction:'received',contactId:customer.id,date:'2026-10-12',amount:'220',bankAccountId:bank.id,allocations:[{targetId:draft.id,amount:'220'}]})
+ for(const [date,memo,lines] of [['2026-09-30','Opening cash by dimension',[{accountId:acct['1000'],debit:'40',...other},{accountId:acct['3000'],credit:'40',...other}]],['2026-10-15','Different coded cash sides',[{accountId:acct['6200'],debit:'10',...tags},{accountId:acct['1000'],credit:'10',...other}]]]){
+  const j=await h.command('journal.save-draft',{date,memo,lines});await h.command('journal.post',{id:j.id,revision:j.revision})
+ }
+ const from='2026-10-01',to='2026-10-31'
+ const before=(await h.view('journal')).entries
+ for(const [kind,values] of [['class',['Studio','Support','']],['location',['New York','Remote','']],['project',['Cedar','Cypress','']]]) {
+  const flows=[]
+  for(const name of values) {
+   const scope={dimension:kind,dimensionValue:name?'value:'+name:'unassigned'},q={from,to,...scope}
+   const flow=await h.view('reports/cash-flow?'+new URLSearchParams(q),reader);flows.push(flow)
+   const figures=[...flow.operating,...flow.investing,...flow.financing].map(l=>[l.id,l.amount])
+   figures.push(['operating',flow.totalOperating],['investing',flow.totalInvesting],['financing',flow.totalFinancing],['net-change',flow.netChange],['opening',flow.opening],['closing',flow.closing])
+   for(const [line,amount] of figures) {
+    const d=await h.view('reports/cash-flow/detail?'+new URLSearchParams({...q,line}),reader)
+    assert.equal(d.ties,true);assert.equal(d.figure,amount);assert.ok(d.rows.every(r=>(r[`${kind}_name`]||'')===name))
+    const csv=await h.send('/api/pantry/reports/cash-flow/detail/export?'+new URLSearchParams({...q,line}),undefined,{cookie:reader})
+    assert.equal(csv.status,200);assert.ok(csv.value.includes('dimensionValue'))
+   }
+   const file=await h.send('/api/pantry/reports/cash-flow.csv?'+new URLSearchParams(q),undefined,{cookie:reader})
+   assert.equal(file.status,200);assert.ok(file.value.includes(`${kind} · ${name||'Unassigned'}`))
+   for(const basis of ['cash','accrual']) {
+    const tq={...q,basis},r=await h.view('reports/sales-tax?'+new URLSearchParams(tq),reader)
+    assert.equal(r.totals.taxable,name===values[0]?(basis==='cash'?5000:10000):name===values[1]?(basis==='cash'?15000:30000):0)
+    for(const metric of ['taxable','charged','collected','owed']) {
+     const d=await h.view('reports/detail?'+new URLSearchParams({...tq,report:'sales-tax',line:JSON.stringify(['total',metric])}),reader)
+     assert.equal(d.ties,true);assert.equal(d.figure,r.totals[metric]);assert.ok(d.rows.every(row=>(row[`${kind}_name`]||'')===name))
+    }
+    for(const a of r.ledger.accounts)for(const part of ['opening','fromSales','other','closing','owed']) {
+     const d=await h.view('reports/detail?'+new URLSearchParams({...tq,report:'sales-tax',line:JSON.stringify(['account',a.id,part])}),reader)
+     assert.equal(d.ties,true);assert.equal(d.figure,a[part])
+    }
+    for(const format of ['pdf','csv','xlsx'])assert.equal((await h.send('/api/pantry/reports/sales-tax/export?'+new URLSearchParams({...tq,format}),undefined,{cookie:reader})).status,200)
+   }
+  }
+  const whole=await h.view('reports/cash-flow?'+new URLSearchParams({from,to}),reader)
+  for(const metric of ['opening','closing','totalOperating','totalInvesting','totalFinancing','netChange'])assert.equal(flows.reduce((n,r)=>n+r[metric],0),whole[metric],`cash-flow ${kind}/${metric} splits tie to the whole report`)
+  assert.equal(flows[0].ties,false,'different coded sides do not claim a filtered cash tie')
+ }
+ assert.deepEqual((await h.view('journal')).entries,before)
+}

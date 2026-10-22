@@ -17,7 +17,7 @@ const money = (n: number) => (n / 100).toFixed(2)
 const cell = (v: unknown) => `"${String(v).replaceAll('"', '""')}"`
 
 export async function reportExport(db: D1Database, kind: string, from: string, to: string, basis: Basis, format: string, columns?: string, account?: string,dimension?:string,dimensionValue?:string) {
-  requireThat(!dimension||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
+  requireThat(!dimension||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
   const scope=await dimensionScope(db,dimension,dimensionValue)
   const entity = await one(db, 'SELECT * FROM pt_entity WHERE id = 1')
   if (columns && columns !== 'single' && (kind === 'profit-and-loss' || kind === 'balance-sheet')) return statementExport(await statementColumns(db, kind, columns, from, to, Number(entity?.fiscal_year_start ?? 1), basis, scope), entity?.legal_name ?? 'Pantry', format)
@@ -53,7 +53,7 @@ export async function reportExport(db: D1Database, kind: string, from: string, t
     rows = r.rows.map(l => row(l.sku ? `${l.name} · ${l.sku}` : l.name, l.amount)); totals = [row('Total', r.total)]
   } else if (kind === 'sales-tax') {
     title = 'Sales tax by state'
-    const r = await salesTax(db, from, to, basis)
+    const r = await salesTax(db, from, to, basis, scope)
     rows = r.states.flatMap(s => s.codes.flatMap((c: Data) => [row(`${s.state} · ${c.name} · taxable sales`, c.taxable), row(`${s.state} · ${c.name} · tax owed`, c.owed)]))
     totals = [row('Tax owed', r.totals.owed)]
   } else throw new Fault(404, 'Choose a financial report to export')

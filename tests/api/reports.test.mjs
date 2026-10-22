@@ -924,3 +924,6 @@ test('REPORT-005 sales tax figures by code, state and all states, exempt sales a
 
 import {dimensionBudgets} from './dimension-extensions.mjs'
 test('DIM-001 class and location budgets import and split to tied actual, plan, variance and source figures',dimensionBudgets)
+
+import {dimensionTaxAndCash} from './dimension-extensions.mjs'
+test('DIM-001 cash-flow and sales-tax dimension filters keep dated contributions, liability ties, source figures and exports',dimensionTaxAndCash)

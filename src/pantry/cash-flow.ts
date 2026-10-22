@@ -1,3 +1,4 @@
+import { inDimension, type DimensionScope } from './dimensions/scope'
 // Indirect cash flow: accrual earnings, working-capital changes and noncash
 // adjustments, then investing and financing. Integer cents throughout.
 import { authority, who } from './access'
@@ -37,10 +38,10 @@ type Contribution = { key: string; lineId: string; accountId: string; entryId: s
 type FlowLine = { id: string; code: string; name: string; amount: number; rows: Contribution[] }
 const sum = (rows: { amount: number }[]) => rows.reduce((n, r) => n + r.amount, 0)
 
-export async function cashFlow(db: D1Database, from: string, to: string) {
+export async function cashFlow(db: D1Database, from: string, to: string, dimension?: DimensionScope) {
   requireThat(from <= to, 'From must be on or before To')
   const accounts = await flowAccounts(db), byId = new Map(accounts.map(a => [a.id, a]))
-  const posted = await all(db, `SELECT l.id, l.account_id, l.debit_cents, l.credit_cents, e.id AS entry_id, e.number, e.entry_date, e.memo
+  const posted = await all(db, `SELECT l.id, l.account_id, l.debit_cents, l.credit_cents,l.class_name,l.location_name,l.project_name, e.id AS entry_id, e.number, e.entry_date, e.memo
     FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? ORDER BY e.entry_date, e.number, l.line_no`, from, to)
   const cashIds = new Set(accounts.filter(a => a.flowClass === 'cash').map(a => a.id))
   const cashByEntry = new Map<string, number>()
@@ -54,6 +55,7 @@ export async function cashFlow(db: D1Database, from: string, to: string) {
   }
   lines.set('net-income', { id: 'net-income', code: '', name: 'Net income (accrual)', amount: 0, rows: [] })
   for (const l of posted) {
+    if(!inDimension(l,dimension))continue
     const a = byId.get(l.account_id)!, amount = l.credit_cents - l.debit_cents
     if (a.type === 'income' || a.type === 'expense') {
       add('net-income', 'Net income (accrual)', l, amount)
@@ -72,16 +74,16 @@ export async function cashFlow(db: D1Database, from: string, to: string) {
   const operating = [...lines.values()].filter(l => l.id === 'net-income' || l.id.startsWith('noncash:') || l.id.startsWith('reclass:') || byId.get(l.id)?.flowClass === 'operating')
   const investing = [...lines.values()].filter(l => byId.get(l.id)?.flowClass === 'investing')
   const financing = [...lines.values()].filter(l => byId.get(l.id)?.flowClass === 'financing')
-  const opening = (await balances(db, prevDay(from))).filter(a => cashIds.has(a.id)).reduce((n, a) => n + a.net, 0)
-  const closing = (await balances(db, to)).filter(a => cashIds.has(a.id)).reduce((n, a) => n + a.net, 0)
+  const opening = (await balances(db, prevDay(from),undefined,'accrual',dimension)).filter(a => cashIds.has(a.id)).reduce((n, a) => n + a.net, 0)
+  const closing = (await balances(db, to,undefined,'accrual',dimension)).filter(a => cashIds.has(a.id)).reduce((n, a) => n + a.net, 0)
   const totalOperating = sum(operating), totalInvesting = sum(investing), totalFinancing = sum(financing), netChange = totalOperating + totalInvesting + totalFinancing
-  return { basis: 'accrual', method: 'indirect', from, to, openingDate: prevDay(from), operating, investing, financing, totalOperating, totalInvesting, totalFinancing,
+  return { ...(dimension?{dimension}:{}), basis: 'accrual', method: 'indirect', from, to, openingDate: prevDay(from), operating, investing, financing, totalOperating, totalInvesting, totalFinancing,
     opening, closing, netChange, balanceSheetChange: closing - opening, ties: netChange === closing - opening,
     cashAccounts: accounts.filter(a => cashIds.has(a.id)).map(a => ({ id: a.id, code: a.code, name: a.name })), accounts }
 }
 
-export async function cashFlowDetail(db: D1Database, from: string, to: string, id: string) {
-  const r = await cashFlow(db, from, to), allLines = [...r.operating, ...r.investing, ...r.financing]
+export async function cashFlowDetail(db: D1Database, from: string, to: string, id: string, dimension?: DimensionScope) {
+  const r = await cashFlow(db, from, to, dimension), allLines = [...r.operating, ...r.investing, ...r.financing]
   const totals: Record<string, [string, FlowLine[]]> = { operating: ['Net cash from operating activities', r.operating], investing: ['Net cash from investing activities', r.investing], financing: ['Net cash from financing activities', r.financing], 'net-change': ['Net change in cash', allLines] }
   const total = totals[id], line = allLines.find(l => l.id === id)
   const detail = async (label: string, figure: number, rows: Contribution[], sourceFrom: string, sourceTo: string) => {
@@ -92,12 +94,12 @@ export async function cashFlowDetail(db: D1Database, from: string, to: string, i
       return { ...source, ...row }
     })
     const sum = enriched.reduce((n, row) => n + row.amount, 0)
-    return { label, figure, rows: enriched, accounts: r.accounts, basis: 'accrual' as const, basisLabel: 'Indirect method - accrual starting income', from: sourceFrom === FIRST_DAY ? null : sourceFrom, to: sourceTo, total: sum, ties: sum === figure }
+    return { ...(dimension?{context:{dimension:dimension.kind,dimensionValue:dimension.id}}:{}), label:label+(dimension?` · ${dimension.label}`:''), figure, rows: enriched, accounts: r.accounts, basis: 'accrual' as const, basisLabel: 'Indirect method - accrual starting income', from: sourceFrom === FIRST_DAY ? null : sourceFrom, to: sourceTo, total: sum, ties: sum === figure }
   }
   if (id === 'opening' || id === 'closing') {
     const asOf = id === 'opening' ? r.openingDate : to
     const cashIds = new Set(r.cashAccounts.map(a => a.id))
-    const rows = (await all(db, `SELECT l.*, e.id AS entry_id, e.number, e.entry_date, e.memo AS entry_memo FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id WHERE e.status = 'posted' AND e.entry_date <= ? ORDER BY e.entry_date, e.number, l.line_no`, asOf)).filter(l => cashIds.has(l.account_id))
+    const rows = (await all(db, `SELECT l.*, e.id AS entry_id, e.number, e.entry_date, e.memo AS entry_memo FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id WHERE e.status = 'posted' AND e.entry_date <= ? ORDER BY e.entry_date, e.number, l.line_no`, asOf)).filter(l => cashIds.has(l.account_id)&&inDimension(l,dimension))
       .map(l => ({ key: l.id, lineId: l.id, accountId: l.account_id, entryId: l.entry_id, number: l.number, date: l.entry_date, description: l.entry_memo, amount: l.debit_cents - l.credit_cents }))
     return detail(id === 'opening' ? 'Opening cash' : 'Closing cash', r[id], rows, FIRST_DAY, asOf)
   }
@@ -109,7 +111,7 @@ export async function cashFlowDetail(db: D1Database, from: string, to: string, i
 const cell = (v: unknown) => `"${String(v).replaceAll('"', '""')}"`
 export function cashFlowCsv(r: Awaited<ReturnType<typeof cashFlow>>) {
   const money = (v: number) => (v / 100).toFixed(2)
-  const rows: unknown[][] = [['Statement of cash flows', 'Indirect method · starts from accrual net income', r.from, r.to], ['Section', 'Code', 'Line', 'Amount (USD)']]
+  const rows: unknown[][] = [[`Statement of cash flows${r.dimension?` · ${r.dimension.label}`:''}`, 'Indirect method · starts from accrual net income', r.from, r.to], ['Section', 'Code', 'Line', 'Amount (USD)']]
   for (const [name, lines, total] of [['Operating', r.operating, r.totalOperating], ['Investing', r.investing, r.totalInvesting], ['Financing', r.financing, r.totalFinancing]] as const) {
     for (const l of lines) rows.push([name, l.code, l.name, money(l.amount)])
     rows.push([name, '', `Net cash from ${name.toLowerCase()} activities`, money(total)])

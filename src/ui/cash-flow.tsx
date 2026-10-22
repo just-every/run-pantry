@@ -8,13 +8,14 @@ function Figure({ id, children }: { id: string; children: React.ReactNode }) {
 }
 
 export function CashFlow({ from, to }: { from: string; to: string }) {
-  const { data: r, error, reload } = useView<D>(`reports/cash-flow?from=${from}&to=${to}`), { state } = useShared()
+  const search=useSearch({from:'/app/reports'}),scope=new URLSearchParams(search.dimension?{dimension:search.dimension,dimensionValue:search.dimensionValue??''}:{}).toString()
+  const { data: r, error, reload } = useView<D>(`reports/cash-flow?from=${from}&to=${to}&${scope}`), { state } = useShared()
   if (!r) return <Loading what="the cash-flow statement" error={error} />
   const sections: [string, D[], number, string][] = [['Operating activities', r.operating, r.totalOperating, 'operating'], ['Investing activities', r.investing, r.totalInvesting, 'investing'], ['Financing activities', r.financing, r.totalFinancing, 'financing']]
   return <>
-    <p><Chip tone={r.ties ? 'good' : 'bad'}>{r.ties ? 'Ties to the balance sheet cash change' : 'Does not tie to the balance sheet'}</Chip></p>
+    <>{r.dimension&&<p className="hint">Only {r.dimension.label} posting lines are included. The cash tie can differ when other sides are coded elsewhere; choose All dimensions to check the whole statement.</p>}<p><Chip tone={r.ties ? 'good' : 'bad'}>{r.ties ? 'Ties to the balance sheet cash change' : 'Does not tie to the balance sheet'}</Chip></p></>
     <p className="hint">Indirect method: accrual net income adjusted for working capital and noncash activity. Cash and cash equivalents: {r.cashAccounts.map((a: D) => a.name).join(', ') || 'none classified'}. Choose any figure to open its entries.</p>
-    <p><a className="btn btn-secondary" download href={`/api/pantry/reports/cash-flow.csv?from=${from}&to=${to}`}>Cash-flow CSV</a></p>
+    <p><a className="btn btn-secondary" download href={`/api/pantry/reports/cash-flow.csv?from=${from}&to=${to}&${scope}`}>Cash-flow CSV</a></p>
     <Table heads={['Activity', 'Amount']} figures={[1]}>
       {[...sections.flatMap(([name, rows, total, id]) => [<tr className="section" key={id}><td colSpan={2}>{name}</td></tr>,
         ...rows.map(l => <tr key={l.id}><td><Figure id={l.id}>{l.name}</Figure></td><td className="fig"><Figure id={l.id}>{usd(l.amount)}</Figure></td></tr>),
@@ -31,7 +32,8 @@ export function CashFlow({ from, to }: { from: string; to: string }) {
 
 export function CashFlowDetail({ from, to, line }: { from: string; to: string; line: string }) {
   const search = useSearch({ from: '/app/reports' })
-  const { data: r, error } = useView<D>(`reports/cash-flow/detail?from=${from}&to=${to}&line=${encodeURIComponent(line)}`)
+  const scope=new URLSearchParams(search.dimension?{dimension:search.dimension,dimensionValue:search.dimensionValue??''}:{}).toString()
+  const { data: r, error } = useView<D>(`reports/cash-flow/detail?from=${from}&to=${to}&line=${encodeURIComponent(line)}&${scope}`)
   return <><nav className="crumbs"><Link to="/app/reports" search={{ ...search, line: undefined, record: undefined }}>Cash flow</Link>{r && <> / {r.label}</>}</nav>
     {!r ? <Loading what="the entries" error={error} /> : <Card title={r.label} actions={<strong>{usd(r.figure)}</strong>}>
       <p>{r.from ? <>{day(r.from)} to {day(r.to)}</> : <>All posted cash activity through {day(r.to)}</>} · Indirect method. These contributions add up to {usd(r.figure)}.</p>
