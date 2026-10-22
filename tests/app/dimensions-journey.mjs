@@ -25,6 +25,7 @@ export async function dimensionsBrowser(t){
  for(const width of [1440,390]){
   const page=await owner.newPage();await page.setViewportSize({width,height:1000})
   const errors=[];page.on('pageerror',e=>errors.push(String(e)))
+  const submit=async(button,operation)=>{const saved=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/pantry/command/'+operation&&r.request().method()==='POST');await button.click();assert.equal((await saved).status(),200)}
   const shot=async(name)=>{assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${name} fits ${width}`);await page.screenshot({path:`${proof}/dimensions-${name}-${width}.png`,fullPage:true})}
   await page.goto(origin+'/app/settings')
   const section=page.getByRole('heading',{name:'Classes, locations and projects',exact:true}).locator('..').locator('..')
@@ -49,7 +50,7 @@ export async function dimensionsBrowser(t){
   await section.getByText('Processor line coding',{exact:true}).click()
   await section.getByLabel('Processor line role',{exact:true}).selectOption('fees')
   for(const [kind,name] of [['class',`Studio ${width}`],['location',`New York ${width}`],['project',`Cedar website ${width}`]])await section.getByLabel(`Processor ${kind}`,{exact:true}).selectOption(name)
-  await section.getByRole('button',{name:'Save processor coding',exact:true}).click()
+  await submit(section.getByRole('button',{name:'Save processor coding',exact:true}),'dimension.processor')
   const processor=(await view('dimensions')).processor.find(p=>p.role==='fees')
   assert.deepEqual([processor.class_name,processor.location_name,processor.project_name],[`Studio ${width}`,`New York ${width}`,`Cedar website ${width}`])
   await section.screenshot({path:`${proof}/dimensions-settings-${width}.png`})
@@ -341,7 +342,7 @@ export async function dimensionsBrowser(t){
   await page.getByRole('button',{name:'Edit contact details',exact:true}).click()
   for(const [kind,name] of [['class',`Studio ${width}`],['location',`New York ${width}`],['project',`Cedar website ${width}`]])await page.getByLabel(`Default ${kind}`,{exact:true}).selectOption(name)
   await shot('vendor-defaults')
-  await page.getByRole('button',{name:'Save',exact:true}).click()
+  await submit(page.getByRole('button',{name:'Save',exact:true}),'contact.save')
   const changedVendor=(await view('state')).contacts.find(v=>v.id===vendor.id)
   assert.deepEqual([changedVendor.default_class,changedVendor.default_location,changedVendor.default_project],[`Studio ${width}`,`New York ${width}`,`Cedar website ${width}`])
   await page.goto(origin+'/app/sales?tab=bills')
@@ -354,7 +355,7 @@ export async function dimensionsBrowser(t){
   await page.getByLabel('Last bill date',{exact:true}).fill('2026-10-10')
   for(const [kind,name] of [['class',`Studio ${width}`],['location',`New York ${width}`],['project',`Cedar website ${width}`]])await page.getByLabel(`Recurring bill ${kind}`,{exact:true}).selectOption(name)
   await shot('recurring-bill-coded')
-  await page.getByRole('button',{name:'Create recurring bill template',exact:true}).click()
+  await submit(page.getByRole('button',{name:'Create recurring bill template',exact:true}),'recurring-bill.save')
   await expect(page.getByRole('button',{name:'Create recurring bill template',exact:true})).toBeEnabled()
   await page.getByRole('button',{name:'Generate due bills',exact:true}).click()
   await expect.poll(async()=>((await view('sales')).bills.find(b=>b.reference===`Dimension renewal ${width} 2026-10-10`))?.status).toBe('draft')
