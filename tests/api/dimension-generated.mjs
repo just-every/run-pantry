@@ -37,6 +37,11 @@ export async function dimensionGenerated(t){
  const funding=await h.command('journal.save-draft',{date:'2026-09-01',memo:'Prepaid subscription funding',lines:[{accountId:prepaid.id,debit:'12',...tags},{accountId:acct['1000'],credit:'12',...tags}]});await h.command('journal.post',{id:funding.id,revision:funding.revision})
  let schedule=await h.command('recognition.save',{kind:'prepaid',name:'Studio subscription recognition',balanceAccountId:prepaid.id,recognitionAccountId:acct['6200'],sourceJournalId:funding.id,amount:'12',startDate:'2026-09-30',months:2})
  assert.equal(schedule.class_name,'Studio');await h.command('recognition.approve',{id:schedule.id,revision:schedule.revision})
+ const recurring=await h.command('recurring.save',{customerId:customer.id,startDate:'2026-09-01',endDate:'2026-09-01',unit:'month',every:1,mode:'draft',lines:[{description:'Recurring studio service',quantity:'1',rate:'10',accountId:acct['4000'],taxCode:'exempt',...tags}]})
+ const price=await h.command('recurring.price',{id:recurring.id,revision:recurring.revision,effectiveDate:'2026-09-01',lines:[{description:'Recurring support revision',quantity:'1',rate:'15',accountId:acct['4000'],taxCode:'exempt',...other}]})
+ assert.equal(price.lines[0].className,'Support')
+ let recurringJournal=await h.command('recurring-journal.save',{name:'Studio repeating journal',memo:'Studio recurring correction',startDate:'2026-09-01',endDate:'2026-09-01',cadence:'month',every:1,mode:'post',lines:[{accountId:acct['6200'],debit:'1',...tags},{accountId:acct['3000'],credit:'1',...tags}]})
+ await h.command('recurring-journal.approve',{id:recurringJournal.id,revision:recurringJournal.revision})
  await h.cron(Date.parse('2026-10-22T12:00:00Z'))
  const recognition=(await entries()).filter(e=>e.memo.startsWith('Studio subscription recognition:'))
  assert.ok(recognition.length);for(const e of recognition)await coded(e.id)
@@ -45,6 +50,10 @@ export async function dimensionGenerated(t){
  const remoteJournal=await scoped('journals/'+check.journal_id);assert.ok(remoteJournal.lines.every(l=>l.class_name==='Studio'))
  assert.equal((await scoped('receipts/'+receipt.id)).class_name,'Studio')
  assert.equal((await scoped('recognition-schedules/'+schedule.id)).class_name,'Studio')
+ const generatedInvoice=(await h.view('sales')).invoices.find(i=>i.recurring_id===recurring.id)
+ assert.ok(generatedInvoice);assert.equal(generatedInvoice.lines[0].class_name,'Support')
+ await h.command('invoice.approve',{id:generatedInvoice.id,revision:generatedInvoice.revision});const recurringIssued=await h.command('invoice.issue',{id:generatedInvoice.id});await coded(recurringIssued.journal_id,other)
+ const recurringPosting=(await entries()).find(e=>e.source_id===recurringJournal.id);assert.ok(recurringPosting);await coded(recurringPosting.id)
  // Required bank/control values refuse incomplete generated work without any partial journal.
  const before=(await entries()).length
  await h.command('customer-deposit.record',{customerId:customer.id,date:'2026-09-08',amount:'1',bankAccountId:bank.id,liabilityAccountId:liability.id,method:'ach',reference:'synthetic-pantry-79'},h.owner,409)
@@ -59,4 +68,13 @@ export async function dimensionGenerated(t){
  assert.deepEqual(receiptEntry.lines.filter(l=>l.account_id===acct['1000']).map(l=>[l.class_name,l.debit_cents]).sort(),[['Studio',10000],['Support',20000]])
  await h.command('match.undo',{id:match.id,reason:'Review source coding'})
  assert.equal((await h.view('sales')).payments.find(p=>p.id===feedReceipt.id).reversal_id!==null,true)
+ const reserve=await h.command('account.save',{code:'1010',name:'Studio reserve',type:'asset',subtype:'bank'})
+ const reserveBank=await h.command('bank-account.save',{name:'Reserve',institution:'Synthetic bank',accountId:reserve.id,numberLast4:'4141',openingDate:'2026-01-01',openingBalance:'0'})
+ await h.command('dimension.require',{accountId:reserve.id,kinds:['class']})
+ const transferStatement=await h.command('statement.import',{bankAccountId:bank.id,fileName:'synthetic-pantry-85.csv',content:'Posting Date,Description,Amount\n12/01/2026,Move studio reserve,-10',opening:'300',closing:'290',start:'2026-12-01',end:'2026-12-31',confirmLast4:'3131'})
+ const transferLine=(await h.view('bank/lines')).lines.find(l=>l.statement_id===transferStatement.statement.id)
+ await h.command('bank-line.dimensions',{id:transferLine.id,...tags})
+ await h.command('match.approve',{bankLineIds:[transferLine.id],create:[{type:'transfer',direction:'out',amount:'10',otherBankAccountId:reserveBank.id}]})
+ const transfer=(await entries()).find(e=>e.source_kind==='bank'&&e.lines.some(l=>l.account_id===reserve.id));assert.ok(transfer);await coded(transfer.id)
+
 }

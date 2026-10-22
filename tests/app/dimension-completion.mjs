@@ -78,6 +78,12 @@ export async function dimensionCompletionBrowser(t){
   await page.goto(origin+'/app/close?period=2026-10');await page.getByRole('button',{name:'New recognition schedule',exact:true}).click();await page.getByLabel('Schedule type',{exact:true}).selectOption('accrual');await page.getByLabel('Schedule name',{exact:true}).fill(`Studio accrual ${width}`);await page.getByLabel('Balance-sheet account',{exact:true}).selectOption(liability.id);await page.getByLabel('Recognition account',{exact:true}).selectOption(acct['6200']);await page.getByLabel('Amount per month',{exact:true}).fill('10');await page.getByLabel('First accrual month',{exact:true}).fill('2026-10-31')
   for(const [kind,name]of [['class','Studio'],['location','New York'],['project','Cedar']])await page.getByLabel(`Recognition ${kind}`,{exact:true}).selectOption(name)
   await shot('recognition-coded',page.getByRole('heading',{name:'New recognition schedule',exact:true}).locator('..').locator('..'));await submit(page.getByRole('button',{name:'Save recognition schedule',exact:true}),'recognition.save');await expect(page.getByRole('heading',{name:`Studio accrual ${width}`,exact:true})).toBeVisible();await shot('recognition-awaiting-approval')
+  await page.goto(origin+'/app/close?period=2026-10');await page.getByRole('button',{name:'New recurring journal',exact:true}).click()
+  const template=page.locator('form').filter({has:page.getByRole('button',{name:'Save journal template',exact:true})})
+  await template.getByLabel('Template name',{exact:true}).fill(`Studio journal ${width}`);await template.getByLabel('Entry description',{exact:true}).fill('Studio loan interest')
+  await template.getByLabel('Line 1 account',{exact:true}).selectOption(acct['6200']);await template.getByLabel('Line 1 debit',{exact:true}).fill('5');await template.getByLabel('Line 2 account',{exact:true}).selectOption(liability.id);await template.getByLabel('Line 2 credit',{exact:true}).fill('5')
+  for(const i of [1,2])for(const [kind,name]of [['class','Studio'],['location','New York'],['project','Cedar']])await template.getByLabel(`Line ${i} ${kind}`,{exact:true}).selectOption(name)
+  await shot('recurring-journal-coded',template)
   assert.deepEqual(errors,[]);await page.close()
  }
 }
