@@ -78,7 +78,7 @@ export async function estimatesJourney(t) {
     await page.getByLabel('How the deposit was paid', { exact: true }).selectOption('ach')
     await page.getByLabel('Deposit reference', { exact: true }).fill(`CEDAR-ADVANCE-${width}`)
     await page.getByRole('button', { name: 'Record customer deposit', exact: true }).click()
-    await expect(page.getByRole('cell', { name: `CEDAR-ADVANCE-${width}`, exact: true })).toBeVisible()
+    await expect(page.locator('td[data-label="Reference"]').filter({ hasText: `CEDAR-ADVANCE-${width}` })).toBeVisible()
     await shot('deposit-held')
     const deposit = (await view('customer-deposits')).deposits.find(d => d.reference === `CEDAR-ADVANCE-${width}`)
     assert.equal(deposit.remaining_cents, 300000)

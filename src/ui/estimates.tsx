@@ -22,7 +22,7 @@ function EstimatePanel({ estimate: e, deposits, onEdit, onChange }: { estimate: 
       </>}
 
     </Card>
-    <EstimateDocumentPreview key={e.id + e.revision} estimateId={e.id} revision={e.revision} />
+    <EstimateDocumentPreview key={e.id + e.revision + e.status} estimateId={e.id} revision={e.revision} />
     </div><Card title="Estimate summary">
       <dl className="summary"><div><dt>Estimate total</dt><dd>{usd(e.total_cents)}</dd></div><div><dt>Previously billed</dt><dd>{usd(e.billed_cents)}</dd></div><div><dt>Remaining to invoice</dt><dd>{usd(e.remaining_cents)}</dd></div></dl>
       <p><strong>Advance deposit held:</strong> {state.actor.role === 'sales' ? 'Financial access required' : usd(held)}</p>
