@@ -14,7 +14,7 @@ export async function dimensionReportSplits(t){
  for(const basis of ['cash','accrual'])for(const split of ['class','location','project'])for(const kind of kinds){
   const q={from:'2026-10-01',to:'2026-10-31',basis,columns:split},query=new URLSearchParams(q)
   const r=await h.view(`reports/${kind}?${query}`,viewer)
-  assert.equal(r.dimension,split)
+  assert.equal(r.dimension,split);assert.equal(r.basis,r.whole.basis)
   assert.deepEqual(r.whole,await h.view(`reports/${kind}?`+new URLSearchParams({...q,columns:'single'}),viewer))
   for(const section of r.sections)assert.deepEqual(section.report,await h.view(`reports/${kind}?`+new URLSearchParams({...q,columns:'single',dimension:split,dimensionValue:section.scope.id}),viewer))
   if(basis==='accrual'&&split==='class'){const scoped=await h.send(`/api/pantry/integration/v1/reports/${kind}?${query}`,undefined,{headers:{authorization:`Bearer ${integration.token}`}})

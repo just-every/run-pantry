@@ -40,6 +40,11 @@ export async function dimensionGenerated(t){
  await h.cron(Date.parse('2026-10-22T12:00:00Z'))
  const recognition=(await entries()).filter(e=>e.memo.startsWith('Studio subscription recognition:'))
  assert.ok(recognition.length);for(const e of recognition)await coded(e.id)
+ const delegated=await h.command('integration.create',{name:'synthetic-pantry-83',scopes:['journals:write','receipts:read','bank-lines:read','recognition:read']})
+ const scoped=async(path)=>{const r=await h.send('/api/pantry/integration/v1/'+path,undefined,{headers:{authorization:`Bearer ${delegated.token}`}});assert.equal(r.status,200,JSON.stringify(r.value));return r.value}
+ const remoteJournal=await scoped('journals/'+check.journal_id);assert.ok(remoteJournal.lines.every(l=>l.class_name==='Studio'))
+ assert.equal((await scoped('receipts/'+receipt.id)).class_name,'Studio')
+ assert.equal((await scoped('recognition-schedules/'+schedule.id)).class_name,'Studio')
  // Required bank/control values refuse incomplete generated work without any partial journal.
  const before=(await entries()).length
  await h.command('customer-deposit.record',{customerId:customer.id,date:'2026-09-08',amount:'1',bankAccountId:bank.id,liabilityAccountId:liability.id,method:'ach',reference:'synthetic-pantry-79'},h.owner,409)
@@ -47,6 +52,7 @@ export async function dimensionGenerated(t){
  const imported=await h.command('statement.import',{bankAccountId:bank.id,fileName:'synthetic-pantry-80.csv',content:'Posting Date,Description,Amount\n11/01/2026,Studio receipt,100\n11/01/2026,Remote receipt,200',opening:'0',closing:'300',start:'2026-11-01',end:'2026-11-30',confirmLast4:'3131'})
  const feed=(await h.view('bank/lines')).lines.filter(l=>l.statement_id===imported.statement.id)
  for(const line of feed)await h.command('bank-line.dimensions',{id:line.id,...(line.amount_cents===10000?tags:other)})
+ for(const line of feed)assert.equal((await scoped('bank-lines/'+line.id)).class_name,line.amount_cents===10000?'Studio':'Support')
  const match=await h.command('match.approve',{bankLineIds:feed.map(l=>l.id),create:[{type:'receipt',amount:'300',contactId:customer.id,allocations:[],...tags}]})
  const feedReceipt=(await h.view('sales')).payments.find(p=>p.amount_cents===30000)
  const receiptEntry=(await entries()).find(e=>e.id===feedReceipt.journal_id)

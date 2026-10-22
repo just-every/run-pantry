@@ -58,13 +58,14 @@ export async function reportSplits(db:D1Database,kind:string,dimension:string,op
  const figures=splitFigures(kind,whole),byId=new Map(figures.map(f=>[f.id,{...f,values:[] as number[],lines:[] as (string|undefined)[]}]))
  for(const section of sections)for(const f of section.figures)if(!byId.has(f.id))byId.set(f.id,{...f,amount:0,values:[],lines:[]})
  for(const [id,row]of byId)for(const section of sections){const f=section.figures.find(f=>f.id===id);row.values.push(f?.amount??0);row.lines.push(f?.line)}
- return {kind,dimension,from:options.from,to:options.to,basis:options.basis,sections,whole,rows:[...byId.values()],note:kind==='audit-log'?'Frozen event memberships; a multi-value event appears in each relevant section. Unassigned includes history without recorded coding. Counts are not additive.':'Each column is the complete filtered report. Signed contributions add to the whole; debit/credit sides, original document amounts, ratios, status and filing decisions are not allocated totals.'}
+ const basis=whole.basis??options.basis,basisLabel=whole.basisLabel??(kind==='cash-flow'?'Indirect method - accrual starting income':['receivables','payables'].includes(kind)?'Open items - accrual basis':basis==='payment'?'Payment basis':basis==='cash'?'Cash basis':'Accrual basis')
+ return {kind,dimension,from:whole.from??options.from,to:whole.to??options.to,basis,basisLabel,sections,whole,rows:[...byId.values()],note:kind==='audit-log'?'Frozen event memberships; a multi-value event appears in each relevant section. Unassigned includes history without recorded coding. Counts are not additive.':'Each column is the complete filtered report. Signed contributions add to the whole; debit/credit sides, original document amounts, ratios, status and filing decisions are not allocated totals.'}
 }
 
 /** Same values and source selectors as the split screen, in the existing
  * PDF/CSV/XLSX table contract. Non-additive values stay explicitly labeled. */
 export function splitLibrary(r:Awaited<ReturnType<typeof reportSplits>>){
- return {kind:r.kind,title:`${r.kind.replaceAll('-',' ')} · split by ${r.dimension}`,from:r.from,to:r.to,basis:r.basis,basisLabel:r.kind==='audit-log'?'Activity history':r.basis==='cash'?'Cash basis':'Accrual basis',note:r.note,
+ return {kind:r.kind,title:`${r.kind.replaceAll('-',' ')} · split by ${r.dimension}`,from:r.from,to:r.to,basis:r.basis,basisLabel:r.basisLabel,note:r.note,
   columns:['Figure / source key',...r.sections.map(s=>s.scope.value||'Unassigned'),'Whole business'],moneyColumns:r.kind==='audit-log'?[]:r.sections.map((_,i)=>i+1).concat(r.sections.length+1),
   rows:r.rows.map(row=>({id:row.id,cells:[`${row.label} · ${row.id}`,...row.values,row.amount]})),totals:[]}
 }
