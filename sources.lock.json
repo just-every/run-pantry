@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "3e2ba4f00dee528960855527a5c7795a82ebb24be636d29020e06438639127f3",
+      "sha256": "de94b4015e335fa5b45e0f952376fb12df22582c70554eddd2e334e08465521f",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "fdf7263993b134bcc5e8b7ccb44ed885aca3edb5e58748b089624856d670e641",
+      "sha256": "e1d016da0b5b74188ec220e73e2e57b60c591d9e4febe1ecb40affbf21d2171d",
       "executable": false
     },
     "DEMO.md": {
@@ -2940,7 +2940,7 @@
       "executable": false
     },
     "src/pantry/accountant-export.ts": {
-      "sha256": "a618a419e11be3585cbd43df822bf2bfc78fe53b6789e52ff59a672d7732916b",
+      "sha256": "04800c58da22aaa5832397e5c4e3522553adaf6a5810e42b5fde390a2227936f",
       "executable": false
     },
     "src/pantry/accounts.ts": {
@@ -5000,7 +5000,7 @@
       "executable": false
     },
     "tests/api/report-export-parity.mjs": {
-      "sha256": "b893336e26ee2ce956464f828e7d5aaaee8a6223e4ae9cc688d375a6fa42fc9c",
+      "sha256": "47d65fc4f35cbbafac81bd7c7f68a3fb178edf0a14e94552fdb1dfe7d54d0425",
       "executable": false
     },
     "tests/api/reports.test.mjs": {

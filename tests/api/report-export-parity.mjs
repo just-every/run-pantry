@@ -34,6 +34,7 @@ export async function reportExportParity(t){
   const xlsx=await downloadSpreadsheet(h.origin,`package/2026-10/export?${query}&format=xlsx`,h.owner)
   assert.equal(xlsx.find(row=>row[0]==='balanceSheet.totalAssets')[1],pkg.balanceSheet.totalAssets/100)
   assert.equal(xlsx.find(row=>row[0]==='profitAndLoss.period.netIncome')[1],pkg.profitAndLoss.period.netIncome/100)
+  for(const kind of ['receivables','payables'])for(const [i,total]of pkg[kind].totals.entries()){const cell=xlsx.find(row=>row[0]===`${kind}.totals[${i}]`);assert.deepEqual(cell.slice(1,3),[total/100,'USD'])}
   assert.ok(xlsx.some(row=>row[3]==='Open items - accrual basis'));assert.ok(xlsx.some(row=>row[3]==='Whole-business evidence'))
   for(const format of ['pdf','csv']){const file=await h.send(`/api/pantry/package/2026-10/export?${query}&format=${format}`,undefined,{cookie:h.owner});assert.equal(file.status,200);assert.ok(file.value.includes('balanceSheet.totalAssets'))}
  }

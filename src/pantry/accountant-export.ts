@@ -20,7 +20,7 @@ export function accountantCells(pkg:Data){
    if(!value.length)rows.push({path,value:'[]',unit:'text',...context})
    value.forEach((child,i)=>visit(child,`${path}[${i}]`,context))
   }else{
-   const key=path.split('.').at(-1)??'',money=typeof value==='number'&&(moneyKeys.has(key)||key.endsWith('_cents'))
+   const key=path.split('.').at(-1)??'',money=typeof value==='number'&&(moneyKeys.has(key)||key.endsWith('_cents')||/^(receivables|payables)\.totals\[\d+\]$/.test(path))
    rows.push({path,value:money?Number(value)/100:value===null?'null':typeof value==='boolean'?String(value):value===undefined?'undefined':typeof value==='number'?value:String(value),unit:money?'USD':typeof value==='number'?'number':'text',...context})
   }
  }
