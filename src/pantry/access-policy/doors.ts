@@ -16,7 +16,7 @@ export function financialSourceAllowed(actor: Actor, source: string) {
   if (actor.role === 'payables-clerk') return source === 'expenses-by-vendor'
   return !limitedBanks(actor)
 }
-const saleCommands = new Set(['contact.save', 'invoice.save-draft', 'invoice.approve', 'invoice.approve-issue', 'invoice.issue', 'invoice.send', 'invoice.reminders', 'recurring.save', 'recurring.approve', 'recurring.price', 'recurring.approve-price', 'recurring.status', 'time.save', 'time-project.save'])
+const saleCommands = new Set(['estimate.save-draft', 'estimate.send', 'estimate.convert', 'estimate.refresh-invoice', 'contact.save', 'invoice.save-draft', 'invoice.approve', 'invoice.approve-issue', 'invoice.issue', 'invoice.send', 'invoice.reminders', 'recurring.save', 'recurring.approve', 'recurring.price', 'recurring.approve-price', 'recurring.status', 'time.save', 'time-project.save'])
 const payableCommands = new Set(['contact.save', 'bill.save', 'bill.record', 'bill.approve', 'bill.post', 'bill.waive-evidence', 'bill.update', 'bill.submit', 'bill.schedule', 'recurring-bill.save', 'recurring-bill.generate', 'recurring-bill.status', 'document.upload', 'time.save'])
 
 export async function assertDoor(c: Context, path: string, body?: Data) {
@@ -32,11 +32,11 @@ export async function assertDoor(c: Context, path: string, body?: Data) {
       requireThat(permitted, 'This action is not part of your role', 403)
       if (op === 'document.upload') requireThat(body?.linkedKind === 'bill' && !!await one(c.db, 'SELECT id FROM pt_bills WHERE id = ?', body?.linkedId), 'Choose a bill for this document', 403)
       if (op === 'contact.save') requireThat(body?.kind === (actor.role === 'sales' ? 'customer' : 'vendor'), 'This contact is not part of your role', 403)
-      if (actor.role === 'sales') requireThat(!body?.deposit, 'Banking is not part of the sales role', 403)
+      if (actor.role === 'sales') requireThat(!body?.deposit && !body?.depositId && !body?.depositAmount, 'Banking is not part of the sales role', 403)
     } else {
       const shared = ['state', 'time', 'sales'].includes(door)
       const custom = /^(custom-reports|management-packages)(\/|$)/.test(door)
-      const sale = actor.role === 'sales' && (/^customers\//.test(door) || door === 'invoice-documents' || door === 'exemptions' || /^invoice-documents\/[^/]+\/(pdf|preview)$/.test(door))
+      const sale = actor.role === 'sales' && (/^(customers|estimates)\//.test(door) || door === 'estimates' || door === 'invoice-documents' || door === 'exemptions' || /^invoice-documents\/[^/]+\/(pdf|preview)$/.test(door))
       const payable = actor.role === 'payables-clerk' && (/^vendors\/[^/]+\/history$/.test(door) || /^documents\/[^/]+$/.test(door) && !!await one(c.db, "SELECT id FROM pt_documents WHERE id = ? AND linked_kind = 'bill'", door.slice(10)))
       requireThat(actor.role === 'time-only' ? door === 'state' || door === 'time' : shared || custom || sale || payable, 'This screen is not part of your role', 403)
     }
@@ -44,7 +44,7 @@ export async function assertDoor(c: Context, path: string, body?: Data) {
   if (limitedBanks(actor) && !narrow(actor)) {
     if (!op) {
       // Bank views are filtered below; reconcile is checked against its account.
-      const safe = ['state', 'time', 'sales', 'bank', 'bank/lines', 'invoice-documents'].includes(door) || /^reconciliation\//.test(door) || /^(custom-reports|management-packages)(\/|$)/.test(door)
+      const safe = ['state', 'time', 'sales', 'bank', 'bank/lines', 'invoice-documents', 'customer-deposits', 'estimates'].includes(door) || /^estimates\//.test(door) || /^reconciliation\//.test(door) || /^(custom-reports|management-packages)(\/|$)/.test(door)
       requireThat(safe, 'This screen requires access to all bank accounts', 403)
       if (door.startsWith('reconciliation/')) {
         const statement = await one(c.db, 'SELECT bank_account_id FROM pt_statements WHERE id = ?', door.slice(15))
@@ -53,7 +53,7 @@ export async function assertDoor(c: Context, path: string, body?: Data) {
     } else {
       // A global rule, feed link, ledger or close workflow can change accounts
       // not present in its request. It requires full bank authority.
-      requireThat(/^(invoice\.|bill\.|contact\.save$|payment\.|time\.|time-project\.|statement\.|reconciliation\.)/.test(op), 'This action requires access to all bank accounts', 403)
+      requireThat(/^(invoice\.|estimate\.|customer-deposit\.|bill\.|contact\.save$|payment\.|time\.|time-project\.|statement\.|reconciliation\.)/.test(op), 'This action requires access to all bank accounts', 403)
     }
   }
   if (actor.policy?.maskTin && /1099|w9|w-9/i.test(door)) requireThat(false, 'Tax identity access is masked for your role', 403)
@@ -74,6 +74,8 @@ async function checkBankTargets(c: Context, body: Data) {
     all(c.db, `SELECT bank_account_id AS bank_id FROM pt_statements WHERE id ${targets}`, ids),
     all(c.db, `SELECT bank_account_id AS bank_id FROM pt_bank_lines WHERE id ${targets}`, ids),
     all(c.db, `SELECT bank_account_id AS bank_id FROM pt_payments WHERE id ${targets}`, ids),
+    all(c.db, `SELECT bank_account_id AS bank_id FROM pt_customer_deposits WHERE id ${targets}`, ids),
+    all(c.db, `SELECT json_extract(input,'$.deposit.bankAccountId') AS bank_id FROM pt_estimates WHERE id ${targets}`, ids),
     all(c.db, `SELECT COALESCE(json_extract(deposit,'$.bankAccountId'),json_extract(deposit,'$.bankId')) AS bank_id FROM pt_invoices WHERE id ${targets} AND deposit IS NOT NULL`, ids),
     all(c.db, `SELECT b.id AS bank_id FROM pt_journal_lines l JOIN pt_bank_accounts b ON b.account_id=l.account_id WHERE l.id ${targets} OR l.entry_id ${targets}`, ids, ids),
   ])
@@ -96,7 +98,7 @@ export async function projectAccess(c: Context, value: unknown, path = new URL(c
     const sales = actor.role === 'sales'
     out = { ...v, invoices: sales ? v.invoices : [], recurring: sales ? v.recurring : [], deliveries: sales ? v.deliveries : [], reminders: sales ? v.reminders : [], onlinePayments: [], bills: sales ? [] : v.bills, capturedBills: sales ? [] : v.capturedBills, recurringBills: sales ? [] : v.recurringBills, approvalRules: [], vendorCredits: sales ? [] : v.vendorCredits, payments: [] }
   }
-  if (narrow(actor) && /^(customers|vendors)\//.test(door)) out = { ...v, rows: v.rows?.filter((r: Data) => actor.role === 'sales' ? ['invoice', 'credit'].includes(r.kind) : r.kind === 'bill') }
+  if (narrow(actor) && /^(customers|vendors)\//.test(door)) out = { ...v, rows: v.rows?.filter((r: Data) => actor.role === 'sales' ? ['invoice', 'credit', 'estimate'].includes(r.kind) : r.kind === 'bill') }
   if (limitedBanks(actor) && !narrow(actor) && door === 'sales') out = { ...v, payments: v.payments?.filter((p: Data) => actor.policy!.bankAccounts!.includes(p.bank_account_id)) }
   if (limitedBanks(actor) && !narrow(actor) && door === 'state') {
     const ids = actor.policy!.bankAccounts!, banks = v.bankAccounts?.filter((b: Data) => ids.includes(b.id)) ?? [], bankLedger = new Set(banks.map((b: Data) => b.account_id))
@@ -105,6 +107,7 @@ export async function projectAccess(c: Context, value: unknown, path = new URL(c
   if (limitedBanks(actor) && door === 'bank') out = { accounts: v.accounts?.filter((b: Data) => actor.policy!.bankAccounts!.includes(b.id)), statements: v.statements?.filter((s: Data) => actor.policy!.bankAccounts!.includes(s.bank_account_id)) }
   if (limitedBanks(actor) && door === 'bank/lines') out = { lines: v.lines?.filter((b: Data) => actor.policy!.bankAccounts!.includes(b.bank_account_id)), pending: v.pending?.filter((b: Data) => actor.policy!.bankAccounts!.includes(b.bank_account_id)), suggestions: {}, suggestionRates: [], recordedPayments: [], depositProposals: [] }
   if (door === 'sales' && Array.isArray(out.bills)) out = { ...out, bills: out.bills.map((b: Data) => { const ownerApprovalRequired = actor.policy?.billLimit != null && b.total_cents > actor.policy.billLimit; return { ...b, ownerApprovalRequired, lifecycle: ownerApprovalRequired && b.status === 'draft' ? { ...b.lifecycle, nextActor: 'Owner' } : b.lifecycle } }) }
+  if (/^(estimates(\/|$)|customers\/|command\/estimate\.)/.test(door)) out = estimateAccess(out, actor)
   return redact(out, actor)
 }
 function redact(value: any, actor: Person): any {
@@ -116,4 +119,12 @@ function redact(value: any, actor: Person): any {
     if (typeof v === 'string' && /^[\[{]/.test(v)) { try { return [key, JSON.stringify(redact(JSON.parse(v), actor))] } catch {} }
     return [key, redact(v, actor)]
   }))
+}
+
+// Customer acceptance is evidence of the exact sent revision. Its IP is kept
+// for the owner; a sales workflow does not grant bank-source visibility.
+function estimateAccess(value: any, actor: Person): any {
+  if (Array.isArray(value)) return value.map(v => estimateAccess(v, actor))
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !['ip', 'accepted_ip'].includes(key) && !(actor.role === 'sales' && ['bankAccountId', 'bank_account_id'].includes(key))).map(([key, child]) => [key, estimateAccess(child, actor)]))
 }

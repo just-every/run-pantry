@@ -4,6 +4,7 @@ import { all, changed, guard, q, type Sql } from '../db'
 import type { Data } from '../core'
 import { scrub } from './personal'
 import { retentionItems } from './retention-items'
+import { estimateCopies } from '../estimates/erasure'
 import { timeCopies } from './time'
 import { supportingBooks } from './retention-clock'
 
@@ -12,6 +13,8 @@ type Column = { name: string; pk: number }
 const quote = (s: string) => `"${s.replaceAll('"', '""')}"`
 const FIELDS: Record<string, string[]> = {
   pt_deliveries: ['recipient', 'subject', 'detail'],
+  pt_estimate_deliveries: ['recipient','detail'],
+  pt_customer_deposits: ['reference','memo'],
   pt_questions: ['title', 'question', 'why', 'facts', 'choices', 'pending', 'answer', 'emailed_to', 'email_detail'],
   pt_question_messages: ['body'],
   pt_receipts: ['sender', 'subject', 'read_note', 'read_vendor', 'vendor', 'vendor_key', 'read_vendor_details', 'read_draft_fields', 'read_match_fields', 'duplicate_reason'],
@@ -51,7 +54,7 @@ const FIELDS: Record<string, string[]> = {
 const JSON_FIELDS = new Set(['facts', 'choices', 'pending', 'read_vendor_details', 'read_draft_fields', 'read_match_fields', 'payload', 'refs', 'evidence', 'document_template', 'document_values', 'self_approval', 'lines', 'splits', 'feed_snapshot', 'details', 'candidates', 'snapshot', 'left_out', 'definition', 'settings', 'recipients', 'setting'])
 // Their scoped trigger exceptions and metadata are owned by the caller. Never
 // attempt a generic update through an immutable accounting/history door.
-const CALLER_OWNED = new Set(['pt_contacts', 'pt_members', 'pt_audit', 'pt_approvals', 'pt_journal_entries', 'pt_journal_lines', 'pt_invoice_documents', 'pt_documents', 'pt_document_parts', 'pt_voided_reconciliations', 'pt_reconciliation_undos', 'pt_line_suggestion_decisions', 'pt_time_entries', 'pt_time_projects'])
+const CALLER_OWNED = new Set(['pt_contacts', 'pt_members', 'pt_audit', 'pt_approvals', 'pt_journal_entries', 'pt_journal_lines', 'pt_invoice_documents', 'pt_documents', 'pt_document_parts', 'pt_voided_reconciliations', 'pt_reconciliation_undos', 'pt_line_suggestion_decisions', 'pt_time_entries', 'pt_time_projects','pt_estimates','pt_estimate_documents'])
 
 function replacement(value: unknown, column: string, input: Input): unknown {
   if (typeof value !== 'string') return value
@@ -104,6 +107,7 @@ export async function eraseCopies(db: D1Database, input: Input) {
       }
       if (table === 'pt_contractor_tax' && !input.member && row.contact_id === input.id) for (const field of ['address', 'city', 'state', 'zip']) set[field] = input.marker
       if (table === 'pt_deliveries' && set.recipient !== row.recipient) set.recipient = `${input.marker}:${row.id}`
+      if(table==='pt_customer_deposits'&&set.reference!==row.reference)set.reference=`${set.reference}:${row.id}`
       if (table === 'pt_bank_rules' && set.name !== row.name) set.name = `${set.name}:${row.id}`
       if (Object.keys(set).some(k => set[k] !== row[k]) && names.has('revision')) set.revision = crypto.randomUUID()
       if (table === 'pt_receipts' && (Object.keys(set).some(k => set[k] !== row[k]) || (!input.member && row.vendor_id === input.id))) {
@@ -169,6 +173,10 @@ export async function eraseCopies(db: D1Database, input: Input) {
     note('pt_document_parts', 'rowsRemoved', parts.length)
     for (const part of parts) removed.push({ table: 'pt_document_parts', key: { document_id: row.id, seq: part.seq } })
   }
+  const est=await estimateCopies(db,input)
+  statements.push(...est.statements)
+  for(const [table,values] of Object.entries(est.counts))counts[table]={...counts[table],...values}
+  for(const id of est.affectedRecordIds)affectedRecordIds.add(id)
   const time = await timeCopies(db, input)
   statements.push(...time.statements)
   for (const [table, values] of Object.entries(time.counts)) counts[table] = { ...counts[table], ...values }

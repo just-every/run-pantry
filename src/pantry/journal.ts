@@ -2,10 +2,10 @@
 // Drafts may change; posted entries are immutable (the schema's triggers refuse
 // edits) and are corrected only by a linked reversal.
 import { nativeApprovalAuthority } from './access-policy/approvals'
-import { ledgerBankAuthority } from './access-policy/banks'
+import { bankAuthority, ledgerBankAuthority } from './access-policy/banks'
 import { authority, who, type Actor } from './access'
 import { cents, date, now, optionalText, requireThat, text, uid, list, type Data } from './core'
-import { all, approval, assertOpen, audit, changed, one, q, run, type AuditActor, type Sql } from './db'
+import { all, approval, assertOpen, audit, changed, guard, one, q, run, type AuditActor, type Sql } from './db'
 import type { Command } from './context'
 import { entryDocuments } from './receipts/attachments'
 import { reverseEarlyDiscounts } from './early-payment'
@@ -139,8 +139,10 @@ export async function reversalStatements(db: D1Database, actor: AuditActor, orig
   const matched = !unmatching && await one(db, 'SELECT 1 FROM pt_match_postings mp JOIN pt_journal_lines l ON l.id = mp.journal_line_id WHERE l.entry_id = ? AND mp.active = 1', original.id)
   requireThat(!matched, 'This entry is matched to a bank statement line; undo the match first', 409)
   const id = uid()
+  const paymentBanks=original.source_kind==='payment'?await all(db,'SELECT bank_account_id FROM pt_payments WHERE journal_id=?',original.id):[]
   const lines: Line[] = original.lines.map((l: Data) => ({ accountId: l.account_id, debit: l.credit_cents, credit: l.debit_cents, memo: l.memo, contactId: l.contact_id }))
   return { id, statements: [
+    ...bankAuthority(actor,paymentBanks.map(p=>p.bank_account_id)),
     ...nativeApprovalAuthority(actor, original.source_kind === 'bill' ? 'bill' : original.source_kind === 'payment' ? 'payment' : 'journal', lines.reduce((sum, l) => sum + l.debit, 0), original.source_kind === 'bank' ? 'record' : undefined),
     ...await ledgerBankAuthority(db, actor, lines.map(l => l.accountId), original.source_kind === 'manual' ? 'post' : 'record'),
     ...entryStatements({ id, date: day, memo, sourceKind: 'reversal', sourceId: original.id, preparedBy: actor.email, preparedKind: 'person', lines }),
@@ -159,6 +161,12 @@ const reverse: Command = { need: 'post', async run(c, b) {
   const day = date(b.date ?? original.entry_date, 'Reversal date'), memo = optionalText(b.memo, 'Reason', 500) || `Reversal of entry ${original.number}`
   const r = await reversalStatements(c.db, c.actor, original, day, memo)
   const extra: Sql[] = []
+  const advance = await one(c.db,'SELECT id FROM pt_customer_deposits WHERE journal_id=?',original.id)
+  if(advance){
+    const available = `NOT EXISTS(SELECT 1 FROM pt_customer_deposit_applications a JOIN pt_payments p ON p.id=a.payment_id WHERE a.deposit_id=? AND p.reversal_id IS NULL) AND NOT EXISTS(SELECT 1 FROM pt_invoice_deposit_plans x JOIN pt_invoices i ON i.id=x.invoice_id WHERE x.deposit_id=? AND i.status<>'issued')`
+    requireThat(await one(c.db,`SELECT 1 WHERE ${available}`,advance.id,advance.id),'Reverse the deposit applications and resolve reserved invoices before reversing the receipt',409)
+    extra.push(guard(available,advance.id,advance.id))
+  }
   if (original.source_kind === 'bill') {
     const allocated = await one(c.db, "SELECT 1 FROM pt_allocations a LEFT JOIN pt_payments p ON p.id = a.source_id AND a.source_kind = 'payment' WHERE a.target_kind = 'bill' AND a.target_id = ? AND (a.source_kind = 'credit' OR p.reversal_id IS NULL)", original.source_id)
     requireThat(!allocated, 'This bill has payments or vendor credits allocated; resolve those allocations first', 409)

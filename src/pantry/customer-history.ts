@@ -1,3 +1,5 @@
+import { estimate } from './estimates/store'
+import { customerDeposit } from './customer-deposits/store'
 // Customer history is complete, unlike the capped sales screen. Its invoice
 // balances come directly from receivables ageing for the same reporting date.
 import { date, requireThat, text, type Data } from './core'
@@ -85,6 +87,16 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
       memo: p.memo, method: p.method, bank_name: p.bank_name, allocations: applied, documents: docsFor('payment', p), deliveries: [],
       reversal_href: p.reversal_id ? recordHref('entry', p.reversal_id) : null })
   }
+  const estimateRows: Data[] = await Promise.all((await all(db,'SELECT id FROM pt_estimates WHERE customer_id=? ORDER BY created_at,id',id)).map(async e=>{
+    const est=await estimate(db,e.id)
+    return {...est,kind:'estimate',date:est.issue_date,reference:est.number,href:`/app/sales?tab=estimates&estimate=${encodeURIComponent(est.id)}`,balance_cents:null,included_in_balance:false,allocations:[],documents:[]}
+  }))
+  for(const e of estimateRows) for(const d of e.deliveries) deliveries.push({...d,kind:'estimate',estimate_id:e.id,number:e.number,href:e.href})
+  const depositRows=await Promise.all((await all(db,'SELECT id FROM pt_customer_deposits WHERE customer_id=? ORDER BY date,id',id)).map(async r=>{
+    const dep=await customerDeposit(db,r.id)
+    return {...dep,kind:'customer-deposit',reference:dep.reference,total_cents:dep.amount_cents,balance_cents:null,included_in_balance:false,status:'Held customer deposit',href:`/app/sales?tab=estimates&deposit=${encodeURIComponent(dep.id)}`,allocations:[],documents:[],deliveries:[]}
+  }))
+  rows.push(...estimateRows,...depositRows)
   rows.sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at) || `${a.kind}:${a.id}`.localeCompare(`${b.kind}:${b.id}`))
   const open = sum(openItems, 'open')
   const unallocatedPayment = sum(rows.filter(r => r.kind === 'payment' && r.included_in_balance), 'balance_cents')
@@ -96,7 +108,7 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
       open_balance_cents: open - unallocatedPayment - unallocatedCredit,
       ageing_href: `/app/reports?report=receivables&to=${asOf}`, ageing_items: openItems,
       ageing_totals: receivables.buckets.map(bucket => sum(openItems.filter(i => i.bucket === bucket), 'open')) },
-    sections: { estimates: { available: false, rows: [] }, statements: { available: false, rows: [] } } }
+    sections: { estimates: { available: true, rows: estimateRows }, statements: { available: false, rows: [] } } }
 }
 
 export type CustomerHistoryData = Awaited<ReturnType<typeof customerHistory>>

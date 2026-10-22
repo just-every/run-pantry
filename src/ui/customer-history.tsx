@@ -1,7 +1,8 @@
 import { Action, Card, Chip, FileLink, Loading, Metrics, Table, day, usd, useShared, useView, type D } from './kit'
 import { ExemptionCertificates } from './exemption-certificates'
+import { invoiceHref } from './estimate-progress'
 
-const KIND: Record<string, string> = { invoice: 'Invoice', credit: 'Credit', payment: 'Payment' }
+const KIND: Record<string, string> = { invoice: 'Invoice', credit: 'Credit', payment: 'Payment', estimate: 'Estimate' }
 const METHOD: Record<string, string> = { card: 'Card', us_bank_account: 'Bank account (ACH)', offline: 'Offline payment instructions' }
 
 export function CustomerHistory({ customerId }: { customerId: string }) {
@@ -26,22 +27,28 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
       <Table heads={['Contact', 'Email', 'Phone', 'Roles']} empty="No contact people recorded.">
         {c.contacts.map((p: D, i: number) => <tr key={i}><td>{p.name}</td><td>{p.email || '—'}</td><td>{p.phone || '—'}</td><td>{p.roles.join(', ') || 'No billing role'}</td></tr>)}
       </Table>
-      <Table heads={['Date', 'Record', 'Status', 'Total', 'Current balance', 'Details']} figures={[3, 4]} empty="No invoices, credits or payments for this customer yet.">
+      <Table heads={['Date', 'Record', 'Status', 'Total', 'Current balance', 'Details']} figures={[3, 4]} empty="No invoices, estimates, credits or payments for this customer yet.">
         {data.rows.map((r: D) => <tr key={`${r.kind}:${r.id}`}>
           <td>{day(r.date)}</td><td><a href={r.href}>{KIND[r.kind] ?? r.kind} {r.reference}</a></td><td><Chip>{r.status}</Chip></td><td className="fig">{usd(r.total_cents)}</td><td className="fig">{usd(r.balance_cents)}</td>
-          <td><details className="details"><summary>Allocations and documents</summary>
-            {r.allocations.map((a: D) => <p key={a.id}><a href={r.kind === 'invoice' ? a.source_href : a.target_href}>{r.kind === 'invoice' ? a.source_reference || 'Applied record' : a.invoice_number || 'Applied record'}</a> · {usd(a.amount_cents)}</p>)}
-            {!r.allocations.length && <p>No allocations.</p>}
-            {r.documents.map((d: D) => <p key={d.id}><FileLink id={d.id} name={d.name} mediaType={d.media_type} /></p>)}
+          <td><details className="details"><summary>{r.kind === 'estimate' ? 'Acceptance and invoices' : 'Allocations and documents'}</summary>
+            {r.kind === 'estimate' && <><p><a href={r.href}>Open estimate {r.reference}</a></p>{r.acceptance ? <p style={{ overflowWrap: 'anywhere' }}>Accepted by {r.acceptance.name} · {day(r.acceptance.at)} · IP {r.acceptance.ip} · Revision {r.acceptance.revision}</p> : <p>Not accepted.</p>}{(r.conversions ?? []).map((c: D) => <p key={c.invoice_id}><a href={invoiceHref(c.invoice_id)}>{c.number}</a> · {c.milestone || c.mode} · {usd(c.amount_cents)} · {c.status}</p>)}</>}
+            {(r.allocations ?? []).map((a: D) => <p key={a.id}><a href={r.kind === 'invoice' ? a.source_href : a.target_href}>{r.kind === 'invoice' ? a.source_reference || 'Applied record' : a.invoice_number || 'Applied record'}</a> · {usd(a.amount_cents)}</p>)}
+            {r.kind !== 'estimate' && !r.allocations?.length && <p>No allocations.</p>}
+            {(r.documents ?? []).map((d: D) => <p key={d.id}><FileLink id={d.id} name={d.name} mediaType={d.media_type} /></p>)}
           </details></td>
         </tr>)}
       </Table>
     </Card>
-    <Card title="Estimates and statements"><p>Estimates and statements are not available yet.</p></Card>
+    {data.sections.estimates.available && <Card title="Customer estimates">
+      <Table heads={['Estimate', 'Date', 'Status', 'Total', 'Acceptance and progress invoices']} figures={[3]} empty="No estimates for this customer.">
+        {data.sections.estimates.rows.map((e: D) => <tr key={e.id}><td><a href={e.href}>{e.reference}</a></td><td>{day(e.date)}</td><td><Chip>{e.status}</Chip></td><td className="fig">{usd(e.total_cents)}</td><td>{e.acceptance && <p>Accepted by {e.acceptance.name} · {day(e.acceptance.at)}</p>}{(e.conversions ?? []).map((c: D) => <p key={c.invoice_id}><a href={invoiceHref(c.invoice_id)}>{c.number}</a> · {usd(c.amount_cents)}</p>)}</td></tr>)}
+      </Table>
+    </Card>}
+    <Card title="Statements"><p>Statements are not available yet.</p></Card>
     <Card title="Customer email history">
       <p className="hint">Accepted means the provider accepted the message. It does not confirm delivery or reading. Local messages are suppressed.</p>
-      <Table heads={['When', 'Invoice', 'Recipient', 'Message', 'Outcome']} empty="No customer email recorded.">
-        {data.deliveries.map((d: D) => <tr id={`delivery-${d.id}`} key={d.id}><td>{day(d.at)}</td><td><a href={`/app/reports?record=${encodeURIComponent(`invoice:${d.invoice_id}`)}`}>{d.number}</a></td><td>{d.recipient}</td><td><details className="details"><summary>{d.subject}</summary><p>{d.kind === 'reminder' ? 'Reminder' : 'Invoice'} · {d.provider || 'No provider'}{d.provider_message_id ? ` · ${d.provider_message_id}` : ''}</p><p>{d.detail || 'No additional outcome detail.'}</p></details></td><td><Chip>{d.status}</Chip></td></tr>)}
+      <Table heads={['When', 'Record', 'Recipient', 'Message', 'Outcome']} empty="No customer email recorded.">
+        {data.deliveries.map((d: D) => <tr id={`delivery-${d.id}`} key={d.id}><td>{day(d.at)}</td><td><a href={d.kind === 'estimate' ? d.href || `/app/sales?tab=estimates&estimate=${encodeURIComponent(d.estimate_id)}` : `/app/reports?record=${encodeURIComponent(`invoice:${d.invoice_id}`)}`}>{d.number}</a></td><td>{d.recipient}</td><td><details className="details"><summary>{d.subject}</summary><p>{d.kind === 'estimate' ? 'Estimate' : d.kind === 'reminder' ? 'Reminder' : 'Invoice'} · {d.provider || 'No provider'}{d.provider_message_id ? ` · ${d.provider_message_id}` : ''}</p><p>{d.detail || 'No additional outcome detail.'}</p></details></td><td><Chip>{d.status}</Chip></td></tr>)}
       </Table>
     </Card>
     {state.actor.role !== 'sales' && <ExemptionCertificates customerId={customerId} />}

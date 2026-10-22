@@ -61,7 +61,7 @@ export function audit(actor: AuditActor, action: string, subjectKind: string, su
 // This maps domain records to their storage, not actions to individual writers.
 // Unversioned records receive a stored history revision in the same batch.
 const AUDIT_RECORDS: Record<string, [string, string?]> = {
-  'close-task': ['pt_close_tasks'], item: ['pt_items'], check: ['pt_checks'], 'check-batch': ['pt_check_batches'], budget: ['pt_budgets'], recognition: ['pt_recognition_schedules'],
+  estimate: ['pt_estimates'], 'customer-deposit': ['pt_customer_deposits'], 'close-task': ['pt_close_tasks'], item: ['pt_items'], check: ['pt_checks'], 'check-batch': ['pt_check_batches'], budget: ['pt_budgets'], recognition: ['pt_recognition_schedules'],
   'recurring-journal': ['pt_recurring_journals'], journal: ['pt_journal_entries'], invoice: ['pt_invoices'], credit: ['pt_invoices'], bill: ['pt_bills'], payment: ['pt_payments'],
   account: ['pt_accounts'], customer: ['pt_contacts'], vendor: ['pt_contacts'], proposal: ['pt_proposals'], member: ['pt_members', 'email'],
   agent: ['pt_agents'], entity: ['pt_entity'], document: ['pt_documents'], statement: ['pt_statements'], period: ['pt_periods'],
@@ -91,7 +91,7 @@ async function snapshotExpression(db: D1Database, kind: string, id: string): Pro
   const source = recordSource(kind, id)
   if (!source) return null
   const [table, key = 'id'] = source
-  const columns = (await columnsFor(db, table)).filter(c => !/(content|token|key|secret|sealed|password|credential|signature|tin|hash|routing|account_number|endpoint|url)/i.test(c))
+  const columns = (await columnsFor(db, table)).filter(c => !/(content|token|key|secret|sealed|password|credential|signature|tin|hash|routing|account_number|endpoint|url|accepted_ip|accepted_name|input|pricing)/i.test(c))
   if (!columns.length) return null
   return q(`(SELECT json_object(${columns.map(c => `'${c}', "${c}"`).join(', ')}) FROM "${table}" WHERE "${key}" = ?)`, kind === 'settings' ? '1' : id)
 }

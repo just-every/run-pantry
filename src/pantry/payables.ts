@@ -191,7 +191,7 @@ export async function billsView(db: D1Database) {
 }
 
 export async function paymentsView(db: D1Database) {
-  const rows = await all(db, 'SELECT p.*, c.name AS contact_name, b.name AS bank_name FROM pt_payments p JOIN pt_contacts c ON c.id = p.contact_id JOIN pt_bank_accounts b ON b.id = p.bank_account_id ORDER BY p.payment_date DESC, p.created_at DESC, p.id LIMIT 500')
+  const rows = await all(db, `SELECT p.*, c.name AS contact_name, CASE WHEN p.customer_deposit_id IS NOT NULL THEN 'Customer deposit applied' ELSE b.name END AS bank_name FROM pt_payments p JOIN pt_contacts c ON c.id = p.contact_id JOIN pt_bank_accounts b ON b.id = p.bank_account_id ORDER BY p.payment_date DESC, p.created_at DESC, p.id LIMIT 500`)
   const allocs = await all(db, "SELECT * FROM pt_allocations WHERE source_kind = 'payment' ORDER BY created_at, id")
   for (const r of rows) { r.allocations = allocs.filter(a => a.source_id === r.id); r.unallocated_cents = r.amount_cents - r.allocations.reduce((s: number, a: Data) => s + a.amount_cents, 0) }
   return rows

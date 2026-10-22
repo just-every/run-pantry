@@ -40,6 +40,9 @@ export async function buildInvoiceDocument(db: D1Database, inv: Data, parsed?: D
   const deposit: Deposit | null = parsed ? parsed.deposit ?? null : json(inv.deposit, null)
   const minus = (c: number) => '-' + usd(c)
   const offer: Offer | null = parsed ? parsed.offer ?? null : json(inv.early_offer, null)
+  const advance = inv.id ? await one(db,'SELECT amount_cents FROM pt_invoice_deposit_plans WHERE invoice_id=?',inv.id) : null
+  const advanceDiscount = advance && offer && advance.amount_cents >= offer.settle ? offer.total-offer.settle : 0
+  const advanceApplied = advance ? Math.min(advance.amount_cents,inv.total_cents-advanceDiscount) : 0
   return {
     business: entity?.legal_name ?? 'Pantry', title: inv.early_for_number ? `Early-payment discount on ${inv.early_for_number} (${inv.number})` : `${inv.kind === 'credit' ? 'Credit' : 'Invoice'} ${inv.number}`,
     templateId: template.id, templateName: template.name, layout: template.layout, accentColor: template.accentColor, textColor: template.textColor, logo: template.logo,
@@ -50,9 +53,12 @@ export async function buildInvoiceDocument(db: D1Database, inv: Data, parsed?: D
     lines: lines.map(l => ({ description: l.description, quantity: String((l.qty ?? l.quantity_milli ?? 1000) / 1000), amount: usd(l.amount ?? l.amount_cents) })),
     totals: [['Subtotal', usd(subtotal)], ...discounts.filter(d => !d.afterTax).map(d => [d.label, minus(d.amount)] as [string, string]), ['Sales tax', usd(tax)],
       ...discounts.filter(d => d.afterTax).map(d => [d.label, minus(d.amount)] as [string, string]), ['Total', usd(inv.total_cents)],
-      ...(deposit ? [[depositLabel(deposit), minus(deposit.amount)] as [string, string]] : []), ['Amount due', usd(inv.total_cents - (deposit?.amount ?? 0))]],
+      ...(deposit ? [[depositLabel(deposit), minus(deposit.amount)] as [string, string]] : []),
+      ...(advanceApplied ? [['Advance customer deposit applied',minus(advanceApplied)] as [string,string]] : []),
+      ...(advanceDiscount ? [['Early-payment discount settled at issue',minus(advanceDiscount)] as [string,string]] : []),
+      ['Amount due', usd(inv.total_cents - (deposit?.amount ?? 0) - advanceApplied - advanceDiscount)]],
     notes: [template.message, memo, ...(offer ? offerText(offer) : []), ...(exemption ? [`Sales tax exempt in ${parsed?.destination ?? inv.destination_state}: certificate ${exemption.certificateNumber}, valid through ${exemption.expiresOn}.`] : []),
-      template.paymentInstructions, template.footer].filter(Boolean),
+      ...(inv.estimate_id ? [`Accepted estimate: previously billed ${usd(inv.estimate_billed_before_cents ?? 0)}; this invoice ${usd(inv.total_cents)}; remaining ${usd(inv.estimate_remaining_cents ?? 0)}.`] : []), template.paymentInstructions, template.footer].filter(Boolean),
   }
 }
 export async function issuedDocumentStatements(db: D1Database, inv: Data, revision: string, parsed?: Data): Promise<Sql[]> {

@@ -4,6 +4,9 @@ import type {Data} from '../core'
 export async function unpostedDependents(db:D1Database,id:string) {
   const statements:Sql[]=[],counts:Record<string,Data>={},removed:{table:string;key:Record<string,unknown>}[]=[]
   const selections:[string,string,string[]][]=[
+    ['pt_estimate_deliveries','estimate_id IN (SELECT id FROM pt_estimates WHERE customer_id=?)',['id']],
+    ['pt_estimate_documents','estimate_id IN (SELECT id FROM pt_estimates WHERE customer_id=?)',['estimate_id','revision']],
+    ['pt_estimates','customer_id=?',['id']],
     ['pt_time_projects','customer_id=? AND NOT EXISTS (SELECT 1 FROM pt_time_entries t WHERE t.project_id=pt_time_projects.id)',['id']],
     ['pt_recurring_runs','recurring_id IN (SELECT id FROM pt_recurring WHERE customer_id=?)',['recurring_id','occurrence']],
     ['pt_recurring_prices','recurring_id IN (SELECT id FROM pt_recurring WHERE customer_id=?)',['id']],

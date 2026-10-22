@@ -15,6 +15,7 @@ import { promisify } from 'node:util'
 import { chromium } from '@playwright/test'
 import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { books } from '../app/books.mjs'
+import { estimatesForRestore, assertEstimatesRestored } from './estimates.mjs'
 import { captureForRestore, assertCaptureRestored } from './capture.mjs'
 
 const source = resolve(fileURLToPath(new URL('../..', import.meta.url)))
@@ -148,6 +149,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   await command('bill.schedule', { id: bill.id, revision: bill.revision, date: '2026-09-24', note: 'Bank transfer outside Pantry' })
   await command('recurring-bill.save', { name: 'Archived rent', vendorId: vendor.id, startDate: '2026-06-30', endDate: '2026-08-30', every: 1, unit: 'month', termsDays: 15, lines: [{ description: 'Monthly rent', amount: '1200.00', accountId: rent }] })
   await command('recurring-bill.generate', { through: '2026-09-30' })
+  const estimates = await estimatesForRestore(context, server.origin)
   const captured = await captureForRestore(context, server.origin)
   // Configure real installation-local credentials through the same public
   // settings doors. No model call is made. A held Stripe key, when injected
@@ -184,6 +186,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
     for(const credential of credentials)assert.ok(!JSON.stringify(item.row).includes(credential),'every archived row excludes credentials')
     if(item.table==='pt_feed_items')assert.deepEqual([item.row.access_token,item.row.status],['','disconnected'])
     if(item.table==='pt_agents')assert.equal(item.row.active,0)
+    if(item.table==='pt_estimates')assert.equal(item.row.link_token,null,'restored estimates cannot reuse customer acceptance links')
     if(item.table==='pt_integrations')assert.equal(item.row.revoked_at,'restored')
     if(item.table==='pt_webhook_subscriptions')archivedSubscriptions.push(item.row)
   }
@@ -205,6 +208,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   assert.deepEqual(restored.view, before.view, 'the fresh install holds the same books')
   assert.deepEqual(restored.bytes, pdf, 'the document comes back byte for byte')
   await assertCaptureRestored(context, server.origin, captured)
+  await assertEstimatesRestored(context, server.origin, estimates)
   const dataFlows=await (await context.request.get(`${server.origin}/api/pantry/data-flows`)).json()
   assert.ok(dataFlows.services.filter(s=>s.id!=='mail').every(s=>!s.connected),'restored books have no live provider connection')
   assert.equal((await context.request.get(`${server.origin}/api/pantry/integration/v1/invoices`,{headers:{authorization:`Bearer ${archivedIntegration.token}`}})).status(),401)

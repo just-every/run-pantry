@@ -114,19 +114,19 @@ export type Incoming = { targetId: string; amount: number }
  * amount), and when it first brings counted settlements to the amount to settle, the discount credit, posted
  * and allocated before the payment's allocation, which is capped at what then remains.
  */
-export async function takeEarlyDiscounts(db: D1Database, actor: AuditActor, list: Incoming[], day: string, opts: { sessionCounts?: boolean; payments?: string } = {}) {
+export async function takeEarlyDiscounts(db: D1Database, actor: AuditActor, list: Incoming[], day: string, opts: { sessionCounts?: boolean; payments?: string; issuing?: Data; qualifyingDate?: string } = {}) {
   const before: Sql[] = [], after: Sql[] = []
   const out: (Incoming & { counted: boolean })[] = []
   for (const a of list) {
-    const inv = await one(db, "SELECT * FROM pt_invoices WHERE id = ? AND kind = 'invoice'", a.targetId)
+    const inv = opts.issuing?.id===a.targetId ? opts.issuing : await one(db, "SELECT * FROM pt_invoices WHERE id = ? AND kind = 'invoice'", a.targetId)
     const offer = inv ? parse<Offer>(inv.early_offer) : null
-    const counted = !!offer && inv!.status === 'issued' && (day <= offer.windowEnd || !!opts.sessionCounts)
+    const counted = !!offer && inv!.status === 'issued' && ((opts.qualifyingDate ?? day) <= offer.windowEnd || !!opts.sessionCounts)
     if (!counted || inv!.early_withdrawn_by || await standingDiscount(db, inv!.id)) { out.push({ ...a, counted }); continue }
     const settled = await countedSettlements(db, inv!.id)
     if (settled + a.amount < offer!.settle) { out.push({ ...a, counted }); continue }
-    const full = await invoice(db, inv!.id)
+    const full = opts.issuing?.id===a.targetId ? opts.issuing : await invoice(db, inv!.id)
     const credited = offer!.discount + offer!.reduction
-    const capped = Math.min(a.amount, full.open_cents - credited)
+    const capped = Math.min(a.amount, (full.open_cents ?? full.total_cents) - credited)
     requireThat(capped > 0, `${full.number} has no balance left once its early-payment discount applies`, 409)
     const originals = full.lines as Data[]
     const lines = offer!.lines.filter(l => l.discount > 0).map(l => {

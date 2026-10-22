@@ -32,5 +32,9 @@ const correspondenceHistory = `(
  UNION ALL SELECT 'exemption:' || id,customer_id,'exemption',id,valid_from,certificate_number,CASE WHEN active=1 THEN 'active' ELSE 'retired' END,NULL,document_id FROM pt_exemption_certificates
 )`
 // D1 bounds each compound SELECT; keep the financial and correspondence sets bounded.
-const history = `(SELECT * FROM ${financialHistory} UNION ALL SELECT * FROM ${correspondenceHistory})`
-export const contactHistoryResource = resource('contact-history', 'contacts:read', history, 'id,contact_id,kind,record_id,date,reference,status,amount_cents,related_id', { contactId: 'contact_id', kind: 'kind', date: 'date', recordId: 'record_id' }, 'Complete paginated contact activity: invoices, credits, bills, payments, email outcomes and certificates. Full records require their own scope; no delivery detail, tokens or provider headers.')
+const estimateHistory = `(
+ SELECT 'estimate:' || id AS id,customer_id AS contact_id,'estimate' AS kind,id AS record_id,issue_date AS date,number AS reference,status,total_cents AS amount_cents,NULL AS related_id FROM pt_estimates
+ UNION ALL SELECT 'deposit:' || id,customer_id,'customer-deposit',id,date,reference,'recorded',amount_cents,journal_id FROM pt_customer_deposits
+)`
+const history = `(SELECT * FROM ${financialHistory} UNION ALL SELECT * FROM ${correspondenceHistory} UNION ALL SELECT * FROM ${estimateHistory})`
+export const contactHistoryResource = resource('contact-history', 'contacts:read', history, 'id,contact_id,kind,record_id,date,reference,status,amount_cents,related_id', { contactId: 'contact_id', kind: 'kind', date: 'date', recordId: 'record_id' }, 'Complete paginated contact activity: invoices, credits, bills, payments, estimates, advance deposits, email outcomes and certificates. Full records require their own scope; no delivery detail, tokens or provider headers.')

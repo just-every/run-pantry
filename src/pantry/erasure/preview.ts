@@ -8,6 +8,7 @@ import { erasureValues, MARKER } from './personal'
 import { eraseCopies } from './copies'
 import { immutableCopies } from './immutable-copies'
 import { retentionItems } from './retention'
+import { customerDeposit } from '../customer-deposits/store'
 import { unbilledTime } from './time'
 import { pendingErased } from '../webhooks/erasure'
 
@@ -31,6 +32,7 @@ export async function erasurePreview(c: Context, input: Data) {
   let posted = false
   if (!member) {
     blockers.push(...await unbilledTime(c.db,id))
+    for(const r of await all(c.db,'SELECT id FROM pt_customer_deposits WHERE customer_id=?',id)){const d=await customerDeposit(c.db,r.id);if(d.remaining_cents>0)blockers.push({kind:'customer-deposit',id:r.id,reason:'unapplied customer-deposit liability'})}
     const entries = await all(c.db,`SELECT DISTINCT e.id,e.entry_date,e.status FROM pt_journal_entries e LEFT JOIN pt_journal_lines l ON l.entry_id=e.id
       WHERE l.contact_id=? OR e.id IN (SELECT journal_id FROM pt_invoices WHERE customer_id=? UNION SELECT journal_id FROM pt_bills WHERE vendor_id=? UNION SELECT journal_id FROM pt_payments WHERE contact_id=? UNION SELECT journal_id FROM pt_vendor_credits WHERE vendor_id=?) ORDER BY e.id`,id,id,id,id,id)
     posted = entries.some(e=>e.status==='posted')

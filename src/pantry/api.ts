@@ -96,9 +96,11 @@ import { FIRST_DAY } from './report-sources'
 import { assertDoor, projectAccess } from './access-policy/doors'
 import { accessPolicyCommands } from './access-policy/settings'
 import { timeCommands, timeView } from './time/commands'
+import { estimateCommands, estimatesView, estimate, registerEstimateRoutes } from './estimates'
+import { customerDepositCommands, customerDepositsView } from './customer-deposits'
 
 const commands: Record<string, Command> = {
-  ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -145,6 +147,10 @@ view('erasure', async ctx => { await ownerSession(ctx); return erasureSettings(c
 view('integrations', async (ctx, c) => { must(ctx.actor, 'owner'); return integrationSettings(ctx, c.req.query('cursor')) })
 const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10)) => date(c.req.query(name) ?? fallback, name)
 
+registerEstimateRoutes(api, reader)
+view('estimates', async ctx => estimatesView(ctx))
+view('estimates/:id', async (ctx, c) => estimate(ctx.db, c.req.param('id')!))
+view('customer-deposits', async ctx => customerDepositsView(ctx))
 registerInvoiceDocumentRoutes(api, reader)
 view('invoice-documents', async ctx => invoiceDocumentsView(ctx.db))
 registerCustomReportRoutes(api, reader)

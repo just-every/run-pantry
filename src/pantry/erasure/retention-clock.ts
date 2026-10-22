@@ -5,6 +5,9 @@ import type { Data } from '../core'
 const SOURCES: Record<string, string[]> = {
   pt_journal_entries: ['id', 'entry_date', 'status', 'reverses_id', 'document_id'],
   pt_journal_lines: ['id', 'entry_id', 'contact_id'],
+  pt_estimates: ['id', 'customer_id'],
+  pt_estimate_conversions: ['id', 'estimate_id', 'invoice_id'],
+  pt_customer_deposits: ['id', 'customer_id', 'journal_id'],
   pt_invoices: ['id', 'customer_id', 'journal_id', 'credit_for', 'exemption_evidence'],
   pt_bills: ['id', 'vendor_id', 'journal_id'],
   pt_payments: ['id', 'contact_id', 'journal_id'],
@@ -62,6 +65,8 @@ export async function supportingBooks(db: D1Database) {
     const sourceKind = a.source_kind === 'payment' ? 'payment' : a.target_kind === 'bill' ? 'vendor-credit' : 'invoice'
     for (const root of record(a.target_kind, a.target_id)) copy(edges, root, record(sourceKind, a.source_id))
   }
+  for(const e of tables.pt_estimates) for(const x of tables.pt_estimate_conversions.filter(x=>x.estimate_id===e.id)) copy(records,`estimate:${e.id}`,record('invoice',x.invoice_id))
+  for(const d of tables.pt_customer_deposits){add(records,`customer-deposit:${d.id}`,d.journal_id);add(contacts,d.customer_id,d.journal_id)}
   const lines = new Map(tables.pt_journal_lines.map(l => [l.id, l.entry_id]))
   const matches = new Map<string, Set<string>>()
   for (const m of tables.pt_match_postings) add(matches, m.match_id, lines.get(m.journal_line_id))

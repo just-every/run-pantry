@@ -31,6 +31,10 @@ async function expiryStatements(db: D1Database, item: RetentionItem, erasureId: 
     q('DELETE FROM pt_document_parts WHERE document_id=?', item.id),
     q("UPDATE pt_documents SET content=?,name='[erased]',note='[erased]',capture_vendor=NULL,capture_invoice_number=NULL,duplicate_reason=NULL,erased_at=? WHERE id=? AND erased_at IS NULL", new Uint8Array(0), at, item.id), changed(),
   ]
+  if(item.table==='pt_estimate_documents'){
+    const [estimateId,revision]=item.id.split(':')
+    return [scoped,q("UPDATE pt_estimate_documents SET pdf_base64='',document='{}',erased_at=? WHERE estimate_id=? AND revision=? AND sha256=? AND erased_at IS NULL",at,estimateId,revision,item.sha256),changed()]
+  }
   if (item.table === 'pt_invoice_documents') {
     const row = await one(db, 'SELECT sha256,document FROM pt_invoice_documents WHERE invoice_id=? AND erased_at IS NULL', item.id)
     requireThat(row, 'The retained document changed; reload', 409)
@@ -64,6 +68,7 @@ const erase: Command = { need: 'owner', async run(c, b) {
   const mutations = (await Promise.all(selected.map(i => expiryStatements(c.db, i, id, at)))).flat()
   for (const item of selected) {
     const count = counts[item.table] ??= { itemsErased: 0, bytesRemoved: 0, fieldsReplaced: 0 }
+    if(item.table==='pt_estimate_documents'){const [e,r]=item.id.split(':');count.bytesRemoved+=Number((await one(c.db,'SELECT length(pdf_base64)*3/4 AS n FROM pt_estimate_documents WHERE estimate_id=? AND revision=?',e,r))?.n??0);count.fieldsReplaced+=2}
     count.itemsErased++; count.fieldsReplaced += item.table === 'pt_contractor_tax' ? 1 : item.table === 'pt_invoice_documents' ? 2 : 0
     if (item.table === 'pt_documents') {
       const doc = await one(c.db, `SELECT size, 1+(name<>'[erased]')+(note<>'[erased]')+(capture_vendor IS NOT NULL)+(capture_invoice_number IS NOT NULL)+(duplicate_reason IS NOT NULL) AS fields FROM pt_documents WHERE id=?`, item.id)

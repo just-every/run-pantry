@@ -1,3 +1,4 @@
+import { depositForIssue } from './customer-deposits/applications'
 // Receivables: draft → approved → issued invoices, and credits that reduce them.
 // A line without a decided tax treatment stops the invoice at review; Pantry
 // never assumes zero tax.
@@ -39,7 +40,7 @@ export async function openBalance(db: D1Database, kind: 'invoice' | 'bill', id: 
   return total - Number(r?.applied ?? 0)
 }
 
-export async function parseInvoice(db: D1Database, b: Data) {
+export async function parseInvoice(db: D1Database, b: Data, options: { estimate?: boolean } = {}) {
   const customer = await contact(db, text(b.customerId, 'Customer'), 'customer')
   requireThat(customer.active, 'Customer is inactive')
   const issueDate = date(b.issueDate, 'Issue date')
@@ -90,7 +91,7 @@ export async function parseInvoice(db: D1Database, b: Data) {
   const discountAccountId = discounts.length ? settings?.discount_account_id ?? null : null
   // An early-payment term (INVOICE-010) becomes an offer computed now and approved with this exact revision.
   const terms = parseTerms(b.earlyPayment, issueDate, dueDate, credit ? 'credit' : 'invoice')
-  const offer: Offer | null = terms ? await computeOffer(db, terms, issueDate, lines, total, deposit?.amount ?? 0, settings?.early_account_id ?? settings?.discount_account_id ?? null) : null
+  const offer: Offer | null = terms && !options.estimate ? await computeOffer(db, terms, issueDate, lines, total, deposit?.amount ?? 0, settings?.early_account_id ?? settings?.discount_account_id ?? null) : null
   requireThat(!offer || offer.payBy > 0, 'The deposit already covers the early-payment amount; lower the deposit or leave out the term')
   return { customer, documentTemplate, documentValues, issueDate, dueDate, destination, exemption, lines, subtotal, discount, afterTax, discounts, discountAccountId, deposit, terms, offer, tax, total, memo: optionalText(b.memo, 'Memo', 1000) }
 }
@@ -113,6 +114,7 @@ export async function nextNumber(db: D1Database, kind: 'invoice' | 'credit') {
 const saveDraft: Command = { need: 'record', async run(c, b) {
   const kind = b.kind === 'credit' ? 'credit' : 'invoice'
   const previous = b.id ? await invoice(c.db, text(b.id, 'Invoice')) : null
+  requireThat(!previous?.estimate_id, 'A converted estimate draft keeps its accepted pricing; issue it without editing', 409)
   const time = await invoiceTime(c.db, b)
   const p = await parseInvoice(c.db, { ...time.body, templateId: b.templateId ?? previous?.document_template_id, customFields: b.customFields ?? (previous ? JSON.parse(previous.document_values) : undefined) })
   const depositScope = p.deposit ? bankAuthority(c.actor, [p.deposit.bankAccountId]) : []
@@ -209,6 +211,7 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
       q('UPDATE pt_invoices SET deposit_payment_id = ? WHERE id = ?', deposit.id, current.id), changed(),
       q('UPDATE pt_allocations SET early_counted = 1 WHERE source_kind = ? AND source_id = ? AND ? = 1', 'payment', deposit.id, current.early_offer ? 1 : 0))
   }
+  if (!credit) statements.push(...await depositForIssue(db, actor, {...current,revision:issuedRevision,status:'issued'}))
   if (credit) {
     const target = await invoice(db, current.credit_for!)
     // Any credit other than the early-payment discount itself withdraws a live early-payment offer (INVOICE-010).

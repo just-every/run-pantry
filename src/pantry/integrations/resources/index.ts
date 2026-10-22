@@ -1,6 +1,7 @@
 import type { Hono } from 'hono'
 import { requireThat } from '../../core'
 import { yearEndState } from '../../year-end'
+import { estimateResources } from './estimates'
 import { bankingResources } from './banking'
 import { catalogResources, contactHistoryResource } from './catalog'
 import { definitionResources, metadataResources } from './definitions'
@@ -10,7 +11,7 @@ import { timeResources } from './time'
 import { workflowResources } from './workflow'
 import { authorizeRead, pick, registerResources, type ResourceEnv } from './model'
 
-export const recordResources = [...catalogResources, contactHistoryResource, ...bankingResources, ...scheduleResources, ...timeResources, ...workflowResources, ...definitionResources, ...metadataResources, ...providerResources]
+export const recordResources = [...estimateResources, ...catalogResources, contactHistoryResource, ...bankingResources, ...scheduleResources, ...timeResources, ...workflowResources, ...definitionResources, ...metadataResources, ...providerResources]
 
 // Every distinct native parent record type is a separate owner selection. Child
 // occurrences and nested references inherit only their named parent record consent.

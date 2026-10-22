@@ -1,3 +1,4 @@
+import { estimatesJourney } from './estimates-journey.mjs'
 import { access001Browser } from './access001-journey.mjs'
 import { effectsJourney } from './effects-journey.mjs'
 import { moveInJourney } from './move-in-journey.mjs'
@@ -12,6 +13,8 @@ import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
 import { vendorCreditJourney } from './vendor-credit-journey.mjs'
+
+test('INVOICE-006 estimates, customer acceptance, progress invoices and advance deposits at 1440 and 390', estimatesJourney)
 
 test('MIGRATE-007 spreadsheet mapping, preview, undo, reimport and sign-off at 1440 and 390', moveInJourney)
 

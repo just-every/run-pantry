@@ -12,6 +12,9 @@ import { Recurring } from './recurring'
 import { ExemptionCitation } from './exemption-certificates'
 import { Items } from './items'
 import { Contacts } from './contacts'
+import { Estimates } from './estimates'
+import { CustomerDeposits } from './customer-deposits'
+import { mayRecordDeposits } from './estimate-economics'
 
 function invoiceStatus(i: D): [string, 'good' | 'warn' | 'info' | 'neutral'] {
   if (i.status === 'draft') return ['Draft', 'neutral']
@@ -29,11 +32,13 @@ function InvoicePanel({ i, data, onChange, onEdit, onCredit }: { i: D; data: D; 
   const untaxed = i.lines.filter((l: D) => !l.tax_code).length
   return <Card title={<>{i.customer_name} — {i.number}</>} actions={<Chip tone={tone}>{label}</Chip>}>
     <p>{i.kind === 'credit' ? 'Credit' : 'Invoice'} for {usd(i.total_cents)}{i.kind === 'invoice' && i.status === 'issued' ? `, ${usd(i.open_cents)} open, due ` : ', due '}{day(i.due_date)}.</p>
+    {i.estimate_id && <div className="callout"><strong><a href={`/app/sales?tab=estimates&estimate=${encodeURIComponent(i.estimate_id)}`}>View accepted estimate</a></strong><span>Previously billed: {usd(i.estimate_billed_before_cents)} · This invoice: {usd(i.total_cents)} · Remaining: {usd(i.estimate_remaining_cents)}</span><span>This invoice keeps the accepted estimate's pricing.</span></div>}
     <ExemptionCitation invoice={i} />
     {untaxed > 0 && <div className="callout callout-warn"><strong>Tax treatment needed before approval</strong><span>{untaxed} line{untaxed === 1 ? '' : 's'} without a sales tax code.</span></div>}
     {i.lines.length > 0 && <Table heads={['Description', 'Quantity', 'Amount', 'Tax']} figures={[1, 2, 3]}>{i.lines.map((l: D) => <tr key={l.id}><td>{l.description}</td><td className="fig">{l.quantity_milli / 1000}</td><td className="fig">{usd(l.amount_cents)}</td><td className="fig">{l.tax_code === 'exempt' ? 'Exempt' : l.tax_code ? usd(l.tax_cents) : 'Needed'}</td></tr>)}</Table>}
     <div className="row-actions">
-      {i.status !== 'issued' && state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit</button>}
+      {i.status !== 'issued' && !i.estimate_id && state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit</button>}
+      {i.status === 'draft' && i.estimate_id && (i.early_terms || i.early_offer) && state.actor.can.record && <Action run={async () => { await command('estimate.refresh-invoice', { id: i.estimate_id, invoiceId: i.id, revision: i.revision }); await onChange() }}>Refresh early-payment treatment</Action>}
       {i.self_approval && <p className="hint">Self-approved within limit · {usd(JSON.parse(i.self_approval).limit)} · {JSON.parse(i.self_approval).source}</p>}
       {i.status === 'draft' && selfAllowed && <Action tone="primary" run={async () => { await command('invoice.approve-issue', { id: i.id, revision: i.revision, limitRevision: state.settings.issuingLimits.effective.revision }); await onChange() }}>Approve and issue within limit</Action>}
       {i.status === 'draft' && (mayApprove ? <Action tone="primary" run={async () => { await command('invoice.approve', { id: i.id, revision: i.revision }); await onChange() }}>Approve</Action> : <span className="hint">Approval needs the posting grant and a different person from the preparer, unless an issuing limit permits self-approval.</span>)}
@@ -47,7 +52,7 @@ function InvoicePanel({ i, data, onChange, onEdit, onCredit }: { i: D; data: D; 
 
 function Invoices({ data, reload }: { data: D; reload: () => Promise<void> }) {
   const { state } = useShared()
-  const [selected, setSelected] = useState<string | null>(null), [editing, setEditing] = useState<{ invoice?: D; creditFor?: D } | null>(null)
+  const [selected, setSelected] = useState<string | null>(() => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('invoice')), [editing, setEditing] = useState<{ invoice?: D; creditFor?: D } | null>(null)
   const invoices = data.invoices as D[], current = invoices.find(i => i.id === selected)
   const sum = (f: (i: D) => boolean) => invoices.filter(i => i.kind === 'invoice' && f(i)).reduce((s, i) => s + i.total_cents, 0)
   const count = (f: (i: D) => boolean) => invoices.filter(i => i.kind === 'invoice' && f(i)).length
@@ -167,15 +172,19 @@ function VendorCredits({ data, reload }: { data: D; reload: () => Promise<void> 
 
 export function Sales({ billId }: { billId?: string } = {}) {
   // Overview's Customers and vendors step opens this page at ?tab=contacts.
-  const [requestedTab, setTab] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'templates' ? 'Invoice templates' : typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'contacts' ? 'Customers & vendors' : typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'bills' ? 'Bills' : billId ? 'Bills' : typeof window !== 'undefined' && window.location.hash.startsWith('#bill-') ? 'Bills' : 'Invoices'), { data, error, reload } = useView<D>('sales'), shared = useShared()
+  const [requestedTab, setTab] = useState(() => {
+    if (typeof window === 'undefined') return billId ? 'Bills' : 'Invoices'
+    const requested = new URLSearchParams(window.location.search).get('tab')
+    return ({ templates: 'Invoice templates', contacts: 'Customers & vendors', bills: 'Bills', estimates: 'Estimates', deposits: 'Customer deposits' } as Record<string, string>)[requested ?? ''] ?? (billId || window.location.hash.startsWith('#bill-') ? 'Bills' : 'Invoices')
+  }), { data, error, reload } = useView<D>('sales'), shared = useShared()
   const role = shared.state.actor.role
-  const tabs = role === 'sales' ? ['Invoices', 'Recurring', 'Deliveries', 'Customers & vendors'] : role === 'payables-clerk' ? ['Bills', 'Customers & vendors'] : ['Invoices', 'Invoice templates', 'Recurring', 'Bills', 'Payments', 'Deliveries', 'Customers & vendors', 'Products & services']
+  const tabs = role === 'sales' ? ['Invoices', 'Estimates', 'Recurring', 'Deliveries', 'Customers & vendors'] : role === 'payables-clerk' ? ['Bills', 'Customers & vendors'] : ['Invoices', 'Invoice templates', ...(['owner', 'bookkeeper', 'accountant', 'viewer'].includes(role) ? ['Estimates'] : []), 'Recurring', 'Bills', 'Payments', ...(mayRecordDeposits(shared.state) ? ['Customer deposits'] : []), 'Deliveries', 'Customers & vendors', 'Products & services']
   const tab = tabs.includes(requestedTab) ? requestedTab : tabs[0]
   const refresh = async () => { await reload(); await shared.reload() }
   return <>
     <PageHead title="Sales & bills" lead="Invoices you send and follow up, recurring invoices, bills and their evidence, and payments." />
     <Tabs tabs={tabs} current={tab} onChange={setTab} pick="Show" />
-    {tab === 'Invoice templates' ? <InvoiceTemplates /> : tab === 'Customers & vendors' ? <Contacts /> : tab === 'Products & services' ? <Items /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
-      : tab === 'Bills' ? <Bills initialBillId={billId} data={data} reload={refresh} /> : tab === 'Deliveries' ? <Card title="Deliveries"><p className="hint">Every invoice and reminder Pantry has sent, with the mail provider's answer. Accepted means the provider took the message, not that the customer read it; "Viewed" on an invoice means the customer opened its link.</p><Deliveries data={data} /></Card> : <Payments data={data} reload={refresh} />}
+    {tab === 'Estimates' ? <Estimates onChange={refresh} /> : tab === 'Invoice templates' ? <InvoiceTemplates /> : tab === 'Customers & vendors' ? <Contacts /> : tab === 'Products & services' ? <Items /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
+      : tab === 'Customer deposits' ? <CustomerDeposits sales={data} onChange={refresh} /> : tab === 'Bills' ? <Bills initialBillId={billId} data={data} reload={refresh} /> : tab === 'Deliveries' ? <Card title="Deliveries"><p className="hint">Every invoice and reminder Pantry has sent, with the mail provider's answer. Accepted means the provider took the message, not that the customer read it; "Viewed" on an invoice means the customer opened its link.</p><Deliveries data={data} /></Card> : <Payments data={data} reload={refresh} />}
   </>
 }

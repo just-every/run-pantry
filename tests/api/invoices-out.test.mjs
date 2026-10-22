@@ -763,3 +763,10 @@ test('INVOICE-010 early-payment terms (with SALESTAX-001/002/004, INVOICE-001/00
   const run = (await h.view('sales')).recurring.find(r => r.id === template.id).runs_list[0]
   assert.equal(run.status, 'drafted'); assert.match(run.detail, /early-payment treatment changed/)
 })
+
+test('INVOICE-006 estimates accept exact revisions, reserve progress once and apply advance liabilities without receiving cash twice',async t=>{
+ const h=await harness();t.after(()=>h.close())
+ const {estimatesJourney,estimateInheritedJourney,estimateErasureJourney}=await import('./estimates-journey.mjs')
+ const x=await estimatesJourney(h),archive=await harness();t.after(()=>archive.close())
+ await Promise.all([estimateInheritedJourney(h,x),estimateErasureJourney(archive)])
+})
