@@ -1,4 +1,4 @@
-// An export issues a report/package to its reader. The immutable audit record
+// A financial export issues a report/package to its reader. The immutable audit record
 // remembers its scope so later corrections can name that exact issued copy.
 import { all, audit, one, run, type AuditActor } from '../db'
 import { date, requireThat, text, type Data } from '../core'
@@ -11,7 +11,11 @@ import type { CustomReportDefinition, CustomReportDrillGraph } from '../custom-r
 import { reportFigure, type FigureQuery } from '../report-figures'
 
 export type ReportIssue = { kind: string; name: string; from: string; to: string; basis: Basis; report?: string; reports?: string[]; account?: string; payee?: string; columns?: string; budgetId?: string; definition?: CustomReportDefinition; definitions?: CustomReportDefinition[]; figure?: FigureQuery; customFigure?: { row: string; column: string; node?: string } }
+// Activity is audit history, not a ledger-derived financial report. Recording
+// its own export as a financial issue would change the very history exported.
+const auditHistory = (issue: ReportIssue) => issue.report === 'audit-log' || issue.figure?.report === 'audit-log'
 export async function recordReportIssue(db: D1Database, actor: AuditActor, issue: ReportIssue) {
+  if (auditHistory(issue)) return
   const from = date(issue.from), to = date(issue.to)
   requireThat(from <= to, 'Report range is reversed')
   // A later edit of a saved report or business basis must never change which
@@ -27,6 +31,7 @@ export async function affectedIssues(db: D1Database, projected: D1Database, earl
   const out: Data[] = []
   for (const record of records) {
     const issue = JSON.parse(record.detail) as ReportIssue
+    if (auditHistory(issue)) continue
     const sources = issue.report ? [issue.report] : issue.reports
     const definitions = issue.definition ? [issue.definition] : issue.definitions
     const latest = issue.figure?.report === 'contractors' ? `${issue.figure.year ?? issue.figure.to.slice(0, 4)}-12-31` : definitions?.length ? definitions.map(d => d.to).sort().at(-1)! : issue.to

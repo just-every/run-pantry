@@ -1,6 +1,7 @@
 import { who } from '../access'
 import { reportBasis } from '../basis'
 import { recordReportIssue } from '../effects/issues'
+import { FIRST_DAY } from '../report-sources'
 import { xlsxResponse } from '../xlsx'
 import { customReportsCsv, customReportsRows } from './csv'
 import type { Hono, Context as HonoContext } from 'hono'
@@ -86,7 +87,7 @@ export function registerCustomReportRoutes(api: Hono<{ Bindings: Bindings }>, re
     const response = format === 'json' ? jsonResponse(detail, 'pantry-report-figure') : figureExport({ ...detail, figure: detail.value }, detail.context)
     const saved = await savedReport(ctx, c.req.param('id'))
     requireThat(saved.revision === detail.context.revision, 'Report changed; reload', 409)
-    return issuedReport(ctx, saved, response, { ...detail.context, from: detail.from ?? detail.context.from, to: detail.to, basis: detail.basis,
+    return issuedReport(ctx, saved, response, { ...detail.context, from: detail.from ?? FIRST_DAY, to: detail.to, basis: detail.basis,
       customFigure: { row: detail.context.row, column: detail.context.column, node: detail.context.node } })
   })
   api.get('/api/pantry/custom-reports/:id/figures', async c => c.json(await customReportFigure(await reader(c), c.req.param('id'), { row: c.req.query('row'), column: c.req.query('column'), node: c.req.query('node') })))

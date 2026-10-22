@@ -92,6 +92,7 @@ import { webhookCommands, webhookSettings } from './webhooks/commands'
 import { runWebhooks } from './webhooks/deliver'
 import { dataFlows } from './data-flows'
 import { recordReportIssue } from './effects/issues'
+import { FIRST_DAY } from './report-sources'
 
 const commands: Record<string, Command> = {
   ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
@@ -195,7 +196,7 @@ api.get('/api/pantry/reports/detail/export', async c => {
   const figure = await figureQuery(ctx.db, c, from, to)
   const detail = await reportFigure(ctx.db, figure, Number(entity?.fiscal_year_start ?? 1))
   const response=figureExport(detail,c.req.query())
-  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`${figure.report} · source figure`,from:detail.from ?? from,to:detail.to,basis:figure.basis,report:figure.report,account:figure.account,payee:figure.payee,columns:figure.columns,budgetId:figure.budget,figure})
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`${figure.report} · source figure`,from:detail.from ?? FIRST_DAY,to:detail.to,basis:figure.basis,report:figure.report,account:figure.account,payee:figure.payee,columns:figure.columns,budgetId:figure.budget,figure})
   return response
 })
 api.get('/api/pantry/reports/record/:kind/:id/export', async c => {
