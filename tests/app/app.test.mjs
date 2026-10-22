@@ -463,3 +463,6 @@ test('DIM-001 required bill coding and dimension statements at 1440 and 390',asy
 
 import {dimensionCompletionBrowser} from './dimension-completion.mjs'
 test('DIM-001 dimension splits, document recoding and generated coding through the built screens at 1440 and 390',dimensionCompletionBrowser)
+
+import {reportDeliveryBrowser} from './report-delivery.mjs'
+test('REPORT-007 dedicated exports and owner-consented lender delivery on month lock at 1440 and 390',reportDeliveryBrowser)

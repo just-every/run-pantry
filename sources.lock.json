@@ -5052,7 +5052,7 @@
       "executable": false
     },
     "tests/app/app.test.mjs": {
-      "sha256": "a39de12b2a6e3e4b86ad9f60c61e0884f0e52722072835e4a264a0f286f7e7e6",
+      "sha256": "3b509b5983ac88c0530147e2d9276e5634249b7694e637f44106d19bdbb1bfa5",
       "executable": false
     },
     "tests/app/bank-rules.test.mjs": {
