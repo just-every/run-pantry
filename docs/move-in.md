@@ -2,6 +2,52 @@ Pantry's move-in kits bring your books across from QuickBooks Online or Xero at 
 
 Open **Move in from QuickBooks or Xero** under **More** and choose your old system.
 
+For your own CSV or Excel files, choose the **Spreadsheet** tab. This tested route brings in lists and an opening, without claiming support for another provider's export package or API.
+
+## From spreadsheets: templates and mappings
+
+Use one file per list, with unique, nonempty headers in the first row. Download **template** beside each list; templates are CSV, and uploads accept CSV or `.xlsx`.
+
+| Template | Fields |
+| --- | --- |
+| Customers | `externalId`, `name`, `email`, `termsDays` |
+| Vendors | `externalId`, `name`, `email`, `termsDays` |
+| Items | `externalId`, `name`, `kind`, `sku`, `description`, `rate`, `account`, `taxDecision`, `taxCode` |
+| Chart of accounts | `externalId`, `name`, `code`, `type`, `subtype`, `description` |
+| Open invoices | `externalId`, `number`, `party`, `date`, `due`, `open`, `original`, `account`, `taxDecision` |
+| Open bills | `externalId`, `number`, `party`, `date`, `due`, `open`, `original`, `account`, `taxDecision` |
+| Opening trial balance | `account`, `debit`, `credit`, `className`, `locationName`, `projectName` |
+
+Headers may use your own names. Open **Map … columns**, select a header for each field, then **Save … mapping**. Each list keeps its own editable mapping. Preview also saves the selected mappings. Optional fields may stay unmapped; a header cannot supply two fields. If a later file removes a saved header, map that field again.
+
+Name each chart account, give it a code and choose `asset`, `liability`, `equity`, `income` or `expense`. Its role (`subtype`) is `other`, `bank`, `receivable`, `payable`, `tax` or `retained`. Account references can use a name or code. Items use `service` or `non-inventory`, an income account and a rate; choose `taxable` or `non-taxable` explicitly. A taxable item can name an active Pantry tax-code ID.
+
+Open items name a customer or vendor and the appropriate receivable or payable account. Their positive open amount cannot exceed the original amount. Choose `included` for tax already included in that opening amount, or `non-taxable`; Pantry does not charge the tax again. Use ISO dates or US `MM/DD/YYYY`, and dollar amounts with at most two decimal places.
+
+Opening dimension columns are optional unless the account requires them. Enable the dimensions and create their active values in Pantry first. Separate rows can give one account different class/location/project amounts; bank and control tie-outs still use that account's combined opening.
+
+## Spreadsheet limits and refusals
+
+The page reads the first worksheet of an `.xlsx`; the API can select a named sheet. Replace formulas with values before uploading. Formula and Excel error cells are refused, and password-protected workbooks, legacy `.xls`, macros and external worksheet relationships are unsupported.
+
+The implemented limits are 2,000,000 bytes per file, 10,000 data rows and 100 columns. Expanded workbook contents are limited to 12,000,000 bytes and 2,000 ZIP entries. The combined command request, including encoded workbook bytes, must fit within 8 MB. These are import limits, not a measured scale guarantee.
+
+Set **Spreadsheet cutover date**, add the files and bank details, then choose **Preview spreadsheets**. The dry run writes no imported records. **Every row** shows its source file, row, values and ready, update, unchanged or refused result, with paging and filters. Refusals name duplicate or conflicting identities, unknown accounts, missing tax decisions, invalid dates/amounts, inactive or required opening dimensions, or an unbalanced opening.
+
+Lists can move on their own. Open invoices or bills also need their opening trial balance. **Spreadsheet tie-outs** must show **All match**: the opening balances, accepted invoices equal receivables, accepted bills equal payables, bank openings equal the entered reconciled statements, and the control-account roles agree. Correct refused rows or explicitly choose **Leave … refused rows out of this import**. Leaving them out never overrides a failed tie-out. Changing files, mappings or relevant native records requires a fresh preview.
+
+## Stage, re-import, undo and accept spreadsheets
+
+Choose **Import spreadsheet records as staged** with the record grant. Pantry retains the original bytes, mapping and reviewed plan, and stages the records and opening draft. If interrupted, **Continue spreadsheet import** resumes the stored job; it does not start a second import. Refused rows remain listed in the outcome. Importing open items does not post them again on top of the opening trial balance.
+
+Before sign-off, re-import updates records matched by external ID, or by name without an ID, case-insensitively. A stable external ID permits a rename. Invoices match by number; bills by vendor and number. Conflicting identities are refused. A changed financial opening needs the same cutover date and its full open-item lists; a lists-only update does not replace the opening.
+
+Someone with the post grant can **Undo import** before acceptance. Undo restores exact previous values for updated records and removes newly imported ones. Undo newer imports first; native edits, postings or dependent records can refuse undo. Saved header mappings remain. **Continue undo** resumes a partially completed undo.
+
+The owner, or someone with the post grant other than the importer, chooses **Accountant sign-off** after pending work finishes. Pantry rechecks the tie-outs, records approval and posts the opening. Undo and spreadsheet re-import are then refused; use normal accounting corrections.
+
+Spreadsheets do not bring provider history or original attachments. Upload supporting files in **Documents**, and keep the old system's archive through the first accepted close. Generic XLSX support does not establish a real QuickBooks, Xero, FreshBooks or other provider migration, or support for its attachment ZIP.
+
 ## From QuickBooks Online: seven reports
 
 In QuickBooks Online, run each report for the cutover date, export it, and save each sheet as CSV without changing its values:

@@ -80,9 +80,9 @@ Download a CSV template beside each list. The columns shown by each template are
 | Chart | `externalId`, `name`, `code`, `type`, `subtype`, `description` |
 | Items | `externalId`, `name`, `kind`, `sku`, `description`, `rate`, `account`, `taxDecision`, `taxCode` |
 | Open invoices / bills | `externalId`, `number`, `party`, `date`, `due`, `open`, `original`, `account`, `taxDecision` |
-| Opening trial balance | `account`, `debit`, `credit` |
+| Opening trial balance | `account`, `debit`, `credit`, `className`, `locationName`, `projectName` |
 
-Headers may have any names: choose their matching fields under **Map columns**. Pantry saves a separate editable mapping for each list; saving a mapping and undoing an import are independent operations. An upload with unchanged headers uses that mapping again. Preview also saves the mappings selected on the page. Optional fields can be left unmapped.
+Headers may have any names: choose their matching fields under **Map columns**. Pantry saves a separate editable mapping for each list; saving a mapping and undoing an import are independent operations. An upload with unchanged headers uses that mapping again. Preview also saves the mappings selected on the page. Optional fields can be left unmapped. Opening dimensions must name enabled, active catalogue values and satisfy each account's requirements. Different dimension tuples may split an account across rows; account tie-outs use their combined amount.
 
 Names, chart codes and account types are required. Chart types are `asset`, `liability`, `equity`, `income` or `expense`; `subtype` is `other` (the default), `bank`, `receivable`, `payable`, `tax` or `retained`. References to an account can use its name or code. Open items name an existing/imported customer or vendor and the relevant receivable/payable control account. Items require an income account, `service` or `non-inventory` kind, a rate, and an explicit `taxable` or `non-taxable` decision. A taxable item may also name an active Pantry tax-code ID. Open amounts already include any tax: explicitly choose `included` or `non-taxable`; importing the opening item does not charge tax again. Open amounts must be positive and no larger than the original amount.
 

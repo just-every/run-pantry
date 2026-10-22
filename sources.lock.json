@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "e1813f3b4dbb9941710b49398de26b33f4cd18cd4bc94757b580e14a8df73564",
+      "sha256": "3e2ba4f00dee528960855527a5c7795a82ebb24be636d29020e06438639127f3",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -152,7 +152,7 @@
       "executable": false
     },
     "docs/move-in.md": {
-      "sha256": "1a3d7e9311e795e11ba8442d87143fd9fe78e0c8bd0196dec9a7f82692dad065",
+      "sha256": "96f99eb5667d232c7c3a3951e949f86a79c303cafbf7ae86aab27f114e8878b1",
       "executable": false
     },
     "docs/people.md": {
@@ -740,7 +740,7 @@
       "executable": false
     },
     "MOVE-IN.md": {
-      "sha256": "51a30d760f1e3342c50d38a1965d51d7607eb9e10ab865804c3dcde2cddbf443",
+      "sha256": "b347ecd94a3e3516c05d3b7129fe6adb0be76bb8bebd6577eb6d0c750c79dbe8",
       "executable": false
     },
     "ONBOARDING.md": {
