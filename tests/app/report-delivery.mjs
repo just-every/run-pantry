@@ -15,7 +15,7 @@ export async function reportDeliveryBrowser(t){
   const download=async name=>{const file=page.waitForEvent('download');await page.getByRole('link',{name,exact:true}).click();const d=await file;assert.equal(await d.failure(),null);return d}
   await report('cash-flow');await download('Cash-flow Excel');await shot('cash-flow-exports')
   await report('receivables');await download('Download PDF');await shot('ageing-exports')
-  await report('budget-actual',{budget:budget.id});await download('Download budget Excel · cash');await shot('budget-exports')
+  await report('budget-actual',{budget:budget.id});await download('Download budget Excel · cash');await shot('budget-exports');await report('budget-actual',{budget:budget.id,split:'class'});await download('Download budget split Excel');await shot('budget-split-exports')
   await report('project-profitability',{projectName:'Cedar'});await download('Project Excel · cash');await shot('project-exports')
   await report('adjusting-entries',{to:'2026-12-31'});await download('Download Excel · cash');await shot('adjusting-exports')
   await report('contractors',{year:'2025'});await download('Contractor review Excel');await download('Filing data PDF');await shot('contractor-exports')
@@ -31,7 +31,7 @@ export async function reportDeliveryBrowser(t){
   const close=await command('close.tasks',{period:'2026-10'});for(const task of close.tasks)if(task.status!=='done')await command('close.task',{id:task.id,revision:task.revision,done:true})
   await page.goto(origin+'/app/close?period=2026-10');await expect(page.getByRole('button',{name:'Lock October 2026',exact:true})).toBeEnabled();await submit('Lock October 2026','period.lock');await app.cron()
   await report('delivery');const deliveries=(await view('report-delivery')).history.filter(d=>d.recipient===lender);assert.equal(deliveries.length,1);assert.equal(deliveries[0].status,'accepted')
-  await expect(page.getByText('accepted',{exact:true}).first()).toBeVisible();await download('Original '+deliveries[0].filename);await shot('delivery-recorded')
+  const original=page.locator(`a[href="/api/pantry/report-delivery/${deliveries[0].id}/attachment"]`);await expect(original).toBeVisible();const originalDownload=page.waitForEvent('download');await original.click();assert.equal(await (await originalDownload).failure(),null);await shot('delivery-recorded')
   assert.ok(mail.some(m=>[m.to].flat().includes(lender)&&m.attachments?.length===1))
   await submit(`Disable Cedar lender ${width}`,'report-schedule.disable');await expect(page.getByRole('button',{name:`Disable Cedar lender ${width}`,exact:true})).toHaveCount(0);await shot('schedule-disabled')
   assert.deepEqual(errors,[]);await page.close()

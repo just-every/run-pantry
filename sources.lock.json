@@ -4488,7 +4488,7 @@
       "executable": false
     },
     "src/ui/budgets.tsx": {
-      "sha256": "6b673504f62946b73269217b5a07586e61ac5135fd060c9f2d75721d21aa6711",
+      "sha256": "20376e897e862c3a60887ff9559b2275e526b2bc4735dc3d3b939c5ff6ef8856",
       "executable": false
     },
     "src/ui/capture-approval-rules.tsx": {
@@ -5168,7 +5168,7 @@
       "executable": false
     },
     "tests/app/report-delivery.mjs": {
-      "sha256": "d8c2287a953bc0ea6edd1fe10ef8d9cbab9ae204cb5af707c90002dfb857490c",
+      "sha256": "692007212afa717af7f778f1083c95ad1eabdba35ea5065badde0beea8a4e7fd",
       "executable": false
     },
     "tests/app/report-library.test.mjs": {
