@@ -1,3 +1,4 @@
+import { dimensionTags } from '../dimensions'
 // A person accepts or corrects what was read and attaches the receipt to a
 // transaction. A bank or card line not yet in the books is recorded to the
 // account the person (or the business's rule) chose, in the same batch.
@@ -48,7 +49,7 @@ async function attachPlan(db: D1Database, actor: Actor, r: Data, target: Target,
       // Not in the books yet: record it, matched to its line, as the person accepted.
       requireThat(f.accountId, 'Choose the account to record this to')
       const into = line.amount_cents > 0, amount = (Math.abs(line.amount_cents) / 100).toFixed(2)
-      const plan = await matchPlan(db, actor, { bankLineIds: [line.id], journalLineIds: [], create: [{ type: into ? 'income' : 'fee', direction: into ? 'in' : 'out', amount, accountId: f.accountId, memo: f.vendor ?? line.description, date: line.posted_date }], note: `Receipt ${r.id}` })
+      const plan = await matchPlan(db, actor, { bankLineIds: [line.id], journalLineIds: [], create: [{ type: into ? 'income' : 'fee', direction: into ? 'in' : 'out', amount, ...dimensionTags(r),accountId: f.accountId, memo: f.vendor ?? line.description, date: line.posted_date }], note: `Receipt ${r.id}` })
       statements.push(...plan.statements)
       linked = { kind: 'journal', id: plan.entryIds[0] }
     }

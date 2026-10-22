@@ -1,3 +1,4 @@
+import { dimensionTags, dimensionRefusal, dimensionsView } from '../dimensions'
 import { authority, who } from '../access'
 import { reportBasis } from '../basis'
 import { cents, now, requireThat, text, uid, type Data } from '../core'
@@ -18,7 +19,8 @@ export function budgetMonth(value: unknown) {
 export async function budget(db: D1Database, id: string): Promise<Data & { months: string[]; cells: Data[] }> {
   const row = await one(db, 'SELECT * FROM pt_budgets WHERE id = ?', id)
   requireThat(row, 'Budget not found', 404)
-  return { ...row, months: Array.from({ length: 12 }, (_, i) => monthAt(row.start_month, i)), cells: await all(db, 'SELECT account_id, month, amount_cents FROM pt_budget_cells WHERE budget_id = ? ORDER BY account_id, month', id) }
+  const detailed=await all(db,'SELECT account_id,month,amount_cents,class_name,location_name FROM pt_budget_dimension_cells WHERE budget_id=? ORDER BY account_id,month,class_name,location_name',id)
+  return { ...row, months: Array.from({ length: 12 }, (_, i) => monthAt(row.start_month, i)), cells: detailed.length?detailed:await all(db, "SELECT account_id,month,amount_cents,'' AS class_name,'' AS location_name FROM pt_budget_cells WHERE budget_id=? ORDER BY account_id,month",id) }
 }
 export async function budgetsView(db: D1Database) {
   return { budgets: await all(db, 'SELECT * FROM pt_budgets ORDER BY created_at, id') }
@@ -29,11 +31,11 @@ export async function actualCells(db: D1Database, start: string, basis: 'cash' |
   for (const account of ledger.accounts.filter(a => ['income', 'expense'].includes(a.type))) {
     const monthly = new Map<string, number>()
     for (const line of account.rows) {
-      const month = line.entry_date.slice(0, 7)
+      const month = line.entry_date.slice(0, 7),key=JSON.stringify([month,line.class_name??'',line.location_name??''])
       if (month < start || month >= monthAt(start, 12)) continue
-      monthly.set(month, (monthly.get(month) ?? 0) + (line.debit_cents - line.credit_cents) * (account.type === 'income' ? -1 : 1))
+      monthly.set(key, (monthly.get(key) ?? 0) + (line.debit_cents - line.credit_cents) * (account.type === 'income' ? -1 : 1))
     }
-    for (const [month, amount_cents] of monthly) cells.push({ account_id: account.id, month, amount_cents })
+    for (const [key, amount_cents] of monthly){const [month,class_name,location_name]=JSON.parse(key);cells.push({ account_id: account.id, month, amount_cents,class_name,location_name })}
   }
   return cells
 }
@@ -41,7 +43,7 @@ const signedScale = (amount: number, numerator: number) => Number((BigInt(Math.a
 
 const save: Command = { need: 'record', async run(c, b) {
   const name = text(b.name, 'Budget name', 200), start = budgetMonth(b.startMonth), basis = await reportBasis(c.db, b.basis)
-  requireThat(!b.classId && !b.locationId, 'Dimensions must be enabled before budgeting by class or location')
+  requireThat(!b.classId&&!b.locationId,'Choose class/location names on budget cells or explicit import mappings')
   const before = b.id ? await budget(c.db, text(b.id, 'Budget')) : null
   if (before) requireThat(before.revision === b.revision && before.start_month === start, 'Budget changed; reload, and keep its annual start', 409)
   const accounts = await all(c.db, 'SELECT id, code, type, active FROM pt_accounts')
@@ -61,7 +63,7 @@ const save: Command = { need: 'record', async run(c, b) {
     requireThat(indices.every(i => i >= 0), 'CSV columns are Account,Month,Amount; Account is the chart code and Amount is signed USD')
     cells = rows.map((r, i) => {
       const a = byCode.get(r[indices[0]].trim()); requireThat(a, `CSV row ${i + 2}: unknown account code`)
-      return { account_id: a.id, month: budgetMonth(r[indices[1]]), amount_cents: cents(r[indices[2]], `Row ${i + 2} amount`, { signed: true, zero: true }) }
+      return { class_name:head.includes('class')?r[head.indexOf('class')].trim():'',location_name:head.includes('location')?r[head.indexOf('location')].trim():'',account_id: a.id, month: budgetMonth(r[indices[1]]), amount_cents: cents(r[indices[2]], `Row ${i + 2} amount`, { signed: true, zero: true }) }
     }); source = 'csv'
   } else if (b.easel !== undefined) {
     const plan = b.easel
@@ -70,28 +72,37 @@ const save: Command = { need: 'record', async run(c, b) {
     const knownLines = new Set(plan.lines.map((line: Data) => line.id)), aggregate = new Map<string, Data>()
     for (const cell of plan.calculation.cells) {
       requireThat(knownLines.has(cell.line) && Number.isSafeInteger(cell.amount), 'Easel cells must name a known line and integer cents')
-      const accountId = b.mapping[cell.line]; requireThat(accountId, `Map Easel line ${cell.line}`)
-      const month = budgetMonth(cell.month), key = `${accountId}:${month}`
+      const mapped=b.mapping[cell.line],accountId=typeof mapped==='string'?mapped:mapped?.accountId; requireThat(accountId, `Map Easel line ${cell.line}`)
+      const tags=dimensionTags({...((b.departmentMapping??{})[cell.department]??{}),...(typeof mapped==='object'?mapped:{})})
+      const class_name=tags.className,location_name=tags.locationName,month = budgetMonth(cell.month), key = JSON.stringify([accountId,month,class_name,location_name])
       const previous = aggregate.get(key)
-      aggregate.set(key, { account_id: accountId, month, amount_cents: (previous?.amount_cents ?? 0) + cell.amount })
+      aggregate.set(key, { class_name,location_name,account_id: accountId, month, amount_cents: (previous?.amount_cents ?? 0) + cell.amount })
     }
     cells = [...aggregate.values()]; source = 'easel'
   } else {
     requireThat(Array.isArray(b.cells), 'Enter budget cells')
-    cells = b.cells.map((cell: Data) => ({ account_id: cell.accountId, month: budgetMonth(cell.month), amount_cents: cents(cell.amount, 'Budget amount', { signed: true, zero: true }) }))
+    cells = b.cells.map((cell: Data) => ({ class_name:dimensionTags(cell).className,location_name:dimensionTags(cell).locationName,account_id: cell.accountId, month: budgetMonth(cell.month), amount_cents: cents(cell.amount, 'Budget amount', { signed: true, zero: true }) }))
   }
   requireThat(cells.length <= 2400, 'Keep a budget within 200 accounts and twelve months')
-  const keys = new Set<string>()
+  const keys = new Set<string>(),catalogue=await dimensionsView(c.db)
+  const settings=catalogue.settings!
   for (const cell of cells) {
-    const account = byId.get(cell.account_id), key = `${cell.account_id}:${cell.month}`
+    cell.class_name??='';cell.location_name??=''
+    requireThat((!cell.class_name||settings.classes_enabled)&&(!cell.location_name||settings.locations_enabled),'Enable the dimension before using it in a budget',409)
+    const refusal=await dimensionRefusal(c.db,[],dimensionTags(cell),catalogue);requireThat(!refusal,refusal??'Invalid budget dimensions',409)
+    const account = byId.get(cell.account_id), key = JSON.stringify([cell.account_id,cell.month,cell.class_name,cell.location_name])
     requireThat(account && ['income', 'expense'].includes(account.type) && account.active, 'Budget only active income or expense accounts')
     requireThat(cell.month >= start && cell.month < monthAt(start, 12), 'Every budget cell must be within its twelve months')
     requireThat(Number.isSafeInteger(cell.amount_cents) && Math.abs(cell.amount_cents) <= 10_000_000_000_000, 'Budget amount is too large')
     requireThat(!keys.has(key), 'Each account/month occurs once'); keys.add(key)
   }
   const id = before?.id ?? uid(), revision = uid(), at = now()
-  await run(c.db, [authority(c.actor, 'record'), ...(before ? [q('UPDATE pt_budgets SET name = ?, basis = ?, source = ?, revision = ?, updated_at = ? WHERE id = ? AND revision = ?', name, basis, source, revision, at, id, b.revision), changed(), q('DELETE FROM pt_budget_cells WHERE budget_id = ?', id)] : [q('INSERT INTO pt_budgets (id,name,start_month,basis,revision,source,prepared_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)', id, name, start, basis, revision, source, c.actor.email, at, at)]),
-    ...cells.map(cell => q('INSERT INTO pt_budget_cells (budget_id,account_id,month,amount_cents) VALUES (?,?,?,?)', id, cell.account_id, cell.month, cell.amount_cents)),
+  const rollup=new Map<string,Data>()
+  for(const cell of cells){const key=JSON.stringify([cell.account_id,cell.month]),prior=rollup.get(key);rollup.set(key,{...cell,amount_cents:(prior?.amount_cents??0)+cell.amount_cents})}
+  requireThat([...rollup.values()].every(c=>Number.isSafeInteger(c.amount_cents)),'Budget sum is too large')
+  await run(c.db, [authority(c.actor, 'record'), ...(before ? [q('UPDATE pt_budgets SET name = ?, basis = ?, source = ?, revision = ?, updated_at = ? WHERE id = ? AND revision = ?', name, basis, source, revision, at, id, b.revision), changed(), q('DELETE FROM pt_budget_dimension_cells WHERE budget_id=?',id),q('DELETE FROM pt_budget_cells WHERE budget_id = ?', id)] : [q('INSERT INTO pt_budgets (id,name,start_month,basis,revision,source,prepared_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)', id, name, start, basis, revision, source, c.actor.email, at, at)]),
+    ...cells.map(cell=>q('INSERT INTO pt_budget_dimension_cells(budget_id,account_id,month,amount_cents,class_name,location_name)VALUES(?,?,?,?,?,?)',id,cell.account_id,cell.month,cell.amount_cents,cell.class_name,cell.location_name)),
+    ...[...rollup.values()].map(cell => q('INSERT INTO pt_budget_cells (budget_id,account_id,month,amount_cents) VALUES (?,?,?,?)', id, cell.account_id, cell.month, cell.amount_cents)),
     audit(who(c.actor), 'budget.save', 'budget', id, { revision, before, after: { name, start, basis, source, cells } })])
   return budget(c.db, id)
 } }

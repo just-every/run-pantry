@@ -116,7 +116,7 @@ const approveMatch: Command = { need: 'record', async run(c, b) {
   }
   // A first decision is recorded only for actual new category filings, not an
   // existing payment/transfer match where no category was chosen.
-  const decisions = selected.length ? await suggestionDecisions(c.db, lines, selected, who(c.actor), input.create.map(i => i.contactId).filter(Boolean)) : []
+  const decisions = selected.length ? await suggestionDecisions(c.db, lines, selected, who(c.actor), input.create.map(i => i.contactId).filter(Boolean),input.create.filter(i=>i.type==='fee'||i.type==='income')) : []
   await run(c.db, [authority(c.actor, 'record'), ...plan.statements, ...decisions])
   return { id: plan.id }
 } }

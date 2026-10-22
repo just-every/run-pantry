@@ -39,8 +39,8 @@ const required:Command={need:'owner',async run(c,b){
 }}
 export const dimensionCommands:Record<string,Command>={'dimensions.settings':settings,'dimension.save':save,'dimension.require':required}
 
-export async function dimensionRefusal(db:D1Database,accountIds:string[],raw:Data):Promise<string|null>{
- const d=await dimensionsView(db),tags=dimensionTags(raw)
+export async function dimensionRefusal(db:D1Database,accountIds:string[],raw:Data,catalogue?:Awaited<ReturnType<typeof dimensionsView>>):Promise<string|null>{
+ const d=catalogue??await dimensionsView(db),tags=dimensionTags(raw)
  for(const [kind,flag] of [['class','classes_enabled'],['location','locations_enabled'],['project','projects_enabled']] as const){
   if(!d.settings?.[flag])continue
   const value=tags[`${kind}Name`]
@@ -59,3 +59,13 @@ const bankTags:Command={need:'record',async run(c,b){
  return (await one(c.db,'SELECT * FROM pt_bank_lines WHERE id=?',id))!
 }}
 dimensionCommands['bank-line.dimensions']=bankTags
+
+const receiptTags:Command={need:'record',async run(c,b){
+ const id=text(b.id,'Receipt'),receipt=await one(c.db,"SELECT * FROM pt_receipts WHERE id=? AND status='review'",id)
+ requireThat(receipt&&receipt.revision===b.revision,'Receipt changed or is already attached; reload',409)
+ const tags=dimensionTags(b),refusal=await dimensionRefusal(c.db,[],tags)
+ requireThat(!refusal,refusal??'Invalid dimensions',409)
+ await run(c.db,[authority(c.actor,'record'),q("UPDATE pt_receipts SET class_name=?,location_name=?,project_name=?,revision=? WHERE id=? AND revision=? AND status='review'",...dimensionValues(tags),uid(),id,b.revision),changed(),audit(who(c.actor),'receipt.dimensions','receipt',id,{before:dimensionTags(receipt),after:tags})])
+ return (await one(c.db,'SELECT * FROM pt_receipts WHERE id=?',id))!
+}}
+dimensionCommands['receipt.dimensions']=receiptTags

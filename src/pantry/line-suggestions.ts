@@ -1,3 +1,4 @@
+import { dimensionTags } from './dimensions'
 // Read-only filing advice. A person's most recent filing wins over older
 // patterns and defaults; only match.approve records a decision, never this read.
 import { now, type Data } from './core'
@@ -8,7 +9,7 @@ import { vendorNameKey } from './receipts/vendor-match'
 
 export type SuggestionSource = 'history' | 'vendor' | 'document'
 export type LineSuggestion = {
-  billId?: string; accountId: string; accountName: string; payee: string; contactId: string | null
+  dimensions?:ReturnType<typeof dimensionTags>;billId?: string; accountId: string; accountName: string; payee: string; contactId: string | null
   source: SuggestionSource; sourceId: string; reason: string
   confidence: number; confidenceReason: string; evidenceCount: number
 }
@@ -36,12 +37,12 @@ export async function lineSuggestions(db: D1Database, lines: Data[]): Promise<Re
   const [active, accounts, vendors, aliases, history] = await Promise.all([
     rules(db),
     all(db, "SELECT id, name, type FROM pt_accounts WHERE active = 1 AND type IN ('expense', 'income')"),
-    all(db, "SELECT id, name, default_account_id FROM pt_contacts WHERE active = 1 AND kind = 'vendor'"),
+    all(db, "SELECT id, name, default_account_id,default_class,default_location,default_project FROM pt_contacts WHERE active = 1 AND kind = 'vendor'"),
     all(db, 'SELECT vendor_id, alias_key FROM pt_vendor_aliases'),
     // Group below by filing, not posting: one split never becomes a made-up
     // single category, and each manual bank line contributes at most once.
     all(db, `SELECT l.id, l.payee, l.description, l.amount_cents, m.id AS match_id,
-        j.account_id, c.id AS contact_id, c.name AS contact_name
+        j.account_id,j.class_name,j.location_name,j.project_name, c.id AS contact_id, c.name AS contact_name
       FROM pt_match_bank_lines mb JOIN pt_bank_lines l ON l.id = mb.bank_line_id
       JOIN pt_matches m ON m.id = mb.match_id
       JOIN pt_match_postings mp ON mp.match_id = m.id AND mp.active = 1
@@ -70,7 +71,8 @@ export async function lineSuggestions(db: D1Database, lines: Data[]): Promise<Re
     // Keep an ambiguous latest filing as a barrier to using older history.
     const unambiguous = new Set(rows.map(r => r.account_id)).size === 1
     const contacts = [...new Set(rows.map(r => r.contact_id).filter(Boolean))]
-    const record = { ...h, account_id: unambiguous ? h.account_id : null,
+    const dims=Object.fromEntries(['class_name','location_name','project_name'].map(k=>[k,new Set(rows.map(r=>r[k])).size===1?h[k]:'']))
+    const record = { ...h,...dims, account_id: unambiguous ? h.account_id : null,
       contact_id: contacts.length === 1 ? contacts[0] : null,
       contact_name: contacts.length === 1 ? rows.find(r => r.contact_id === contacts[0])?.contact_name : null }
     byPayee.set(key(h), [...(byPayee.get(key(h)) ?? []), record])
@@ -102,9 +104,9 @@ export async function lineSuggestions(db: D1Database, lines: Data[]): Promise<Re
       const lastAccount = latest && valid(latest.account_id)
       if (lastAccount && !billDoc) {
         let streak = 0
-        for (const h of prior) { if (h.account_id !== latest.account_id) break; streak++ }
+        for (const h of prior) { if (h.account_id !== latest.account_id||JSON.stringify(dimensionTags(h))!==JSON.stringify(dimensionTags(latest))) break; streak++ }
         const payee = latest.contact_name || latest.payee || payeeKey(line)
-        result[line.id] = { accountId: lastAccount.id, accountName: lastAccount.name, payee,
+        result[line.id] = { dimensions:dimensionTags(latest),accountId: lastAccount.id, accountName: lastAccount.name, payee,
           contactId: latest.contact_id, source: 'history', sourceId: latest.match_id, evidenceCount: streak,
           reason: streak === 1 ? `Your most recent manual filing for ${payee} went to ${lastAccount.name}.` : `Your last ${streak} manual filings for ${payee} went to ${lastAccount.name}.`,
           confidence: Math.round(100 * (streak + 1) / (streak + 2)),
@@ -115,7 +117,7 @@ export async function lineSuggestions(db: D1Database, lines: Data[]): Promise<Re
       // Conflicting attached readings remain for a person to resolve.
       if (docAccount && new Set(attached.map(d => d.read_account_id)).size === 1) {
         const contact = vendors.find(v => v.id === (doc.bill_vendor_id ?? doc.vendor_id))
-        result[line.id] = { accountId: docAccount.id, accountName: docAccount.name,
+        result[line.id] = { dimensions:dimensionTags(doc),accountId: docAccount.id, accountName: docAccount.name,
           payee: contact?.name || doc.read_vendor || line.payee || payeeKey(line), contactId: contact?.id ?? null,
           billId: doc.bill_id ?? undefined, source: 'document', sourceId: doc.id, evidenceCount: attached.length,
           reason: `${doc.bill_id ? 'Attached bill document' : 'Matching receipt'} ${doc.name} was read as ${docAccount.name}.${doc.bill_id ? ' Match its vendor payment; do not create another expense.' : ''}`, confidence: 75,
@@ -123,7 +125,7 @@ export async function lineSuggestions(db: D1Database, lines: Data[]): Promise<Re
         continue
       }
       const vendor = vendorFor(line, vendors, aliases), defaultAccount = vendor && valid(vendor.default_account_id)
-      if (defaultAccount) result[line.id] = { accountId: defaultAccount.id, accountName: defaultAccount.name,
+      if (defaultAccount) result[line.id] = { dimensions:{className:vendor.default_class,locationName:vendor.default_location,projectName:vendor.default_project},accountId: defaultAccount.id, accountName: defaultAccount.name,
         payee: vendor.name, contactId: vendor.id, source: 'vendor', sourceId: vendor.id, evidenceCount: 1,
         reason: `${vendor.name}'s saved vendor default is ${defaultAccount.name}.`, confidence: 80,
         confidenceReason: 'Evidence score: 80% for an exact vendor name or confirmed alias and its saved default; not a calibrated probability.' }
@@ -136,7 +138,7 @@ export async function lineSuggestions(db: D1Database, lines: Data[]): Promise<Re
  * expense/income categories chosen, either shared by the match or per line.
  * No suggestion, no decision. A split counts as changed unless it has only
  * the suggested category. Existing first decisions survive undo/re-filing. */
-export async function suggestionDecisions(db: D1Database, lines: Data[], selectedAccountIds: string[] | Record<string, string[]>, actor: AuditActor, selectedContactIds: string[] = []): Promise<Sql[]> {
+export async function suggestionDecisions(db: D1Database, lines: Data[], selectedAccountIds: string[] | Record<string, string[]>, actor: AuditActor, selectedContactIds: string[] = [],selectedDimensions:Data[]=[]): Promise<Sql[]> {
   if (actor.kind !== 'person' || !lines.length) return []
   const suggestions = await lineSuggestions(db, lines)
   const seen = new Set<string>()
@@ -151,8 +153,9 @@ export async function suggestionDecisions(db: D1Database, lines: Data[], selecte
     const selected = [...new Set(Array.isArray(selectedAccountIds) ? selectedAccountIds : selectedAccountIds[lineId] ?? [])].sort()
     const contacts = [...new Set(selectedContactIds)]
     const payeeAgrees = !suggestion.contactId || (contacts.length === 1 && contacts[0] === suggestion.contactId)
-    const outcome = selected.length === 1 && selected[0] === suggestion.accountId && payeeAgrees ? 'accepted' : 'changed'
-    const event = audit(actor, 'suggestion.decision', 'bank-line', lineId, { suggestion, selectedAccountIds: selected, outcome })
+    const dimensionAgrees=selectedDimensions.length?selectedDimensions.every(d=>JSON.stringify(dimensionTags(d))===JSON.stringify(suggestion.dimensions??dimensionTags({}))):Object.values(suggestion.dimensions??{}).every(v=>!v)
+    const outcome = dimensionAgrees&&selected.length === 1 && selected[0] === suggestion.accountId && payeeAgrees ? 'accepted' : 'changed'
+    const event = audit(actor, 'suggestion.decision', 'bank-line', lineId, { suggestion, selectedDimensions:selectedDimensions.map(d=>dimensionTags(d)),selectedAccountIds: selected, outcome })
     statements.push(q(`INSERT INTO pt_line_suggestion_decisions
       (bank_line_id, source, source_id, suggested_account_id, selected_account_ids, outcome, suggestion, actor_email, decided_at, audit_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, lineId, suggestion.source, suggestion.sourceId, suggestion.accountId,

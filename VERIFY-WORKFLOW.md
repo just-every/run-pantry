@@ -29,3 +29,11 @@ The action pins were checked against the official
 [checkout v7.0.1 release](https://github.com/actions/checkout/releases/tag/v7.0.1)
 and [setup-node v7.1.0 release](https://github.com/actions/setup-node/releases/tag/v7.1.0).
 Their pinned `action.yml` files declare `runs.using: node24`.
+
+Pantry partitions verification in `scripts/verify.mjs`: source checks, three API
+file groups and eight browser jobs. Browser jobs 1–5 divide the literal top-level
+journeys in `tests/app/app.test.mjs`; jobs 6–8 divide every other browser test
+file. New registrations and matching files are included automatically, exactly
+once. Each browser job builds the real Worker before its journeys. The
+15-minute job limit and final requirement that every shard and restore succeeds
+remain unchanged. Refresh the edition lock after an intentional plan change.

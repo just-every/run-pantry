@@ -33,8 +33,8 @@ const accept:Command={need:'record',async run(c,b){
  for(const item of current){
   requireThat(item.available&&b.items.find((x:Data)=>x.id===item.id)?.fingerprint===item.fingerprint,'A line or its suggestion changed; review the whole selection again',409)
   const line=await one(c.db,'SELECT * FROM pt_bank_lines WHERE id=?',item.id),s=item.suggestion!
-  const plan=await matchPlan(c.db,c.actor,{bankLineIds:[item.id],journalLineIds:[],create:[{type:item.amount_cents<0?'fee':'income',direction:item.amount_cents<0?'out':'in',amount:(Math.abs(item.amount_cents)/100).toFixed(2),accountId:s.accountId,contactId:s.contactId,memo:line!.description}]})
-  statements.push(...plan.statements,...await suggestionDecisions(c.db,[line!],[s.accountId],who(c.actor),s.contactId?[s.contactId]:[]))
+  const plan=await matchPlan(c.db,c.actor,{bankLineIds:[item.id],journalLineIds:[],create:[{type:item.amount_cents<0?'fee':'income',direction:item.amount_cents<0?'out':'in',amount:(Math.abs(item.amount_cents)/100).toFixed(2),...s.dimensions,accountId:s.accountId,contactId:s.contactId,memo:line!.description}]})
+  statements.push(...plan.statements,...await suggestionDecisions(c.db,[line!],[s.accountId],who(c.actor),s.contactId?[s.contactId]:[],[s.dimensions??{}]))
  }
  await run(c.db,[authority(c.actor,'record'),...statements,audit(who(c.actor),'bank-queue.accept','bank-review',uid(),{lines:selected,count:selected.length})])
  return {accepted:selected}

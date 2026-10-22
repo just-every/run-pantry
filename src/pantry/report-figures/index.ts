@@ -11,7 +11,7 @@ import { libraryFigure } from './library'
 import { salesTaxFigure } from './sales-tax'
 import { isLibrary } from '../report-library'
 
-export type FigureQuery = { report: string; line: string; from: string; to: string; basis: Basis; account?: string; columns?: string; column?: string; budget?: string; year?: string; payee?: string }
+export type FigureQuery = { report: string; line: string; from: string; to: string; basis: Basis; account?: string; columns?: string; column?: string; budget?: string; year?: string; payee?: string;dimension?:string;dimensionValue?:string }
 export async function reportFigure(db: D1Database, q: FigureQuery, startMonth: number) {
   if ((q.report === 'profit-and-loss' || q.report === 'balance-sheet') && q.columns && q.columns !== 'single') return columnFigure(db, q, startMonth)
   if (q.report === 'profit-and-loss' && q.line.startsWith('bridge:')) return bridgeFigure(db, q, startMonth)

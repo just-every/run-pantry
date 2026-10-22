@@ -61,7 +61,7 @@ async function ruleInput(db: D1Database, b: Data) {
   const optionalCents = (v: unknown, label: string) => v === undefined || v === null || v === '' ? null : cents(v, label)
   const r = {
     dimensionConditions:dimensionTags(b.dimensionConditions??{}),
-    dimensionActions:Object.fromEntries(Object.entries(dimensionTags(b.dimensionActions??{})).filter(([key])=>(b.dimensionActions??{})[key]!==undefined)),
+    dimensionActions:Object.fromEntries(Object.entries(dimensionTags(b.dimensionActions??{})).filter(([key,value])=>value&&(b.dimensionActions??{})[key]!==undefined)),
     name: text(b.name, 'Rule name', 120),
     priority: b.priority === undefined || b.priority === '' ? null : Number(b.priority),
     mode: optionalText(b.mode, 'Rule mode') || 'automatic',
@@ -83,7 +83,7 @@ async function ruleInput(db: D1Database, b: Data) {
   requireThat(['contains', 'equals'].includes(r.descriptionMode), 'Description match is contains or equals')
   requireThat(['percent', 'amount'].includes(r.splitMode), 'Split type is percent or amount')
   requireThat(['out', 'in', 'any'].includes(r.direction), 'Money in or out is "out", "in" or "any"')
-  requireThat(r.payee || r.descriptionContains || r.amountMin || r.amountMax, 'Give the rule a payee, description text or amount to match')
+  requireThat(r.payee || r.descriptionContains || r.amountMin || r.amountMax ||Object.values(r.dimensionConditions).some(Boolean), 'Give the rule a payee, description text or amount to match')
   requireThat(!r.amountMin || !r.amountMax || r.amountMin <= r.amountMax, 'The smallest amount is more than the largest')
   if (r.bankAccountId) requireThat(await one(db, 'SELECT 1 FROM pt_bank_accounts WHERE id = ?', r.bankAccountId), 'Bank account not found', 404)
   const raw = Array.isArray(b.splits) && b.splits.length ? b.splits : [{ accountId: b.accountId, percent: '100' }]
@@ -103,7 +103,7 @@ async function ruleInput(db: D1Database, b: Data) {
   }
   if (r.contactId) requireThat(await one(db, 'SELECT 1 FROM pt_contacts WHERE id = ? AND active = 1', r.contactId), 'Contact not found', 404)
   if (r.taxCodeId) requireThat(await one(db, 'SELECT 1 FROM pt_tax_codes WHERE id = ? AND active = 1', r.taxCodeId), 'Tax code not found', 404)
-  const refusal=await dimensionRefusal(db,[],r.dimensionActions)
+  const refusal=await dimensionRefusal(db,[],r.dimensionActions)??await dimensionRefusal(db,[],r.dimensionConditions)
   requireThat(!refusal,refusal??'Invalid dimension actions',409)
   return r
 }

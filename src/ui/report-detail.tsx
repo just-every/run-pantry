@@ -22,7 +22,7 @@ const percent = (n: number | null) => n === null ? 'Undefined' : `${n.toFixed(2)
 export function FigureDetail({ report, line, from, to, basis, reportLabel }: { report: string; line: string; from: string; to: string; basis: 'cash' | 'accrual'; reportLabel: string }) {
   const search = useSearch({ from: '/app/reports' })
   // The columns, column, budget and tax year a figure was read under travel with it.
-  const scope = Object.fromEntries((['account', 'payee', 'columns', 'column', 'budget', 'year'] as const).filter(k => search[k]).map(k => [k, search[k]!]))
+  const scope = Object.fromEntries((['account', 'payee', 'columns', 'column', 'budget', 'year','dimension','dimensionValue'] as const).filter(k => search[k]).map(k => [k, search[k]!]))
   const { data: d, error } = useView<D>(`reports/detail?${new URLSearchParams({ report, line, from, to, basis, ...scope })}`)
   const exportQuery = new URLSearchParams(Object.entries({ ...search, report, line, from, to, basis }).filter(([, value]) => value !== undefined) as [string, string][]).toString()
   const back = <Link to="/app/reports" search={{ ...search, line: undefined, record: undefined, column: undefined }}>{reportLabel}</Link>

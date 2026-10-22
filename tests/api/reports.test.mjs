@@ -921,3 +921,6 @@ test('REPORT-005 sales tax figures by code, state and all states, exempt sales a
   const invalid = line => h.view(`reports/detail?${new URLSearchParams({ report: 'sales-tax', line: JSON.stringify(line), from: '2026-10-01', to: '2026-10-31', basis: 'accrual' })}`, h.owner, 404)
   await invalid(['code', 'nope', 'taxable']); await invalid(['total', 'kept']); await invalid(['account', 'nope', 'opening']); await invalid(['exempt', 'owed'])
 })
+
+import {dimensionBudgets} from './dimension-extensions.mjs'
+test('DIM-001 class and location budgets import and split to tied actual, plan, variance and source figures',dimensionBudgets)

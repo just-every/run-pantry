@@ -206,3 +206,7 @@ test('RULE-003 learned line suggestions follow human corrections and show decisi
 
 import {queueJourney} from './queue-journey.mjs'
 test('RULE-001 one review queue keeps fifty lines, splits, exclusions, reviewed bulk decisions and undo consistent with the books',queueJourney)
+
+import {dimensionRules,dimensionSuggestions} from './dimension-extensions.mjs'
+test('DIM-001 bank-rule dimension predicates and actions preserve precedence, frozen filings and linked correction evidence',dimensionRules)
+test('DIM-001 dimension suggestions follow vendor, history and document coding with first-decision rates',dimensionSuggestions)
