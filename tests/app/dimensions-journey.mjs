@@ -50,7 +50,7 @@ export async function dimensionsBrowser(t){
   for(const [kind,name] of [['class',`Studio ${width}`],['location',`New York ${width}`],['project',`Cedar website ${width}`]])await billForm.getByLabel(`Line 1 ${kind}`,{exact:true}).selectOption(name)
   await shot('bill-coded')
   await billForm.getByRole('button',{name:'Save bill',exact:true}).click()
-  await expect(page.getByRole('cell',{name:`DIM-${width}`,exact:true})).toBeVisible()
+  await expect(page.getByText(`DIM-${width}`,{exact:true})).toBeVisible()
   const bill=(await view('sales')).bills.find(b=>b.reference===`DIM-${width}`)
   await command('bill.record',{id:bill.id,revision:bill.revision})
   await page.goto(origin+'/app/sales?tab=invoices')

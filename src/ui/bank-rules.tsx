@@ -4,13 +4,13 @@ import { useState } from 'react'
 import { Action, Card, command, Field, accountOptions, day, usd, useShared, type D } from './kit'
 import { Suggestions } from './bank-lines'
 
-export type Draft = { id?: string; revision?: string; name: string; priority: string; mode: string; descriptionMode: string; splitMode: string; bankAccountId: string; direction: string; payee: string; descriptionContains: string; amountMin: string; amountMax: string; splits: { accountId: string; percent: string; amount: string }[]; contactId: string; taxCodeId: string; memo: string }
+export type Draft = { id?: string; revision?: string; name: string; priority: string; mode: string; descriptionMode: string; splitMode: string; bankAccountId: string; direction: string; payee: string; descriptionContains: string; amountMin: string; amountMax: string; splits: { accountId: string; percent: string; amount: string }[]; contactId: string; taxCodeId: string; memo: string;dimensionConditions?:D;dimensionActions?:D }
 const blank: Draft = { name: '', priority: '', mode: 'automatic', descriptionMode: 'contains', splitMode: 'percent', bankAccountId: '', direction: 'out', payee: '', descriptionContains: '', amountMin: '', amountMax: '', splits: [{ accountId: '', percent: '100', amount: '' }], contactId: '', taxCodeId: '', memo: '' }
 const money = (c?: number | null) => c ? (c / 100).toFixed(2) : ''
 
 export const fromSuggestion = (s: D): Draft => ({ ...blank, name: s.payee, payee: s.payee, direction: s.direction, splits: [{ accountId: s.accountId, percent: '100', amount: '' }] })
 const fromRule = (r: D): Draft => ({ id: r.id, revision: r.revision, name: r.name, priority: String(r.priority), mode: r.mode, descriptionMode: r.description_mode, splitMode: r.split_mode, bankAccountId: r.bank_account_id ?? '', direction: r.direction, payee: r.payee, descriptionContains: r.description_contains, amountMin: money(r.amount_min_cents), amountMax: money(r.amount_max_cents),
-  splits: r.splits.map((s: D) => ({ accountId: s.accountId, percent: s.share ? String(s.share / 100) : '', amount: money(s.amountCents) })), contactId: r.contact_id ?? '', taxCodeId: r.tax_code_id ?? '', memo: r.memo })
+  splits: r.splits.map((s: D) => ({ accountId: s.accountId, percent: s.share ? String(s.share / 100) : '', amount: money(s.amountCents) })), contactId: r.contact_id ?? '', taxCodeId: r.tax_code_id ?? '', memo: r.memo,dimensionConditions:r.dimension_conditions??{},dimensionActions:r.dimension_actions??{} })
 
 function when(r: D, banks: D[]) {
   const parts = [r.direction === 'out' ? 'Money out' : r.direction === 'in' ? 'Money in' : 'Any line']
@@ -18,13 +18,14 @@ function when(r: D, banks: D[]) {
   if (r.payee) parts.push(`payee ${r.payee}`)
   if (r.description_contains) parts.push(`description ${r.description_mode === 'equals' ? 'equals' : 'contains'} “${r.description_contains}”`)
   if (r.amount_min_cents || r.amount_max_cents) parts.push(r.amount_min_cents && r.amount_max_cents ? `${usd(r.amount_min_cents)}–${usd(r.amount_max_cents)}` : r.amount_min_cents ? `${usd(r.amount_min_cents)} or more` : `up to ${usd(r.amount_max_cents)}`)
+  for(const [key,value] of Object.entries(r.dimension_conditions??{}))if(value)parts.push(`${key.replace('Name','')} ${value}`)
   return parts.join(', ')
 }
 
 function fileAs(r: D, state: D) {
   const name = (id: string) => state.accounts.find((a: D) => a.id === id)?.name ?? '—'
   const split = r.splits.length === 1 ? name(r.splits[0].accountId) : r.splits.map((s: D) => `${r.split_mode === 'amount' ? usd(s.amountCents) : `${s.share / 100}%`} ${name(s.accountId)}`).join(' · ')
-  const extra = [r.contact_id && state.contacts.find((c: D) => c.id === r.contact_id)?.name, r.tax_code_id && `tax ${state.taxCodes.find((t: D) => t.id === r.tax_code_id)?.name ?? ''}`, r.memo && `“${r.memo}”`].filter(Boolean)
+  const extra = [r.contact_id && state.contacts.find((c: D) => c.id === r.contact_id)?.name, r.tax_code_id && `tax ${state.taxCodes.find((t: D) => t.id === r.tax_code_id)?.name ?? ''}`, r.memo && `“${r.memo}”`,...Object.entries(r.dimension_actions??{}).filter(([,v])=>v).map(([k,v])=>`${k.replace('Name','')} ${v}`)].filter(Boolean)
   return <>{split}{extra.length > 0 && <small className="sub"> · {extra.join(' · ')}</small>}</>
 }
 
@@ -49,6 +50,7 @@ function Editor({ start, onClose, onDone }: { start: Draft; onClose: () => void;
         <Field label="Amount from" name="amountMin" inputMode="decimal" {...field('amountMin')} />
         <Field label="Amount up to" name="amountMax" inputMode="decimal" {...field('amountMax')} />
       </div>
+      <div className="grid-form">{['class','location','project'].filter(kind=>state.dimensions?.settings[{class:'classes_enabled',location:'locations_enabled',project:'projects_enabled'}[kind]!]).map(kind=><Field key={kind} label={`Match ${kind}`} name={`match-${kind}`} value={d.dimensionConditions?.[`${kind}Name`]??''} onChange={(e:any)=>set({dimensionConditions:{...d.dimensionConditions,[`${kind}Name`]:e.target.value}})} empty={`Any ${kind}`} options={state.dimensions.values.filter((v:D)=>v.kind===kind&&v.active).map((v:D)=>({value:v.name,label:v.name}))} />)}</div>
       <h3>…file it as</h3>
       <div className="grid-form">
         <Field label="Mode" name="mode" {...field('mode')} options={[{ value: 'automatic', label: 'Add automatically' }, { value: 'suggest', label: 'Suggest only' }]} />
@@ -62,6 +64,7 @@ function Editor({ start, onClose, onDone }: { start: Draft; onClose: () => void;
         <div className="field-wide"><button type="button" className="btn btn-link" onClick={() => set({ splits: d.splits.length === 1 ? [{ ...d.splits[0], percent: '50' }, { accountId: '', percent: '50', amount: '' }] : [...d.splits, { accountId: '', percent: '', amount: '' }] })}>+ Split across categories</button></div>
         <Field label="Vendor or customer" name="contactId" empty="None" {...field('contactId')} options={state.contacts.filter((c: D) => c.active).map((c: D) => ({ value: c.id, label: c.name }))} />
         <Field label="Tax code" name="taxCodeId" empty="No tax code" {...field('taxCodeId')} options={state.taxCodes.map((t: D) => ({ value: t.id, label: `${t.name} (${t.rate_milli_percent / 1000}%)` }))} hint="Its share of the line goes to the tax account" />
+        {['class','location','project'].filter(kind=>state.dimensions?.settings[{class:'classes_enabled',location:'locations_enabled',project:'projects_enabled'}[kind]!]).map(kind=><Field key={kind} label={`Set ${kind}`} name={`set-${kind}`} value={d.dimensionActions?.[`${kind}Name`]??''} onChange={(e:any)=>set({dimensionActions:{...d.dimensionActions,[`${kind}Name`]:e.target.value}})} empty={`Keep line ${kind}`} options={state.dimensions.values.filter((v:D)=>v.kind===kind&&v.active).map((v:D)=>({value:v.name,label:v.name}))} />)}
         <Field label="Memo" name="memo" {...field('memo')} />
         <Field label="Rule name" name="name" required {...field('name')} />
       </div>

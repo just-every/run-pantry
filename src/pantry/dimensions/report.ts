@@ -12,7 +12,7 @@ export async function dimensionColumns(db:D1Database,kind:DimensionKind,from:str
  const accounts=ledger.accounts.filter(a=>['income','expense'].includes(a.type))
  const names=[...new Set(accounts.flatMap(a=>a.rows.map((l:Data)=>String(l[field]??''))))].sort((a,b)=>a.localeCompare(b))
  if(!names.includes(''))names.push('')
- const columns=[...names.map(name=>({id:name||'unassigned',label:name||'Unassigned',from,to,unit:'money' as const})),{id:'total',label:'Total',from,to,unit:'money' as const}]
+ const columns=[...names.map(name=>({id:name?'value:'+name:'unassigned',label:name||'Unassigned',from,to,unit:'money' as const})),{id:'total',label:'Total',from,to,unit:'money' as const}]
  const rows=accounts.map(a=>{const values=names.map(name=>a.rows.filter((l:Data)=>String(l[field]??'')===name).reduce((sum:number,l:Data)=>sum+(l.debit_cents-l.credit_cents)*(a.type==='income'?-1:1),0));return{id:a.id,code:a.code,name:a.name,section:a.type==='income'?'Income':'Expenses',values:[...values,values.reduce((s,n)=>s+n,0)]}})
  const sum=(section:string)=>columns.map((_,i)=>rows.filter(r=>r.section===section).reduce((s,r)=>s+r.values[i],0)),income=sum('Income'),expenses=sum('Expenses')
  const totals=[{id:'income',code:'',name:'Total income',section:'Income',values:income},{id:'expenses',code:'',name:'Total expenses',section:'Expenses',values:expenses},{id:'net-income',code:'',name:'Net income',section:'',values:income.map((n,i)=>n-expenses[i])}]

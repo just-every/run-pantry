@@ -9,6 +9,7 @@ const ACTION: Record<string, string> = { 'journal.draft': 'Drafted entry', 'jour
 
 function Reclassify({ onDone }: { onDone: () => Promise<void> }) {
   const { state } = useShared(), journal = useView<D>('journal')
+  const [mode,setMode]=useState('account')
   const [from, setFrom] = useState(''), [picked, setPicked] = useState<Set<string>>(new Set())
   if (!journal.data) return <Loading error={journal.error} what="the journal" />
   const ordinary = (a: D) => a.subtype === 'other'
@@ -17,14 +18,15 @@ function Reclassify({ onDone }: { onDone: () => Promise<void> }) {
   const toggle = (id: string) => setPicked(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
   return <Card title="Reclassify in bulk">
     <p className="hint">Each chosen line moves by its own posted correcting entry, dated on the original’s date and linked to it; the original stays as posted. Lines in locked months are refused: ask for the month to be reopened first.</p>
+    <Field label="Reclassify by" name="reclassifyMode" value={mode} onChange={(e:any)=>setMode(e.target.value)} options={[{value:'account',label:'Account'},...[['class','classes_enabled'],['location','locations_enabled'],['project','projects_enabled']].filter(([,flag])=>state.dimensions?.settings[flag]).map(([value])=>({value,label:value[0].toUpperCase()+value.slice(1)}))]} />
     <Field label="From account" name="from" value={from} onChange={(e: any) => { setFrom(e.target.value); setPicked(new Set()) }} options={accountOptions(state.accounts, ordinary)} />
     {from && <Table heads={['', 'Date', 'Entry', 'Description', 'Amount']} figures={[4]} empty="No posted lines on this account can be reclassified." caption="Lines to reclassify">
       {movable.length > 0 && <tr><td><input type="checkbox" aria-label="Select all lines" checked={picked.size === movable.length} onChange={e => setPicked(e.target.checked ? new Set(movable.map((l: D) => l.id)) : new Set())} /></td><td colSpan={4}>Select all ({movable.length})</td></tr>}
       {movable.map((l: D) => <tr key={l.id}><td><input type="checkbox" aria-label={`Reclassify ${l.entry.memo}`} checked={picked.has(l.id)} onChange={() => toggle(l.id)} /></td>
-        <td>{day(l.entry.entry_date)}</td><td>{l.entry.number}</td><td>{l.entry.memo}</td><td className="fig">{usd(l.debit_cents || -l.credit_cents)}</td></tr>)}
+        <td>{day(l.entry.entry_date)}</td><td>{l.entry.number}</td><td>{l.entry.memo}<small className="sub block">{[l.class_name,l.location_name,l.project_name].filter(Boolean).join(' · ')}</small></td><td className="fig">{usd(l.debit_cents || -l.credit_cents)}</td></tr>)}
     </Table>}
-    {picked.size > 0 && <Form label={`Reclassify ${picked.size} line${picked.size === 1 ? '' : 's'}`} submit={b => command('journal.reclassify', { ...b, lineIds: [...picked] })} onDone={async () => { setPicked(new Set()); await journal.reload(); await onDone() }} className="grid-form">
-      <Field label="To account" name="toAccountId" required options={accountOptions(state.accounts, a => ordinary(a) && a.id !== from)} />
+    {picked.size > 0 && <Form label={`Reclassify ${picked.size} line${picked.size === 1 ? '' : 's'}`} submit={b => command('journal.reclassify', { ...b,...(mode==='account'?{}:{dimensionKind:mode}), lineIds: [...picked] })} onDone={async () => { setPicked(new Set()); await journal.reload(); await onDone() }} className="grid-form">
+      {mode==='account'?<Field label="To account" name="toAccountId" required options={accountOptions(state.accounts, a => ordinary(a) && a.id !== from)} />:<Field label={`To ${mode}`} name="toDimensionName" required options={state.dimensions.values.filter((v:D)=>v.kind===mode&&v.active).map((v:D)=>({value:v.name,label:v.name}))} />}
       <Field label="Reason" name="memo" wide />
     </Form>}
   </Card>
