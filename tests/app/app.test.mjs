@@ -456,3 +456,7 @@ test('API-001 owner webhook lifecycle, data declaration and delivery history at 
 })
 
 test('CAPTURE-001 camera split, HEIC, multi-page PDF and multi-file drop keep original evidence at 1440 and 390', captureJourney)
+
+test('DIM-001 required bill coding and dimension statements at 1440 and 390',async t=>{
+ const {dimensionsBrowser}=await import('./dimensions-journey.mjs');await dimensionsBrowser(t)
+})

@@ -1,4 +1,5 @@
 // Read models for the screens. Every view is behind the read capability.
+import { dimensionsView } from './dimensions'
 import { allowed, type Person } from './access'
 import { addDays, longDay, period, type Data } from './core'
 import { all, one } from './db'
@@ -7,6 +8,7 @@ import { entity } from './settings'
 
 export async function lookups(db: D1Database) {
   return {
+    dimensions: await dimensionsView(db),
     accounts: await all(db, 'SELECT * FROM pt_accounts ORDER BY code'),
     contacts: await all(db, 'SELECT * FROM pt_contacts ORDER BY kind, name'),
     bankAccounts: await all(db, 'SELECT * FROM pt_bank_accounts ORDER BY name'),

@@ -1,3 +1,4 @@
+import { DimensionFields } from './dimensions'
 // Invoice and credit drafts, and the service lines recurring invoices share. A
 // line without a tax code is shown as needing a decision; approval is refused
 // until every line has one.
@@ -5,7 +6,7 @@ import { useState } from 'react'
 import { InvoiceDocumentPreview } from './invoice-templates'
 import { accountOptions, Card, command, contactOptions, Field, today, usd, useShared, useView, type D } from './kit'
 
-export type Line = { description: string; quantity: string; rate: string; accountId: string; taxCode: string; itemId?: string }
+export type Line = { description: string; quantity: string; rate: string; accountId: string; taxCode: string; itemId?: string;className?:string;locationName?:string;projectName?:string }
 export const blank = (accountId = ''): Line => ({ description: '', quantity: '1', rate: '', accountId, taxCode: '' })
 export const cents = (v: string) => /^\d+(\.\d{1,2})?$/.test(v.replace(/,/g, '').trim()) ? Math.round(Number(v.replace(/,/g, '')) * 100) : 0
 export const qty = (v: string) => /^\d+(\.\d{1,3})?$/.test(v.trim()) ? Number(v) : 0
@@ -29,7 +30,7 @@ export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCan
   const [templateId, setTemplateId] = useState(invoice?.document_template_id ?? ''), [customFields, setCustomFields] = useState<D>(JSON.parse(invoice?.document_values ?? '{}'))
   const income = accountOptions(state.accounts, a => a.type === 'income')
   const source = invoice ?? creditFor
-  const [lines, setLines] = useState<Line[]>(source?.lines?.length ? source.lines.map((l: D) => ({ ...(l.item_id ? { itemId: l.item_id } : {}), description: l.description, quantity: String(l.quantity_milli / 1000), rate: (l.unit_cents / 100).toFixed(2), accountId: l.account_id, taxCode: creditFor ? l.tax_code ?? '' : ('chosen_tax_code' in l ? l.chosen_tax_code : l.tax_code) ?? '' })) : [blank(income[0]?.value)])
+  const [lines, setLines] = useState<Line[]>(source?.lines?.length ? source.lines.map((l: D) => ({ className:l.class_name,locationName:l.location_name,projectName:l.project_name,...(l.item_id ? { itemId: l.item_id } : {}), description: l.description, quantity: String(l.quantity_milli / 1000), rate: (l.unit_cents / 100).toFixed(2), accountId: l.account_id, taxCode: creditFor ? l.tax_code ?? '' : ('chosen_tax_code' in l ? l.chosen_tax_code : l.tax_code) ?? '' })) : [blank(income[0]?.value)])
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const kind = creditFor || invoice?.kind === 'credit' ? 'credit' : 'invoice'
   // The due date follows the customer's terms from the issue date until the person types one.
@@ -105,7 +106,7 @@ export function ServiceLines({ lines, setLines }: { lines: Line[]; setLines: (f:
     <div className="table-wrap"><table className="ledger lines-editor"><thead><tr><th>#</th><th>Item and description</th><th className="fig">Quantity</th><th className="fig">Rate</th><th className="fig">Amount</th><th>Income account</th><th>Sales tax code</th><th /></tr></thead>
       <tbody>{lines.map((l, i) => <tr key={i}>
         <td data-label="#">{i + 1}</td>
-        <td data-label="Item and description"><div className="stack" style={{ gap: 6 }}><select aria-label={`Line ${i + 1} product or service`} value={l.itemId ?? ''} onChange={e => pick(i, e.target.value)}><option value="">No item</option>{items.filter(it => it.active || it.id === l.itemId).map(it => <option key={it.id} value={it.id}>{it.name}{it.sku ? ` · ${it.sku}` : ''}{it.active ? '' : ' (inactive)'}</option>)}</select><input aria-label={`Line ${i + 1} description`} value={l.description} onChange={e => set(i, { description: e.target.value })} required /></div></td>
+        <td data-label="Item and description"><div className="stack" style={{ gap: 6 }}><select aria-label={`Line ${i + 1} product or service`} value={l.itemId ?? ''} onChange={e => pick(i, e.target.value)}><option value="">No item</option>{items.filter(it => it.active || it.id === l.itemId).map(it => <option key={it.id} value={it.id}>{it.name}{it.sku ? ` · ${it.sku}` : ''}{it.active ? '' : ' (inactive)'}</option>)}</select><input aria-label={`Line ${i + 1} description`} value={l.description} onChange={e => set(i, { description: e.target.value })} required /><DimensionFields line={l} index={i} onChange={patch=>set(i,patch)} /></div></td>
         <td data-label="Quantity"><input aria-label={`Line ${i + 1} quantity`} className="fig narrow" inputMode="decimal" value={l.quantity} onChange={e => set(i, { quantity: e.target.value })} required /></td>
         <td data-label="Rate"><input aria-label={`Line ${i + 1} rate`} className="fig narrow" inputMode="decimal" value={l.rate} onChange={e => set(i, { rate: e.target.value })} required /></td>
         <td data-label="Amount" className="fig">{usd(amounts[i])}</td>

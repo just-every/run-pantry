@@ -1,3 +1,4 @@
+import { dimensionTags, dimensionValues } from './dimensions'
 // Approval rules are shared by captured and manually entered bills. The rule
 // snapshot and exact bill revision are guarded again in the posting batch.
 import { nativeApprovalAuthority } from './access-policy/approvals'
@@ -41,7 +42,7 @@ const update: Command = { need: 'record', async run(c, b) {
   await assertOpen(c.db, current.bill_date); await assertOpen(c.db, p.billDate)
   await run(c.db, [authority(c.actor, 'record'), periodOpen(current.bill_date), periodOpen(p.billDate),
     q("UPDATE pt_bills SET vendor_id = ?, reference = ?, bill_date = ?, due_date = ?, memo = ?, class_name = ?, total_cents = ?, prepared_by = ?, revision = ?, updated_at = ?, approved_by = NULL, approved_revision = NULL WHERE id = ? AND revision = ? AND status = 'draft'", p.vendor.id, p.reference, p.billDate, p.dueDate, p.memo, p.className, p.total, c.actor.email, uid(), now(), current.id, current.revision), changed(),
-    q('DELETE FROM pt_bill_lines WHERE bill_id = ?', current.id), ...p.lines.map((l, i) => q('INSERT INTO pt_bill_lines (id, bill_id, line_no, description, account_id, amount_cents) VALUES (?, ?, ?, ?, ?, ?)', uid(), current.id, i + 1, l.description, l.accountId, l.amount)),
+    q('DELETE FROM pt_bill_lines WHERE bill_id = ?', current.id), ...p.lines.map((l, i) => q('INSERT INTO pt_bill_lines (id, bill_id, line_no, description, account_id, amount_cents, class_name, location_name, project_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', uid(), current.id, i + 1, l.description, l.accountId, l.amount,...dimensionValues(l))),
     audit(who(c.actor), 'bill.edit', 'bill', current.id, { approvalInvalidated: current.approved_revision ?? null, lines: p.lines })])
   return bill(c.db, current.id)
 } }

@@ -257,3 +257,6 @@ test('ACCESS-001 narrower roles, amount approval routing, bank privacy and time-
   const { access001Journey } = await import('./access001-journey.mjs')
   await access001Journey(h)
 })
+
+import { dimensionsJourney } from './dimensions-journey.mjs'
+test('DIM-001 native catalogue, required line coding, tied statement columns and project profitability', dimensionsJourney)

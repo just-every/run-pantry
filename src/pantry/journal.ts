@@ -1,6 +1,7 @@
 // The general journal: every posting in Pantry is a balanced entry written here.
 // Drafts may change; posted entries are immutable (the schema's triggers refuse
 // edits) and are corrected only by a linked reversal.
+import { dimensionTags } from './dimensions'
 import { nativeApprovalAuthority } from './access-policy/approvals'
 import { bankAuthority, ledgerBankAuthority } from './access-policy/banks'
 import { authority, who, type Actor } from './access'
@@ -48,7 +49,7 @@ export async function parseLines(db: D1Database, raw: unknown, { control = false
     const debit = l.debit === undefined || l.debit === '' ? 0 : cents(l.debit, `${label} debit`, { zero: true })
     const credit = l.credit === undefined || l.credit === '' ? 0 : cents(l.credit, `${label} credit`, { zero: true })
     requireThat((debit > 0) !== (credit > 0), `${label} needs either a debit or a credit`)
-    return { accountId: text(l.accountId, `${label} account`), debit, credit, memo: optionalText(l.memo, `${label} memo`, 500), contactId: l.contactId ? text(l.contactId, `${label} contact`) : null }
+    return { ...dimensionTags(l), accountId: text(l.accountId, `${label} account`), debit, credit, memo: optionalText(l.memo, `${label} memo`, 500), contactId: l.contactId ? text(l.contactId, `${label} contact`) : null }
   })
   const accounts = new Map((await all(db, 'SELECT id, subtype, active, name FROM pt_accounts')).map(a => [a.id, a]))
   for (const [i, l] of lines.entries()) {

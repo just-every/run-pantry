@@ -26,6 +26,10 @@ export async function columnFigure(db: D1Database, q: Query, startMonth: number)
   const base = { report: kind, line: q.line, label, basis: q.basis, to: column.to, context }
   const native = async (id: string) => {
     const c = r.columns.find(x => x.id === id)!
+    if(['class','location','project'].includes(r.mode)&&id!=='total'){
+      const rows=(await figureDetail(db,{report:kind,line:q.line,from:c.from,to:c.to,basis:q.basis},startMonth)).rows
+      return rows.filter(row=>(row[`${r.mode}_name`]||'unassigned')===id)
+    }
     if (r.mode !== 'customer' || id === 'total') return (await figureDetail(db, { report: kind, line: q.line, from: c.from, to: c.to, basis: q.basis }, startMonth)).rows
     const grouping = await customerGrouping(db), accounts = new Map((await all(db, 'SELECT id, type FROM pt_accounts')).map(a => [a.id, a.type]))
     const [types, sign] = TOTALS[q.line] ?? [[], accounts.get(q.line) === 'income' ? -1 : 1]

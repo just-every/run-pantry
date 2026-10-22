@@ -1,3 +1,4 @@
+import { DimensionFields } from './dimensions'
 import { useRef, useState } from 'react'
 import { Action, Card, Chip, command, contactOptions, Field, Form, Table, accountOptions, day, readFileBase64, today, usd, useShared, type D } from './kit'
 import { CaptureApprovalRules } from './capture-approval-rules'
@@ -5,7 +6,7 @@ import { BillWorkflow, CapturedBills, RecurringBills } from './bill-workflow'
 import { VendorHistory } from './vendor-history'
 
 function BillForm({ bill, onDone, onCancel }: { bill?: D; onDone: () => Promise<void>; onCancel?: () => void }) {
-  const { state } = useShared(), [lines, setLines] = useState<D[]>(bill ? bill.lines.map((l: D) => ({ description: l.description, accountId: l.account_id, amount: (l.amount_cents / 100).toFixed(2) })) : [{ description: '', accountId: '', amount: '' }])
+  const { state } = useShared(), [lines, setLines] = useState<D[]>(bill ? bill.lines.map((l: D) => ({ description: l.description, accountId: l.account_id, amount: (l.amount_cents / 100).toFixed(2),className:l.class_name,locationName:l.location_name,projectName:l.project_name })) : [{ description: '', accountId: '', amount: '' }])
   const set = (i: number, patch: D) => setLines(ls => ls.map((l, j) => j === i ? { ...l, ...patch } : l))
   const expense = accountOptions(state.accounts, a => !['bank', 'receivable', 'payable'].includes(a.subtype) && (a.type === 'expense' || a.type === 'asset'))
   return <Form label={bill ? "Save bill revision" : "Save bill"} submit={b => command(bill ? 'bill.update' : 'bill.save', { ...b, ...(bill ? { id: bill.id, revision: bill.revision } : {}), post: b.post === 'on', lines })} onDone={async () => { setLines([{ description: '', accountId: '', amount: '' }]); await onDone() }}>
@@ -20,6 +21,7 @@ function BillForm({ bill, onDone, onCancel }: { bill?: D; onDone: () => Promise<
     {lines.map((l, i) => <div className="grid-form line" key={i}>
       <Field label={`Line ${i + 1} description`} name={`d${i}`} value={l.description} onChange={(e: any) => set(i, { description: e.target.value })} required />
       <Field label={`Line ${i + 1} account`} name={`a${i}`} value={l.accountId} onChange={(e: any) => set(i, { accountId: e.target.value })} required options={expense} />
+      <DimensionFields line={l} index={i} onChange={patch=>set(i,patch)} />
       <Field label={`Line ${i + 1} amount`} name={`m${i}`} value={l.amount} onChange={(e: any) => set(i, { amount: e.target.value })} required inputMode="decimal" />
     </div>)}
     <button type="button" className="btn btn-secondary" onClick={() => setLines(ls => [...ls, { description: '', accountId: '', amount: '' }])}>Add line</button>

@@ -1,3 +1,4 @@
+import { dimensionTags, dimensionValues } from './dimensions'
 import { depositForIssue } from './customer-deposits/applications'
 // Receivables: draft → approved → issued invoices, and credits that reduce them.
 // A line without a decided tax treatment stops the invoice at review; Pantry
@@ -78,7 +79,7 @@ export async function parseInvoice(db: D1Database, b: Data, options: { estimate?
     else if (item && chosenCode === null && item.tax_code && taxCodes.has(item.tax_code)) chosenCode = item.tax_code
     const code = exemption ? 'exempt' : chosenCode
     const description = item && !given(l.description) ? item.description || item.name : text(l.description, `${label} description`, 500)
-    return { description, qty, unit, amount, kind, discount: 0, accountId: account.id, taxCode: code, chosenTaxCode: chosenCode, tax: 0, itemId: item ? item.id as string : null }
+    return { ...dimensionTags(l), description, qty, unit, amount, kind, discount: 0, accountId: account.id, taxCode: code, chosenTaxCode: chosenCode, tax: 0, itemId: item ? item.id as string : null }
   })
   // Before-tax discounts reduce each line's taxable amount; tax is per line on what remains, rounded half up.
   const { discounts, afterTax } = applyDiscounts(b.discounts, priced, credit)
@@ -100,8 +101,8 @@ export async function parseInvoice(db: D1Database, b: Data, options: { estimate?
 export const discountColumns = (p: Awaited<ReturnType<typeof parseInvoice>>) => [JSON.stringify(p.discounts), p.discount, p.afterTax, p.discountAccountId, p.deposit ? JSON.stringify(p.deposit) : null, p.terms ? JSON.stringify(p.terms) : null, p.offer ? JSON.stringify(p.offer) : null]
 
 export const lineStatements = (invoiceId: string, lines: Awaited<ReturnType<typeof parseInvoice>>['lines']) => lines.map((l, i) =>
-  q('INSERT INTO pt_invoice_lines (id, invoice_id, line_no, description, quantity_milli, unit_cents, amount_cents, account_id, tax_code, tax_cents, chosen_tax_code, item_id, line_kind, discount_cents) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    uid(), invoiceId, i + 1, l.description, l.qty, l.unit, l.amount, l.accountId, l.taxCode, l.tax, l.chosenTaxCode, l.itemId, l.kind, l.discount))
+  q('INSERT INTO pt_invoice_lines (id, invoice_id, line_no, description, quantity_milli, unit_cents, amount_cents, account_id, tax_code, tax_cents, chosen_tax_code, item_id, line_kind, discount_cents, class_name, location_name, project_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    uid(), invoiceId, i + 1, l.description, l.qty, l.unit, l.amount, l.accountId, l.taxCode, l.tax, l.chosenTaxCode, l.itemId, l.kind, l.discount,...dimensionValues(l)))
 
 export async function nextNumber(db: D1Database, kind: 'invoice' | 'credit') {
   if (kind === 'invoice') return nextInvoiceNumber(db)
@@ -180,7 +181,7 @@ const approve: Command = { need: 'post', async run(c, b) {
 /** The invoice fields issuing reads; an invoice being created in the same batch passes them directly. */
 export type Issuable = { id: string; kind: string; number: string; customer_id: string; customer_name: string; issue_date: string; total_cents: number; credit_for?: string | null; revision: string; destination_state?: string; exemption_evidence?: string | null
   discount_cents?: number; after_tax_discount_cents?: number; discount_account_id?: string | null; deposit?: Deposit | null; early_offer?: Offer | null; early_for_number?: string
-  lines: { account_id: string; amount_cents: number; description: string; tax_code: string | null; tax_cents: number }[] }
+  lines: { account_id: string; amount_cents: number; description: string; tax_code: string | null; tax_cents: number; class_name?:string;location_name?:string;project_name?:string }[] }
 
 /** Issue posts the approved revision: receivable against income and sales tax (reversed for a credit). */
 export async function issueStatements(db: D1Database, current: Issuable, actor: AuditActor, preparedBy = actor.email, parsed?: Data): Promise<{ journalId: string; statements: Sql[] }> {
@@ -190,7 +191,7 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
   const credit = current.kind === 'credit'
   const side = (amount: number, debit: boolean) => debit ? { debit: amount, credit: 0 } : { debit: 0, credit: amount }
   const lines: Line[] = [{ accountId: receivable.id, ...side(current.total_cents, !credit), memo: `${current.number} ${current.customer_name}`, contactId: current.customer_id }]
-  for (const l of current.lines) lines.push({ accountId: l.account_id, ...side(l.amount_cents, credit), memo: l.description })
+  for (const l of current.lines) lines.push({ ...dimensionTags(l), accountId: l.account_id, ...side(l.amount_cents, credit), memo: l.description })
   // Discounts post to the discounts account after the sale lines, so sale line N stays journal line N + 1.
   const discounted = (current.discount_cents ?? 0) + (current.after_tax_discount_cents ?? 0)
   if (discounted) lines.push({ accountId: current.discount_account_id!, ...side(discounted, !credit), memo: `Discounts ${current.number}` })

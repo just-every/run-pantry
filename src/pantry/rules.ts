@@ -1,3 +1,4 @@
+import { dimensionTags, dimensionRefusal } from './dimensions'
 // Bank rules: the business's own instructions for filing routine statement
 // lines. A rule names conditions (payee, description text, amount, direction,
 // bank account) and how a matching line is filed (one category or a split, a
@@ -29,6 +30,9 @@ export function payeeKey(line: Data) {
 }
 
 export function ruleMatches(rule: Data, line: Data) {
+  const conditions=typeof rule.dimension_conditions==='string'?JSON.parse(rule.dimension_conditions):rule.dimension_conditions??{}
+  const tags=dimensionTags(line)
+  for(const [key,value] of Object.entries(conditions))if(value&&tags[key as keyof typeof tags]!==value)return false
   if (rule.bank_account_id && rule.bank_account_id !== line.bank_account_id) return false
   if (rule.direction === 'out' && line.amount_cents > 0) return false
   if (rule.direction === 'in' && line.amount_cents < 0) return false
@@ -56,6 +60,8 @@ function share(value: unknown, label: string) {
 async function ruleInput(db: D1Database, b: Data) {
   const optionalCents = (v: unknown, label: string) => v === undefined || v === null || v === '' ? null : cents(v, label)
   const r = {
+    dimensionConditions:dimensionTags(b.dimensionConditions??{}),
+    dimensionActions:Object.fromEntries(Object.entries(dimensionTags(b.dimensionActions??{})).filter(([key])=>(b.dimensionActions??{})[key]!==undefined)),
     name: text(b.name, 'Rule name', 120),
     priority: b.priority === undefined || b.priority === '' ? null : Number(b.priority),
     mode: optionalText(b.mode, 'Rule mode') || 'automatic',
@@ -97,14 +103,16 @@ async function ruleInput(db: D1Database, b: Data) {
   }
   if (r.contactId) requireThat(await one(db, 'SELECT 1 FROM pt_contacts WHERE id = ? AND active = 1', r.contactId), 'Contact not found', 404)
   if (r.taxCodeId) requireThat(await one(db, 'SELECT 1 FROM pt_tax_codes WHERE id = ? AND active = 1', r.taxCodeId), 'Tax code not found', 404)
+  const refusal=await dimensionRefusal(db,[],r.dimensionActions)
+  requireThat(!refusal,refusal??'Invalid dimension actions',409)
   return r
 }
 
 /** The rule as stored, from input (for previews of a rule not yet saved). */
-const asRow = (r: Awaited<ReturnType<typeof ruleInput>>, extra: Data = {}): Rule => ({ id: '', name: r.name, bank_account_id: r.bankAccountId, direction: r.direction, payee: r.payee, description_contains: r.descriptionContains, amount_min_cents: r.amountMin, amount_max_cents: r.amountMax, contact_id: r.contactId, tax_code_id: r.taxCodeId, memo: r.memo, splits: r.splits, priority: r.priority, mode: r.mode, description_mode: r.descriptionMode, split_mode: r.splitMode, ...extra })
+const asRow = (r: Awaited<ReturnType<typeof ruleInput>>, extra: Data = {}): Rule => ({ id: '', name: r.name, bank_account_id: r.bankAccountId, direction: r.direction, payee: r.payee, description_contains: r.descriptionContains, amount_min_cents: r.amountMin, amount_max_cents: r.amountMax, contact_id: r.contactId, tax_code_id: r.taxCodeId, memo: r.memo, splits: r.splits, priority: r.priority, mode: r.mode, description_mode: r.descriptionMode, split_mode: r.splitMode,dimension_conditions:r.dimensionConditions,dimension_actions:r.dimensionActions, ...extra })
 
 export async function rules(db: D1Database, { active = true } = {}): Promise<Rule[]> {
-  return (await all(db, `SELECT * FROM pt_bank_rules ${active ? 'WHERE active = 1' : ''} ORDER BY priority, created_at, id`)).map(r => ({ ...r, splits: JSON.parse(r.splits) })) as Rule[]
+  return (await all(db, `SELECT * FROM pt_bank_rules ${active ? 'WHERE active = 1' : ''} ORDER BY priority, created_at, id`)).map(r => ({ ...r, id:r.id,name:r.name,splits: JSON.parse(r.splits),dimension_conditions:JSON.parse(r.dimension_conditions),dimension_actions:JSON.parse(r.dimension_actions) })) as Rule[]
 }
 
 const precedes = (a: Rule, b: Rule) => a.priority - b.priority || (String(a.created_at) < String(b.created_at) ? -1 : String(a.created_at) > String(b.created_at) ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
@@ -138,8 +146,9 @@ export async function fileStatements(db: D1Database, rule: Rule, line: Data, fil
   parts[parts.length - 1].amount = net - parts.slice(0, -1).reduce((n, p) => n + p.amount, 0)
   if (code && tax) parts.push({ accountId: code.account_id, amount: tax })
   const memo = rule.memo || line.description
+  const tags={...dimensionTags(line),...(typeof rule.dimension_actions==='string'?JSON.parse(rule.dimension_actions):rule.dimension_actions??{})}
   const lines = [
-    ...parts.filter(p => p.amount > 0).map(p => ({ accountId: p.accountId, debit: out ? p.amount : 0, credit: out ? 0 : p.amount, memo, contactId: rule.contact_id ?? null })),
+    ...parts.filter(p => p.amount > 0).map(p => ({ ...tags,accountId: p.accountId, debit: out ? p.amount : 0, credit: out ? 0 : p.amount, memo, contactId: rule.contact_id ?? null })),
     { accountId: bank.account_id, debit: out ? 0 : abs, credit: out ? abs : 0, memo },
   ]
   const entryId = uid(), matchId = uid()
@@ -194,7 +203,7 @@ async function preview(db: D1Database, rule: Rule, others: Rule[]) {
   for (const l of candidates) {
     const first = others.find(r => precedes(r, rule) < 0 && ruleMatches(r, l))
     if (first) { preceded.push({ ...l, reason: `rule ${first.name} takes precedence` }); continue }
-    const why = deposits[l.id] ? 'Review the proposed invoice payment first' : recorded[l.id]?.length ? 'Match the recorded payment first' : await blocked(db, l) || splitHold(rule, l)
+    const why = deposits[l.id] ? 'Review the proposed invoice payment first' : recorded[l.id]?.length ? 'Match the recorded payment first' : await blocked(db, l) || splitHold(rule, l) || await dimensionRefusal(db,rule.splits.map(s=>s.accountId),{...dimensionTags(l),...(typeof rule.dimension_actions==='string'?JSON.parse(rule.dimension_actions):rule.dimension_actions??{})})
     if (why) held.push({ ...l, reason: why })
     else if (rule.mode === 'suggest') suggested.push({ ...l, reason: 'Suggest only; a person must file this line' })
     else files.push(l)
@@ -209,9 +218,9 @@ const previewRule: Command = { need: 'record', async run(c, b) {
   return { ...p, files: p.files.slice(0, 200), held: p.held.slice(0, 50), preceded: p.preceded.slice(0, 50), suggested: p.suggested.slice(0, 200), count: p.files.length }
 } }
 
-const ruleFields = (input: Awaited<ReturnType<typeof ruleInput>>) => [input.name, input.bankAccountId, input.direction, input.payee, input.descriptionContains, input.amountMin, input.amountMax, JSON.stringify(input.splits), input.contactId, input.taxCodeId, input.memo, input.mode, input.descriptionMode, input.splitMode]
+const ruleFields = (input: Awaited<ReturnType<typeof ruleInput>>) => [input.name, input.bankAccountId, input.direction, input.payee, input.descriptionContains, input.amountMin, input.amountMax, JSON.stringify(input.splits), input.contactId, input.taxCodeId, input.memo, input.mode, input.descriptionMode, input.splitMode,JSON.stringify(input.dimensionConditions),JSON.stringify(input.dimensionActions)]
 const ruleInsert = (id: string, fields: unknown[], by: string, priority: number | null) =>
-  q('INSERT INTO pt_bank_rules (id, name, bank_account_id, direction, payee, description_contains, amount_min_cents, amount_max_cents, splits, contact_id, tax_code_id, memo, mode, description_mode, split_mode, position, priority, active, created_by, created_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM pt_bank_rules), COALESCE(?, (SELECT COALESCE(MAX(priority), 0) + 1 FROM pt_bank_rules)), 1, ?, ?, ?)', id, ...fields, priority, by, now(), uid())
+  q('INSERT INTO pt_bank_rules (id, name, bank_account_id, direction, payee, description_contains, amount_min_cents, amount_max_cents, splits, contact_id, tax_code_id, memo, mode, description_mode, split_mode,dimension_conditions,dimension_actions, position, priority, active, created_by, created_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM pt_bank_rules), COALESCE(?, (SELECT COALESCE(MAX(priority), 0) + 1 FROM pt_bank_rules)), 1, ?, ?, ?)', id, ...fields, priority, by, now(), uid())
 
 /** A new rule from rule input (the same checks as a saved one), for a write the caller authorises. */
 export async function newRuleStatements(db: D1Database, b: Data, by: AuditActor) {
@@ -229,7 +238,7 @@ const saveRule: Command = { need: 'record', async run(c, b) {
     requireThat(current.revision === b.revision, 'This rule changed since you opened it; reload', 409)
     id = current.id
     await run(c.db, [authority(c.actor, 'record'), ...bankAuthority(c.actor, input.bankAccountId ? [input.bankAccountId] : []),
-      q('UPDATE pt_bank_rules SET name = ?, bank_account_id = ?, direction = ?, payee = ?, description_contains = ?, amount_min_cents = ?, amount_max_cents = ?, splits = ?, contact_id = ?, tax_code_id = ?, memo = ?, mode = ?, description_mode = ?, split_mode = ?, priority = COALESCE(?, priority), revision = ? WHERE id = ? AND revision = ?', ...fields, input.priority, uid(), id, b.revision), changed(),
+      q('UPDATE pt_bank_rules SET name = ?, bank_account_id = ?, direction = ?, payee = ?, description_contains = ?, amount_min_cents = ?, amount_max_cents = ?, splits = ?, contact_id = ?, tax_code_id = ?, memo = ?, mode = ?, description_mode = ?, split_mode = ?,dimension_conditions=?,dimension_actions=?, priority = COALESCE(?, priority), revision = ? WHERE id = ? AND revision = ?', ...fields, input.priority, uid(), id, b.revision), changed(),
       audit(who(c.actor), 'bank-rule.edit', 'bank-rule', id, { name: input.name })])
   } else {
     id = uid()

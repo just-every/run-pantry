@@ -1,3 +1,4 @@
+import { DIMENSIONS, dimensionTags, dimensionRefusal } from './dimensions'
 // Accountant review tools: bulk reclassification by linked correcting entries,
 // review notes on entries, and everything changed since a reviewer's last
 // review with who changed it. Originals never change: each selected line is
@@ -18,8 +19,12 @@ const MAX_LINES = 200
 const reclassify: Command = { need: 'post', async run(c, b) {
   const ids = [...new Set(list<string>(b.lineIds, 'Lines to reclassify', MAX_LINES).map(id => text(id, 'Line')))]
   requireThat(ids.length, 'Choose the lines to reclassify')
-  const to = await one(c.db, `SELECT * FROM pt_accounts WHERE id = ? AND active = 1 AND ${MOVABLE}`, text(b.toAccountId, 'Reclassify to'))
-  requireThat(to, 'Reclassify to an active ordinary account (not bank, receivable, payable, sales tax or retained earnings)')
+  const dimension=b.dimensionKind?text(b.dimensionKind,'Dimension kind'):null
+  requireThat(!dimension||DIMENSIONS.includes(dimension as any),'Choose class, location or project')
+  const target=dimension?text(b.toDimensionName,'New dimension',100):null
+  if(dimension)requireThat(await one(c.db,'SELECT 1 FROM pt_dimensions WHERE kind=? AND name=? AND active=1',dimension,target),'Choose an active dimension value')
+  const to = dimension?null:await one(c.db, `SELECT * FROM pt_accounts WHERE id = ? AND active = 1 AND ${MOVABLE}`, text(b.toAccountId, 'Reclassify to'))
+  requireThat(dimension||to, 'Reclassify to an active ordinary account (not bank, receivable, payable, sales tax or retained earnings)')
   const reason = optionalText(b.memo, 'Reason', 300)
   const lines = await all(c.db, `SELECT l.*, e.number, e.entry_date, e.status, e.reversed_by_id, e.source_kind, a.code AS account_code, a.name AS account_name, a.subtype,
       (SELECT 1 FROM pt_reclassifications r WHERE r.original_line_id = l.id) AS moved
@@ -32,24 +37,26 @@ const reclassify: Command = { need: 'post', async run(c, b) {
     requireThat(!l.reversed_by_id && l.source_kind !== 'reversal', `${label} is reversed or is a reversal; it cannot be reclassified`, 409)
     requireThat(!l.moved, `${label} was already reclassified; reclassify its correcting entry instead`, 409)
     requireThat(l.subtype === 'other', `${label} is on ${l.account_name}, a bank, control, sales tax or retained-earnings account; record a correction there instead`, 409)
-    requireThat(l.account_id !== to.id, `${label} is already on ${to.name}`)
+    requireThat(dimension?l[`${dimension}_name`]!==target:l.account_id !== to!.id, `${label} already has the destination coding`)
     await assertOpen(c.db, l.entry_date)
   }
-  const batch = uid(), statements: Sql[] = [authority(c.actor, 'post'), ...await ledgerBankAuthority(c.db, c.actor, [to.id, ...lines.map(l => l.account_id)], 'post')]
+  const batch = uid(), statements: Sql[] = [authority(c.actor, 'post'), ...await ledgerBankAuthority(c.db, c.actor, [...(to?[to.id]:[]), ...lines.map(l => l.account_id)], 'post')]
   for (const l of lines) {
     const id = uid(), revision = uid(), amount = l.debit_cents || l.credit_cents, debit = l.debit_cents > 0
+    const destination=dimension?{...dimensionTags(l),[`${dimension}Name`]:target}:dimensionTags(l)
+    const refusal=await dimensionRefusal(c.db,[to?.id??l.account_id],destination);requireThat(!refusal,refusal??'Invalid dimensions',409)
     const moved: Line[] = [
-      { accountId: to.id, debit: debit ? amount : 0, credit: debit ? 0 : amount, memo: l.memo, contactId: l.contact_id },
-      { accountId: l.account_id, debit: debit ? 0 : amount, credit: debit ? amount : 0, memo: l.memo, contactId: l.contact_id },
+      { ...destination,accountId: to?.id??l.account_id, debit: debit ? amount : 0, credit: debit ? 0 : amount, memo: l.memo, contactId: l.contact_id },
+      { ...dimensionTags(l),accountId: l.account_id, debit: debit ? 0 : amount, credit: debit ? amount : 0, memo: l.memo, contactId: l.contact_id },
     ]
     statements.push(...nativeApprovalAuthority(c.actor, 'journal', amount), periodOpen(l.entry_date), guard("EXISTS (SELECT 1 FROM pt_journal_entries WHERE id = ? AND status = 'posted' AND reversed_by_id IS NULL)", l.entry_id),
-      ...entryStatements({ id, revision, date: l.entry_date, memo: `Reclassify entry ${l.number} line ${l.line_no}: ${l.account_code} ${l.account_name} → ${to.code} ${to.name}${reason ? ` — ${reason}` : ''}`,
+      ...entryStatements({ id, revision, date: l.entry_date, memo: `Reclassify entry ${l.number} line ${l.line_no}: ${l.account_code} ${l.account_name} → ${dimension?`${dimension} ${target}`:`${to!.code} ${to!.name}`} ${reason ? ` — ${reason}` : ''}`,
         sourceKind: 'manual', sourceId: l.entry_id, preparedBy: c.actor.email, preparedKind: 'person', lines: moved }, c.actor.email),
       q('INSERT INTO pt_reclassifications (id, batch_id, original_entry_id, original_line_id, correcting_entry_id, from_account_id, to_account_id, amount_cents, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        uid(), batch, l.entry_id, l.id, id, l.account_id, to.id, amount, c.actor.email, now()),
+        uid(), batch, l.entry_id, l.id, id, l.account_id, to?.id??l.account_id, amount, c.actor.email, now()),
       approval(who(c.actor), 'journal', id, revision, 'reclassify', 'approved', reason))
   }
-  statements.push(audit(who(c.actor), 'journal.reclassify', 'reclassification', batch, { to: `${to.code} ${to.name}`, lines: lines.length, reason }))
+  statements.push(audit(who(c.actor), 'journal.reclassify', 'reclassification', batch, { to: `${dimension?`${dimension} ${target}`:`${to!.code} ${to!.name}`} `, lines: lines.length, reason }))
   await run(c.db, statements)
   return { batch, reclassified: await all(c.db, 'SELECT * FROM pt_reclassifications WHERE batch_id = ? ORDER BY created_at, id', batch) }
 } }

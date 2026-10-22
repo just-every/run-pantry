@@ -3,7 +3,7 @@ import { Table, day, usd } from './kit'
 
 export const COLUMN_MODES = [
   ['single', 'Single period'], ['prior-period', 'Prior period'], ['prior-year', 'Prior year'],
-  ['months', 'Months'], ['quarters', 'Quarters'], ['ytd', 'Year to date'], ['customer', 'Customer'],
+  ['months', 'Months'], ['quarters', 'Quarters'], ['ytd', 'Year to date'], ['customer', 'Customer'], ['class','Class'], ['location','Location'], ['project','Project'],
 ] as const
 export type ColumnMode = typeof COLUMN_MODES[number][0]
 type Section = 'Income' | 'Expenses' | 'Assets' | 'Liabilities' | 'Equity'
@@ -15,13 +15,13 @@ export type ColumnStatement = {
 }
 
 export function columnMode(value: string | undefined, kind: string): ColumnMode {
-  return COLUMN_MODES.find(([id]) => id === value && (id !== 'customer' || kind === 'profit-and-loss'))?.[0] ?? 'single'
+  return COLUMN_MODES.find(([id]) => id === value && (!['customer','class','location','project'].includes(id) || kind === 'profit-and-loss'))?.[0] ?? 'single'
 }
 
 export function ColumnPicker({ mode, kind, onChange }: { mode: ColumnMode; kind: string; onChange: (mode: ColumnMode) => void }) {
   return <div className="field inline"><label htmlFor="r-columns">Columns</label>
     <select id="r-columns" value={mode} onChange={e => onChange(e.target.value as ColumnMode)}>
-      {COLUMN_MODES.filter(([id]) => id !== 'customer' || kind === 'profit-and-loss').map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+      {COLUMN_MODES.filter(([id]) => !['customer','class','location','project'].includes(id) || kind === 'profit-and-loss').map(([id, label]) => <option key={id} value={id}>{label}</option>)}
     </select>
   </div>
 }

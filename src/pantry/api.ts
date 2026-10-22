@@ -1,3 +1,5 @@
+import { projectProfit } from './dimensions/report'
+import { dimensionCommands, dimensionsView } from './dimensions'
 import { closeBoard } from './close-workflow'
 import { figureExport, recordExport } from './detail-export'
 // Pantry's HTTP surface. People use /api/pantry/* with their native session;
@@ -102,7 +104,7 @@ import { estimateCommands, estimatesView, estimate, registerEstimateRoutes } fro
 import { customerDepositCommands, customerDepositsView } from './customer-deposits'
 
 const commands: Record<string, Command> = {
-  ...siblingCommands,
+  ...dimensionCommands, ...siblingCommands,
   ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
@@ -157,6 +159,8 @@ api.get('/api/pantry/estimate-siblings/:id/document', async c => {
   return new Response(document.bytes, { headers: { 'content-type': document.mediaType, 'content-disposition': `inline; filename="${document.name}"`, 'content-security-policy': "default-src 'none'; sandbox" } })
 })
 view('estimates', async ctx => estimatesView(ctx))
+view('dimensions',async ctx=>dimensionsView(ctx.db))
+view('dimensions/project',async(ctx,c)=>projectProfit(ctx.db,c.req.query('name')??'',day(c,'from'),day(c,'to'),await reportBasis(ctx.db,c.req.query('basis'))))
 view('estimates/:id', async (ctx, c) => estimate(ctx.db, c.req.param('id')!))
 view('customer-deposits', async ctx => customerDepositsView(ctx))
 registerInvoiceDocumentRoutes(api, reader)

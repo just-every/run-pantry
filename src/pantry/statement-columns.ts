@@ -1,5 +1,6 @@
 // Financial statement columns are independent reads of the same posted ledger.
 import { addDays, daysBetween, monthName, requireThat, type Data } from './core'
+import { dimensionColumns } from './dimensions/report'
 import { all } from './db'
 import { balanceSheet, fiscalYearStart, generalLedger, prevDay, profitAndLoss } from './reports'
 import type { Basis } from './basis'
@@ -44,7 +45,11 @@ function matrix(snapshots: Snapshot[], key: 'rows' | 'totals'): MatrixLine[] {
 
 export async function statementColumns(db: D1Database, kind: Kind, mode: string, from: string, to: string, startMonth: number, basis: Basis): Promise<StatementColumns> {
   requireThat(from <= to, 'From must be on or before To')
-  requireThat(['prior-period', 'prior-year', 'months', 'quarters', 'ytd', 'customer'].includes(mode), 'Choose comparison, months, quarters, year to date or customer columns')
+  requireThat(['prior-period', 'prior-year', 'months', 'quarters', 'ytd', 'customer','class','location','project'].includes(mode), 'Choose comparison, months, quarters, year to date or customer columns')
+  if (['class','location','project'].includes(mode)) {
+    requireThat(kind==='profit-and-loss','Dimension columns are for profit and loss')
+    return dimensionColumns(db,mode as 'class'|'location'|'project',from,to,basis)
+  }
   if (mode === 'customer') {
     requireThat(kind === 'profit-and-loss', 'Customer columns are for profit and loss')
     return customerColumns(db, from, to, basis)

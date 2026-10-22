@@ -1,0 +1,63 @@
+import assert from 'node:assert/strict'
+import { books, harness } from './harness.mjs'
+
+export async function dimensionsJourney(t) {
+ const h=await harness();t.after(()=>h.close())
+ const {acct}=await books(h)
+ const before=await h.view('dimensions')
+ const reader=await h.member('synthetic-pantry-dimension-reader@example.test','viewer')
+ await h.command('dimensions.settings',{revision:before.settings.revision,class:true,location:true,project:true},reader,403)
+ await h.command('dimensions.settings',{revision:before.settings.revision,class:true,location:true,project:true})
+ await h.command('dimensions.settings',{revision:before.settings.revision,class:false},h.owner,409)
+ for(const [kind,names] of [['class',['Studio','Support']],['location',['New York','Remote']],['project',['Cedar website','Cypress care']]])for(const name of names)await h.command('dimension.save',{kind,name})
+ await h.command('dimension.save',{kind:'class',name:'studio'},h.owner,409)
+ await h.command('dimension.require',{accountId:acct['6200'],kinds:['class']})
+ const vendor=await h.command('contact.save',{kind:'vendor',name:'Design supplier',email:'synthetic-pantry-vendor@example.test'})
+ const customer=await h.command('contact.save',{kind:'customer',name:'Cedar Workshop',email:'synthetic-pantry-customer@example.test'})
+ const bank=await h.command('bank-account.save',{name:'Checking',institution:'Synthetic bank',numberLast4:'1234',accountId:acct['1000'],openingDate:'2026-01-01',openingBalance:'0'})
+ const tags={className:'Studio',locationName:'New York',projectName:'Cedar website'}
+ const billBody={vendorId:vendor.id,reference:'DIM-1',billDate:'2026-09-15',post:true,lines:[{description:'Project software',accountId:acct['6200'],amount:'400'}]}
+ const journals=(await h.view('journal')).entries.length
+ await h.command('bill.save',billBody,h.owner,409)
+ assert.equal((await h.view('journal')).entries.length,journals,'refused bill leaves no posting')
+ assert.equal((await h.view('sales')).bills.length,0,'refused bill is atomic')
+ const bill=await h.command('bill.save',{...billBody,lines:billBody.lines.map(l=>({...l,...tags}))})
+ assert.deepEqual(bill.lines.map(l=>[l.class_name,l.location_name,l.project_name]),[['Studio','New York','Cedar website']])
+ const draft=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-09-15',lines:[{description:'Website',quantity:'1',rate:'1200',accountId:acct['4000'],taxCode:'exempt',...tags}]})
+ await h.command('invoice.approve',{id:draft.id,revision:draft.revision});const invoice=await h.command('invoice.issue',{id:draft.id})
+ assert.equal(invoice.lines[0].class_name,'Studio')
+ for(const [direction,id,amount] of [['received',invoice.id,'600'],['paid',bill.id,'200']])await h.command('payment.record',{direction,contactId:direction==='paid'?vendor.id:customer.id,date:'2026-09-20',amount,bankAccountId:bank.id,allocations:[{targetId:id,amount}]})
+ const journal=await h.command('journal.save-draft',{date:'2026-09-16',memo:'Remote support project',lines:[{accountId:acct['6200'],debit:'100',className:'Support',locationName:'Remote',projectName:'Cypress care'},{accountId:acct['1000'],credit:'100'}]})
+ await h.command('journal.post',{id:journal.id,revision:journal.revision})
+ const missing=await h.command('journal.save-draft',{date:'2026-09-17',memo:'Unclassified draft',lines:[{accountId:acct['6200'],debit:'5'},{accountId:acct['1000'],credit:'5'}]})
+ await h.command('journal.post',{id:missing.id,revision:missing.revision},h.owner,409)
+ await h.command('journal.save-draft',{date:'2026-09-17',memo:'Unknown class',lines:[{accountId:acct['6200'],debit:'5',className:'Unknown'},{accountId:acct['1000'],credit:'5'}]},h.owner,409)
+ for(const basis of ['accrual','cash']) {
+  const unsplit=await h.view(`reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=${basis}`)
+  for(const kind of ['class','location','project']) {
+   const r=await h.view(`reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=${basis}&columns=${kind}`)
+   for(const row of [...r.rows,...r.totals])assert.equal(row.values.slice(0,-1).reduce((s,n)=>s+n,0),row.values.at(-1))
+   assert.equal(r.totals.find(t=>t.id==='income').values.at(-1),unsplit.totalIncome)
+   assert.equal(r.totals.find(t=>t.id==='expenses').values.at(-1),unsplit.totalExpenses)
+   const studio=r.columns.findIndex(c=>c.label===(kind==='class'?'Studio':kind==='location'?'New York':'Cedar website'))
+   assert.equal(r.totals.find(t=>t.id==='net-income').values[studio],basis==='cash'?40000:80000)
+   for(const format of ['csv','pdf','xlsx'])assert.equal((await h.send(`/api/pantry/reports/profit-and-loss/export?from=2026-09-01&to=2026-09-30&basis=${basis}&columns=${kind}&format=${format}`,undefined,{cookie:h.owner})).status,200)
+  }
+ }
+ const service=await h.command('item.save',{kind:'service',name:'Design hours',rate:'100',accountId:acct['4000'],taxCategory:'non-taxable'})
+ const project=await h.command('time-project.save',{customerId:customer.id,name:'Cedar website'})
+ await h.command('time.save',{customerId:customer.id,projectId:project.id,itemId:service.id,date:'2026-09-18',hours:'4'})
+ const profit=await h.view('dimensions/project?name=Cedar%20website&from=2026-09-01&to=2026-09-30&basis=accrual')
+ assert.deepEqual([profit.income,profit.costs,profit.profit,profit.minutes,profit.unbilledMinutes,profit.unbilledCents],[120000,40000,80000,240,240,40000])
+ const catalogue=await h.view('dimensions'),studio=catalogue.values.find(v=>v.kind==='class'&&v.name==='Studio')
+ await h.command('dimension.save',{...studio,active:false})
+ await h.command('bill.save',{...billBody,reference:'DIM-INACTIVE',lines:billBody.lines.map(l=>({...l,...tags}))},h.owner,409)
+ const original=await h.view('journal'),posted=original.entries.find(e=>e.id===bill.journal_id)
+ const reversed=await h.command('journal.reverse',{id:journal.id,date:'2026-09-22',memo:'Reverse support cost'})
+ assert.equal(reversed.lines[0].class_name,'Support')
+ assert.equal((await h.view(`reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=accrual&columns=class`)).totals.find(r=>r.id==='expenses').values.at(-1),40000)
+ assert.equal(posted.lines.find(l=>l.account_id===acct['6200']).class_name,'Studio','deactivation does not rewrite posted evidence')
+ const activity=(await h.view('activity')).audit
+ for(const action of ['dimensions.settings','dimension.save','dimension.required'])assert.ok(activity.some(a=>a.action===action))
+ return {h,acct,tags,invoice,bill,customer,vendor,bank}
+}

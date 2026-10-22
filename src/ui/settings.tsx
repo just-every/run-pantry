@@ -1,4 +1,5 @@
 // People & settings: the business, its declared policies, who has which role, and agent access.
+import { DimensionSettings } from './dimensions'
 import { useState } from 'react'
 import { Action, Card, Chip, command, Details, Field, Form, PageHead, ROLE_LABEL, Table, day, placeholderEmail, useShared, type D } from './kit'
 import { Icon } from './icons'
@@ -96,7 +97,7 @@ export function Settings() {
   const { state } = useShared()
   return <>
     <PageHead title="People & settings" lead="The business these books belong to, invoice sending and online payments, Stripe payouts and Gusto payroll, who works in them, agent access, and how receipts are read and received." />
-    <Business />
+    <Business /><DimensionSettings />
     {state.settings.entity && <><InvoicingSettings /><ConnectedSettings /></>}
     {state.actor.can.owner && <><DataFlows /><Owner /><People /><RolePrivacy /><IssuingLimits /><Agents /><IntegrationSettings /><WebhookSettings /><ErasureSettings /><ReceiptSettings /><Hosting /></>}
   </>

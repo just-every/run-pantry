@@ -1,3 +1,4 @@
+import { dimensionTags, dimensionValues } from './dimensions'
 // Payables and recorded money movement. Bills post expense against payables;
 // payments record money that moved outside Pantry and allocate it to open items.
 import { nativeApprovalAuthority } from './access-policy/approvals'
@@ -34,7 +35,7 @@ export async function parseBill(db: D1Database, b: Data) {
   const lines = list<Data>(b.lines, 'Bill lines', 100).map((l, i) => {
     const a = accounts.get(text(l.accountId, `Line ${i + 1} account`))
     requireThat(a && a.active && !['receivable', 'payable', 'bank'].includes(a.subtype), `Line ${i + 1}: choose an active expense or asset account`)
-    return { description: text(l.description, `Line ${i + 1} description`, 500), accountId: a.id, amount: cents(l.amount, `Line ${i + 1} amount`) }
+    return { ...dimensionTags({...l,className:l.className??b.className}), description: text(l.description, `Line ${i + 1} description`, 500), accountId: a.id, amount: cents(l.amount, `Line ${i + 1} amount`) }
   })
   return { vendor, billDate, dueDate, lines, total: lines.reduce((s, l) => s + l.amount, 0), reference: text(b.reference, "Vendor's invoice number", 80), memo: optionalText(b.memo, 'Memo', 1000), className: optionalText(b.className, 'Class', 100) }
 }
@@ -51,8 +52,8 @@ export async function billStatements(c: Context, b: Data) {
   const statements: Sql[] = [authority(c.actor, 'record'), periodOpen(p.billDate), ...(post ? rules.guards : []),
     q("INSERT INTO pt_bills (id, vendor_id, reference, bill_date, due_date, status, memo, total_cents, opening, prepared_by, revision, created_at, class_name, updated_at) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, 0, ?, ?, ?, ?, ?)",
       id, p.vendor.id, p.reference, p.billDate, p.dueDate, p.memo, p.total, c.actor.email, uid(), now(), p.className, now()),
-    ...p.lines.map((l, i) => q('INSERT INTO pt_bill_lines (id, bill_id, line_no, description, account_id, amount_cents) VALUES (?, ?, ?, ?, ?, ?)', uid(), id, i + 1, l.description, l.accountId, l.amount))]
-  if (payable) statements.push(...postBill(c.actor, { id, journalId, payable: payable.id, vendor: p.vendor, reference: p.reference, date: p.billDate, lines: p.lines.map(l => ({ account_id: l.accountId, amount_cents: l.amount, description: l.description })), total: p.total }))
+    ...p.lines.map((l, i) => q('INSERT INTO pt_bill_lines (id, bill_id, line_no, description, account_id, amount_cents, class_name, location_name, project_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', uid(), id, i + 1, l.description, l.accountId, l.amount,...dimensionValues(l)))]
+  if (payable) statements.push(...postBill(c.actor, { id, journalId, payable: payable.id, vendor: p.vendor, reference: p.reference, date: p.billDate, lines: p.lines.map(l => ({ account_id: l.accountId, amount_cents: l.amount, description: l.description,...dimensionTags(l) })), total: p.total }))
   statements.push(audit(who(c.actor), post ? 'bill.record' : 'bill.draft', 'bill', id, { vendor: p.vendor.name, reference: p.reference, total: p.total }))
   return { id, statements }
 }
@@ -64,7 +65,7 @@ const saveBill: Command = { need: 'record', async run(c, b) {
 } }
 
 export function postBill(actor: Actor, b: { id: string; journalId: string; payable: string; vendor: Data; reference: string; date: string; lines: Data[]; total: number }): Sql[] {
-  const lines: Line[] = [...b.lines.map(l => ({ accountId: l.account_id, debit: l.amount_cents, credit: 0, memo: l.description })), { accountId: b.payable, debit: 0, credit: b.total, memo: `${b.vendor.name} ${b.reference}`, contactId: b.vendor.id }]
+  const lines: Line[] = [...b.lines.map(l => ({ ...dimensionTags(l), accountId: l.account_id, debit: l.amount_cents, credit: 0, memo: l.description })), { accountId: b.payable, debit: 0, credit: b.total, memo: `${b.vendor.name} ${b.reference}`, contactId: b.vendor.id }]
   return [...nativeApprovalAuthority(actor, 'bill', b.total), ...entryStatements({ id: b.journalId, date: b.date, memo: `Bill ${b.reference} — ${b.vendor.name}`, sourceKind: 'bill', sourceId: b.id, preparedBy: actor.email, preparedKind: 'person', lines }, actor.email),
     q("UPDATE pt_bills SET status = 'posted', journal_id = ?, revision = ? WHERE id = ? AND status = 'draft'", b.journalId, uid(), b.id), changed()]
 }
