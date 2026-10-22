@@ -391,6 +391,19 @@ test('API-001 / REPORT-002 scoped financial reports read native nonzero books, b
   assert.ok(calls.some(c => c.path.endsWith('/reports/profit-and-loss') && c.status === 200))
   assert.ok(calls.some(c => c.path.endsWith('/reports/audit-log') && c.status === 404))
   assert.ok(calls.some(c => c.path.endsWith('/reports/balance-sheet') && c.status === 403))
+  const dimensionSettings=(await h.view('dimensions')).settings
+  await h.command('dimensions.settings',{revision:dimensionSettings.revision,class:true})
+  await h.command('dimension.save',{kind:'class',name:'Scoped report studio'})
+  const coded=await h.command('journal.save-draft',{date:'2026-10-20',memo:'Dimension-filtered fee',lines:[{accountId:acct['6400'],debit:'11',className:'Scoped report studio'},{accountId:acct['1000'],credit:'11'}]})
+  await h.command('journal.post',{id:coded.id,revision:coded.revision})
+  for(const basis of ['cash','accrual'])for(const kind of ['general-ledger','trial-balance']){
+    const query=range+'&basis='+basis+'&dimension=class&dimensionValue=value:Scoped%20report%20studio'
+    const scoped=await call('/reports/'+kind+'?'+query),native=await h.view('reports/'+kind+'?'+query)
+    assert.equal(scoped.status,200);assert.deepEqual(scoped.value,native)
+    if(kind==='general-ledger'){assert.equal(scoped.value.accounts.length,1);assert.equal(scoped.value.accounts[0].closing,1100)}
+    else assert.equal(scoped.value.rows.find(r=>r.id===acct['6400']).net,1100)
+    assert.equal((await call('/reports/'+kind+'?'+query,invoicesOnly.token)).status,403)
+  }
   await h.command('integration.revoke', { id: reader.id })
   assert.equal((await call('/reports/profit-and-loss?' + range)).status, 401)
   assert.equal((await call('/reports/transactions?' + range)).status, 401)
@@ -425,6 +438,7 @@ test('API-001 / INVOICE-010 scoped issuance counts the deposit toward the frozen
   const apiBody = { ...body, number: 'API-TERMS', post: true }
   const [scoped, replay] = await Promise.all([call('invoices', apiBody, 'terms-invoice'), call('invoices', apiBody, 'terms-invoice')])
   assert.equal(scoped.id, replay.id)
+  assert.ok(scoped.lines.every(l=>l.class_name===coding.className&&l.location_name===coding.locationName&&l.project_name===coding.projectName),'scoped readback retains line coding')
   const scopedEntry=(await h.view('journal')).entries.find(e=>e.id===scoped.journal_id)
   assert.ok(scopedEntry.lines.filter(l=>l.account_id!==acct['1200']).every(l=>l.class_name===coding.className&&l.location_name===coding.locationName&&l.project_name===coding.projectName),'scoped posting keeps native source coding on sales, discounts and tax')
   const deposits = await call('payments?invoiceId=' + scoped.id)

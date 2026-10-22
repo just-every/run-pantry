@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { Card, Chip, Field, Loading, PageHead, Table, Tabs, day, monthName, today, usd, useShared, useView, type D } from './kit'
 import { BASIS_NAME, FigureDetail, RecordView } from './report-detail'
+import { DimensionReportPicker } from './dimensions'
 import { ProjectProfitability } from './project-profitability'
 import { Budgets } from './budgets'
 import { CustomReports } from './custom-reports'
@@ -30,10 +31,10 @@ function Figure({ line, children }: { line: string; children: React.ReactNode })
 }
 
 function Trial({ r, from, to, basis }: { r: D; from: string; to: string; basis: Basis }) {
-  return <Table heads={['Code', 'Account', 'Debit', 'Credit']} figures={[2, 3]} empty="No posted balances on this date.">
+  return <>{r.dimension&&<p className="hint">Only {r.dimension.label} lines are included. Debits and credits can differ when the other side is coded elsewhere. Choose All dimensions to check the whole trial balance.</p>}<Table heads={['Code', 'Account', 'Debit', 'Credit']} figures={[2, 3]} empty="No posted balances on this date.">
     {[...r.rows.map((x: D) => <tr key={x.id}><td>{x.code}</td><td>{x.name}<AskAccountant key={JSON.stringify({ from, to, basis })} subjectKind="report-line" subjectId={JSON.stringify({ report: 'trial-balance', line: x.id, from, to, basis })} label={`Trial balance · ${x.code} · ${x.name} · ${to} · ${BASIS_NAME[basis]}`} /></td><td className="fig">{x.debitBalance ? <Figure line={JSON.stringify([x.id, 'debit'])}>{usd(x.debitBalance)}</Figure> : ''}</td><td className="fig">{x.creditBalance ? <Figure line={JSON.stringify([x.id, 'credit'])}>{usd(x.creditBalance)}</Figure> : ''}</td></tr>),
-      <tr key="total" className="total"><td /><td>Total {r.balanced ? '' : '(out of balance)'}</td><td className="fig"><Figure line={JSON.stringify(['total', 'debit'])}>{usd(r.debit)}</Figure></td><td className="fig"><Figure line={JSON.stringify(['total', 'credit'])}>{usd(r.credit)}</Figure></td></tr>]}
-  </Table>
+      <tr key="total" className="total"><td /><td>Total {r.dimension?'(filtered lines)':r.balanced ? '' : '(out of balance)'}</td><td className="fig"><Figure line={JSON.stringify(['total', 'debit'])}>{usd(r.debit)}</Figure></td><td className="fig"><Figure line={JSON.stringify(['total', 'credit'])}>{usd(r.credit)}</Figure></td></tr>]}
+  </Table></>
 }
 
 function Ledger({ r }: { r: D }) {
@@ -89,7 +90,7 @@ const periodOf = (v: string) => { const m = DAY.exec(v); return `${String(Number
 function Report({ slug, basis, from, to, columns }: { slug: string; basis: Basis; from: string; to: string; columns: ColumnMode }) {
   const search = useSearch({ from: '/app/reports' })
   const ranged = KINDS.find(k => k[1] === slug)![3]
-  const { data: r, error } = useView<D>(['budget-actual','project-profitability'].includes(slug) ? null : `reports/${slug}?to=${to}${ranged || columns !== 'single' ? `&from=${from}` : ''}&basis=${basis}${columns !== 'single' ? `&columns=${columns}` : ''}${slug === 'general-ledger' && search.account ? `&account=${encodeURIComponent(search.account)}` : ''}`)
+  const { data: r, error } = useView<D>(['budget-actual','project-profitability'].includes(slug) ? null : `reports/${slug}?to=${to}${ranged || columns !== 'single' ? `&from=${from}` : ''}&basis=${basis}${columns !== 'single' ? `&columns=${columns}` : ''}${slug === 'general-ledger' && search.account ? `&account=${encodeURIComponent(search.account)}` : ''}${['general-ledger','trial-balance'].includes(slug)&&search.dimension?`&dimension=${encodeURIComponent(search.dimension)}&dimensionValue=${encodeURIComponent(search.dimensionValue??'')}`:''}`)
   if (slug === 'project-profitability') return <ProjectProfitability from={from} to={to} basis={basis} />
   if (slug === 'budget-actual') return <Budgets from={from} to={to} basis={basis} />
   if (!r) return <Loading error={error} what="the report" />
@@ -130,15 +131,16 @@ export function Reports() {
   // 1099 figures read a calendar tax year.
   const taxYear = Number(search.year) || Number(today().slice(0, 4)), [figureFrom, figureTo] = slug === 'contractors' ? [`${taxYear}-01-01`, `${taxYear}-12-31`] : [from, to]
   const library = isLibraryReport(slug), filtered = hasLibraryFilters(slug)
-  const exportQuery = library ? libraryQuery(slug, from, to, basis, search.account, search.payee) : `from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}${slug === 'general-ledger' && search.account ? `&account=${encodeURIComponent(search.account)}` : ''}`
+  const exportQuery = library ? libraryQuery(slug, from, to, basis, search.account, search.payee) : `from=${from}&to=${to}&basis=${basis}${statement ? `&columns=${columns}` : ''}${slug === 'general-ledger' && search.account ? `&account=${encodeURIComponent(search.account)}` : ''}${['general-ledger','trial-balance'].includes(slug)&&search.dimension?`&dimension=${encodeURIComponent(search.dimension)}&dimensionValue=${encodeURIComponent(search.dimensionValue??'')}`:''}`
   return <>
     <PageHead title="Reports" lead="Every report is calculated from the same posted ledger, on the cash or the accrual basis."
       actions={!customOnly && <><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv${q}`} download>General ledger CSV · {basis === 'cash' ? 'cash' : 'accrual'}</a><a className="btn btn-primary" href={`/api/pantry/package/${period}/accountant-package.zip${q}`} download title="A ZIP of CSV reports, the close checklist and a README">Accountant package · {monthName(period)}</a></>} />
-    <Tabs tabs={kinds.map(k => k[0])} current={label} onChange={t => set({ report: kinds.find(k => k[0] === t)![1], line: undefined, record: undefined })} pick="Report" />
+    <Tabs tabs={kinds.map(k => k[0])} current={label} onChange={t => set({ report: kinds.find(k => k[0] === t)![1], line: undefined, record: undefined,dimension:undefined,dimensionValue:undefined,projectName:undefined })} pick="Report" />
     {customOnly ? <CustomReports /> : search.record ? <RecordView record={search.record} reportLabel={label} /> : detail && slug === 'cash-flow' ? <CashFlowDetail line={search.line!} from={from} to={to} />
       : detail ? <FigureDetail report={slug} line={search.line!} from={figureFrom} to={figureTo} basis={basis} reportLabel={label} />
       : slug === 'custom' ? <CustomReports /> : slug === 'contractors' ? <Contractors year={taxYear} onYear={y => set({ year: String(y) })} />
       : <Card className={library ? 'report-library' : undefined} title={<>{label} <Chip tone="info">{library ? libraryBasisLabel(slug, basis) : slug === 'cash-flow' ? 'Indirect method · accrual starting income' : based ? BASIS_NAME[basis] : 'Open items · accrual basis'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}
+          {['general-ledger','trial-balance'].includes(slug)&&<DimensionReportPicker />}
           {statement && <ColumnPicker mode={columns} kind={slug} onChange={mode => set({ columns: mode, line: undefined, record: undefined, column: undefined })} />}
           {ranged && <div className="field inline"><label htmlFor="r-from">From</label><input id="r-from" type="date" value={from} onChange={e => isDay(e.target.value) && set({ from: e.target.value })} /></div>}
           <div className="field inline"><label htmlFor="r-to">{ranged ? 'To' : 'As of'}</label><input id="r-to" type="date" value={to} onChange={e => isDay(e.target.value) && set({ to: e.target.value })} /></div>

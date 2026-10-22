@@ -155,7 +155,7 @@ integrations.get('/reports/:kind', async c => {
   const to = date(c.req.query('to') ?? new Date().toISOString().slice(0, 10), 'to')
   const from = date(c.req.query('from') ?? to.slice(0, 8) + '01', 'from')
   await run(ctx.db, [authority(ctx.actor, 'read')])
-  return c.json(await readReport(ctx.db, kind, { from, to, basis: await reportBasis(ctx.db, c.req.query('basis')), account: c.req.query('account'), payee: c.req.query('payee'), columns: c.req.query('columns') }))
+  return c.json(await readReport(ctx.db, kind, { from, to, basis: await reportBasis(ctx.db, c.req.query('basis')), account: c.req.query('account'), payee: c.req.query('payee'), columns: c.req.query('columns'),dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue') }))
 })
 
 const document = (db: D1Database, id: string) => one(db, 'SELECT id,name,media_type,size,sha256,linked_kind,linked_id,note,uploaded_by,uploaded_at FROM pt_documents WHERE id = ?', id).then(r => r!)

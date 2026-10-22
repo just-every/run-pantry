@@ -1,6 +1,7 @@
 // Reports, all calculated from posted journal lines (and, for ageing, the open
 // items those lines carry). Nothing here stores or accepts a total. Each ledger
 // report reads on the accrual or the cash basis (basis.ts) and names its basis.
+import { inDimension, type DimensionScope } from './dimensions/scope'
 import { daysBetween, longDay, requireThat, type Data } from './core'
 import { all, one } from './db'
 import { cashLines, sameOnCash, type Basis } from './basis'
@@ -8,40 +9,40 @@ import { appliedAsOf, unappliedRows } from './open-items'
 
 type Balance = { id: string; code: string; name: string; type: string; subtype: string; debit: number; credit: number; net: number }
 
-export async function balances(db: D1Database, to: string, from = '0000-01-01', basis: Basis = 'accrual'): Promise<Balance[]> {
-  const kept = basis === 'cash' ? `AND ${sameOnCash()}` : ''
+export async function balances(db: D1Database, to: string, from = '0000-01-01', basis: Basis = 'accrual', dimension?:DimensionScope): Promise<Balance[]> {
+  const kept = (basis === 'cash' ? `AND ${sameOnCash()}` : '')+(dimension?` AND l.${dimension.kind}_name = ?`:'')
   const rows = await all(db, `SELECT a.id, a.code, a.name, a.type, a.subtype,
       COALESCE(SUM(CASE WHEN e.status = 'posted' AND e.entry_date BETWEEN ? AND ? ${kept} THEN l.debit_cents END), 0) AS debit,
       COALESCE(SUM(CASE WHEN e.status = 'posted' AND e.entry_date BETWEEN ? AND ? ${kept} THEN l.credit_cents END), 0) AS credit
     FROM pt_accounts a LEFT JOIN pt_journal_lines l ON l.account_id = a.id LEFT JOIN pt_journal_entries e ON e.id = l.entry_id
-    GROUP BY a.id ORDER BY a.code`, from, to, from, to)
+    GROUP BY a.id ORDER BY a.code`, from, to, ...(dimension?[dimension.value]:[]),from, to,...(dimension?[dimension.value]:[]))
   const out = rows.map(r => ({ ...r, debit: Number(r.debit), credit: Number(r.credit) })) as Balance[]
   if (basis === 'cash') {
     const byId = new Map(out.map(b => [b.id, b]))
-    for (const l of await cashLines(db, from, to)) { const b = byId.get(l.accountId)!; if (l.net > 0) b.debit += l.net; else b.credit -= l.net }
+    for (const l of await cashLines(db, from, to)) { if(!inDimension(l,dimension))continue;const b = byId.get(l.accountId)!; if (l.net > 0) b.debit += l.net; else b.credit -= l.net }
   }
   return out.map(b => ({ ...b, net: b.debit - b.credit }))
 }
 
-export async function trialBalance(db: D1Database, asOf: string, basis: Basis = 'accrual') {
-  const rows = (await balances(db, asOf, undefined, basis)).filter(r => r.net !== 0).map(r => ({ ...r, debitBalance: r.net > 0 ? r.net : 0, creditBalance: r.net < 0 ? -r.net : 0 }))
+export async function trialBalance(db: D1Database, asOf: string, basis: Basis = 'accrual',dimension?:DimensionScope) {
+  const rows = (await balances(db, asOf, undefined, basis,dimension)).filter(r => r.net !== 0).map(r => ({ ...r, debitBalance: r.net > 0 ? r.net : 0, creditBalance: r.net < 0 ? -r.net : 0 }))
   const debit = rows.reduce((s, r) => s + r.debitBalance, 0), credit = rows.reduce((s, r) => s + r.creditBalance, 0)
-  return { basis, asOf, rows, debit, credit, balanced: debit === credit }
+  return { basis, asOf,...(dimension?{dimension}:{}), rows, debit, credit, balanced: debit === credit }
 }
 
-export async function generalLedger(db: D1Database, from: string, to: string, accountId?: string, basis: Basis = 'accrual') {
-  const opening = new Map((await balances(db, prevDay(from), undefined, basis)).map(b => [b.id, b.net]))
+export async function generalLedger(db: D1Database, from: string, to: string, accountId?: string, basis: Basis = 'accrual',dimension?:DimensionScope) {
+  const opening = new Map((await balances(db, prevDay(from), undefined, basis,dimension)).map(b => [b.id, b.net]))
   const lines = await all(db, `SELECT l.*, e.number, e.entry_date, e.memo AS entry_memo, e.source_kind, e.reverses_id, e.reversed_by_id, a.code, a.name AS account_name, c.name AS contact_name
     FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id JOIN pt_accounts a ON a.id = l.account_id LEFT JOIN pt_contacts c ON c.id = l.contact_id
-    WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? ${accountId ? 'AND l.account_id = ?' : ''} ${basis === 'cash' ? `AND ${sameOnCash()}` : ''} ORDER BY a.code, e.entry_date, e.number, l.line_no`, from, to, ...(accountId ? [accountId] : []))
+    WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? ${accountId ? 'AND l.account_id = ?' : ''} ${basis === 'cash' ? `AND ${sameOnCash()}` : ''} ${dimension?`AND l.${dimension.kind}_name = ?`:''} ORDER BY a.code, e.entry_date, e.number, l.line_no`, from, to, ...(accountId ? [accountId] : []),...(dimension?[dimension.value]:[]))
   if (basis === 'cash') {
     // Settled shares of invoices, credits and bills, dated when they were settled.
-    for (const [i, l] of (await cashLines(db, from, to)).entries()) if (!accountId || l.accountId === accountId)
+    for (const [i, l] of (await cashLines(db, from, to)).entries()) if ((!accountId || l.accountId === accountId)&&inDimension(l,dimension))
       lines.push({ id: `cash-${i}`, entry_id: l.docJournalId, account_id: l.accountId, entry_date: l.date, number: null, entry_memo: settlementMemo(l), memo: l.description, contact_name: l.contactName, contact_id: l.contactId, debit_cents: Math.max(l.net, 0), credit_cents: Math.max(-l.net, 0), class_name:l.class_name??'',location_name:l.location_name??'',project_name:l.project_name??'',source_kind: l.docKind, item_id: l.itemId ?? null })
     lines.sort((x, y) => x.entry_date < y.entry_date ? -1 : x.entry_date > y.entry_date ? 1 : (x.number ?? Infinity) - (y.number ?? Infinity))
   }
   const accounts = await all(db, `SELECT id, code, name, type FROM pt_accounts ${accountId ? 'WHERE id = ?' : ''} ORDER BY code`, ...(accountId ? [accountId] : []))
-  return { basis, from, to, accounts: accounts.map(a => {
+  return { basis, from, to,...(dimension?{dimension}:{}), accounts: accounts.map(a => {
     let running = opening.get(a.id) ?? 0
     const rows = lines.filter(l => l.account_id === a.id).map(l => ({ ...l, running: (running += l.debit_cents - l.credit_cents) }) as Data)
     return { ...a, opening: opening.get(a.id) ?? 0, rows, closing: running } as Data

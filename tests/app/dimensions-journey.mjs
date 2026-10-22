@@ -101,6 +101,17 @@ export async function dimensionsBrowser(t){
    await page.goto(href.href);await expect(page.getByText('Adds up to the report figure',{exact:true})).toBeVisible();await shot(`sources-${kind}`)
    await page.goto(origin+`/app/reports?report=profit-and-loss&from=2026-09-01&to=2026-09-30&basis=accrual&columns=${kind}`)
   }
+  for(const report of ['general-ledger','trial-balance']){
+   await page.goto(origin+`/app/reports?report=${report}&from=2026-09-16&to=2026-09-30&basis=accrual`)
+   await page.getByLabel('Dimension filter',{exact:true}).selectOption(JSON.stringify(['class',`value:Studio ${width}`]))
+   await expect(page.getByRole('link',{name:'Download CSV · accrual',exact:true})).toHaveAttribute('href',/dimension=class/)
+   await shot('filtered-'+report)
+   let link
+   if(report==='general-ledger')link=page.locator('.gl-account').filter({has:page.getByRole('heading',{name:'6200 · Software and subscriptions',exact:true})}).getByRole('row').filter({has:page.getByText('Opening balance',{exact:true})}).getByRole('link',{name:'$400.00',exact:true})
+   else link=page.getByRole('row').filter({hasText:'6200'}).getByRole('link',{name:'$400.00',exact:true})
+   await link.click();await expect(page.getByText('Adds up to the report figure',{exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:new RegExp(`class · Studio ${width}`)})).toBeVisible()
+   await shot('filtered-'+report+'-sources')
+  }
   const service=await command('item.save',{kind:'service',name:`Design hours ${width}`,rate:'100',accountId:acct['4000'],taxCategory:'non-taxable'})
   const timeProject=await command('time-project.save',{customerId:customer.id,name:`Cedar website ${width}`})
   await command('time.save',{customerId:customer.id,projectId:timeProject.id,itemId:service.id,date:'2026-09-18',hours:'4'})
@@ -194,6 +205,7 @@ export async function dimensionsBrowser(t){
   for(const [kind,name] of [['class',`Studio ${width}`],['location',`New York ${width}`],['project',`Cedar website ${width}`]])await receipt.getByLabel(`Default ${kind}`,{exact:true}).selectOption(name)
   await receipt.getByText('I checked this vendor identity against the original document.',{exact:true}).click()
   await shot('receipt-vendor-defaults')
+  await receipt.locator('section[aria-label="Vendor identity"]').screenshot({path:`${proof}/dimensions-receipt-vendor-card-${width}.png`})
   await receipt.getByRole('button',{name:'Accept new vendor',exact:true}).click()
   await expect(receipt.getByText(`Dimension provider ${width}`,{exact:true})).toBeVisible()
   const createdVendor=(await view('state')).contacts.find(v=>v.name===`Dimension provider ${width}`)
@@ -240,6 +252,7 @@ export async function dimensionsBrowser(t){
   await page.getByLabel('Write-off account',{exact:true}).selectOption(acct['6200'])
   for(const [kind,name] of [['class',`Studio ${width}`],['location',`New York ${width}`],['project',`Cedar website ${width}`]])await page.getByLabel(`Write-off ${kind}`,{exact:true}).selectOption(name)
   await shot('write-off-coded')
+  await page.getByRole('heading',{name:'Write off small balances',exact:true}).locator('..').locator('..').screenshot({path:`${proof}/dimensions-write-off-card-${width}.png`})
   await page.getByRole('button',{name:'Write off 1 balance',exact:true}).click()
   await expect(page.getByText('Wrote off 1 balance to 6200 · Software and subscriptions.',{exact:true})).toBeVisible()
   const written=(await view('sales')).vendorCredits.find(c=>c.write_off&&c.allocations.some(a=>a.target_id===generatedBill.id))

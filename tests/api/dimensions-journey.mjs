@@ -56,6 +56,32 @@ export async function dimensionsJourney(t) {
   const split=await h.view(`reports/profit-and-loss?from=2026-10-01&to=2026-10-31&basis=${basis}&columns=class`),net=split.totals.find(t=>t.id==='net-income')
   for(const [name,expected] of [['Studio',108000],['Support',62000]])assert.equal(net.values[split.columns.findIndex(c=>c.label===name)],basis==='cash'?expected/2:expected,'before/after-tax discounts keep source dimensions on both bases')
  }
+ for(const basis of ['cash','accrual'])for(const [kind,value] of [['class','Studio'],['location','New York'],['project','Cedar website']]){
+  const query=new URLSearchParams({from:'2026-09-16',to:'2026-09-30',basis,dimension:kind,dimensionValue:'value:'+value})
+  const ledger=await h.view('reports/general-ledger?'+query),account=ledger.accounts.find(a=>a.id===acct['6200'])
+  assert.equal(account.opening,basis==='cash'?0:40000);assert.equal(account.closing,basis==='cash'?20000:40000)
+  assert.ok(ledger.accounts.every(a=>a.rows.every(l=>l[`${kind}_name`]===value)))
+  for(const [metric,row] of [['opening',null],['closing',null],...account.rows.map(l=>['running',l])]){
+   const line=JSON.stringify([account.id,metric,...(row?[row.id]:[])])
+   const detail=await h.view('reports/detail?'+new URLSearchParams({...Object.fromEntries(query),report:'general-ledger',line}))
+   assert.equal(detail.ties,true);assert.ok(detail.rows.every(r=>r[`${kind}_name`]===value));assert.equal(detail.context.dimension,kind)
+  }
+  const trial=await h.view('reports/trial-balance?'+query)
+  const trialLine=JSON.stringify([acct['6200'],'debit'])
+  assert.equal(trial.rows.find(a=>a.id===acct['6200']).net,account.closing)
+  const detail=await h.view('reports/detail?'+new URLSearchParams({...Object.fromEntries(query),report:'trial-balance',line:trialLine}))
+  assert.equal(detail.ties,true);assert.equal(detail.figure,account.closing)
+  for(const report of ['general-ledger','trial-balance'])for(const format of ['csv','pdf','xlsx']){
+   const exported=await h.send(`/api/pantry/reports/${report}/export?${query}&format=${format}`,undefined,{cookie:h.owner})
+   assert.equal(exported.status,200)
+   if(format==='csv')assert.ok(exported.value.includes(`${kind} · ${value}`),'export states its dimension filter')
+  }
+ }
+ await h.view('reports/general-ledger?from=2026-09-01&to=2026-09-30&dimension=unknown&dimensionValue=unassigned',h.owner,400)
+ await h.view('reports/general-ledger?from=2026-09-01&to=2026-09-30&dimension=class&dimensionValue=value:Unknown',h.owner,404)
+ await h.view('reports/profit-and-loss?from=2026-09-01&to=2026-09-30&dimension=class&dimensionValue=value:Studio',h.owner,409)
+ const issuedScope=(await h.view('activity')).audit.filter(a=>a.action==='report.issued').map(a=>JSON.parse(a.detail)).filter(a=>['general-ledger','trial-balance'].includes(a.report))
+ assert.ok(issuedScope.every(i=>i.dimension&&i.dimensionValue),'issued copies freeze the dimension filter')
  const service=await h.command('item.save',{kind:'service',name:'Design hours',rate:'100',accountId:acct['4000'],taxCategory:'non-taxable'})
  const project=await h.command('time-project.save',{customerId:customer.id,name:'Cedar website'})
  await h.command('time.save',{customerId:customer.id,projectId:project.id,itemId:service.id,date:'2026-09-18',hours:'4'})

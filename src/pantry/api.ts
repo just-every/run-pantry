@@ -215,7 +215,7 @@ view('budgets/:id', async (ctx, c) => budget(ctx.db, c.req.param('id')!))
 view('budgets/:id/report', async (ctx, c) => budgetReport(ctx.db, c.req.param('id')!, day(c, 'from'), day(c, 'to'), await reportBasis(ctx.db, c.req.query('basis')),{dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue')}))
 api.get('/api/pantry/budgets/:id/report.csv', async c => {
   const ctx = await reader(c), r = await budgetReport(ctx.db, c.req.param('id')!, day(c, 'from'), day(c, 'to'), await reportBasis(ctx.db, c.req.query('basis')),{dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue')})
-  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`Budget report`,from:day(c,'from'),to:day(c,'to'),basis:await reportBasis(ctx.db,c.req.query('basis')),budgetId:c.req.param('id')!})
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`Budget report`,from:day(c,'from'),to:day(c,'to'),basis:await reportBasis(ctx.db,c.req.query('basis')),budgetId:c.req.param('id')!,dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue')})
   return new Response(budgetCsv(r), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="budget-actual.csv"', 'cache-control': 'no-store' } })
 })
 view('recognition', async (ctx, c) => recognitionView(ctx.db, day(c, 'to')))
@@ -260,14 +260,16 @@ api.get('/api/pantry/reports/cash-flow.csv', async c => {
 api.get('/api/pantry/reports/:kind/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const kind=c.req.param('kind')!,basis=await reportBasis(ctx.db,c.req.query('basis'))
+  requireThat(!c.req.query('dimensionValue')||c.req.query('dimension'),'Choose a dimension before a value')
+  requireThat(!c.req.query('dimension')||['general-ledger','trial-balance'].includes(kind),'This report does not yet support a dimension filter',409)
   const response=isLibrary(kind)?await libraryExport(ctx.db,await libraryReport(ctx.db,kind,from,to,basis,c.req.query('account'),c.req.query('payee')),c.req.query('format')??'pdf')
-    :await reportExport(ctx.db,kind,from,to,basis,c.req.query('format')??'pdf',c.req.query('columns'),c.req.query('account'))
-  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:kind.replaceAll('-',' '),from,to,basis,report:kind,account:c.req.query('account'),payee:c.req.query('payee'),columns:c.req.query('columns')})
+    :await reportExport(ctx.db,kind,from,to,basis,c.req.query('format')??'pdf',c.req.query('columns'),c.req.query('account'),c.req.query('dimension'),c.req.query('dimensionValue'))
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:kind.replaceAll('-',' '),from,to,basis,report:kind,dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue'),account:c.req.query('account'),payee:c.req.query('payee'),columns:c.req.query('columns')})
   return response
 })
 view('reports/:kind', async (ctx, c) => {
   const to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
-  return readReport(ctx.db, c.req.param('kind')!, { from, to, basis: await reportBasis(ctx.db, c.req.query('basis')), account: c.req.query('account'), payee: c.req.query('payee'), columns: c.req.query('columns') })
+  return readReport(ctx.db, c.req.param('kind')!, { from, to, basis: await reportBasis(ctx.db, c.req.query('basis')), account: c.req.query('account'), payee: c.req.query('payee'), columns: c.req.query('columns'),dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue') })
 })
 
 // The 1099-NEC filing file carries full TINs: the owner or someone with the posting grant, audited.

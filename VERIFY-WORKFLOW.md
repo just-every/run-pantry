@@ -37,3 +37,7 @@ file. New registrations and matching files are included automatically, exactly
 once. Each browser job builds the real Worker before its journeys. The
 15-minute job limit and final requirement that every shard and restore succeeds
 remain unchanged. Refresh the edition lock after an intentional plan change.
+
+Files within each API/browser file group run sequentially. This prevents concurrent test processes from racing their local Worker proxy port reservations; independent jobs remain parallel. Server startup errors fail the job, with no assertion retry.
+
+The shared API and provider-backed browser harnesses bind Miniflare to port 0 and keep that socket while setting AUTH_ORIGIN to its assigned origin. They no longer release a reserved port before Worker startup. Startup failure still fails the test without retrying assertions.

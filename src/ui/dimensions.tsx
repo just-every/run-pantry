@@ -1,3 +1,4 @@
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Action, Card, command, Field, Form, Table, useShared, type D } from './kit'
 const KINDS = [['class','Class','classes_enabled'],['location','Location','locations_enabled'],['project','Project','projects_enabled']] as const
 
@@ -42,4 +43,12 @@ export function DimensionFormFields({label,defaults={}}:{label:string;defaults?:
  const {state}=useShared(),d=state.dimensions
  if(!d)return null
  return <>{KINDS.filter(([, ,flag])=>d.settings[flag]).map(([kind])=><Field key={kind} label={`${label} ${kind}`} name={`${kind}Name`} defaultValue={defaults[`${kind}Name`]??defaults[`${kind}_name`]??''} empty="Unassigned" options={d.values.filter((v:D)=>v.kind===kind&&(v.active||v.name===(defaults[`${kind}Name`]??defaults[`${kind}_name`]))).map((v:D)=>({value:v.name,label:v.name+(v.active?'':' (inactive)')}))} />)}</>
+}
+
+export function DimensionReportPicker(){
+ const {state}=useShared(),search=useSearch({from:'/app/reports'}),navigate=useNavigate({from:'/app/reports'}),d=state.dimensions
+ if(!d)return null
+ const enabled=KINDS.filter(([, ,flag])=>d.settings[flag])
+ if(!enabled.length)return null
+ return <Field label="Dimension filter" name="dimensionFilter" value={search.dimension?JSON.stringify([search.dimension,search.dimensionValue]):''} empty="All dimensions" options={enabled.flatMap(([kind])=>[{value:JSON.stringify([kind,'unassigned']),label:`${kind} · Unassigned`},...d.values.filter((v:D)=>v.kind===kind).map((v:D)=>({value:JSON.stringify([kind,'value:'+v.name]),label:`${kind} · ${v.name}${v.active?'':' (inactive)'}`}))])} onChange={(e:React.ChangeEvent<HTMLSelectElement>)=>{const [dimension,dimensionValue]=e.target.value?JSON.parse(e.target.value):[];void navigate({search:s=>({...s,dimension,dimensionValue,line:undefined,record:undefined})})}} />
 }

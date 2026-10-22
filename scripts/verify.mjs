@@ -37,7 +37,10 @@ export function verificationPlan(shard = process.env.VERIFY_SHARD ?? 'all') {
     .filter(name => group !== 'app' || name !== 'app.test.mjs')
     .filter((_, position) => position % 3 === (group === 'app' ? part - 6 : part - 1)).map(name => `tests/${group}/${name}`)
   if (!files.length) throw new Error(`Verification shard ${shard} has no test files`)
-  const test = [process.execPath, ['--test', ...(group === 'api' ? ['--test-concurrency=1'] : []), ...files]]
+  // Separate Miniflare processes reserve then release an ephemeral port before
+  // startup. Serialize files within each job so their proxy startups cannot
+  // race one another; the independent jobs still run in parallel.
+  const test = [process.execPath, ['--test', '--test-concurrency=1', ...files]]
   // Browser journeys exercise the real emitted Worker and assets, built in this job.
   return group === 'app' ? [pnpm('build'), test] : [test]
 }

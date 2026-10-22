@@ -10,7 +10,7 @@ import { calculateCustomReport } from '../custom-reports/calculate'
 import type { CustomReportDefinition, CustomReportDrillGraph } from '../custom-reports/types'
 import { reportFigure, type FigureQuery } from '../report-figures'
 
-export type ReportIssue = { kind: string; name: string; from: string; to: string; basis: Basis; report?: string; reports?: string[]; account?: string; payee?: string; columns?: string; budgetId?: string; definition?: CustomReportDefinition; definitions?: CustomReportDefinition[]; figure?: FigureQuery; customFigure?: { row: string; column: string; node?: string } }
+export type ReportIssue = { kind: string; name: string; from: string; to: string; basis: Basis; report?: string; reports?: string[]; account?: string; payee?: string; columns?: string;dimension?:string;dimensionValue?:string; budgetId?: string; definition?: CustomReportDefinition; definitions?: CustomReportDefinition[]; figure?: FigureQuery; customFigure?: { row: string; column: string; node?: string } }
 // Activity is audit history, not a ledger-derived financial report. Recording
 // its own export as a financial issue would change the very history exported.
 const auditHistory = (issue: ReportIssue) => issue.report === 'audit-log' || issue.figure?.report === 'audit-log'
@@ -64,19 +64,19 @@ export async function affectedIssues(db: D1Database, projected: D1Database, earl
         rows: r.rows?.map((row: Data) => ({ date: row.date, amount: row.amount, debit: row.debit, credit: row.credit, description: row.description, lineMemo: row.lineMemo })) })
       changed = figuresDiffer(financial(before), financial(after))
     } else if (issue.budgetId) {
-      const [before, after] = await Promise.all([budgetReport(db, issue.budgetId, issue.from, issue.to, issue.basis), budgetReport(projected, issue.budgetId, issue.from, issue.to, issue.basis)])
+      const [before, after] = await Promise.all([budgetReport(db, issue.budgetId, issue.from, issue.to, issue.basis,{dimension:issue.dimension,dimensionValue:issue.dimensionValue}), budgetReport(projected, issue.budgetId, issue.from, issue.to, issue.basis,{dimension:issue.dimension,dimensionValue:issue.dimensionValue})])
       changed = figuresDiffer(before, after)
     } else if (sources?.length) {
       for (const source of sources) {
         const key = PROPERTY[source]
-        if (key && !issue.account && !issue.payee && !issue.columns) {
+        if (key && !issue.account && !issue.payee && !issue.columns && !issue.dimension) {
           const [before, after] = await Promise.all([figures(db, issue.from, issue.to, issue.basis), figures(projected, issue.from, issue.to, issue.basis)])
           changed ||= figuresDiffer((before as Data)[key], (after as Data)[key])
         } else {
           // Library reports and source-filtered exports use their own native
           // calculation, including all current report families. Unsupported
           // source names fail visibly instead of being silently ignored.
-          const scope = { from: issue.from, to: issue.to, basis: issue.basis, account: issue.account, payee: issue.payee, columns: issue.columns }
+          const scope = { from: issue.from, to: issue.to, basis: issue.basis, account: issue.account, payee: issue.payee, columns: issue.columns,dimension:issue.dimension,dimensionValue:issue.dimensionValue }
           const [before, after] = await Promise.all([readReport(db, source, scope), readReport(projected, source, scope)])
           changed ||= figuresDiffer(before, after)
         }

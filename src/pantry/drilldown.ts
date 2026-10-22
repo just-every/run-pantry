@@ -49,7 +49,7 @@ async function scope(db: D1Database, report: string, line: string, from: string,
   throw new Error('unreachable')
 }
 
-export async function figureDetail(db: D1Database, q: { report: string; line: string; from: string; to: string; basis: Basis; account?: string }, startMonth: number) {
+export async function figureDetail(db: D1Database, q: { report: string; line: string; from: string; to: string; basis: Basis; account?: string;dimension?:string;dimensionValue?:string }, startMonth: number) {
   requireThat(q.from <= q.to, 'The end date is on or after the start date')
   if (q.report === 'trial-balance' || q.report === 'general-ledger') return ledgerFigureDetail(db, q)
   const s = await scope(db, q.report, q.line, q.from, q.to, q.basis, startMonth)
