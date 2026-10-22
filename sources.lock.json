@@ -3268,7 +3268,7 @@
       "executable": false
     },
     "src/pantry/dimensions/splits.ts": {
-      "sha256": "42fa52a5335498230541b28cf3d558e11a9e04657bc54417caebea97a7452bb5",
+      "sha256": "cf59ae9cd1f91e2b46c865953d29be3128f93263a47396da8ea3e2fd9168ef06",
       "executable": false
     },
     "src/pantry/discounts.ts": {
@@ -4876,7 +4876,7 @@
       "executable": false
     },
     "tests/api/dimension-splits.mjs": {
-      "sha256": "44622b2b36588c6085a09f5cc8726be148d32ea87b0288cbdb83814ee768b147",
+      "sha256": "a754978a2bfd4fbf2281447995374b87e25415d3562a21822d3408e850934197",
       "executable": false
     },
     "tests/api/dimensions-journey.mjs": {

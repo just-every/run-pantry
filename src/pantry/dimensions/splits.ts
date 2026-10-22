@@ -1,7 +1,7 @@
 // Dimension splits read the existing filtered calculators. They never allocate
 // header totals or recalculate settlements, and retain each figure's public key.
 import { requireThat, type Data } from '../core'
-import { all } from '../db'
+import { all,one } from '../db'
 import { dimensionScope, type DimensionScope } from './scope'
 import { DIMENSIONS, type DimensionKind } from './index'
 import type { Basis } from '../basis'
@@ -53,11 +53,14 @@ export function splitFigures(kind:string,r:Data):SplitFigure[]{
 }
 export type SplitOptions={from:string;to:string;basis:Basis;account?:string;payee?:string}
 export async function reportSplits(db:D1Database,kind:string,dimension:string,options:SplitOptions,read:(scope?:DimensionScope)=>Promise<Data>){
+ const revision=await one(db,'SELECT COUNT(*) AS changes,COALESCE(MAX(rowid),0) AS last FROM pt_audit')
  const scopes=await dimensionScopes(db,dimension),whole=await read(),sections=[]
  for(const scope of scopes){const report=await read(scope);sections.push({scope,report,figures:splitFigures(kind,report)})}
  const figures=splitFigures(kind,whole),byId=new Map(figures.map(f=>[f.id,{...f,values:[] as number[],lines:[] as (string|undefined)[]}]))
  for(const section of sections)for(const f of section.figures)if(!byId.has(f.id))byId.set(f.id,{...f,amount:0,values:[],lines:[]})
  for(const [id,row]of byId)for(const section of sections){const f=section.figures.find(f=>f.id===id);row.values.push(f?.amount??0);row.lines.push(f?.line)}
+ const current=await one(db,'SELECT COUNT(*) AS changes,COALESCE(MAX(rowid),0) AS last FROM pt_audit')
+ requireThat(JSON.stringify(current)===JSON.stringify(revision),'The books changed while splitting this report; run it again',409)
  const basis=whole.basis??options.basis,basisLabel=whole.basisLabel??(kind==='cash-flow'?'Indirect method - accrual starting income':['receivables','payables'].includes(kind)?'Open items - accrual basis':basis==='payment'?'Payment basis':basis==='cash'?'Cash basis':'Accrual basis')
  return {kind,dimension,from:whole.from??options.from,to:whole.to??options.to,basis,basisLabel,sections,whole,rows:[...byId.values()],note:kind==='audit-log'?'Frozen event memberships; a multi-value event appears in each relevant section. Unassigned includes history without recorded coding. Counts are not additive.':'Each column is the complete filtered report. Signed contributions add to the whole; debit/credit sides, original document amounts, ratios, status and filing decisions are not allocated totals.'}
 }

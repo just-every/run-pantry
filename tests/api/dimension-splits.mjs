@@ -59,4 +59,9 @@ export async function dimensionReportSplits(t){
   for(const row of r.rows)assert.equal(row.values.reduce((n,v)=>n+v,0),row.amount)
   assert.equal((await h.send(`/api/pantry/budgets/${budget.id}/splits/export?${query}`,undefined,{cookie:viewer})).status,200)
  }
+ const concurrent=await h.command('journal.save-draft',{date:'2026-10-20',memo:'Concurrent dimension change',lines:[{accountId:acct['4000'],credit:'1',...tags},{accountId:acct['3000'],debit:'1',...tags}]})
+ const [split,posted]=await Promise.all([h.send('/api/pantry/reports/sales-by-customer?from=2026-10-01&to=2026-10-31&basis=accrual&columns=class',undefined,{cookie:viewer}),h.command('journal.post',{id:concurrent.id,revision:concurrent.revision})])
+ assert.ok([200,409].includes(split.status));assert.equal(posted.status,'posted')
+ if(split.status===200)for(const row of split.value.rows)assert.equal(row.values.reduce((n,v)=>n+v,0),row.amount)
+
 }
