@@ -86,7 +86,7 @@ test('CAPTURE-006 vendor matching and creation: a phone photo is kept byte for b
   assert.equal(r.read_account_id, acct['6300'])
   assert.equal(r.vendorProposal.state, 'matched')
   assert.equal(r.vendorProposal.matched.id, vendor.id)
-  assert.deepEqual(r.vendorProposal.defaults, { accountId: acct['6300'], termsDays: 15, is1099: false, className: 'Repairs' })
+  assert.deepEqual(r.vendorProposal.defaults, { accountId: acct['6300'], termsDays: 15, is1099: false, className: 'Repairs',locationName:'',projectName:'' })
   assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM pt_vendor_aliases').first()).n, 0, 'a model reading does not teach an alias')
   const viewer = await h.member('vendor-viewer@example.test', 'viewer')
   const confirmVendor = { id: r.id, revision: r.revision, vendorId: vendor.id, vendorRevision: vendor.revision, confirm: true }

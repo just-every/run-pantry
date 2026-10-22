@@ -1,5 +1,6 @@
 // Vendor credits reduce payables and reverse the original expense or asset.
 // Applying one to a bill settles the balance without recording money movement.
+import { dimensionTags, dimensionValues, dimensionRefusal } from './dimensions'
 import { authority, who } from './access'
 import { cents, date, now, requireThat, text, uid, type Data } from './core'
 import { all, assertOpen, audit, guard, one, periodOpen, q, run, type Sql } from './db'
@@ -28,16 +29,18 @@ export async function prepareVendorCredit(c: Context, b: Data) {
   await assertOpen(c.db, day)
   const account = await one(c.db, 'SELECT * FROM pt_accounts WHERE id = ?', text(b.accountId, 'Original expense or asset account'))
   requireThat(account?.active && ['expense', 'asset'].includes(account.type) && !['bank', 'receivable', 'payable'].includes(account.subtype), 'Choose the original active expense or asset account')
+  const tags=dimensionTags(b),refusal=await dimensionRefusal(c.db,[account.id],tags)
+  requireThat(!refusal,refusal??'Invalid dimensions',409)
   const allocated = await allocations(c.db, 'paid', vendor.id, b.allocations, amount)
   const payable = await controlAccount(c.db, 'payable'), id = uid(), journalId = uid()
   const statements = [authority(c.actor, 'record'), periodOpen(day),
     ...entryStatements({ id: journalId, date: day, memo: `Vendor credit ${reference} — ${vendor.name}`, sourceKind: 'credit', sourceId: id, preparedBy: c.actor.email, preparedKind: c.actor.kind === 'integration' ? 'import' : 'person', lines: [
       { accountId: payable.id, debit: amount, credit: 0, memo: reference, contactId: vendor.id },
-      { accountId: account.id, debit: 0, credit: amount, memo: reference },
+      { ...tags,accountId: account.id, debit: 0, credit: amount, memo: reference },
     ] }, c.actor.email),
-    q('INSERT INTO pt_vendor_credits (id, vendor_id, reference, credit_date, amount_cents, account_id, journal_id, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', id, vendor.id, reference, day, amount, account.id, journalId, c.actor.email, now()),
+    q('INSERT INTO pt_vendor_credits (id, vendor_id, reference, credit_date, amount_cents, account_id, journal_id, created_by, created_at,class_name,location_name,project_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?,?,?)', id, vendor.id, reference, day, amount, account.id, journalId, c.actor.email, now(),...dimensionValues(tags)),
     ...inserts(id, day, c.actor.email, allocated.list), ...allocated.guards,
-    audit(who(c.actor), 'vendor-credit.record', 'vendor-credit', id, { vendor: vendor.name, reference, amount, allocations: allocated.list }),
+    audit(who(c.actor), 'vendor-credit.record', 'vendor-credit', id, { ...tags,vendor: vendor.name, reference, amount, allocations: allocated.list }),
   ]
   return { id, kind: 'vendor-credit', statements }
 }

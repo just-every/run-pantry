@@ -1,17 +1,18 @@
 // Shared vendor review for a receipt or document-to-bill draft. The containing
 // page supplies live contacts and owns refreshing after the deliberate decision.
 import { useState } from 'react'
-import { command, Field, Form, type D } from './kit'
+import { command, Field, Form, useShared, type D } from './kit'
 
 type Props = { r: D; accounts: D[]; vendors: D[]; onChange: () => Promise<void> }
 const options = (accounts: D[]) => accounts.map(a => ({ value: a.id, label: `${a.code} · ${a.name}` }))
 export function ReceiptVendor({ r, accounts, vendors, onChange }: Props) {
+  const {state}=useShared()
   const p = r.vendorProposal
   const [editing, setEditing] = useState(false)
   const [selected, setSelected] = useState<string>(p?.confirmed?.id ?? p?.matched?.id ?? (p?.state === 'new' ? 'new' : ''))
   if (!p) return null
   const selectedVendor = vendors.find(v => v.id === selected) ?? p.candidates.find((v: D) => v.id === selected)
-  const defaults = selectedVendor?.defaults ?? (selectedVendor ? { accountId: selectedVendor.default_account_id, termsDays: selectedVendor.terms_days, is1099: !!selectedVendor.is_1099, className: selectedVendor.default_class } : null)
+  const defaults = selectedVendor?.defaults ?? (selectedVendor ? { accountId: selectedVendor.default_account_id, termsDays: selectedVendor.terms_days, is1099: !!selectedVendor.is_1099, className: selectedVendor.default_class,locationName:selectedVendor.default_location,projectName:selectedVendor.default_project } : null)
   const account = accounts.find(a => a.id === defaults?.accountId)
   const creating = selected === 'new'
   if (p.confirmed && !editing) return <section aria-label="Vendor identity">
@@ -38,7 +39,8 @@ export function ReceiptVendor({ r, accounts, vendors, onChange }: Props) {
         <Field label="Phone read" name="phone" defaultValue={p.proposed.phone} maxLength={60} />
         <Field label="Default account" name="defaultAccountId" options={options(accounts)} defaultValue={r.read_account_id ?? ''} />
         <Field label="Payment terms (days)" name="termsDays" type="number" min={0} max={365} defaultValue="30" />
-        <Field label="Default class" name="defaultClass" maxLength={100} />
+        {!state.dimensions?.settings.classes_enabled&&<Field label="Default class" name="defaultClass" maxLength={100} />}
+        {['class','location','project'].filter(kind=>state.dimensions?.settings[kind==='class'?'classes_enabled':kind==='location'?'locations_enabled':'projects_enabled']).map(kind=><Field key={kind} label={`Default ${kind}`} name={`default${kind[0].toUpperCase()+kind.slice(1)}`} empty="Unassigned" options={state.dimensions.values.filter((v:D)=>v.kind===kind&&v.active).map((v:D)=>({value:v.name,label:v.name}))} />)}
         <Field label="1099 status" name="is1099" defaultValue="false" options={[{ value: 'false', label: 'Not marked for 1099' }, { value: 'true', label: '1099 vendor' }]} />
         {p.proposed.einLast4 && <p className="hint field-wide">EIN ending {p.proposed.einLast4} read from the document. Check it on the original W-9.</p>}
         {p.candidates.length > 0 && <Field label="Why this is a separate vendor" name="newVendorReason" required maxLength={300} wide />}

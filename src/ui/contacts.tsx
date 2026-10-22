@@ -21,6 +21,7 @@ function ContactEditor({ editing, onDone, onCancel }: { editing: D | null; onDon
       <Field label="Name" name="name" defaultValue={editing?.name} required />
       <Field label="Email" name="email" type="email" defaultValue={editing?.email} />
       <Field label="Payment terms (days)" name="termsDays" type="number" defaultValue={editing?.terms_days ?? 30} min={0} max={365} />
+      {kind === 'vendor' && ['class','location','project'].filter(kind=>state.dimensions?.settings[kind==='class'?'classes_enabled':kind==='location'?'locations_enabled':'projects_enabled']).map(kind=><Field key={kind} label={`Default ${kind}`} name={`default${kind[0].toUpperCase()+kind.slice(1)}`} defaultValue={editing?.[`default_${kind}`]??''} empty="Unassigned" options={state.dimensions.values.filter((v:D)=>v.kind===kind&&(v.active||v.name===editing?.[`default_${kind}`])).map((v:D)=>({value:v.name,label:v.name+(v.active?'':' (inactive)')}))} />)}
       {kind === 'customer' && <>
         <Field label="Phone" name="phone" defaultValue={editing?.phone} />
         <Field label="Billing address" name="billingAddress" type="textarea" defaultValue={editing?.billing_address} />

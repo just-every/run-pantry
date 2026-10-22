@@ -1,4 +1,5 @@
 // Recurring bills create drafts; approval and posting still use the bill doors.
+import { dimensionTags, dimensionValues } from './dimensions'
 import { authority, who } from './access'
 import type { Command } from './context'
 import { addDays, date, Fault, now, optionalText, requireThat, text, uid, type Data } from './core'
@@ -25,7 +26,7 @@ const save: Command = { need: 'record', async run(c, b) {
     requireThat(before.revision === b.revision, 'Recurring bill changed; reload', 409)
     requireThat(!before.runs || (before.start_date === start && before.every === every && before.unit === unit), 'Keep a used schedule anchor; create another template to change it', 409)
   }
-  const id = before?.id ?? uid(), revision = uid(), lines = p.lines.map(l => ({ description: l.description, accountId: l.accountId, amount: (l.amount / 100).toFixed(2) }))
+  const id = before?.id ?? uid(), revision = uid(), lines = p.lines.map(l => ({ ...dimensionTags(l),description: l.description, accountId: l.accountId, amount: (l.amount / 100).toFixed(2) }))
   const next = occurrence(start, unit, every, before?.runs ?? 0), nextDate = end && next > end ? null : next
   const name = text(b.name, 'Template name', 60)
   await run(c.db, [authority(c.actor, 'record'), ...(before ? [
@@ -65,7 +66,7 @@ export async function runDueBills(db: D1Database, today: string) {
       try {
         await run(db, [fence, periodOpen(day),
           q("INSERT INTO pt_bills (id,vendor_id,reference,bill_date,due_date,status,memo,total_cents,opening,prepared_by,revision,created_at) VALUES (?,?,?,?,?,'draft',?,?,0,?,?,?)", id, p.vendor.id, p.reference, day, p.dueDate, p.memo, p.total, t.prepared_by, revision, now()),
-          ...p.lines.map((l, index) => q('INSERT INTO pt_bill_lines (id,bill_id,line_no,description,account_id,amount_cents) VALUES (?,?,?,?,?,?)', uid(), id, index + 1, l.description, l.accountId, l.amount)),
+          ...p.lines.map((l, index) => q('INSERT INTO pt_bill_lines (id,bill_id,line_no,description,account_id,amount_cents,class_name,location_name,project_name) VALUES (?,?,?,?,?,?,?,?,?)', uid(), id, index + 1, l.description, l.accountId, l.amount,...dimensionValues(l))),
           q("INSERT INTO pt_recurring_bill_runs VALUES (?,?,?,?,'drafted','Draft awaits normal bill review and posting',?)", t.id, day, t.revision, id, now()), advance, changed(),
           audit(actor, 'bill.draft', 'bill', id, { template: t.id, templateRevision: t.revision, occurrence: day }), audit(actor, 'recurring-bill.run', 'recurring-bill', t.id, { billId: id, occurrence: day })])
       } catch (error) {

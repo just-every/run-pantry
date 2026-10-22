@@ -1,5 +1,5 @@
 import { requireThat, type Data } from '../core'
-import { all } from '../db'
+import { all, one } from '../db'
 import { generalLedger, profitAndLoss } from '../reports'
 import type { Basis } from '../basis'
 import type { StatementColumns } from '../statement-columns'
@@ -21,7 +21,8 @@ export async function dimensionColumns(db:D1Database,kind:DimensionKind,from:str
  return {kind:'profit-and-loss',mode:kind,basis,from,to,columns,rows,totals}
 }
 export async function projectProfit(db:D1Database,name:string,from:string,to:string,basis:Basis){
- requireThat(await all(db,"SELECT id FROM pt_dimensions WHERE kind='project' AND name=? COLLATE NOCASE",name).then(r=>r.length),'Project not found',404)
+ const project=await one(db,"SELECT name FROM pt_dimensions WHERE kind='project' AND name=? COLLATE NOCASE",name)
+ requireThat(project,'Project not found',404);name=project.name
  const r=await dimensionColumns(db,'project',from,to,basis),i=r.columns.findIndex(c=>c.label===name)
  const values=Object.fromEntries(r.totals.map(t=>[t.id,i<0?0:t.values[i]]))
  const time=await all(db,'SELECT t.id,t.work_date,t.minutes,t.invoice_id IS NOT NULL AS invoiced,c.name AS customer,p.name AS project,i.name AS service,CASE WHEN t.invoice_id IS NULL THEN i.rate_cents ELSE 0 END AS rate_cents FROM pt_time_entries t JOIN pt_time_projects p ON p.id=t.project_id JOIN pt_items i ON i.id=t.item_id JOIN pt_contacts c ON c.id=t.customer_id WHERE p.name=? AND t.work_date BETWEEN ? AND ? ORDER BY t.work_date,t.id',name,from,to)

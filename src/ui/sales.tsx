@@ -1,6 +1,7 @@
 // Sales & bills: invoices and credits (sent, viewed, reminded, paid online),
 // recurring invoices, bills with their evidence, payments recorded from outside
 // Pantry, every delivery, and the customers and vendors behind them.
+import { DimensionFormFields } from './dimensions'
 import { useEffect, useState } from 'react'
 import { useLocation } from '@tanstack/react-router'
 import { Action, Card, Chip, command, contactOptions, Details, Field, Form, Loading, Metrics, PageHead, Table, Tabs, accountOptions, day, today, usd, useShared, useView, useWho, type D } from './kit'
@@ -167,6 +168,7 @@ function VendorCredits({ data, reload }: { data: D; reload: () => Promise<void> 
       <Field label="Vendor's credit reference" name="reference" required />
       <Field label="Credit date" name="date" type="date" defaultValue={today()} required />
       <Field label="Credit amount" name="amount" inputMode="decimal" required />
+      <DimensionFormFields label="Vendor credit" />
       <Field label="Original expense or asset account" name="accountId" required options={accountOptions(state.accounts, a => ['expense', 'asset'].includes(a.type) && !['bank', 'receivable', 'payable'].includes(a.subtype))} />
     </Form>}
   </Card>

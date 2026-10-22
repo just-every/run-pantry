@@ -32,9 +32,9 @@ const confirm: Command = { need: 'record', async run(c, b) {
     const profile = await vendorProfile(c.db, { ...b, address: b.address ?? proposal.proposed.address, phone: b.phone ?? proposal.proposed.phone, defaultAccountId: b.defaultAccountId ?? r.read_account_id })
     const terms = b.termsDays === undefined || b.termsDays === '' ? 30 : Number(b.termsDays)
     requireThat(Number.isInteger(terms) && terms >= 0 && terms <= 365, 'Payment terms are 0–365 days')
-    vendor = { id: uid(), name, email, revision: uid(), terms_days: terms, is_1099: profile.is1099, default_account_id: profile.accountId, default_class: profile.className }
-    statements.push(q(`INSERT INTO pt_contacts (id, kind, name, email, terms_days, external_ref, bank_reference, active, revision, address, phone, default_account_id, default_class, is_1099, vendor_ein_hash)
-      VALUES (?, 'vendor', ?, ?, ?, '', '', 1, ?, ?, ?, ?, ?, ?, ?)`, vendor.id, name, email, terms, vendor.revision, profile.address, profile.phone, profile.accountId, profile.className, profile.is1099, profile.einHash || details.einHash || ''),
+    vendor = { id: uid(), name, email, revision: uid(), terms_days: terms, is_1099: profile.is1099, default_account_id: profile.accountId, default_class: profile.className,default_location:profile.locationName,default_project:profile.projectName }
+    statements.push(q(`INSERT INTO pt_contacts (id, kind, name, email, terms_days, external_ref, bank_reference, active, revision, address, phone, default_account_id, default_class, default_location, default_project, is_1099, vendor_ein_hash)
+      VALUES (?, 'vendor', ?, ?, ?, '', '', 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, vendor.id, name, email, terms, vendor.revision, profile.address, profile.phone, profile.accountId, profile.className, profile.locationName, profile.projectName, profile.is1099, profile.einHash || details.einHash || ''),
     audit(who(c.actor), 'contact.create-from-receipt', 'vendor', vendor.id, { receiptId: r.id, name, separateVendorReason: reason || undefined }))
   }
   // Only the observed name is learned. Domain/address/phone evidence never
@@ -42,8 +42,8 @@ const confirm: Command = { need: 'record', async run(c, b) {
   const alias = r.read_vendor || r.vendor || ''
   if (alias && vendorNameKey(alias) !== vendorNameKey(vendor.name)) statements.push(q(`INSERT INTO pt_vendor_aliases (vendor_id, alias_key, alias, confirmed_by, confirmed_at) VALUES (?, ?, ?, ?, ?)
     ON CONFLICT (vendor_id, alias_key) DO NOTHING`, vendor.id, vendorNameKey(alias), alias, c.actor.email, now()))
-  statements.push(q(`UPDATE pt_receipts SET vendor_id = ?, vendor = ?, account_id = ?, vendor_terms_days = ?, vendor_is_1099 = ?, vendor_class = ?, vendor_confirmed_by = ?, vendor_confirmed_at = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'review'`,
-    vendor.id, vendor.name, vendor.default_account_id ?? r.account_id ?? r.read_account_id, vendor.terms_days, vendor.is_1099, vendor.default_class, c.actor.email, now(), uid(), r.id, r.revision), changed(),
+  statements.push(q(`UPDATE pt_receipts SET vendor_id = ?, vendor = ?, account_id = ?, vendor_terms_days = ?, vendor_is_1099 = ?, vendor_class = ?, class_name=CASE WHEN class_name='' THEN ? ELSE class_name END,location_name=CASE WHEN location_name='' THEN ? ELSE location_name END,project_name=CASE WHEN project_name='' THEN ? ELSE project_name END,vendor_confirmed_by = ?, vendor_confirmed_at = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'review'`,
+    vendor.id, vendor.name, vendor.default_account_id ?? r.account_id ?? r.read_account_id, vendor.terms_days, vendor.is_1099, vendor.default_class, vendor.default_class??'',vendor.default_location??'',vendor.default_project??'',c.actor.email, now(), uid(), r.id, r.revision), changed(),
   audit(who(c.actor), 'receipt.vendor-confirm', 'receipt', r.id, { vendorId: vendor.id, created: !b.vendorId, alias: alias || undefined, einLast4: details.einLast4 ?? undefined }))
   await run(c.db, statements)
   const saved = (await one(c.db, 'SELECT * FROM pt_receipts WHERE id = ?', r.id))!

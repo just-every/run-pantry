@@ -105,7 +105,7 @@ async function documents(db: D1Database): Promise<Map<string, Doc>> {
     WHERE v.id IN (SELECT source_id FROM pt_allocations WHERE source_kind = 'credit' AND target_kind = 'bill')`)
   for (const v of vendorCredits) docs.set(v.id, { kind: 'credit', id: v.id, ref: v.reference, journalId: v.journal_id, total: v.amount_cents, contactId: v.vendor_id, contactName: v.contact_name,
     control: { accountId: control.get('payable')!, sign: 1, magnitude: v.amount_cents, role: 'control', description: `${v.contact_name} ${v.reference}`, taxCode: null },
-    parts: [{ accountId: v.account_id, sign: -1, magnitude: v.amount_cents, role: 'expense', description: `Vendor credit ${v.reference}`, taxCode: null }] })
+    parts: [{ class_name:v.class_name,location_name:v.location_name,project_name:v.project_name,accountId: v.account_id, sign: -1, magnitude: v.amount_cents, role: 'expense', description: `Vendor credit ${v.reference}`, taxCode: null }] })
   return docs
 }
 

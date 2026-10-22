@@ -11,7 +11,7 @@ const addressKey = (v: string | null) => vendorNameKey(v).replace(/\b(street|roa
 const PUBLIC_MAIL = new Set(['gmail.com', 'googlemail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'live.com', 'aol.com', 'icloud.com', 'proton.me', 'protonmail.com'])
 const domain = (v: string | null) => { const d = /@([a-z0-9.-]+\.[a-z]{2,})\s*>?$/i.exec(v ?? '')?.[1].toLowerCase() ?? ''; return PUBLIC_MAIL.has(d) ? '' : d }
 export function vendorDefaults(v: Data) {
-  return { accountId: v.default_account_id ?? null, termsDays: v.terms_days, is1099: !!v.is_1099, className: v.default_class ?? '' }
+  return { accountId: v.default_account_id ?? null, termsDays: v.terms_days, is1099: !!v.is_1099, className: v.default_class ?? '',locationName:v.default_location??'',projectName:v.default_project??'' }
 }
 function publicVendor(v: Data) { return { id: v.id, name: v.name, email: v.email, address: v.address, phone: v.phone, revision: v.revision, defaults: vendorDefaults(v) } }
 
@@ -45,6 +45,6 @@ export async function receiptVendorProposal(db: D1Database, r: Data) {
     matched, confirmed: confirmed ? publicVendor(confirmed) : null, candidates,
     // Any full EIN was discarded on intake. A person can inspect the original W-9.
     proposed: { name, email: details.email ?? '', address: details.address ?? '', phone: details.phone ?? '', einLast4: details.einLast4 ?? null },
-    defaults: confirmed ? { accountId: r.account_id ?? confirmed.default_account_id ?? null, termsDays: r.vendor_terms_days ?? confirmed.terms_days, is1099: r.vendor_is_1099 === null || r.vendor_is_1099 === undefined ? !!confirmed.is_1099 : !!r.vendor_is_1099, className: r.vendor_class ?? confirmed.default_class ?? '' } : matched?.defaults ?? null,
+    defaults: confirmed ? { accountId: r.account_id ?? confirmed.default_account_id ?? null, termsDays: r.vendor_terms_days ?? confirmed.terms_days, is1099: r.vendor_is_1099 === null || r.vendor_is_1099 === undefined ? !!confirmed.is_1099 : !!r.vendor_is_1099, className: r.class_name||r.vendor_class||confirmed.default_class||'',locationName:r.location_name||confirmed.default_location||'',projectName:r.project_name||confirmed.default_project||'' } : matched?.defaults ?? null,
   }
 }

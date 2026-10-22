@@ -37,3 +37,9 @@ export function DimensionSettings() {
   </details>
  </Card>
 }
+
+export function DimensionFormFields({label,defaults={}}:{label:string;defaults?:D}) {
+ const {state}=useShared(),d=state.dimensions
+ if(!d)return null
+ return <>{KINDS.filter(([, ,flag])=>d.settings[flag]).map(([kind])=><Field key={kind} label={`${label} ${kind}`} name={`${kind}Name`} defaultValue={defaults[`${kind}Name`]??defaults[`${kind}_name`]??''} empty="Unassigned" options={d.values.filter((v:D)=>v.kind===kind&&(v.active||v.name===(defaults[`${kind}Name`]??defaults[`${kind}_name`]))).map((v:D)=>({value:v.name,label:v.name+(v.active?'':' (inactive)')}))} />)}</>
+}

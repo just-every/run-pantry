@@ -1,6 +1,7 @@
 // Accountant review: move posted lines between accounts in bulk by linked
 // correcting entries, write off small open balances in bulk, see every change since your last review with who made
 // it, and read the review notes left on entries.
+import { DimensionFormFields } from './dimensions'
 import { useState } from 'react'
 import { Action, Card, command, day, Field, Form, Loading, Table, accountOptions, today, usd, useShared, useView, type D } from './kit'
 
@@ -48,6 +49,7 @@ function WriteOff({ limit, onDone }: { limit: number; onDone: () => Promise<void
     </Table>
     {items.length > 0 && <Form label={`Write off ${items.length} balance${items.length === 1 ? '' : 's'}`} submit={b => command('write-off.bulk', { ...b, kind, ceiling })} onDone={async r => { setDone(r); await v.reload(); await onDone() }} className="grid-form">
       <Field label="Write-off account" name="accountId" required options={accountOptions(state.accounts, a => a.subtype === 'other' && ['income', 'expense'].includes(a.type))} />
+      <DimensionFormFields label="Write-off" />
       <Field label="Write-off date" name="date" type="date" defaultValue={today()} required />
     </Form>}
   </Card>

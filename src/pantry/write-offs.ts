@@ -6,6 +6,7 @@
 // nexus watch leave them out. Each item's balance is capped by the owner's
 // write-off limit ($100 until the owner sets one); the whole selection posts
 // in one batch, each item guarded against a payment landing meanwhile.
+import { dimensionTags, dimensionValues, dimensionRefusal } from './dimensions'
 import { authority, who } from './access'
 import { cents, date, list, now, requireThat, text, uid, type Data } from './core'
 import { all, approval, assertOpen, audit, guard, one, periodOpen, q, run, type Sql } from './db'
@@ -43,6 +44,8 @@ const writeOff: Command = { need: 'post', async run(c, b) {
   requireThat(ceiling <= limit, `The owner's write-off limit is $${(limit / 100).toFixed(2)} per item; a larger write-off needs approval under INVOICE-008, which Pantry does not have yet`, 403)
   const account = await one(c.db, "SELECT * FROM pt_accounts WHERE id = ? AND active = 1 AND subtype = 'other' AND type IN ('income', 'expense')", text(b.accountId, 'Write-off account'))
   requireThat(account, 'Write off to an active ordinary income or expense account, such as bad debts')
+  const tags=dimensionTags(b),refusal=await dimensionRefusal(c.db,[account.id],tags)
+  requireThat(!refusal,refusal??'Invalid write-off dimensions',409)
   await assertOpen(c.db, day)
   let items = await smallBalances(c.db, kind, ceiling)
   if (b.ids !== undefined) {
@@ -65,24 +68,24 @@ const writeOff: Command = { need: 'post', async run(c, b) {
       statements.push(
         q("INSERT INTO pt_invoices (id, kind, number, customer_id, destination_state, issue_date, due_date, status, memo, credit_for, subtotal_cents, tax_cents, total_cents, opening, prepared_by, approved_by, approved_revision, revision, created_at, write_off) VALUES (?, 'credit', ?, ?, ?, ?, ?, 'approved', ?, ?, ?, 0, ?, 0, ?, ?, ?, ?, ?, 1)",
           id, number, item.contact_id, item.destination_state ?? '', day, day, memo, item.id, item.open, item.open, c.actor.email, c.actor.email, revision, revision, now()),
-        q("INSERT INTO pt_invoice_lines (id, invoice_id, line_no, description, quantity_milli, unit_cents, amount_cents, account_id, tax_code, tax_cents, chosen_tax_code) VALUES (?, ?, 1, ?, 1000, ?, ?, ?, 'exempt', 0, 'exempt')",
-          uid(), id, memo, item.open, item.open, account.id),
+        q("INSERT INTO pt_invoice_lines (id, invoice_id, line_no, description, quantity_milli, unit_cents, amount_cents, account_id, tax_code, tax_cents, chosen_tax_code,class_name,location_name,project_name) VALUES (?, ?, 1, ?, 1000, ?, ?, ?, 'exempt', 0, 'exempt',?,?,?)",
+          uid(), id, memo, item.open, item.open, account.id,...dimensionValues(tags)),
         approval(who(c.actor), 'credit', id, revision, 'write-off', 'approved'))
       const issued = await issueStatements(c.db, { id, kind: 'credit', number, customer_id: item.contact_id, customer_name: item.name, issue_date: day, total_cents: item.open, credit_for: item.id, revision,
-        lines: [{ account_id: account.id, amount_cents: item.open, description: memo, tax_code: 'exempt', tax_cents: 0 }] }, who(c.actor))
+        lines: [{ ...tags,account_id: account.id, amount_cents: item.open, description: memo, tax_code: 'exempt', tax_cents: 0 }] }, who(c.actor))
       statements.push(...issued.statements)
     } else {
       const id = uid(), journalId = uid()
       statements.push(
         ...entryStatements({ id: journalId, date: day, memo, sourceKind: 'credit', sourceId: id, preparedBy: c.actor.email, preparedKind: 'person', lines: [
           { accountId: payable!.id, debit: item.open, credit: 0, memo, contactId: item.contact_id },
-          { accountId: account.id, debit: 0, credit: item.open, memo },
+          { ...tags,accountId: account.id, debit: 0, credit: item.open, memo },
         ] }, c.actor.email),
-        q('INSERT INTO pt_vendor_credits (id, vendor_id, reference, credit_date, amount_cents, account_id, journal_id, created_by, created_at, write_off) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)', id, item.contact_id, `Write-off ${item.reference} ${batch.slice(0, 8)}`, day, item.open, account.id, journalId, c.actor.email, now()),
+        q('INSERT INTO pt_vendor_credits (id, vendor_id, reference, credit_date, amount_cents, account_id, journal_id, created_by, created_at, write_off,class_name,location_name,project_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1,?,?,?)', id, item.contact_id, `Write-off ${item.reference} ${batch.slice(0, 8)}`, day, item.open, account.id, journalId, c.actor.email, now(),...dimensionValues(tags)),
         q("INSERT INTO pt_allocations (id, source_kind, source_id, target_kind, target_id, amount_cents, allocation_date, created_by, created_at) VALUES (?, 'credit', ?, 'bill', ?, ?, ?, ?, ?)", uid(), id, item.id, item.open, day, c.actor.email, now()))
     }
   }
-  statements.push(audit(who(c.actor), 'write-off.bulk', kind, batch, { account: `${account.code} ${account.name}`, ceiling, limit, date: day, count: items.length, total: items.reduce((t, i) => t + i.open, 0), items: items.map(i => ({ id: i.id, reference: i.reference, amount: i.open })) }))
+  statements.push(audit(who(c.actor), 'write-off.bulk', kind, batch, { ...tags,account: `${account.code} ${account.name}`, ceiling, limit, date: day, count: items.length, total: items.reduce((t, i) => t + i.open, 0), items: items.map(i => ({ id: i.id, reference: i.reference, amount: i.open })) }))
   await run(c.db, statements)
   return { batch, kind, account: { code: account.code, name: account.name }, items: items.map(i => ({ id: i.id, reference: i.reference, name: i.name, amount: i.open })) }
 } }

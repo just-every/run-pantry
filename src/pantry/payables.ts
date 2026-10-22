@@ -1,4 +1,4 @@
-import { dimensionTags, dimensionValues } from './dimensions'
+import { dimensionRefusal, dimensionsView, dimensionTags, dimensionValues } from './dimensions'
 // Payables and recorded money movement. Bills post expense against payables;
 // payments record money that moved outside Pantry and allocate it to open items.
 import { nativeApprovalAuthority } from './access-policy/approvals'
@@ -37,6 +37,8 @@ export async function parseBill(db: D1Database, b: Data) {
     requireThat(a && a.active && !['receivable', 'payable', 'bank'].includes(a.subtype), `Line ${i + 1}: choose an active expense or asset account`)
     return { ...dimensionTags({...l,className:l.className??b.className}), description: text(l.description, `Line ${i + 1} description`, 500), accountId: a.id, amount: cents(l.amount, `Line ${i + 1} amount`) }
   })
+  const catalogue=await dimensionsView(db)
+  for(const line of lines){const refusal=await dimensionRefusal(db,[line.accountId],line,catalogue);requireThat(!refusal,refusal??'Invalid dimensions',409)}
   return { vendor, billDate, dueDate, lines, total: lines.reduce((s, l) => s + l.amount, 0), reference: text(b.reference, "Vendor's invoice number", 80), memo: optionalText(b.memo, 'Memo', 1000), className: optionalText(b.className, 'Class', 100) }
 }
 
