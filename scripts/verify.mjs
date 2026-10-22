@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const sequence = ['build', 'typecheck', 'test:typecheck', 'test:pantry', 'test:site', 'test:runtime', 'test:app']
 const pnpm = name => ['pnpm', ['run', name]]
-export const shards = ['source', 'api-1', 'api-2', 'api-3', 'app-1', 'app-2', 'app-3']
+export const shards = ['source', 'api-1', 'api-2', 'api-3', 'app-1', 'app-2', 'app-3', 'app-4']
 
 export function verificationPlan(shard = process.env.VERIFY_SHARD ?? 'all') {
   // Keep the complete local command and its order. CI partitions only test files;
@@ -14,13 +14,18 @@ export function verificationPlan(shard = process.env.VERIFY_SHARD ?? 'all') {
   if (shard === 'all') return sequence.map(pnpm)
   // Called through rer verify so its hosted-output and hydration checks still run.
   if (shard === 'source') return sequence.filter(name => !['test:pantry', 'test:app'].includes(name)).map(pnpm)
+  // The spreadsheet browser journey takes about seven minutes on Actions.
+  // Give it its own job; leaving it in the sequential app.test.mjs worker
+  // brought app-1 to the 15-minute job limit. No assertions are omitted.
+  const spreadsheet = '^MIGRATE-007 '
+  if (shard === 'app-4') return [pnpm('build'), [process.execPath, ['--test', `--test-name-pattern=${spreadsheet}`, 'tests/app/app.test.mjs']]]
   const match = /^(api|app)-([1-3])$/.exec(shard)
   if (!match) throw new Error(`Unknown VERIFY_SHARD ${JSON.stringify(shard)}; choose ${shards.join(', ')}, or all`)
   const [, group, index] = match
   const files = readdirSync(resolve(root, 'tests', group)).filter(name => name.endsWith('.test.mjs')).sort()
     .filter((_, position) => position % 3 === Number(index) - 1).map(name => `tests/${group}/${name}`)
   if (!files.length) throw new Error(`Verification shard ${shard} has no test files`)
-  const test = [process.execPath, ['--test', ...(group === 'api' ? ['--test-concurrency=1'] : []), ...files]]
+  const test = [process.execPath, ['--test', ...(group === 'api' ? ['--test-concurrency=1'] : [`--test-skip-pattern=${spreadsheet}`]), ...files]]
   // Browser journeys exercise the real emitted Worker and assets, built in this job.
   return group === 'app' ? [pnpm('build'), test] : [test]
 }
