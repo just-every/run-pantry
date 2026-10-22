@@ -1,6 +1,6 @@
 import { runtimeBindings } from '../../auth.server'
 import { operatorMail } from '../../mail.server.mjs'
-import { authority, ownerEmail, who } from '../access'
+import { authority, ownerEmail, pantry, who } from '../access'
 import { bankAuthority } from '../access-policy/banks'
 import { customerRecipients } from '../customer-profile'
 import { now, requireThat, sha256, text, uid, type Data } from '../core'
@@ -47,4 +47,25 @@ export async function sendEstimate(c:Context,b:Data) {
     await run(c.db,[q('UPDATE pt_estimate_deliveries SET status=?,detail=? WHERE id=?',status,detail,d.id),audit(who(c.actor),'estimate.delivery','estimate',row.id,{revision:row.revision,deliveryId:d.id,status})])
   }
   return estimate(c.db,row.id)
+}
+
+// Called only by the acceptance that reserved these deliveries atomically.
+// An uncertain provider result is recorded and never replayed by the public link.
+export async function confirmAcceptance(env:Context['env'],db:D1Database,row:Data,document:Data,deliveries:Data[]) {
+  const mailer=operatorMail(runtimeBindings(env)) as unknown as {send(message:Data):Promise<Data>}|undefined
+  const settings=await sendingSettings(db),link=`${runtimeBindings(env).AUTH_ORIGIN}/e/${row.link_token}/estimate.pdf`
+  for(const d of deliveries){
+    let status='failed',detail='mail_provider_unavailable'
+    if(mailer){
+      status='uncertain';detail='transport_failure'
+      try{
+        const result=await mailer.send({deliveryId:d.id,from:env.MAIL_FROM,to:[d.recipient],replyTo:settings.reply_to||await ownerEmail(db,env),
+          subject:`Accepted estimate ${row.number} from ${document.business}`,
+          text:`${row.accepted_name} electronically signed estimate ${row.number}, revision ${row.accepted_revision}, at ${row.accepted_at}. Download the accepted estimate PDF: ${link}`})
+        status=result.status==='development'?'suppressed':String(result.status);detail=String(result.code??'')
+      }catch(error){if((error as Error).name==='MailValidationError'){status='failed';detail=String((error as Data).code??'message_refused')}}
+    }
+    await run(db,[q('UPDATE pt_estimate_deliveries SET status=?,detail=? WHERE id=?',status,detail,d.id),
+      audit(pantry('customer'),'estimate.acceptance-delivery','estimate',row.id,{revision:row.accepted_revision,deliveryId:d.id,status})])
+  }
 }

@@ -27,6 +27,8 @@ export async function estimatesForRestore(context, origin, siblings) {
   assert.equal(invoice.open_cents, 20000)
   const preview = await (await context.request.get(`${origin}/api/pantry/estimates/${estimate.id}/preview`)).json()
   const pdf = Buffer.from(await (await context.request.get(`${origin}/api/pantry/estimates/${estimate.id}/pdf`)).body())
+  const acceptedPdf=Buffer.from(await (await context.request.get(`${origin}/api/pantry/estimates/${estimate.id}/accepted.pdf`)).body())
+  for(const fact of ['Casey Archive',accepted.acceptance.at,estimate.revision]) assert.ok(acceptedPdf.toString().includes(fact))
   const external = []
   if (siblings) {
     const { signedEstimate, acceptedProposal } = await import('../siblings/harness.mjs')
@@ -40,7 +42,7 @@ export async function estimatesForRestore(context, origin, siblings) {
       external.push({ link: attached.link, ...(attached.link.document_href ? { pdf: Buffer.from(await (await context.request.get(origin + attached.link.document_href)).body()) } : {}) })
     }
   }
-  return { peerIP, estimateId: estimate.id, depositId: deposit.id, invoiceId: invoice.id, link, document: preview.document, sha256: preview.sha256, pdf, external }
+  return { acceptedPdf, acceptedSha256:accepted.accepted_pdf_sha256, peerIP, estimateId: estimate.id, depositId: deposit.id, invoiceId: invoice.id, link, document: preview.document, sha256: preview.sha256, pdf, external }
 }
 
 export async function assertEstimatesRestored(context, origin, expected) {
@@ -62,6 +64,8 @@ export async function assertEstimatesRestored(context, origin, expected) {
   const estimate = await get(`estimates/${expected.estimateId}`)
   assert.equal(estimate.acceptance.name, 'Casey Archive'); assert.equal(estimate.acceptance.ip, expected.peerIP)
   assert.equal(estimate.public_path, null)
+  assert.equal(estimate.accepted_pdf_sha256,expected.acceptedSha256)
+  assert.deepEqual(Buffer.from(await (await context.request.get(`${origin}/api/pantry/estimates/${expected.estimateId}/accepted.pdf`)).body()),expected.acceptedPdf)
   assert.equal(estimate.billed_cents, 30000); assert.equal(estimate.remaining_cents, 90000)
   assert.equal(estimate.conversions[0].invoice_id, expected.invoiceId)
   const preview = await get(`estimates/${expected.estimateId}/preview`)

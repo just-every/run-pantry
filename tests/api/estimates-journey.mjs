@@ -10,7 +10,7 @@ export async function estimatesJourney(h){
  const body={customerId:customer.id,issueDate:day,dueDate:due,lines:[{description:'Design project',quantity:'1',rate:'12000.00',accountId:acct['4000'],taxCode:'exempt'}]}
  const accept=async(est,name='Alex Customer')=>{
   const sent=await h.command('estimate.send',{id:est.id,revision:est.revision}),path=sent.public_path
-  const page=await h.send(path);assert.equal(page.status,200);assert.match(page.value,/Accept estimate/)
+  const page=await h.send(path);assert.equal(page.status,200);assert.match(page.value,new RegExp(`Typing your name and selecting Accept estimate signs revision ${est.revision} of this estimate electronically`))
   const pdf=await h.send(path+'/estimate.pdf'),privatePdf=await h.send(`/api/pantry/estimates/${est.id}/pdf`,undefined,{cookie:h.owner})
   assert.equal(pdf.status,200);assert.equal(pdf.value,privatePdf.value)
   const email=h.mail.findLast(m=>m.subject.includes(sent.number)),bytes=Buffer.from(email.attachments[0].content,'base64')
@@ -19,7 +19,24 @@ export async function estimatesJourney(h){
   assert.equal(createHash('sha256').update(bytes).digest('hex'),sent.pdf_sha256)
   const accepted=await h.send(path+'/accept',undefined,{raw:new URLSearchParams({name,revision:est.revision}).toString(),headers:{'content-type':'application/x-www-form-urlencoded','cf-connecting-ip':'192.0.2.45'}})
   assert.equal(accepted.status,200,JSON.stringify(accepted.value));assert.match(accepted.value,/Accepted by Alex Customer/)
-  return h.view(`estimates/${est.id}`)
+  const result=await h.view(`estimates/${est.id}`)
+  const stamped=await h.send(path+'/estimate.pdf'),privateAccepted=await h.send(`/api/pantry/estimates/${est.id}/accepted.pdf`,undefined,{cookie:h.owner})
+  assert.equal(stamped.status,200);assert.equal(stamped.value,privateAccepted.value)
+  for(const fact of [name,result.acceptance.at,est.revision])assert.ok(stamped.value.includes(fact),`accepted PDF contains ${fact}`)
+  assert.doesNotMatch(stamped.value,/192\.0\.2\.45/)
+  assert.notEqual(stamped.value,pdf.value,'original sent copy remains separate')
+  assert.equal((await h.send(`/api/pantry/estimates/${est.id}/pdf`,undefined,{cookie:h.owner})).value,pdf.value)
+  const bytesAccepted=Buffer.from(await (await fetch(h.origin+path+'/estimate.pdf')).arrayBuffer())
+  assert.equal(createHash('sha256').update(bytesAccepted).digest('hex'),result.accepted_pdf_sha256)
+  const confirmation=h.mail.findLast(m=>m.subject.startsWith('Accepted estimate '+sent.number))
+  assert.deepEqual(confirmation.to,[customer.email]);assert.ok(confirmation.text.includes(path+'/estimate.pdf'))
+  assert.equal(result.deliveries.filter(d=>d.kind==='acceptance').length,1)
+  assert.equal(result.deliveries.find(d=>d.kind==='acceptance').attachment_sha256,result.accepted_pdf_sha256)
+  const count=h.mail.length
+  assert.equal((await h.send(path+'/accept',undefined,{raw:new URLSearchParams({name,revision:est.revision}).toString(),headers:{'content-type':'application/x-www-form-urlencoded','cf-connecting-ip':'192.0.2.45'}})).status,200)
+  assert.equal(h.mail.length,count,'repeated acceptance never sends another confirmation')
+  assert.equal((await h.view(`estimates/${est.id}`)).accepted_pdf_sha256,result.accepted_pdf_sha256)
+  return result
  }
  const estimate=await accept(await h.command('estimate.save-draft',body))
  assert.deepEqual([estimate.acceptance.name,estimate.acceptance.ip,estimate.acceptance.revision],['Alex Customer','192.0.2.45',estimate.revision])
@@ -77,7 +94,7 @@ export async function estimateInheritedJourney(h,x){
  assert.deepEqual((await h.view('estimates',sales)).deposits,[])
  for(const role of ['time-only','payables-clerk']){
   const restricted=await h.member(`synthetic-pantry-${role}@example.test`,role,{canPost:true})
-  for(const door of ['estimates',`estimates/${estimate.id}`,`estimates/${estimate.id}/preview`,`estimates/${estimate.id}/pdf`,'customer-deposits'])await h.view(door,restricted,403)
+  for(const door of ['estimates',`estimates/${estimate.id}`,`estimates/${estimate.id}/preview`,`estimates/${estimate.id}/pdf`,`estimates/${estimate.id}/accepted.pdf`,'customer-deposits'])await h.view(door,restricted,403)
   await h.command('estimate.save-draft',body,restricted,403)
   await h.command('estimate.send',{id:estimate.id,revision:estimate.revision},restricted,403)
   await h.command('estimate.convert',{id:estimate.id,revision:estimate.revision,requestId:crypto.randomUUID(),issueDate:day,mode:'balance'},restricted,403)
@@ -93,6 +110,12 @@ export async function estimateInheritedJourney(h,x){
  assert.equal((await h.send('/api/pantry/estimates')).status,401)
  let revised=await h.command('estimate.save-draft',{...body,lines:[{...body.lines[0],rate:'10.00'}]})
  revised=await h.command('estimate.send',{id:revised.id,revision:revised.revision})
+ const noPeer=await h.send(revised.public_path+'/accept',undefined,{...form(revised.revision),headers:{...form(revised.revision).headers,'cf-connecting-ip':''}})
+ assert.equal(noPeer.status,409)
+ const untouched=await h.view(`estimates/${revised.id}`)
+ assert.equal(untouched.status,'sent');assert.equal(untouched.acceptance,null);assert.equal(untouched.accepted_pdf_sha256,null)
+ assert.equal(untouched.deliveries.filter(d=>d.kind==='acceptance').length,0)
+ assert.equal((await h.send(`/api/pantry/estimates/${revised.id}/accepted.pdf`,undefined,{cookie:h.owner})).status,404)
  const oldPath=revised.public_path,oldRevision=revised.revision
  await h.command('estimate.link-revoke',{id:revised.id,revision:revised.revision},bookkeeper,403)
  revised=await h.command('estimate.save-draft',{...revised.input,id:revised.id,revision:revised.revision,memo:'Revised scope'})
@@ -221,6 +244,7 @@ export async function estimateErasureJourney(h){
  const expired=await h.command('retention.erase',{ids:[item.key],revision:state.revision,confirm:'ERASE'})
  assert.equal(expired.erased[0].sha256,e.pdf_sha256)
  assert.equal((await h.send(`/api/pantry/estimates/${e.id}/pdf`,undefined,{cookie:h.owner})).status,410)
+ assert.equal((await h.send(`/api/pantry/estimates/${e.id}/accepted.pdf`,undefined,{cookie:h.owner})).status,410)
  assert.deepEqual(await h.view('reports/trial-balance?to=2026-12-31&basis=accrual'),before)
  // A sent estimate without a transaction has no retention claim; erasure
  // removes its dependents and the customer without a dangling foreign key.

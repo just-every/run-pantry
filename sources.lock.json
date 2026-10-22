@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "9fb7eafe033abc71f3006b062295fa34487c488b7a3e8b807b703fbbf5d88953",
+      "sha256": "f6520fb8bde88fb0466125943f564d0da8571b6521673fc43d69e220a401f9e2",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "0e80126c51d7e1b50d8762f5a2aa72eb4baab412a9f8df1c79ab742849372f8d",
+      "sha256": "6b69b780a6fdf3dc0b00089437253e5b0468471c56a456445fcccb661a34e5cf",
       "executable": false
     },
     "DEMO.md": {
@@ -689,6 +689,10 @@
     },
     "migrations/core/0082_sibling_retention.sql": {
       "sha256": "79cfc0d2c26b3a7b9ce52c7a5ef06b1d2e81845c7f5b3810c7ac50302810d3f0",
+      "executable": false
+    },
+    "migrations/core/0083_estimate_acceptance.sql": {
+      "sha256": "0bb4a954fc6fed1873c799b2cd0d2b0a7690e24964739d324d63219868bb3d4c",
       "executable": false
     },
     "migrations/rewrites.json": {
@@ -3264,7 +3268,7 @@
       "executable": false
     },
     "src/pantry/erasure/retention.ts": {
-      "sha256": "6937c699e392871ac19ef19b26d1513ac308c60d9c4ed489a37ea1740e59b9cc",
+      "sha256": "d9cbbc927786c3f321440f3d226a25dad4820e66e59f6de1b80d33d2d08b96e2",
       "executable": false
     },
     "src/pantry/erasure/time.ts": {
@@ -3284,15 +3288,15 @@
       "executable": false
     },
     "src/pantry/estimates/customer-page.ts": {
-      "sha256": "47de7d3ffa03e2418aedf8cdab660593ff921107069cce4ec1b51b90aee5f8b3",
+      "sha256": "649196539cdf2f51ad683d75f061855b799caadfca6af5c1797584219e1546dc",
       "executable": false
     },
     "src/pantry/estimates/delivery.ts": {
-      "sha256": "2e7ba847a89f5c1402df66c72c346e082a905d86968a813bdb72ad148543f1a6",
+      "sha256": "0947caa649b80bd1b5c05fc0bf49da65113ba70eb07bf784dc800c478186e1e0",
       "executable": false
     },
     "src/pantry/estimates/documents.ts": {
-      "sha256": "a2b0a095189141f09cb3e333c05f7193732e6446cb50bb3bba40c542fde0a9cf",
+      "sha256": "868d6fa8bae62870a40ddefae1fad8d5b4a633108e853478452a43da1adb6b61",
       "executable": false
     },
     "src/pantry/estimates/erasure.ts": {
@@ -3308,7 +3312,7 @@
       "executable": false
     },
     "src/pantry/estimates/routes.ts": {
-      "sha256": "bb3a85c94e223d77792584503ab098b1afec930f612ad90c81ed3d16e829ac51",
+      "sha256": "85ffd59e0728269cbcfc3f9dc4344409cd2114a610779987925522fe0dae8dcd",
       "executable": false
     },
     "src/pantry/estimates/siblings/commands.ts": {
@@ -3348,7 +3352,7 @@
       "executable": false
     },
     "src/pantry/estimates/store.ts": {
-      "sha256": "be510df8ae03fb2656fbd373c0f31be662c15dda7a6fc54b1b55623bd42f5002",
+      "sha256": "a2f7ac9f8bad3c70b174797ad5253291131001eaa3d2171044f82d8763c92471",
       "executable": false
     },
     "src/pantry/exemption-reminders.ts": {
@@ -3456,7 +3460,7 @@
       "executable": false
     },
     "src/pantry/integrations/resources/estimates.ts": {
-      "sha256": "47b7a1d585839264517ffa5abcb1a073282c2ddf97ae6b6358e424468f3ef055",
+      "sha256": "46f627b635ec9d4a37fdd3d05fbf9c6dd5006d398e724417c5a1c422b206c8b2",
       "executable": false
     },
     "src/pantry/integrations/resources/index.ts": {
@@ -4448,7 +4452,7 @@
       "executable": false
     },
     "src/ui/estimates.tsx": {
-      "sha256": "4692cbb6c358aab576a1edc7e2340f98ba65594a2a081a3b0665c402f5b10853",
+      "sha256": "988dda8a04bbda4fed48e4da4444ab438a14afb0b9fef49a941512d9844f8e4c",
       "executable": false
     },
     "src/ui/exemption-certificates.tsx": {
@@ -4748,7 +4752,7 @@
       "executable": false
     },
     "tests/api/estimates-journey.mjs": {
-      "sha256": "44d7c2ff1a142da04960be44ca32617218109982b70105dffb64c599a6a73d6a",
+      "sha256": "f1741509f27669f7e7e8a59d7eb59f9db1ea88eb05c740285c119f22904b10e5",
       "executable": false
     },
     "tests/api/feeds.test.mjs": {
@@ -4920,7 +4924,7 @@
       "executable": false
     },
     "tests/app/estimates-journey.mjs": {
-      "sha256": "c5fc119d0cf6dbb16ed5095729b288b3cf851f8f110d3206002c54a5734a8b6d",
+      "sha256": "e063fb0cbd88a8cee4f1649984ab6980f560076c0b27994fb867b6b580c0c9bb",
       "executable": false
     },
     "tests/app/feed-history.test.mjs": {
@@ -5016,7 +5020,7 @@
       "executable": false
     },
     "tests/restore/estimates.mjs": {
-      "sha256": "ca3b07af82d4f74daa887d1e17269aa9d003c3acbe3d78b5c4163e99fb970fd8",
+      "sha256": "a8c15ad78c167f343cf63ee1f51503409e109190d019a17bf6c301de675cdd54",
       "executable": false
     },
     "tests/restore/restore.test.mjs": {

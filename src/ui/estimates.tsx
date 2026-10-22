@@ -28,12 +28,13 @@ function EstimatePanel({ estimate: e, deposits, onEdit, onChange }: { estimate: 
       <dl className="summary"><div><dt>Estimate total</dt><dd>{usd(e.total_cents)}</dd></div><div><dt>Previously billed</dt><dd>{usd(e.billed_cents)}</dd></div><div><dt>Remaining to invoice</dt><dd>{usd(e.remaining_cents)}</dd></div></dl>
       <p><strong>Advance deposit held:</strong> {state.actor.role === 'sales' ? 'Financial access required' : usd(held)}</p>
       {e.acceptance && <div className="callout" role="status"><strong>Accepted by {e.acceptance.name}</strong><span><time dateTime={e.acceptance.at}>{new Date(e.acceptance.at).toLocaleString()}</time> · IP {e.acceptance.ip}</span><span style={{ overflowWrap: 'anywhere' }}>Accepted revision: {e.acceptance.revision}</span></div>}
+      {e.accepted_pdf_sha256 && <p><a href={`/api/pantry/estimates/${e.id}/accepted.pdf`} target="_blank" rel="noreferrer">Download accepted estimate PDF</a></p>}
       {e.public_path && <p><a href={e.public_path} target="_blank" rel="noreferrer">Open the customer's acceptance page</a></p>}
       <div className="row-actions">
         {e.status !== 'accepted' && state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit estimate</button>}
         {e.public_path && state.actor.can.owner && <Action tone="danger" run={async () => { await command('estimate.link-revoke', { id: e.id, revision: e.revision }); await onChange() }}>Revoke acceptance link</Action>}
       </div>
-      <Details facts={{ revision: e.revision, 'prepared by': who(e.prepared_by), sent: e.sent_at, 'PDF SHA-256': e.pdf_sha256 }} code={['revision', 'PDF SHA-256']} />
+      <Details facts={{ revision: e.revision, 'prepared by': who(e.prepared_by), sent: e.sent_at, 'PDF SHA-256': e.pdf_sha256, 'accepted PDF SHA-256': e.accepted_pdf_sha256 }} code={['revision', 'PDF SHA-256', 'accepted PDF SHA-256']} />
     </Card></div>
     <EstimateProgress key={e.id + e.revision + e.billed_cents} estimate={e} deposits={deposits} onDone={onChange} />
     <EstimateSiblings estimate={e} onChange={onChange} />

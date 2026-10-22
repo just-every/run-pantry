@@ -1,5 +1,6 @@
 import { siblingEdge, siblingBrowser } from './estimate-siblings.mjs'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
 import { chromium, expect } from '@playwright/test'
 import { providerWorker } from './provider-worker.mjs'
@@ -63,6 +64,8 @@ export async function estimatesJourney(t) {
     const customerPage = await customerContext.newPage()
     await customerPage.goto(`${origin}${publicPath}`)
     await expect(customerPage.getByLabel('Your name', { exact: true })).toBeVisible()
+    await expect(customerPage.getByText(`Typing your name and selecting Accept estimate signs revision ${estimate.revision} of this estimate electronically. Your name, time and IP address are kept as evidence.`, { exact: true })).toBeVisible()
+    assert.equal(await customerPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `intent wording fits ${width}`)
     await customerPage.screenshot({ path: `${evidence}/estimate-customer-${width}.png`, fullPage: true })
     const publicPdf = await customerContext.request.get(`${origin}${publicPath}/estimate.pdf`)
     assert.equal(publicPdf.status(), 200); assert.deepEqual(await publicPdf.body(), await sentPdf.body())
@@ -74,6 +77,18 @@ export async function estimatesJourney(t) {
     assert.equal(accepted.status(), 200, await accepted.text())
     await expect(customerPage.getByRole('status').filter({ hasText: 'Accepted by Casey Cedar' })).toBeVisible()
     await customerPage.screenshot({ path: `${evidence}/estimate-accepted-${width}.png`, fullPage: true })
+    const acceptedEstimate = await view(`estimates/${estimate.id}`)
+    const acceptedPdf = await customerContext.request.get(`${origin}${publicPath}/estimate.pdf`)
+    const acceptedBytes = await acceptedPdf.body()
+    for (const fact of ['Casey Cedar', acceptedEstimate.acceptance.at, estimate.revision]) assert.ok(acceptedBytes.toString().includes(fact))
+    assert.equal(createHash('sha256').update(acceptedBytes).digest('hex'), acceptedEstimate.accepted_pdf_sha256)
+    assert.doesNotMatch(acceptedBytes.toString(), /127\.0\.0\.1/)
+    const confirmation = mail.findLast(m => m.subject.startsWith('Accepted estimate '+estimate.number))
+    assert.deepEqual(confirmation.to, [customer.email]); assert.ok(confirmation.text.includes(publicPath+'/estimate.pdf'))
+    await page.goto(`${origin}/app/sales?tab=estimates&estimate=${estimate.id}`)
+    await expect(page.getByRole('link', { name: 'Download accepted estimate PDF', exact: true })).toBeVisible()
+    assert.deepEqual(await (await owner.request.get(`${origin}/api/pantry/estimates/${estimate.id}/accepted.pdf`)).body(), acceptedBytes)
+    await shot('accepted-copy')
     await siblingBrowser(page, origin, estimate, customer, await sentPdf.body(), width, evidence, sibling)
 
     await page.goto(`${origin}/app/sales?tab=deposits`)

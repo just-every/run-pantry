@@ -3,10 +3,12 @@ import type { Bindings } from '../../auth.server'
 import { runtimeBindings } from '../../auth.server'
 import type { Context } from '../context'
 import { pantry } from '../access'
-import { now, requireThat, text } from '../core'
-import { audit, changed, q, run } from '../db'
-import { base64Bytes } from '../invoice-logo'
-import { estimatePreview, publicEstimate } from './documents'
+import { now, requireThat, sha256, text, uid } from '../core'
+import { all, audit, changed, q, run } from '../db'
+import { invoicePdf } from '../invoice-pdf'
+import { confirmAcceptance } from './delivery'
+import { base64Bytes, bytesBase64 } from '../invoice-logo'
+import { acceptedEstimatePdf, estimatePreview, publicEstimate } from './documents'
 import { estimateCustomerPage } from './customer-page'
 
 async function acceptanceBody(request:Request){
@@ -33,17 +35,21 @@ export function registerEstimateRoutes(api:Hono<{Bindings:Bindings}>,reader:(c:a
   const ctx=await reader(c),p=await estimatePreview(ctx.db,c.req.param('id'),c.req.query('templateId'))
   return new Response(p.pdf,{headers:{'content-type':'application/pdf','cache-control':'no-store','content-disposition':'inline; filename="estimate.pdf"','content-security-policy':"default-src 'none'; sandbox"}})
  })
+ api.get('/api/pantry/estimates/:id/accepted.pdf',async c=>{
+  const ctx=await reader(c),pdf=await acceptedEstimatePdf(ctx.db,c.req.param('id'))
+  return new Response(pdf,{headers:{'content-type':'application/pdf','cache-control':'no-store','content-disposition':'inline; filename="accepted-estimate.pdf"','content-security-policy':"default-src 'none'; sandbox"}})
+ })
  api.get('/e/:token',c=>customerPage(c.env.DB,c.req.param('token')))
  api.get('/e/:token/estimate.pdf',async c=>{
   const {saved}=await publicEstimate(c.env.DB,c.req.param('token'))
-  return new Response(base64Bytes(saved.pdf_base64),{headers:{'content-type':'application/pdf','cache-control':'no-store','content-disposition':'inline; filename="estimate.pdf"','content-security-policy':"default-src 'none'; sandbox"}})
+  return new Response(base64Bytes(saved.accepted_pdf_base64??saved.pdf_base64),{headers:{'content-type':'application/pdf','cache-control':'no-store','content-disposition':'inline; filename="estimate.pdf"','content-security-policy':"default-src 'none'; sandbox"}})
  })
  api.post('/e/:token/accept',async c=>{
   requireThat(c.req.header('origin')===runtimeBindings(c.env).AUTH_ORIGIN&&c.req.header('sec-fetch-site')!=='cross-site','Invalid origin',403)
   requireThat(Number(c.req.header('content-length')??0)<=4096,'Request too large',413)
   const encoded=await acceptanceBody(c.req.raw)
   requireThat((c.req.header('content-type')??'').startsWith('application/x-www-form-urlencoded'),'Send the acceptance form',400)
-  const token=c.req.param('token'),{row}=await publicEstimate(c.env.DB,token),body=Object.fromEntries(new URLSearchParams(encoded))
+  const token=c.req.param('token'),{row,saved,document}=await publicEstimate(c.env.DB,token),body=Object.fromEntries(new URLSearchParams(encoded))
   const name=text(body.name,'Your name',200),revision=text(body.revision,'Estimate revision',100)
   requireThat(row.revision===revision,'This estimate changed; reload before accepting',409)
   if(row.status==='accepted'){requireThat(row.accepted_revision===revision&&row.accepted_name===name,'This estimate already has an acceptance',409);return customerPage(c.env.DB,token)}
@@ -52,7 +58,15 @@ export function registerEstimateRoutes(api:Hono<{Bindings:Bindings}>,reader:(c:a
   const ip=c.req.header('cf-connecting-ip'),at=now()
   requireThat(ip,'The platform did not supply a trusted customer IP address; acceptance cannot be recorded',409)
   requireThat(ip.length<=64,'Invalid peer address',400)
-  await run(c.env.DB,[q("UPDATE pt_estimates SET status='accepted',accepted_name=?,accepted_at=?,accepted_ip=?,accepted_revision=? WHERE id=? AND revision=? AND link_token=? AND status='sent' AND erased_at IS NULL",name,at,ip,revision,row.id,revision,token),changed(),audit(pantry('customer'),'estimate.accept','estimate',row.id,{revision,acceptedAt:at})])
+  const acceptedDocument={...document,facts:[...document.facts,['Accepted by',name],['Accepted at (UTC)',at],['Accepted revision',revision]]}
+  const pdf=invoicePdf(acceptedDocument as typeof document),hash=await sha256(pdf)
+  const recipients=await all(c.env.DB,"SELECT DISTINCT recipient FROM pt_estimate_deliveries WHERE estimate_id=? AND revision=? AND kind='estimate'",row.id,revision)
+  const deliveries=recipients.map(r=>({id:uid(),recipient:r.recipient}))
+  await run(c.env.DB,[q("UPDATE pt_estimates SET status='accepted',accepted_name=?,accepted_at=?,accepted_ip=?,accepted_revision=? WHERE id=? AND revision=? AND link_token=? AND status='sent' AND erased_at IS NULL",name,at,ip,revision,row.id,revision,token),changed(),
+    q('UPDATE pt_estimate_documents SET accepted_document=?,accepted_pdf_base64=?,accepted_sha256=?,accepted_at=? WHERE estimate_id=? AND revision=? AND sha256=? AND accepted_sha256 IS NULL AND erased_at IS NULL',JSON.stringify(acceptedDocument),bytesBase64(pdf),hash,at,row.id,revision,saved.sha256),changed(),
+    ...deliveries.map(d=>q("INSERT INTO pt_estimate_deliveries(id,estimate_id,revision,recipient,status,at,attachment_sha256,kind)VALUES(?,?,?,?,'sending',?,?,'acceptance')",d.id,row.id,revision,d.recipient,at,hash)),
+    audit(pantry('customer'),'estimate.accept','estimate',row.id,{revision,acceptedAt:at,acceptedPdfSha256:hash})])
+  await confirmAcceptance(c.env,c.env.DB,{...row,accepted_name:name,accepted_at:at,accepted_revision:revision},document,deliveries)
   return customerPage(c.env.DB,token)
  })
 }
