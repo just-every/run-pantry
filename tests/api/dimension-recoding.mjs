@@ -35,7 +35,7 @@ export async function dimensionRecoding(t){
  assert.deepEqual([ar.itemsTotal,ap.itemsTotal],[5000,3000])
  const laterPayment=await h.command('payment.record',{direction:'received',contactId:customer.id,date:'2026-10-05',amount:'50',bankAccountId:bank.id,allocations:[{targetId:invoice.id,amount:'50'}]})
  const paid=await h.view('reports/profit-and-loss?from=2026-10-01&to=2026-10-31&basis=cash&dimension=class&dimensionValue=value:Support');assert.equal(paid.totalIncome,5000)
- const correction=attempts.find(r=>r.status===200).value.reclassified[0]
+ const correction=attempts.find(r=>r.status===200).value.reclassified.find(r=>r.original_line_id===sourceLines[0].id)
  await h.command('journal.reverse',{id:correction.correcting_entry_id,date:'2026-10-20',memo:'Wrong path'},h.owner,409)
  const dest=(await h.view('journal')).entries.find(e=>e.id===correction.correcting_entry_id).lines.find(l=>l.line_no===1)
  await h.command('journal.reclassify',{lineIds:[dest.id],dimensionKind:'location',toDimensionName:'Remote'})
