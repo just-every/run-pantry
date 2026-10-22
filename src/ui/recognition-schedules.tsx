@@ -25,6 +25,7 @@ function ScheduleEditor({ schedule: s, sources, to, cancel, onDone }: { schedule
       ...(kind !== 'accrual' ? { sourceJournalId: source?.journal_id } : {}),
     })} onDone={onDone} secondary={<button type="button" className="btn btn-secondary" onClick={cancel}>Cancel</button>}>
       <div className="grid-form">
+        <p className="hint field-wide">For a funded schedule, leaving all coding blank inherits the original funding line.</p>
         <DimensionFormFields label="Recognition" defaults={s??{}} />
         <Field label="Schedule name" name="name" defaultValue={s?.name} required />
         <Field label="Schedule type" name="kind" value={kind} onChange={(e: any) => { setKind(e.target.value); setBalance(''); setRecognition(''); setSourceLine(''); setPlan('monthly') }} required options={Object.entries(KINDS).map(([value, label]) => ({ value, label }))} />
@@ -63,6 +64,7 @@ function ScheduleDetail({ schedule: s, asOf, businessToday, edit, refresh }: { s
     <p>{KINDS[s.kind as Kind]} · {usd(s.amount_cents)}{s.kind === 'accrual' ? ' per month' : ' total'} · {s.months === null ? 'Milestone recognition' : `${s.months} month${s.months === 1 ? '' : 's'}`}.</p>
     <p>Balance-sheet account: {account(s.balance_account_id)}. Recognition account: {account(s.recognition_account_id)}.</p>
     <p>Remaining balance at {day(asOf)}: <strong>{usd(s.remaining_cents)}</strong>. Posted schedule balance: {usd(s.posted_remaining_cents)}.</p>
+    <p>Line coding: {['class','location','project'].map(k=>`${k} · ${s[k+'_name']||'Unassigned'}`).join('; ')}.</p>
     <p>Prepared by {who(s.prepared_by)}; {approved ? `this revision approved by ${who(s.approved_by)}` : 'this revision needs approval'}.</p>
     {s.source_journal_id && <p><a href={journalLink(s.source_journal_id)}>Original posted funding journal</a> · {day(s.source_date)}</p>}
     {mayApprove && <p><Action tone="primary" run={async () => { await command('recognition.approve', { id: s.id, revision: s.revision }); await refresh() }}>{approved ? 'Renew schedule approval' : 'Approve this schedule revision'}</Action></p>}
