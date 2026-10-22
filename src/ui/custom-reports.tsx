@@ -19,7 +19,7 @@ export function CustomReportPreview({ report }: { report: D }) {
     return unit === 'money' ? usd(amount) : unit === 'percent' ? `${amount.toFixed(2)}%` : `${amount.toFixed(2)} ratio`
   }
   return <><Card title={<>{report.name} <Chip tone="info">{report.basisLabel}</Chip></>}>
-    <p>{report.range}{!customReportsOnly(state.actor) && <> · <a href={`/app/reports?${new URLSearchParams({ report: report.source, from: report.from, to: report.to, basis: report.basis })}`}>Open source report</a></>}</p>
+    <p>{report.range}{!customReportsOnly(state.actor) && <> · <a href={`/app/reports?${new URLSearchParams({ report: report.source, from: report.from, to: report.to, basis: report.basis, ...report.sourceQuery })}`}>Open source report</a></>}</p>
     <Table heads={report.columns.map((c: D) => c.label)} figures={report.columns.map((c: D, i: number) => c.unit === 'text' ? -1 : i).filter((i: number) => i >= 0)}>
       {report.rows.map((r: D) => r.kind === 'note' ? <tr key={r.id}><td colSpan={report.columns.length}>{r.text}</td></tr> : <tr key={r.id} className={r.kind === 'section' || r.kind === 'formula' ? 'total' : ''}>{report.columns.map((c: D) => <td key={c.id} className={c.unit === 'text' ? '' : 'fig'}>{c.unit === 'text' ? value(r, c) : <button className="btn btn-link" type="button" aria-label={`Open ${r.name} ${c.label}`} onClick={() => setFigure(`custom-reports/${encodeURIComponent(report.id)}/figures?${new URLSearchParams({ row: r.id, column: c.id })}`)}>{value(r, c)}</button>}</td>)}</tr>)}
     </Table>

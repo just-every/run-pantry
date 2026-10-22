@@ -1,3 +1,4 @@
+import type { DimensionScope } from '../dimensions/scope'
 // Sales by item (ITEM-001, REPORT-004): income grouped by the item each
 // invoice or credit line was sold as, on the accrual or cash basis. Income that
 // carries no item (lines typed without one, direct postings) stays visible as
@@ -23,10 +24,10 @@ export async function itemGrouping(db: D1Database) {
   }
 }
 
-export async function salesByItem(db: D1Database, from: string, to: string, basis: Basis) {
+export async function salesByItem(db: D1Database, from: string, to: string, basis: Basis, dimension?: DimensionScope) {
   const grouping = await itemGrouping(db)
   const groups = new Map<string, { id: string; name: string; sku: string | null; amount: number }>()
-  const ledger = await generalLedger(db, from, to, undefined, basis)
+  const ledger = await generalLedger(db, from, to, undefined, basis, dimension)
   for (const account of ledger.accounts.filter(a => a.type === 'income')) for (const line of account.rows) {
     const id = grouping.of(line), it = grouping.item(id)
     const group = groups.get(id) ?? { id, name: it ? it.name : 'No item (other income)', sku: it?.sku ?? null, amount: 0 }
@@ -34,5 +35,5 @@ export async function salesByItem(db: D1Database, from: string, to: string, basi
     groups.set(id, group)
   }
   const rows = [...groups.values()].filter(r => r.amount !== 0).sort((a, b) => a.id === 'unassigned' ? 1 : b.id === 'unassigned' ? -1 : a.name.localeCompare(b.name))
-  return { basis, from, to, rows, total: rows.reduce((sum, r) => sum + r.amount, 0) }
+  return { basis, from, to, ...(dimension ? { dimension } : {}), rows, total: rows.reduce((sum, r) => sum + r.amount, 0) }
 }

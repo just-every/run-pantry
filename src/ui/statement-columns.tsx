@@ -15,14 +15,14 @@ export type ColumnStatement = {
 }
 
 export function columnMode(value: string | undefined, kind: string): ColumnMode {
-  return COLUMN_MODES.find(([id]) => id === value && (!['customer','class','location','project'].includes(id) || kind === 'profit-and-loss'))?.[0] ?? 'single'
+  return COLUMN_MODES.find(([id]) => id === value && (id !== 'customer' || kind === 'profit-and-loss'))?.[0] ?? 'single'
 }
 
 export function ColumnPicker({ mode, kind, onChange }: { mode: ColumnMode; kind: string; onChange: (mode: ColumnMode) => void }) {
   const {state}=useShared(),enabled:Record<string,string>={class:'classes_enabled',location:'locations_enabled',project:'projects_enabled'}
   return <div className="field inline"><label htmlFor="r-columns">Columns</label>
     <select id="r-columns" value={mode} onChange={e => onChange(e.target.value as ColumnMode)}>
-      {COLUMN_MODES.filter(([id])=>!enabled[id]||state.dimensions?.settings[enabled[id]]).filter(([id]) => !['customer','class','location','project'].includes(id) || kind === 'profit-and-loss').map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+      {COLUMN_MODES.filter(([id])=>!enabled[id]||state.dimensions?.settings[enabled[id]]).filter(([id]) => id !== 'customer' || kind === 'profit-and-loss').map(([id, label]) => <option key={id} value={id}>{label}</option>)}
     </select>
   </div>
 }

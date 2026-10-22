@@ -1,3 +1,4 @@
+import type { DimensionScope } from './dimensions/scope'
 // Income and costs grouped by the counterparty carried by the posted line or
 // its source document. Unassigned postings stay visible so totals tie to P&L.
 import { generalLedger } from './reports'
@@ -19,10 +20,10 @@ export async function contactGrouping(db: D1Database, kind: 'customer' | 'vendor
   }
 }
 
-export async function contactTotals(db: D1Database, kind: 'customer' | 'vendor', from: string, to: string, basis: Basis) {
+export async function contactTotals(db: D1Database, kind: 'customer' | 'vendor', from: string, to: string, basis: Basis, dimension?: DimensionScope) {
   const grouping = await contactGrouping(db, kind)
   const groups = new Map<string, { id: string; name: string; amount: number }>()
-  const ledger = await generalLedger(db, from, to, undefined, basis)
+  const ledger = await generalLedger(db, from, to, undefined, basis, dimension)
   for (const account of ledger.accounts.filter(a => a.type === (kind === 'customer' ? 'income' : 'expense'))) {
     for (const line of account.rows) {
       const id = grouping.of(line)
@@ -32,5 +33,5 @@ export async function contactTotals(db: D1Database, kind: 'customer' | 'vendor',
     }
   }
   const rows = [...groups.values()].filter(r => r.amount !== 0).sort((a, b) => a.name.localeCompare(b.name))
-  return { basis, from, to, kind, rows, total: rows.reduce((sum, r) => sum + r.amount, 0) }
+  return { basis, from, to, ...(dimension ? { dimension } : {}), kind, rows, total: rows.reduce((sum, r) => sum + r.amount, 0) }
 }

@@ -79,7 +79,7 @@ export async function dimensionsJourney(t) {
  }
  await h.view('reports/general-ledger?from=2026-09-01&to=2026-09-30&dimension=unknown&dimensionValue=unassigned',h.owner,400)
  await h.view('reports/general-ledger?from=2026-09-01&to=2026-09-30&dimension=class&dimensionValue=value:Unknown',h.owner,404)
- await h.view('reports/profit-and-loss?from=2026-09-01&to=2026-09-30&dimension=class&dimensionValue=value:Studio',h.owner,409)
+ await statementDimensions(h,acct,reader)
  const issuedScope=(await h.view('activity')).audit.filter(a=>a.action==='report.issued').map(a=>JSON.parse(a.detail)).filter(a=>['general-ledger','trial-balance'].includes(a.report))
  assert.ok(issuedScope.every(i=>i.dimension&&i.dimensionValue),'issued copies freeze the dimension filter')
  const service=await h.command('item.save',{kind:'service',name:'Design hours',rate:'100',accountId:acct['4000'],taxCategory:'non-taxable'})
@@ -131,7 +131,119 @@ export async function dimensionsJourney(t) {
  assert.equal(reversed.lines[0].class_name,'Support')
  assert.equal((await h.view(`reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=accrual&columns=class`)).totals.find(r=>r.id==='expenses').values.at(-1),40000)
  assert.equal(posted.lines.find(l=>l.account_id===acct['6200']).class_name,'Studio','deactivation does not rewrite posted evidence')
- const activity=(await h.view('activity')).audit
- for(const action of ['dimensions.settings','dimension.save','dimension.required'])assert.ok(activity.some(a=>a.action===action))
+ for(const [action,kind] of [['dimensions.settings','dimension-settings'],['dimension.save','dimension'],['dimension.required','account']])assert.ok((await h.view('activity?kind='+kind)).audit.some(a=>a.action===action))
  return {h,acct,tags,invoice,bill,customer,vendor,bank}
+}
+
+// All statement variants use the selected line coding, including opening and
+// calculated earnings, and carry it through native/scoped reads and evidence.
+async function statementDimensions(h,acct,reader) {
+ const credential=await h.command('integration.create',{name:'synthetic-pantry-34',scopes:['reports:read']})
+ const before=(await h.view('journal')).entries
+ for(const basis of ['accrual','cash']) for(const report of ['profit-and-loss','balance-sheet']) {
+  const base={from:'2026-09-01',to:'2026-09-30',basis}
+  for(const kind of ['class','location','project']) {
+   const columns=await h.view(`reports/${report}?`+new URLSearchParams({...base,columns:kind}),reader)
+   for(const row of [...columns.rows,...columns.totals]) {
+    assert.equal(row.values.slice(0,-1).reduce((a,n)=>a+n,0),row.values.at(-1),`${report} ${basis} ${kind} columns tie`)
+    for(const [i,c] of columns.columns.entries()) {
+     const q={...base,report,line:row.id,columns:kind,column:c.id}
+     const d=await h.view('reports/detail?'+new URLSearchParams(q),reader)
+     assert.equal(d.ties,true,JSON.stringify(q));assert.equal(d.figure,row.values[i])
+     if(c.id!=='total') assert.ok(d.rows.every(r=>(r[`${kind}_name`]||'')===(c.id==='unassigned'?'':c.id.slice(6))))
+    }
+   }
+   const filters=columns.columns.filter(c=>c.id!=='total')
+   for(const c of filters) {
+    const filter={dimension:kind,dimensionValue:c.id}
+    const single=await h.view(`reports/${report}?`+new URLSearchParams({...base,...filter}),reader)
+    const total=report==='profit-and-loss'?single.netIncome:single.totalLiabilities+single.totalEquity
+    assert.equal(total,columns.totals.find(r=>r.id===(report==='profit-and-loss'?'net-income':'liabilities-and-equity')).values[columns.columns.indexOf(c)])
+    for(const mode of ['prior-period','prior-year','months','quarters','ytd',...(report==='profit-and-loss'?['customer']:[])]) {
+     const params=new URLSearchParams({...base,...filter,columns:mode})
+     const r=await h.view(`reports/${report}?`+params,reader)
+     for(const row of r.totals) for(const [i,column] of r.columns.entries()) {
+      if(['months','quarters'].includes(mode)&&i!==0&&!(column.from<='2026-09-30'&&column.to>='2026-09-01'))continue
+      const d=await h.view('reports/detail?'+new URLSearchParams({...Object.fromEntries(params),report,line:row.id,column:column.id}),reader)
+      assert.equal(d.ties,true,`${report}/${mode}/${row.id}/${column.id}`);assert.equal(d.figure,row.values[i])
+     }
+     // Scope persists through an integration credential without a session.
+     if(c===filters[0]) {
+      const scoped=await h.send(`/api/pantry/integration/v1/reports/${report}?${params}`,undefined,{headers:{authorization:`Bearer ${credential.token}`}})
+      assert.equal(scoped.status,200);assert.deepEqual(scoped.value,r)
+     }
+    }
+    for(const mode of ['single','prior-period']) for(const format of ['csv','pdf','xlsx']) {
+     const exported=await h.send(`/api/pantry/reports/${report}/export?`+new URLSearchParams({...base,...filter,columns:mode,format}),undefined,{cookie:reader})
+     assert.equal(exported.status,200);if(format==='csv')assert.ok(exported.value.includes(`${kind} · ${c.label}`),'download identifies the filter')
+    }
+   }
+   const splitExport=await h.send(`/api/pantry/reports/${report}/export?`+new URLSearchParams({...base,columns:kind,format:'csv'}),undefined,{cookie:reader})
+   assert.equal(splitExport.status,200);assert.ok(splitExport.value.includes('Unassigned'))
+  }
+ }
+ for(const [line,figure] of [['bridge:accrual',80000],['bridge:recorded',-80000],['bridge:settled',40000],['bridge:cash',40000]]) {
+  const d=await h.view('reports/detail?'+new URLSearchParams({report:'profit-and-loss',line,from:'2026-09-01',to:'2026-09-30',basis:'cash',dimension:'class',dimensionValue:'value:Studio'}),reader)
+  assert.equal(d.figure,figure);assert.equal(d.ties,true)
+ }
+ await h.view('reports/balance-sheet?to=2026-09-30&columns=class&dimension=class&dimensionValue=unassigned',h.owner,400)
+ await groupedAndCustomDimensions(h,acct,reader)
+ assert.deepEqual((await h.view('journal')).entries,before,'dimension statements and exports never alter posted books')
+}
+
+async function groupedAndCustomDimensions(h,acct,reader) {
+ const from='2026-09-01',to='2026-09-30'
+ for(const basis of ['cash','accrual']) {
+  const base={from,to,basis},filter={dimension:'class',dimensionValue:'value:Studio'}
+  for(const report of ['sales-by-customer','expenses-by-vendor','sales-by-item','transactions','journal']) {
+   const unsplit=await h.view(`reports/${report}?`+new URLSearchParams(base),reader)
+   const pieces=[]
+   for(const name of ['Studio','Support','']) {
+    const q={...base,dimension:'class',dimensionValue:name?'value:'+name:'unassigned'}
+    const r=await h.view(`reports/${report}?`+new URLSearchParams(q),reader);pieces.push(r)
+    const figures=['transactions','journal'].includes(report)?[...r.rows.flatMap(row=>r.moneyColumns.map(i=>[JSON.stringify([row.id,String(i)]),row.cells[i]])),...r.totals.map((t,i)=>[JSON.stringify(['total',String(i)]),t.amount])]:[...r.rows.map(row=>[row.id,row.amount]),['total',r.total]]
+    for(const [line,amount] of figures) {
+     const d=await h.view('reports/detail?'+new URLSearchParams({...q,report,line}),reader)
+     assert.equal(d.figure,amount);assert.equal(d.ties,true);assert.ok(d.rows.every(row=>(row.class_name||'')===name))
+    }
+    for(const format of ['csv','pdf','xlsx']) {
+     const r=await h.send(`/api/pantry/reports/${report}/export?`+new URLSearchParams({...q,format}),undefined,{cookie:reader})
+     assert.equal(r.status,200);if(format==='csv')assert.ok(r.value.includes('class · '+(name||'Unassigned')))
+    }
+   }
+   if(['transactions','journal'].includes(report))for(const [i,total] of unsplit.totals.entries())assert.equal(pieces.reduce((n,p)=>n+p.totals[i].amount,0),total.amount)
+   else assert.equal(pieces.reduce((n,p)=>n+p.total,0),unsplit.total)
+  }
+  const definition={name:'synthetic-pantry-34 '+basis,source:'profit-and-loss',...base,filters:filter,layout:[{id:'income',kind:'section',label:'Income',accountTypes:['income']},{id:'expense',kind:'section',label:'Expense',accountTypes:['expense']},{id:'net',kind:'formula',label:'Project margin',expression:'row("income") - row("expense")',unit:'money'}]}
+  const saved=await h.command('custom-report.save',{definition,sharedRoles:['viewer']})
+  const native=await h.view('reports/profit-and-loss?'+new URLSearchParams({...base,...filter}),reader)
+  const rendered=await h.view(`custom-reports/${saved.id}/render`,reader)
+  assert.equal(rendered.report.rows.find(r=>r.id==='net').values.amount,native.netIncome)
+  const pending=[`custom-reports/${saved.id}/figures?row=net&column=amount`]
+  while(pending.length) {
+   const d=await h.view(pending.pop(),reader)
+   assert.deepEqual(d.context.filters,filter)
+   if(d.rows){assert.equal(d.ties,true);assert.ok(d.rows.every(r=>r.class_name==='Studio'))}
+   for(const o of d.operands)pending.push(o.href.replace('/api/pantry/',''))
+  }
+  const split=await h.command('custom-report.save',{definition:{...definition,name:'Split '+basis,filters:{},comparison:'class',allColumns:true},sharedRoles:['viewer']})
+  const matrix=(await h.view(`custom-reports/${split.id}/render`,reader)).report
+  const nativeMatrix=await h.view('reports/profit-and-loss?'+new URLSearchParams({...base,columns:'class'}),reader)
+  const net=matrix.rows.find(r=>r.id==='net')
+  for(const [i,c] of nativeMatrix.columns.entries()) {
+   assert.equal(net.values[c.id],nativeMatrix.totals.find(r=>r.id==='net-income').values[i])
+   const root=await h.view(`custom-reports/${split.id}/figures?row=net&column=${encodeURIComponent(c.id)}`,reader)
+   for(const o of root.operands) {
+    const d=await h.view(o.href.replace('/api/pantry/',''),reader)
+    assert.equal(d.ties,true);if(c.id!=='total')assert.ok(d.rows.every(r=>(r.class_name||'')===(c.id==='unassigned'?'':c.id.slice(6))))
+   }
+  }
+  const pkg=await h.command('management-package.save',{name:'Dimension board '+basis,reportIds:[saved.id,split.id],sharedRoles:['viewer']})
+  const packageRender=await h.view(`management-packages/${pkg.id}/render`,reader)
+  assert.equal(packageRender.reports[0].report.rows.find(r=>r.id==='net').values.amount,native.netIncome)
+  for(const kind of ['custom-reports','management-packages'])for(const format of ['json','csv','pdf','xlsx']) {
+   const r=await h.send(`/api/pantry/${kind}/${kind==='custom-reports'?saved.id:pkg.id}/export.${format}`,undefined,{cookie:reader})
+   assert.equal(r.status,200);if(format==='csv')assert.ok(r.value.includes('Dimension filter: class · Studio'))
+  }
+ }
 }

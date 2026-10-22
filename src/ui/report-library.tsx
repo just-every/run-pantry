@@ -28,11 +28,12 @@ export function libraryBasisLabel(slug: string, basis: 'cash' | 'accrual') {
   return 'Open items · accrual basis'
 }
 
-export function libraryQuery(slug: string, from: string, to: string, basis: 'cash' | 'accrual', account?: string, payee?: string) {
+export function libraryQuery(slug: string, from: string, to: string, basis: 'cash' | 'accrual', account?: string, payee?: string, dimension?: string, dimensionValue?: string) {
   const query = new URLSearchParams({ from, to, basis })
   if (hasLibraryFilters(slug)) {
     if (account) query.set('account', account)
     if (payee) query.set('payee', payee)
+    if (dimension) { query.set('dimension',dimension); query.set('dimensionValue',dimensionValue??'') }
   }
   return query.toString()
 }
@@ -46,7 +47,7 @@ type LibraryReport = {
 /** The library shares one table contract; record links retain the complete report address. */
 export function ReportLibrary({ slug, from, to, basis }: { slug: string; from: string; to: string; basis: 'cash' | 'accrual' }) {
   const search = useSearch({ from: '/app/reports' })
-  const { data: report, error } = useView<LibraryReport>(`reports/${slug}?${libraryQuery(slug, from, to, basis, search.account, search.payee)}`)
+  const { data: report, error } = useView<LibraryReport>(`reports/${slug}?${libraryQuery(slug, from, to, basis, search.account, search.payee, search.dimension, search.dimensionValue)}`)
   if (!report) return <Loading error={error} what="the report" />
   // Money cells and totals open to the lines, payments, open items or statement behind them.
   const drill = slug !== 'audit-log'

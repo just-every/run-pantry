@@ -1,3 +1,4 @@
+import type { DimensionScope } from '../dimensions/scope'
 // Everyday report variants share the seed's posted ledger and native evidence.
 import { addDays, requireThat, type Data } from '../core'
 import { all } from '../db'
@@ -15,11 +16,12 @@ export async function contractorPayments(db: D1Database, from: string, to: strin
     .map(p => ({ ...p, group: `${p.contact_id}:${p.year}`, class: ['check', 'ach', 'wire', 'cash'].includes(p.method) ? 'counted' : ['card', 'payment-network'].includes(p.method) ? 'excluded' : 'unknown' }))
 }
 
-export async function libraryReport(db: D1Database, kind: string, from: string, to: string, basis: Basis, account?: string, payee?: string): Promise<LibraryReport> {
+export async function libraryReport(db: D1Database, kind: string, from: string, to: string, basis: Basis, account?: string, payee?: string, dimension?: DimensionScope): Promise<LibraryReport> {
   requireThat(isLibrary(kind), 'Unknown library report', 404)
+  requireThat(!dimension || ['transactions','journal'].includes(kind), 'This library report does not yet support a dimension filter', 409)
   requireThat(from <= to, 'The end date is on or after the start date')
   let data: Partial<LibraryReport>
-  if (['transactions', 'journal'].includes(kind)) data = await ledgerActivity(db, kind, from, to, basis, account, payee)
+  if (['transactions', 'journal'].includes(kind)) data = await ledgerActivity(db, kind, from, to, basis, account, payee, dimension)
   else if (kind === 'deposits' || kind === 'check-detail') data = await paymentActivity(db, kind, from, to)
   else if (kind === 'reconciliations') {
     const statements = await all(db, 'SELECT id FROM pt_statements WHERE end_date BETWEEN ? AND ? ORDER BY end_date,id', from, to)
@@ -47,5 +49,5 @@ export async function libraryReport(db: D1Database, kind: string, from: string, 
       columns: ['Tax year', 'Vendor', '1099-NEC eligible methods', 'Card/network excluded', 'Method not recorded'], moneyColumns: [2, 3, 4],
       rows: [...grouped].map(([id, r]) => ({ id, cells: [r.year, r.name, r.counted, r.excluded, r.unknown] })), totals: [{ label: 'Eligible-method payments', amount: payments.filter(p => p.class === 'counted').reduce((n, p) => n + p.amount_cents, 0) }] }
   } else data = await openItems(db, kind, from, to)
-  return { kind, title: LIBRARY[kind], from, to, basis: 'accrual', basisLabel: 'Open items - accrual basis', ...data } as LibraryReport
+  return { kind, title: LIBRARY[kind] + (dimension ? ` · ${dimension.label}` : ''), from, to, basis: 'accrual', basisLabel: 'Open items - accrual basis', ...data } as LibraryReport
 }

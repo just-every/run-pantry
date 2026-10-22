@@ -112,6 +112,57 @@ export async function dimensionsBrowser(t){
    await link.click();await expect(page.getByText('Adds up to the report figure',{exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:new RegExp(`class · Studio ${width}`)})).toBeVisible()
    await shot('filtered-'+report+'-sources')
   }
+  // Statement filters and balance-sheet columns share their source/export scope.
+  for(const basis of ['cash','accrual']) {
+   for(const report of ['profit-and-loss','balance-sheet']) {
+    const params=new URLSearchParams({report,from:'2026-09-01',to:'2026-09-30',basis,dimension:'class',dimensionValue:`value:Studio ${width}`})
+    await page.goto(origin+'/app/reports?'+params)
+    await expect(page.getByLabel('Dimension filter',{exact:true})).toHaveValue(JSON.stringify(['class',`value:Studio ${width}`]))
+    await page.getByLabel('Columns',{exact:true}).selectOption('prior-period')
+    const title=report==='profit-and-loss'?'Profit and loss':'Balance sheet'
+    await expect(page.getByRole('table',{name:`${title} · prior-period · ${basis} basis`,exact:true})).toBeVisible()
+    await shot(`${report}-${basis}-filtered-comparison`)
+    for(const format of ['PDF','CSV','Excel']) {
+     const href=await page.getByRole('link',{name:`Download ${format} · ${basis}`,exact:true}).getAttribute('href')
+     const url=new URL(href,origin);assert.equal(url.searchParams.get('dimensionValue'),`value:Studio ${width}`)
+     const r=await owner.request.get(url.href);assert.equal(r.status(),200)
+     if(format==='CSV')assert.ok((await r.text()).includes(`class · Studio ${width}`))
+    }
+    const figure=page.getByRole('rowheader',{name:report==='profit-and-loss'?'Net income':'Liabilities and equity',exact:true}).locator('..').getByRole('link').first()
+    await figure.click();await expect(page.getByText('Adds up to the report figure',{exact:true})).toBeVisible();await shot(`${report}-${basis}-filtered-sources`)
+    await page.goto(origin+'/app/reports?'+new URLSearchParams({report,from:'2026-09-01',to:'2026-09-30',basis,columns:'class'}))
+    const table=page.getByRole('table',{name:`${title} · class · ${basis} basis`,exact:true})
+    await expect(table).toBeVisible();await shot(`${report}-${basis}-split`)
+   }
+  }
+  for(const report of ['sales-by-customer','expenses-by-vendor','sales-by-item','transactions','journal']) {
+   await page.goto(origin+'/app/reports?'+new URLSearchParams({report,from:'2026-09-01',to:'2026-09-30',basis:'accrual',dimension:'class',dimensionValue:`value:Studio ${width}`}))
+   await expect(page.getByLabel('Dimension filter',{exact:true})).toBeVisible()
+   const download=page.getByRole('link',{name:'Download CSV · accrual',exact:true})
+   await expect(download).toBeVisible()
+   const response=await owner.request.get(new URL(await download.getAttribute('href'),origin).href)
+   assert.equal(response.status(),200);assert.ok((await response.text()).includes(`class · Studio ${width}`))
+   await shot(report+'-filtered')
+  }
+  await page.goto(origin+'/app/reports?report=custom')
+  await page.getByRole('button',{name:'New custom report',exact:true}).click()
+  await page.getByLabel('Report name',{exact:true}).fill(`Dimension margin ${width}`)
+  await page.getByLabel('From',{exact:true}).fill('2026-09-01')
+  await page.getByLabel('To',{exact:true}).fill('2026-09-30')
+  await page.getByLabel('Report basis',{exact:true}).selectOption('accrual')
+  await page.getByLabel('Custom dimension filter',{exact:true}).selectOption(JSON.stringify(['class',`value:Studio ${width}`]))
+  await shot('custom-dimension-editor')
+  await page.getByRole('button',{name:'Save custom report',exact:true}).click()
+  await expect(page.getByText(`Dimension filter: class · Studio ${width}. Other sides may be coded elsewhere.`,{exact:true})).toBeVisible()
+  await expect(page.getByRole('link',{name:'Open source report',exact:true})).toHaveAttribute('href',new RegExp('dimension=class'))
+  await shot('custom-dimension-report')
+  await page.getByRole('button',{name:'Edit custom report',exact:true}).click()
+  await page.getByLabel('Period columns',{exact:true}).selectOption('class')
+  await expect(page.getByLabel('Custom dimension filter',{exact:true})).toHaveCount(0)
+  await shot('custom-dimension-columns-editor')
+  await page.getByRole('button',{name:'Save custom report',exact:true}).click()
+  await expect(page.getByRole('columnheader',{name:`Studio ${width} · USD`,exact:true})).toBeVisible()
+  await shot('custom-dimension-columns')
   const service=await command('item.save',{kind:'service',name:`Design hours ${width}`,rate:'100',accountId:acct['4000'],taxCategory:'non-taxable'})
   const timeProject=await command('time-project.save',{customerId:customer.id,name:`Cedar website ${width}`})
   await command('time.save',{customerId:customer.id,projectId:timeProject.id,itemId:service.id,date:'2026-09-18',hours:'4'})

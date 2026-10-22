@@ -1,7 +1,7 @@
 import type { Basis } from '../basis'
 
 export type CustomReportSource = 'profit-and-loss' | 'balance-sheet' | 'trial-balance' | 'sales-by-customer' | 'expenses-by-vendor'
-export type CustomReportComparison = 'single' | 'prior-period' | 'prior-year' | 'months' | 'quarters' | 'ytd' | 'customer'
+export type CustomReportComparison = 'single' | 'prior-period' | 'prior-year' | 'months' | 'quarters' | 'ytd' | 'customer' | 'class' | 'location' | 'project'
 export type ReportUnit = 'money' | 'ratio' | 'percent'
 export type AccountSelection = { accountIds?: string[]; accountTypes?: string[] }
 export type CustomReportLayoutRow =
@@ -20,7 +20,7 @@ export type CustomReportDefinition = {
   columns?: string[]
   allColumns?: boolean
   comparison?: CustomReportComparison
-  filters?: AccountSelection & { contactIds?: string[] }
+  filters?: AccountSelection & { contactIds?: string[]; dimension?: string; dimensionValue?: string }
   grouping?: 'account' | 'section' | 'customer'
   layout?: CustomReportLayoutRow[]
   notes?: string[]
@@ -48,6 +48,7 @@ export type CalculatedCustomReport = {
   columns: CustomReportColumn[]
   rows: CalculatedCustomReportRow[]
   notes: string[]
+  sourceQuery?: Record<string,string>
 }
 
 export type ManagementReportPackage = {
@@ -59,7 +60,7 @@ export type ManagementReportPackage = {
 }
 
 /** Request-local provenance; never persisted or serialized with report renders. */
-export type CustomReportDrillOrigin = { accountId?: string; contactId?: string; type: string; value: number }
+export type CustomReportDrillOrigin = { accountId?: string; contactId?: string; type: string; value: number; dimension?: string; dimensionValue?: string }
 export type CustomReportDrillNode = {
   label: string; value: number | null; unit: ReportUnit; from: string | null; to: string
   expression?: string; sourceTo?: string; exact?: { numerator: bigint; denominator: bigint; dimension: number } | null

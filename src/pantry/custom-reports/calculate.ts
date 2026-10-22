@@ -1,3 +1,4 @@
+import { dimensionScope } from '../dimensions/scope'
 import { BASIS_LABEL, reportBasis } from '../basis'
 import { date, requireThat, text, type Data } from '../core'
 import { all, one } from '../db'
@@ -8,7 +9,7 @@ import { addFormulaValues, compileFormula, exactFormulaValue, roundFormula, type
 import type { AccountSelection, CalculatedCustomReport, CalculatedCustomReportRow, CustomReportColumn, CustomReportDefinition, CustomReportLayoutRow, CustomReportDrillGraph, CustomReportDrillNode } from './types'
 
 const SOURCES = ['profit-and-loss', 'balance-sheet', 'trial-balance', 'sales-by-customer', 'expenses-by-vendor']
-const COMPARISONS = ['single', 'prior-period', 'prior-year', 'months', 'quarters', 'ytd', 'customer']
+const COMPARISONS = ['single', 'prior-period', 'prior-year', 'months', 'quarters', 'ytd', 'customer', 'class', 'location', 'project']
 const TYPES = ['asset', 'liability', 'equity', 'income', 'expense']
 type Account = { id: string; code: string; name: string; type: string }
 type SourceLine = { id: string; accountId?: string; contactId?: string; code: string; name: string; type: string; section: string; amount: number }
@@ -87,22 +88,25 @@ export function validateCustomReportDefinition(value: unknown): CustomReportDefi
 
 async function sourceLines(db: D1Database, d: CustomReportDefinition, from: string, to: string, basis: 'cash' | 'accrual', startMonth: number, accounts: Map<string, Account>, contactColumn?: string): Promise<SourceLine[]> {
   let rows: SourceLine[]
+  const dimension = await dimensionScope(db,d.filters?.dimension,d.filters?.dimensionValue)
+  const splitDimension = ['class','location','project'].includes(d.comparison??'') && contactColumn && contactColumn !== 'total' ? await dimensionScope(db,d.comparison,contactColumn) : dimension
+  const customerColumn=d.comparison==='customer'?contactColumn:undefined
   const financial = (a: Data, section: string): SourceLine => ({ id: a.id, accountId: a.id, code: a.code, name: a.name, type: a.type, section, amount: a.amount })
-  if (d.source === 'profit-and-loss' && (d.filters?.contactIds || d.grouping === 'customer' || contactColumn)) {
-    const matrix = await statementColumns(db, 'profit-and-loss', 'customer', from, to, startMonth, basis)
-    const contacts = matrix.columns.map((column, index) => ({ ...column, index })).filter(c => c.id !== 'total' && (!contactColumn || contactColumn === 'total' || c.id === contactColumn) && (!d.filters?.contactIds || d.filters.contactIds.includes(c.id)))
+  if (d.source === 'profit-and-loss' && (d.filters?.contactIds || d.grouping === 'customer' || d.comparison==='customer' && contactColumn)) {
+    const matrix = await statementColumns(db, 'profit-and-loss', 'customer', from, to, startMonth, basis, splitDimension)
+    const contacts = matrix.columns.map((column, index) => ({ ...column, index })).filter(c => c.id !== 'total' && (!customerColumn || customerColumn === 'total' || c.id === customerColumn) && (!d.filters?.contactIds || d.filters.contactIds.includes(c.id)))
     rows = matrix.rows.flatMap(a => contacts.map(c => ({ id: `${a.id}:${c.id}`, accountId: a.id, contactId: c.id, code: a.code, name: a.name, type: accounts.get(a.id)?.type ?? '', section: a.section, amount: a.values[c.index] ?? 0 })))
   } else if (d.source === 'profit-and-loss') {
-    const r = await profitAndLoss(db, from, to, basis)
+    const r = await profitAndLoss(db, from, to, basis, splitDimension)
     rows = [...r.income.map(a => financial(a, 'Income')), ...r.expenses.map(a => financial(a, 'Expenses'))]
   } else if (d.source === 'balance-sheet') {
-    const r = await balanceSheet(db, to, startMonth, basis)
+    const r = await balanceSheet(db, to, startMonth, basis, splitDimension)
     rows = [...r.assets.map(a => financial(a, 'Assets')), ...r.liabilities.map(a => financial(a, 'Liabilities')), ...r.equity.map(a => financial(a, 'Equity'))]
   } else if (d.source === 'trial-balance') {
-    rows = (await trialBalance(db, to, basis)).rows.map(a => ({ ...financial({ ...a, amount: a.net }, sectionOf(a.type)), amount: a.net }))
+    rows = (await trialBalance(db, to, basis, splitDimension)).rows.map(a => ({ ...financial({ ...a, amount: a.net }, sectionOf(a.type)), amount: a.net }))
   } else {
     const kind = d.source === 'sales-by-customer' ? 'customer' : 'vendor'
-    rows = (await contactTotals(db, kind, from, to, basis)).rows.map(a => ({ id: a.id, contactId: a.id, code: '', name: a.name, type: kind === 'customer' ? 'income' : 'expense', section: kind === 'customer' ? 'Sales' : 'Expenses', amount: a.amount }))
+    rows = (await contactTotals(db, kind, from, to, basis, splitDimension)).rows.map(a => ({ id: a.id, contactId: a.id, code: '', name: a.name, type: kind === 'customer' ? 'income' : 'expense', section: kind === 'customer' ? 'Sales' : 'Expenses', amount: a.amount }))
     if (d.filters?.contactIds) rows = rows.filter(a => d.filters!.contactIds!.includes(a.contactId!))
   }
   return rows.filter(a => selected(a, d.filters)).map(a => ({ ...a, amount: safe(a.amount) }))
@@ -119,16 +123,18 @@ export async function calculateCustomReport(db: D1Database, definition: CustomRe
   checkSelection(d.filters)
   for (const row of d.layout ?? []) if (row.kind === 'accounts' || row.kind === 'section') checkSelection(row)
   for (const id of d.filters?.contactIds ?? []) requireThat(contactNames.has(id) || id === 'unassigned', `Unknown contact ${id}`)
+  const dimension = await dimensionScope(db,d.filters?.dimension,d.filters?.dimensionValue)
+  requireThat(!dimension || !['class','location','project'].includes(d.comparison??''), 'Choose dimension columns or a dimension filter, not both')
   const startMonth = Number(entity?.fiscal_year_start ?? 1)
   const available: CustomReportColumn[] = [{ id: 'code', label: 'Code', unit: 'text' }, { id: 'name', label: 'Name', unit: 'text' }, { id: 'amount', label: d.source === 'trial-balance' ? 'Net (debit positive / credit negative) · USD' : 'Amount · USD', unit: 'money', from: d.from, to: d.to }]
   const snapshots = new Map<string, SourceLine[]>()
   snapshots.set('amount', await sourceLines(db, d, d.from, d.to, basis, startMonth, accounts))
   const comparison = d.comparison ?? 'single'
   if (comparison !== 'single' && isStatement(d.source)) {
-    const native = await statementColumns(db, d.source, comparison, d.from, d.to, startMonth, basis)
+    const native = await statementColumns(db, d.source, comparison, d.from, d.to, startMonth, basis, dimension)
     for (const column of native.columns.filter(c => c.unit === 'money' && c.id !== 'change')) {
       available.push({ ...column, label: `${column.label} · USD` })
-      snapshots.set(column.id, await sourceLines(db, d, column.from, column.to, basis, startMonth, accounts, comparison === 'customer' ? column.id : undefined))
+      snapshots.set(column.id, await sourceLines(db, d, column.from, column.to, basis, startMonth, accounts, ['customer','class','location','project'].includes(comparison) ? column.id : undefined))
     }
     if (comparison === 'prior-period' || comparison === 'prior-year') available.push({ id: 'change', label: 'Change · USD', unit: 'money' }, { id: 'percent', label: 'Change (%)', unit: 'percent' })
   }
@@ -159,7 +165,7 @@ export async function calculateCustomReport(db: D1Database, definition: CustomRe
       if (members[0].accountId === 'prior-earnings') range.to = prevDay(fy)
     }
     return putDrill(key, { label, value, unit: 'money', ...range, sourceTo, operands: [],
-      origins: members.map(line => ({ accountId: line.accountId, contactId: line.contactId, type: line.type, value: line.amounts[column] ?? 0 })),
+      origins: members.map(line => ({ ...(['class','location','project'].includes(comparison) && !['amount','total'].includes(column) ? {dimension:comparison,dimensionValue:column} : dimension ? {dimension:dimension.kind,dimensionValue:dimension.id} : {}), accountId: line.accountId, contactId: line.contactId, type: line.type, value: line.amounts[column] ?? 0 })),
     })
   }
   const denominatorKey = JSON.stringify(['denominator'])
@@ -254,5 +260,5 @@ export async function calculateCustomReport(db: D1Database, definition: CustomRe
     earlierLayout.add(row.id)
   }
   const range = ['balance-sheet', 'trial-balance'].includes(d.source) ? `As of ${d.to}` : `${d.from} to ${d.to}`
-  return { id: d.id ?? '', name: d.name, source: d.source, basis, basisLabel: BASIS_LABEL[basis], from: d.from, to: d.to, range, columns, rows: output, notes: d.notes ?? [] }
+  return { id: d.id ?? '', name: d.name, source: d.source, basis, basisLabel: BASIS_LABEL[basis], from: d.from, to: d.to, range, columns, rows: output, sourceQuery: { ...(dimension?{dimension:dimension.kind,dimensionValue:dimension.id}:{}), ...(comparison!=='single'?{columns:comparison}:{}) }, notes: [...(dimension ? [`Dimension filter: ${dimension.label}. Other sides may be coded elsewhere.`] : []), ...(d.notes ?? [])] }
 }

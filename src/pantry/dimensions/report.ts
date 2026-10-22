@@ -2,23 +2,24 @@ import { requireThat, type Data } from '../core'
 import { all, one } from '../db'
 import { generalLedger, profitAndLoss } from '../reports'
 import type { Basis } from '../basis'
-import type { StatementColumns } from '../statement-columns'
+import { statementSnapshot, statementMatrix, type StatementColumns } from '../statement-columns'
 import { DIMENSIONS, dimensionsView, type DimensionKind } from './index'
 
-export async function dimensionColumns(db:D1Database,kind:DimensionKind,from:string,to:string,basis:Basis):Promise<StatementColumns> {
+/** Each dimension column uses the same statement calculation as its unsplit total,
+ * including balance-sheet openings and calculated fiscal-year earnings. */
+export async function dimensionColumns(db:D1Database,kind:DimensionKind,from:string,to:string,basis:Basis,report:'profit-and-loss'|'balance-sheet'='profit-and-loss',startMonth=1):Promise<StatementColumns> {
  const settings=(await dimensionsView(db)).settings!,flag={class:'classes_enabled',location:'locations_enabled',project:'projects_enabled'}[kind]
  requireThat(settings[flag],'Enable this dimension before running its columns',409)
- const ledger=await generalLedger(db,from,to,undefined,basis),field=`${kind}_name`
- const accounts=ledger.accounts.filter(a=>['income','expense'].includes(a.type))
- const names=[...new Set(accounts.flatMap(a=>a.rows.map((l:Data)=>String(l[field]??''))))].sort((a,b)=>a.localeCompare(b))
- if(!names.includes(''))names.push('')
+ const names=(await all(db,'SELECT name FROM pt_dimensions WHERE kind=? ORDER BY name',kind)).map(v=>String(v.name))
+ // Include Unassigned even when empty; inactive catalogue values remain historical evidence.
+ names.push('')
  const columns=[...names.map(name=>({id:name?'value:'+name:'unassigned',label:name||'Unassigned',from,to,unit:'money' as const})),{id:'total',label:'Total',from,to,unit:'money' as const}]
- const rows=accounts.map(a=>{const values=names.map(name=>a.rows.filter((l:Data)=>String(l[field]??'')===name).reduce((sum:number,l:Data)=>sum+(l.debit_cents-l.credit_cents)*(a.type==='income'?-1:1),0));return{id:a.id,code:a.code,name:a.name,section:a.type==='income'?'Income':'Expenses',values:[...values,values.reduce((s,n)=>s+n,0)]}})
- const sum=(section:string)=>columns.map((_,i)=>rows.filter(r=>r.section===section).reduce((s,r)=>s+r.values[i],0)),income=sum('Income'),expenses=sum('Expenses')
- const totals=[{id:'income',code:'',name:'Total income',section:'Income',values:income},{id:'expenses',code:'',name:'Total expenses',section:'Expenses',values:expenses},{id:'net-income',code:'',name:'Net income',section:'',values:income.map((n,i)=>n-expenses[i])}]
- const unsplit=await profitAndLoss(db,from,to,basis)
- requireThat(income.at(-1)===unsplit.totalIncome&&expenses.at(-1)===unsplit.totalExpenses,'Dimension columns do not tie to the unsplit statement',409)
- return {kind:'profit-and-loss',mode:kind,basis,from,to,columns,rows,totals}
+ const snapshots=[]
+ for(const name of names) snapshots.push(await statementSnapshot(db,report,from,to,startMonth,basis,{kind,value:name,id:name?'value:'+name:'unassigned',label:`${kind} · ${name||'Unassigned'}`}))
+ snapshots.push(await statementSnapshot(db,report,from,to,startMonth,basis))
+ const rows=statementMatrix(snapshots,'rows'),totals=statementMatrix(snapshots,'totals')
+ for(const row of [...rows,...totals]) requireThat(row.values.slice(0,-1).reduce<number>((sum,n)=>sum+(n??0),0)===row.values.at(-1),'Dimension columns do not tie to the unsplit statement',409)
+ return {kind:report,mode:kind,basis,from,to,columns,rows,totals}
 }
 export async function projectProfit(db:D1Database,name:string,from:string,to:string,basis:Basis){
  const project=await one(db,"SELECT name FROM pt_dimensions WHERE kind='project' AND name=? COLLATE NOCASE",name)

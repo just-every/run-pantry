@@ -1,3 +1,4 @@
+import type { DimensionScope } from './dimensions/scope'
 // Financial statement columns are independent reads of the same posted ledger.
 import { addDays, daysBetween, monthName, requireThat, type Data } from './core'
 import { dimensionColumns } from './dimensions/report'
@@ -9,7 +10,7 @@ type Kind = 'profit-and-loss' | 'balance-sheet'
 type Column = { id: string; label: string; from: string; to: string; unit: 'money' | 'percent' }
 type Line = { id: string; code: string; name: string; section: string; amount: number }
 type Snapshot = { rows: Line[]; totals: Line[] }
-export type StatementColumns = { kind: Kind; mode: string; basis: Basis; from: string; to: string; columns: Column[]; rows: MatrixLine[]; totals: MatrixLine[] }
+export type StatementColumns = { kind: Kind; mode: string; basis: Basis; from: string; to: string; dimension?: DimensionScope; columns: Column[]; rows: MatrixLine[]; totals: MatrixLine[] }
 type MatrixLine = Omit<Line, 'amount'> & { values: (number | null)[] }
 
 function monthAfter(day: string, months: number) {
@@ -29,35 +30,35 @@ export function changePercent(change: number, prior: number): number | null {
   return Number(rounded) / 100 * Math.sign(change)
 }
 const line = (id: string, name: string, amount: number, section = ({ income: 'Income', expenses: 'Expenses', assets: 'Assets', liabilities: 'Liabilities', equity: 'Equity' } as Record<string, string>)[id] ?? ''): Line => ({ id, code: '', name, amount, section })
-async function snapshot(db: D1Database, kind: Kind, from: string, to: string, startMonth: number, basis: Basis): Promise<Snapshot> {
-  const r: Data = kind === 'profit-and-loss' ? await profitAndLoss(db, from, to, basis) : await balanceSheet(db, to, startMonth, basis)
+export async function statementSnapshot(db: D1Database, kind: Kind, from: string, to: string, startMonth: number, basis: Basis, dimension?: DimensionScope): Promise<Snapshot> {
+  const r: Data = kind === 'profit-and-loss' ? await profitAndLoss(db, from, to, basis, dimension) : await balanceSheet(db, to, startMonth, basis, dimension)
   const sections: [string, string][] = kind === 'profit-and-loss' ? [['Income', 'income'], ['Expenses', 'expenses']] : [['Assets', 'assets'], ['Liabilities', 'liabilities'], ['Equity', 'equity']]
   return {
     rows: sections.flatMap(([section, key]) => r[key].map((l: Data) => ({ id: l.id, code: l.code, name: l.id === 'current-earnings' ? 'Current fiscal-year earnings (calculated)' : l.name, section, amount: l.amount }))),
     totals: kind === 'profit-and-loss' ? [line('income', 'Total income', r.totalIncome), line('expenses', 'Total expenses', r.totalExpenses), line('net-income', 'Net income', r.netIncome)] : [line('assets', 'Total assets', r.totalAssets), line('liabilities', 'Total liabilities', r.totalLiabilities), line('equity', 'Total equity', r.totalEquity), line('liabilities-and-equity', 'Liabilities and equity', r.totalLiabilities + r.totalEquity)],
   }
 }
-function matrix(snapshots: Snapshot[], key: 'rows' | 'totals'): MatrixLine[] {
+export function statementMatrix(snapshots: Snapshot[], key: 'rows' | 'totals'): MatrixLine[] {
   const lines = new Map<string, Line>()
   for (const s of snapshots) for (const l of s[key]) lines.set(l.id, l)
   return [...lines.values()].map(({ amount, ...l }) => ({ ...l, values: snapshots.map(s => s[key].find(x => x.id === l.id)?.amount ?? 0) }))
 }
 
-export async function statementColumns(db: D1Database, kind: Kind, mode: string, from: string, to: string, startMonth: number, basis: Basis): Promise<StatementColumns> {
+export async function statementColumns(db: D1Database, kind: Kind, mode: string, from: string, to: string, startMonth: number, basis: Basis, dimension?: DimensionScope): Promise<StatementColumns> {
   requireThat(from <= to, 'From must be on or before To')
   requireThat(['prior-period', 'prior-year', 'months', 'quarters', 'ytd', 'customer','class','location','project'].includes(mode), 'Choose comparison, months, quarters, year to date or customer columns')
   if (['class','location','project'].includes(mode)) {
-    requireThat(kind==='profit-and-loss','Dimension columns are for profit and loss')
-    return dimensionColumns(db,mode as 'class'|'location'|'project',from,to,basis)
+    requireThat(!dimension, 'Choose dimension columns or a dimension filter, not both')
+    return dimensionColumns(db,mode as 'class'|'location'|'project',from,to,basis,kind,startMonth)
   }
   if (mode === 'customer') {
     requireThat(kind === 'profit-and-loss', 'Customer columns are for profit and loss')
-    return customerColumns(db, from, to, basis)
+    return customerColumns(db, from, to, basis, dimension)
   }
   const columns: Column[] = [], snapshots: Snapshot[] = []
   const add = async (id: string, label: string, a: string, b: string) => {
     columns.push({ id, label, from: a, to: b, unit: 'money' })
-    snapshots.push(await snapshot(db, kind, a, b, startMonth, basis))
+    snapshots.push(await statementSnapshot(db, kind, a, b, startMonth, basis, dimension))
   }
   const fy = fiscalYearStart(to, startMonth)
   if (mode === 'months' || mode === 'quarters') {
@@ -73,7 +74,7 @@ export async function statementColumns(db: D1Database, kind: Kind, mode: string,
     const b = mode === 'prior-year' ? yearBefore(to) : prevDay(from)
     await add('prior', `Prior · ${kind === 'balance-sheet' ? b : `${a} to ${b}`}`, a, b)
   }
-  const rows = matrix(snapshots, 'rows'), totals = matrix(snapshots, 'totals')
+  const rows = statementMatrix(snapshots, 'rows'), totals = statementMatrix(snapshots, 'totals')
   if (mode === 'prior-period' || mode === 'prior-year') {
     columns.push({ id: 'change', label: 'Change', from, to, unit: 'money' }, { id: 'percent', label: 'Change %', from, to, unit: 'percent' })
     for (const l of [...rows, ...totals]) {
@@ -81,7 +82,7 @@ export async function statementColumns(db: D1Database, kind: Kind, mode: string,
       l.values.push(change, changePercent(change, prior))
     }
   }
-  return { kind, mode, basis, from, to, columns, rows, totals }
+  return { kind, mode, basis, from, to, ...(dimension ? { dimension } : {}), columns, rows, totals }
 }
 
 /** The customer column a profit-and-loss line belongs to: the line's customer, else its invoice's customer. */
@@ -94,10 +95,10 @@ export async function customerGrouping(db: D1Database) {
   }
 }
 
-async function customerColumns(db: D1Database, from: string, to: string, basis: Basis): Promise<StatementColumns> {
+async function customerColumns(db: D1Database, from: string, to: string, basis: Basis, dimension?: DimensionScope): Promise<StatementColumns> {
   const grouping = await customerGrouping(db)
   const groups = new Map<string, { name: string; rows: Line[] }>()
-  const ledger = await generalLedger(db, from, to, undefined, basis)
+  const ledger = await generalLedger(db, from, to, undefined, basis, dimension)
   for (const account of ledger.accounts.filter(a => a.type === 'income' || a.type === 'expense')) for (const l of account.rows) {
     const id = grouping.of(l)
     const group: { name: string; rows: Line[] } = groups.get(id) ?? { name: grouping.name(id), rows: [] }
@@ -113,6 +114,6 @@ async function customerColumns(db: D1Database, from: string, to: string, basis: 
     return { rows: g.rows, totals: [line('income', 'Total income', income), line('expenses', 'Total expenses', expenses), line('net-income', 'Net income', income - expenses)] }
   })
   columns.push({ id: 'total', label: 'Total', from, to, unit: 'money' })
-  snapshots.push(await snapshot(db, 'profit-and-loss', from, to, 1, basis))
-  return { kind: 'profit-and-loss', mode: 'customer', basis, from, to, columns, rows: matrix(snapshots, 'rows'), totals: matrix(snapshots, 'totals') }
+  snapshots.push(await statementSnapshot(db, 'profit-and-loss', from, to, 1, basis, dimension))
+  return { kind: 'profit-and-loss', mode: 'customer', basis, from, to, ...(dimension ? { dimension } : {}), columns, rows: statementMatrix(snapshots, 'rows'), totals: statementMatrix(snapshots, 'totals') }
 }

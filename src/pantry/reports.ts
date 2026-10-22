@@ -60,22 +60,22 @@ export function settlementMemo(l: { docKind: string; docRef: string; contactName
   return `${doc}: ${amount} of ${of} applied to ${s.appliedToNumber}`
 }
 
-export async function profitAndLoss(db: D1Database, from: string, to: string, basis: Basis = 'accrual') {
-  const rows = (await balances(db, to, from, basis)).filter(r => (r.type === 'income' || r.type === 'expense') && r.net !== 0)
+export async function profitAndLoss(db: D1Database, from: string, to: string, basis: Basis = 'accrual', dimension?: DimensionScope) {
+  const rows = (await balances(db, to, from, basis, dimension)).filter(r => (r.type === 'income' || r.type === 'expense') && r.net !== 0)
   const income = rows.filter(r => r.type === 'income').map(r => ({ ...r, amount: -r.net }))
   const expenses = rows.filter(r => r.type === 'expense').map(r => ({ ...r, amount: r.net }))
   const totalIncome = income.reduce((s, r) => s + r.amount, 0), totalExpenses = expenses.reduce((s, r) => s + r.amount, 0)
-  const report = { basis, from, to, income, expenses, totalIncome, totalExpenses, netIncome: totalIncome - totalExpenses }
-  return basis === 'cash' ? { ...report, bridge: await bridge(db, from, to, report.netIncome) } : report
+  const report = { basis, from, to, ...(dimension ? { dimension } : {}), income, expenses, totalIncome, totalExpenses, netIncome: totalIncome - totalExpenses }
+  return basis === 'cash' ? { ...report, bridge: await bridge(db, from, to, report.netIncome, dimension) } : report
 }
 
 /** Accrual net income to cash net income: documents recorded in the range out, their settlements in the range in. */
-async function bridge(db: D1Database, from: string, to: string, cashNet: number): Promise<{ accrualNetIncome: number; recordedInRange: number; settledInRange: number; cashNetIncome: number; ties: boolean }> {
-  const accrual = { netIncome: -(await balances(db, to, from)).filter(r => r.type === 'income' || r.type === 'expense').reduce((s, r) => s + r.net, 0) }
+async function bridge(db: D1Database, from: string, to: string, cashNet: number, dimension?: DimensionScope): Promise<{ accrualNetIncome: number; recordedInRange: number; settledInRange: number; cashNetIncome: number; ties: boolean }> {
+  const accrual = { netIncome: -(await balances(db, to, from, 'accrual', dimension)).filter(r => r.type === 'income' || r.type === 'expense').reduce((s, r) => s + r.net, 0) }
   const recorded = -Number((await one(db, `SELECT COALESCE(SUM(l.debit_cents - l.credit_cents), 0) AS n FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id JOIN pt_accounts a ON a.id = l.account_id
-    WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? AND a.type IN ('income', 'expense') AND NOT ${sameOnCash()}`, from, to))?.n ?? 0)
+    WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? AND a.type IN ('income', 'expense') AND NOT ${sameOnCash()} ${dimension ? `AND l.${dimension.kind}_name = ?` : ''}`, from, to, ...(dimension ? [dimension.value] : [])))?.n ?? 0)
   const types = new Map((await all(db, 'SELECT id, type FROM pt_accounts')).map(a => [a.id, a.type]))
-  const settled = -(await cashLines(db, from, to)).filter(l => ['income', 'expense'].includes(types.get(l.accountId))).reduce((s, l) => s + l.net, 0)
+  const settled = -(await cashLines(db, from, to)).filter(l => inDimension(l, dimension) && ['income', 'expense'].includes(types.get(l.accountId))).reduce((s, l) => s + l.net, 0)
   return { accrualNetIncome: accrual.netIncome, recordedInRange: recorded, settledInRange: settled, cashNetIncome: cashNet, ties: accrual.netIncome - recorded + settled === cashNet }
 }
 
@@ -85,11 +85,11 @@ export function fiscalYearStart(asOf: string, startMonth: number) {
   return `${year}-${String(startMonth).padStart(2, '0')}-01`
 }
 
-export async function balanceSheet(db: D1Database, asOf: string, startMonth: number, basis: Basis = 'accrual') {
-  const all_ = await balances(db, asOf, undefined, basis)
+export async function balanceSheet(db: D1Database, asOf: string, startMonth: number, basis: Basis = 'accrual', dimension?: DimensionScope) {
+  const all_ = await balances(db, asOf, undefined, basis, dimension)
   const fyStart = fiscalYearStart(asOf, startMonth)
-  const current = await profitAndLoss(db, fyStart, asOf, basis)
-  const prior = (await balances(db, prevDay(fyStart), undefined, basis)).filter(r => r.type === 'income' || r.type === 'expense').reduce((s, r) => s - r.net, 0)
+  const current = await profitAndLoss(db, fyStart, asOf, basis, dimension)
+  const prior = (await balances(db, prevDay(fyStart), undefined, basis, dimension)).filter(r => r.type === 'income' || r.type === 'expense').reduce((s, r) => s - r.net, 0)
   const assets = all_.filter(r => r.type === 'asset' && r.net !== 0).map(r => ({ ...r, amount: r.net }))
   const liabilities = all_.filter(r => r.type === 'liability' && r.net !== 0).map(r => ({ ...r, amount: -r.net }))
   const equity = all_.filter(r => r.type === 'equity' && r.net !== 0).map(r => ({ ...r, amount: -r.net }))
@@ -97,7 +97,7 @@ export async function balanceSheet(db: D1Database, asOf: string, startMonth: num
   if (prior) equity.push({ id: 'prior-earnings', code: '', name: "Prior years' earnings (calculated)", type: 'equity', subtype: 'retained', debit: 0, credit: 0, net: -prior, amount: prior })
   if (current.netIncome) equity.push({ id: 'current-earnings', code: '', name: `Net income since ${longDay(fyStart)} (calculated)`, type: 'equity', subtype: 'retained', debit: 0, credit: 0, net: -current.netIncome, amount: current.netIncome })
   const totalAssets = assets.reduce((s, r) => s + r.amount, 0), totalLiabilities = liabilities.reduce((s, r) => s + r.amount, 0), totalEquity = equity.reduce((s, r) => s + r.amount, 0)
-  return { basis, asOf, fyStart, assets, liabilities, equity, totalAssets, totalLiabilities, totalEquity, balanced: totalAssets === totalLiabilities + totalEquity }
+  return { basis, asOf, fyStart, ...(dimension ? { dimension } : {}), assets, liabilities, equity, totalAssets, totalLiabilities, totalEquity, balanced: totalAssets === totalLiabilities + totalEquity }
 }
 
 export const BUCKETS = ['Current', '1–30 days', '31–60 days', '61–90 days', 'Over 90 days']

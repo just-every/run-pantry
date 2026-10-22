@@ -1,3 +1,4 @@
+import { dimensionScope, inDimension } from '../dimensions/scope'
 // Statement comparison, period and customer columns, and the cash-basis bridge:
 // each money cell opens to the native statement figure for its column's own
 // range; change cells to the current rows less the prior rows; percentages to
@@ -12,28 +13,29 @@ import { changePercent, customerGrouping, statementColumns } from '../statement-
 import { groupedRows } from './groups'
 import { figureResult, less, percentResult, tagged } from './result'
 
-type Query = { report: string; line: string; from: string; to: string; basis: Basis; columns?: string; column?: string }
+type Query = { report: string; line: string; from: string; to: string; basis: Basis; columns?: string; column?: string; dimension?: string; dimensionValue?: string }
 const TOTALS: Record<string, [string[], 1 | -1]> = { income: [['income'], -1], expenses: [['expense'], 1], 'net-income': [['income', 'expense'], -1] }
 
 export async function columnFigure(db: D1Database, q: Query, startMonth: number) {
   const kind = q.report as 'profit-and-loss' | 'balance-sheet'
-  const r = await statementColumns(db, kind, q.columns!, q.from, q.to, startMonth, q.basis)
+  const r = await statementColumns(db, kind, q.columns!, q.from, q.to, startMonth, q.basis, await dimensionScope(db,q.dimension,q.dimensionValue))
   const index = r.columns.findIndex(c => c.id === q.column), row = [...r.rows, ...r.totals].find(x => x.id === q.line)
   requireThat(index >= 0 && row, 'Choose a figure on this statement', 404)
   const column = r.columns[index], figure = row.values[index]
   const label = `${row.code ? `${row.code} · ` : ''}${row.name} · ${column.label}`
-  const context = { columns: r.mode, column: column.id, columnLabel: column.label, columnFrom: column.from, columnTo: column.to }
+  const context = { dimension: q.dimension, dimensionValue: q.dimensionValue, columns: r.mode, column: column.id, columnLabel: column.label, columnFrom: column.from, columnTo: column.to }
   const base = { report: kind, line: q.line, label, basis: q.basis, to: column.to, context }
   const native = async (id: string) => {
     const c = r.columns.find(x => x.id === id)!
     if(['class','location','project'].includes(r.mode)&&id!=='total'){
-      const rows=(await figureDetail(db,{report:kind,line:q.line,from:c.from,to:c.to,basis:q.basis},startMonth)).rows
+      const rows=(await figureDetail(db,{report:kind,line:q.line,from:c.from,to:c.to,basis:q.basis,dimension:r.mode,dimensionValue:id},startMonth)).rows
       return rows.filter(row=>(row[`${r.mode}_name`]||'')===(id==='unassigned'?'':id.slice(6)))
     }
-    if (r.mode !== 'customer' || id === 'total') return (await figureDetail(db, { report: kind, line: q.line, from: c.from, to: c.to, basis: q.basis }, startMonth)).rows
+    if (r.mode !== 'customer' || id === 'total') return (await figureDetail(db, { report: kind, line: q.line, from: c.from, to: c.to, basis: q.basis, dimension: q.dimension, dimensionValue: q.dimensionValue }, startMonth)).rows
+    const dimension = await dimensionScope(db,q.dimension,q.dimensionValue)
     const grouping = await customerGrouping(db), accounts = new Map((await all(db, 'SELECT id, type FROM pt_accounts')).map(a => [a.id, a.type]))
     const [types, sign] = TOTALS[q.line] ?? [[], accounts.get(q.line) === 'income' ? -1 : 1]
-    return groupedRows(db, { types, accountId: TOTALS[q.line] ? undefined : q.line, of: grouping.of, selected: id, from: c.from, to: c.to, basis: q.basis, sign })
+    return (await groupedRows(db, { types, accountId: TOTALS[q.line] ? undefined : q.line, of: grouping.of, selected: id, from: c.from, to: c.to, basis: q.basis, sign })).filter(row => inDimension(row, dimension))
   }
   if (column.id === 'percent') {
     const [current, prior] = row.values as number[], change = current - prior
@@ -52,15 +54,16 @@ const BRIDGE: Record<string, string> = { accrual: 'Net income on the accrual bas
 export async function bridgeFigure(db: D1Database, q: Query, startMonth: number) {
   const metric = q.line.slice('bridge:'.length)
   requireThat(BRIDGE[metric] && q.basis === 'cash', 'Choose a figure on the accrual-to-cash bridge', 404)
-  const b = (await profitAndLoss(db, q.from, q.to, 'cash') as Data).bridge
-  const base = { report: 'profit-and-loss', line: q.line, label: BRIDGE[metric], from: q.from, to: q.to }
+  const dimension = await dimensionScope(db,q.dimension,q.dimensionValue)
+  const b = (await profitAndLoss(db, q.from, q.to, 'cash', dimension) as Data).bridge
+  const base = { context:{dimension:q.dimension,dimensionValue:q.dimensionValue}, report: 'profit-and-loss', line: q.line, label: BRIDGE[metric], from: q.from, to: q.to }
   if (metric === 'accrual' || metric === 'cash')
-    return figureResult({ ...base, basis: metric, figure: metric === 'cash' ? b.cashNetIncome : b.accrualNetIncome, rows: (await figureDetail(db, { report: 'profit-and-loss', line: 'net-income', from: q.from, to: q.to, basis: metric }, startMonth)).rows })
+    return figureResult({ ...base, basis: metric, figure: metric === 'cash' ? b.cashNetIncome : b.accrualNetIncome, rows: (await figureDetail(db, { report: 'profit-and-loss', line: 'net-income', from: q.from, to: q.to, basis: metric, dimension:q.dimension, dimensionValue:q.dimensionValue }, startMonth)).rows })
   if (metric === 'recorded') {
     const documents = new Set((await all(db, `SELECT e.id FROM pt_journal_entries e WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? AND NOT ${sameOnCash()}`, q.from, q.to)).map(e => e.id))
-    const rows = (await reportSourceRows(db, { types: ['income', 'expense'], from: q.from, to: q.to, sign: 1 }, 'accrual')).filter(r => documents.has(r.entry.id))
+    const rows = (await reportSourceRows(db, { types: ['income', 'expense'], from: q.from, to: q.to, sign: 1 }, 'accrual')).filter(r => inDimension(r,dimension) && documents.has(r.entry.id))
     return figureResult({ ...base, basis: 'accrual', basisLabel: 'Accrual basis · documents recorded in the range', figure: -b.recordedInRange, rows, scopeNote: 'Income and expense lines of invoices, credits and bills recorded in the range, as debits less credits.' })
   }
-  const rows = (await reportSourceRows(db, { types: ['income', 'expense'], from: q.from, to: q.to, sign: -1 }, 'cash')).filter(r => String(r.key).startsWith('cash-'))
+  const rows = (await reportSourceRows(db, { types: ['income', 'expense'], from: q.from, to: q.to, sign: -1 }, 'cash')).filter(r => inDimension(r,dimension) && String(r.key).startsWith('cash-'))
   return figureResult({ ...base, basis: 'cash', basisLabel: 'Cash basis · settled shares in the range', figure: b.settledInRange, rows, scopeNote: 'Shares of invoices, credits and bills paid or credited in the range.' })
 }

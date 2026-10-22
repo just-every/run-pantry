@@ -1,10 +1,11 @@
+import type { DimensionScope } from '../dimensions/scope'
 import { all } from '../db'
 import { generalLedger } from '../reports'
 import { BASIS_LABEL, type Basis } from '../basis'
 import type { LibraryReport } from './types'
 
-export async function ledgerActivity(db: D1Database, kind: string, from: string, to: string, basis: Basis, account?: string, payee?: string): Promise<Partial<LibraryReport>> {
-  const gl = await generalLedger(db, from, to, account, basis)
+export async function ledgerActivity(db: D1Database, kind: string, from: string, to: string, basis: Basis, account?: string, payee?: string, dimension?: DimensionScope): Promise<Partial<LibraryReport>> {
+  const gl = await generalLedger(db, from, to, account, basis, dimension)
   // Some source lines identify a contact only on their control line. Carry that
   // source contact to the other lines before applying a payee filter.
   const contacts = await all(db, `SELECT l.entry_id, l.contact_id, c.name FROM pt_journal_lines l JOIN pt_contacts c ON c.id=l.contact_id GROUP BY l.entry_id,l.contact_id`)

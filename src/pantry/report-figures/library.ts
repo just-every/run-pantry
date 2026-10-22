@@ -1,3 +1,4 @@
+import type { DimensionScope } from '../dimensions/scope'
 // Everyday-library figures: each money cell and total opens to the ledger
 // lines, payments or open items its row or total was read from, under the
 // report's own range, basis and account/payee filters.
@@ -14,14 +15,14 @@ import { figureResult, less, parseLine } from './result'
 const RECEIVABLE = ['receivables-summary', 'open-invoices', 'customer-balances']
 const TYPES = ['asset', 'liability', 'equity', 'income', 'expense']
 
-export async function libraryFigure(db: D1Database, kind: string, line: string, from: string, to: string, basis: Basis, account?: string, payee?: string) {
-  const report = await libraryReport(db, kind, from, to, basis, account, payee)
+export async function libraryFigure(db: D1Database, kind: string, line: string, from: string, to: string, basis: Basis, account?: string, payee?: string, dimension?: DimensionScope) {
+  const report = await libraryReport(db, kind, from, to, basis, account, payee, dimension)
   const [rowId, column] = parseLine(line, [2, 2], 'Choose a figure on this report'), index = Number(column)
   const total = rowId === 'total', row = report.rows.find(r => r.id === rowId)
   const figure = total ? report.totals[index]?.amount : report.moneyColumns.includes(index) ? row?.cells[index] : undefined
   requireThat(typeof figure === 'number' && kind !== 'audit-log', 'Choose a figure on this report', 404)
   const name = total ? report.totals[index].label : `${row!.cells.filter((_, i) => !report.moneyColumns.includes(i)).join(' · ')} · ${report.columns[index]}`
-  const base = { report: kind, line, label: name, basis, basisLabel: report.basisLabel, from, to, figure, context: { ...(account ? { account } : {}), ...(payee ? { payee } : {}) } }
+  const base = { report: kind, line, label: name, basis, basisLabel: report.basisLabel, from, to, figure, context: { ...(dimension ? { dimension: dimension.kind, dimensionValue: dimension.id } : {}), ...(account ? { account } : {}), ...(payee ? { payee } : {}) } }
   const ids = new Set(total ? report.rows.map(r => r.id) : [rowId])
   if (kind === 'reconciliations') return figureResult({ ...base, ...await proofRows(db, rowId, index) })
   if (kind === 'transactions' || kind === 'journal') {

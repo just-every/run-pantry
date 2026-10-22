@@ -7,12 +7,12 @@ import type { StatementColumns } from './statement-columns'
 
 const cell = (v: unknown) => `"${String(v).replaceAll('"', '""')}"`
 export function statementExport(r: StatementColumns, business: string, format: string) {
-  const title = r.kind === 'profit-and-loss' ? 'Profit and loss' : 'Balance sheet'
+  const title = (r.kind === 'profit-and-loss' ? 'Profit and loss' : 'Balance sheet') + (r.dimension ? ` · ${r.dimension.label}` : '')
   const basis = BASIS_LABEL[r.basis], lines = [...r.rows, ...r.totals]
   const headers = { 'content-disposition': `attachment; filename="${r.kind}-${r.mode}-${r.to}-${r.basis}.${format}"`, 'cache-control': 'no-store', 'x-pantry-basis': basis }
   if (format === 'xlsx') return xlsxResponse([[business, title, basis, r.from, r.to], ['Account', 'Section', 'Code', 'Basis', ...r.columns.map(c => `${c.label} · ${c.from} to ${c.to} · ${c.unit === 'percent' ? '%' : 'USD'}`)], ...lines.map(l => [l.name, l.section, l.code, basis, ...l.values.map((v, i) => v === null ? 'Not comparable (prior is zero)' : r.columns[i].unit === 'percent' ? v : v / 100)])], `${r.kind}-${r.mode}-${r.to}-${r.basis}`, { 'x-pantry-basis': basis })
   if (format === 'csv') {
-    const head = ['Account', 'Section', 'Code', 'Basis', ...r.columns.map(c => `${c.label} · ${c.from} to ${c.to} · ${c.unit === 'percent' ? '%' : 'USD'}`)]
+    const head = [r.dimension ? `Account · ${r.dimension.label}` : 'Account', 'Section', 'Code', 'Basis', ...r.columns.map(c => `${c.label} · ${c.from} to ${c.to} · ${c.unit === 'percent' ? '%' : 'USD'}`)]
     const rows = lines.map(l => [l.name, l.section, l.code, basis, ...l.values.map((v, i) => v === null ? 'Not comparable (prior is zero)' : r.columns[i].unit === 'percent' ? `${v}%` : (v / 100).toFixed(2))])
     return new Response([head, ...rows].map(row => row.map(cell).join(',')).join('\r\n') + '\r\n', { headers: { ...headers, 'content-type': 'text/csv; charset=utf-8' } })
   }

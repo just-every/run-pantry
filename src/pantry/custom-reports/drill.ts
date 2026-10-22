@@ -58,10 +58,10 @@ export async function customReportFigure(c: Context, id: string, query: { row?: 
       const line = origin.accountId ?? (type === 'income' ? 'income' : 'expenses')
       const from = report.source === 'trial-balance' ? START : node.from ?? START
       const to = node.sourceTo ?? node.to
-      const nativeKey = JSON.stringify([nativeReport, line, from, to])
+      const nativeKey = JSON.stringify([nativeReport, line, from, to, origin.dimension, origin.dimensionValue])
       let detail = native.get(nativeKey)
       if (!detail) {
-        detail = await figureDetail(c.db, { report: nativeReport, line, from, to, basis: report.basis }, startMonth)
+        detail = await figureDetail(c.db, { report: nativeReport, line, from, to, basis: report.basis, dimension:origin.dimension,dimensionValue:origin.dimensionValue }, startMonth)
         native.set(nativeKey, detail)
       }
       const selected = origin.contactId === undefined ? detail.rows : detail.rows.filter(row => {
