@@ -57,8 +57,9 @@ export function DimensionSelection({label='Dimension filter',value,onChange}:{la
  const {state}=useShared(),d=state.dimensions
  if(!d)return null
  const enabled=KINDS.filter(([, ,flag])=>d.settings[flag])
+ const values=[...d.values,...(state.dimensionHistory??[]).filter((v:D)=>!d.values.some((c:D)=>c.kind===v.kind&&c.name===v.name)).map((v:D)=>({...v,historical:true}))]
  if(!enabled.length)return null
- return <Field label={label} name="dimensionFilter" value={value} empty="All dimensions" options={enabled.flatMap(([kind])=>[{value:JSON.stringify([kind,'unassigned']),label:`${kind} · Unassigned`},...d.values.filter((v:D)=>v.kind===kind).map((v:D)=>({value:JSON.stringify([kind,'value:'+v.name]),label:`${kind} · ${v.name}${v.active?'':' (inactive)'}`}))])} onChange={(e:React.ChangeEvent<HTMLSelectElement>)=>onChange(e.target.value)} />
+ return <Field label={label} name="dimensionFilter" value={value} empty="All dimensions" options={enabled.flatMap(([kind])=>[{value:JSON.stringify([kind,'unassigned']),label:`${kind} · Unassigned`},...values.filter((v:D)=>v.kind===kind).map((v:D)=>({value:JSON.stringify([kind,'value:'+v.name]),label:`${kind} · ${v.name}${v.historical?' (historical)':v.active?'':' (inactive)'}`}))])} onChange={(e:React.ChangeEvent<HTMLSelectElement>)=>onChange(e.target.value)} />
 }
 export function DimensionReportPicker(){
  const search=useSearch({from:'/app/reports'}),navigate=useNavigate({from:'/app/reports'})

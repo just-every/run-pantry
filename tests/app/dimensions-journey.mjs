@@ -20,6 +20,8 @@ export async function dimensionsBrowser(t){
  const bank=await command('bank-account.save',{name:'Operating checking',institution:'Juniper Bank',accountId:acct['1000'],numberLast4:'4821',openingDate:'2026-01-01',openingBalance:'0'})
  acct['1010']=(await command('account.save',{code:'1010',name:'Project reserve',type:'asset',subtype:'bank'})).id
  const reserve=await command('bank-account.save',{name:'Project reserve',institution:'Juniper Bank',accountId:acct['1010'],numberLast4:'4242',openingDate:'2026-01-01',openingBalance:'0'})
+ const legacy=await command('journal.save-draft',{date:'2026-01-20',memo:'Historical dimension',lines:[{accountId:acct['6300'],debit:'25',className:'Legacy studio'},{accountId:acct['1000'],credit:'25'}]})
+ await command('journal.post',{id:legacy.id,revision:legacy.revision})
  for(const width of [1440,390]){
   const page=await owner.newPage();await page.setViewportSize({width,height:1000})
   const errors=[];page.on('pageerror',e=>errors.push(String(e)))
@@ -109,6 +111,10 @@ export async function dimensionsBrowser(t){
    await page.goto(href.href);await expect(page.getByText('Adds up to the report figure',{exact:true})).toBeVisible();await shot(`sources-${kind}`)
    await page.goto(origin+`/app/reports?report=profit-and-loss&from=2026-09-01&to=2026-09-30&basis=accrual&columns=${kind}`)
   }
+  await page.goto(origin+'/app/reports?report=profit-and-loss&from=2026-01-01&to=2026-01-31&basis=accrual')
+  await page.getByLabel('Dimension filter',{exact:true}).selectOption(JSON.stringify(['class','value:Legacy studio']))
+  await expect(page.getByRole('link',{name:'$25.00',exact:true}).first()).toBeVisible()
+  await shot('historical-dimension-filter')
   for(const report of ['general-ledger','trial-balance']){
    await page.goto(origin+`/app/reports?report=${report}&from=2026-09-16&to=2026-09-30&basis=accrual`)
    await page.getByLabel('Dimension filter',{exact:true}).selectOption(JSON.stringify(['class',`value:Studio ${width}`]))

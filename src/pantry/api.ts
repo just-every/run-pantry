@@ -1,7 +1,7 @@
 import { fiscalYearStart } from './reports'
 import { dimensionScope } from './dimensions/scope'
 import { projectProfit } from './dimensions/report'
-import { dimensionCommands, dimensionsView } from './dimensions'
+import { dimensionCommands, dimensionsView, dimensionHistory } from './dimensions'
 import { closeBoard } from './close-workflow'
 import { figureExport, recordExport } from './detail-export'
 // Pantry's HTTP surface. People use /api/pantry/* with their native session;
@@ -99,7 +99,7 @@ import { dataFlows } from './data-flows'
 import { recordReportIssue } from './effects/issues'
 import { FIRST_DAY } from './report-sources'
 import { siblingCommands, siblingsView, siblingArtifact } from './estimates/siblings'
-import { assertDoor, projectAccess } from './access-policy/doors'
+import { assertDoor, projectAccess, financialSourceAllowed } from './access-policy/doors'
 import { accessPolicyCommands } from './access-policy/settings'
 import { timeCommands, timeView } from './time/commands'
 import { estimateCommands, estimatesView, estimate, registerEstimateRoutes } from './estimates'
@@ -172,7 +172,7 @@ view('vendors/:id/history', async (ctx, c) => vendorHistory(ctx.db, c.req.param(
 view('customers/:id', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to')))
 view('customers/:id/history', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to')))
 view('dashboard', async (ctx, c) => dashboard(ctx.db, day(c, 'to'), c.req.query('basis') ? basisOf(c.req.query('basis')) : undefined))
-view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await lookups(ctx.db)), overview: await overview(ctx.db), settings: await settingsView(ctx) }))
+view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await lookups(ctx.db)), dimensionHistory: financialSourceAllowed(ctx.actor,'profit-and-loss')?await dimensionHistory(ctx.db):[], overview: await overview(ctx.db), settings: await settingsView(ctx) }))
 view('close-board', async (ctx, c) => closeBoard(ctx.db, c.req.query('year') ?? new Date().getUTCFullYear().toString()))
 view('recurring-journals', async ctx => recurringJournalsView(ctx.db))
 view('journal', async ctx => ({ entries: await journalView(ctx.db) }))

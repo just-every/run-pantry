@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "5d7e42f68d978af04568efc866221d5b595cf264c016092d89e5071f60f62d00",
+      "sha256": "c93b1611211d2bd33e7be672223cf52db9b3151eed7a169fd6df8a992beefc02",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "85b7362c159150f6a69e81bb0aec1f6a46594089118a4ddace7ae69512337200",
+      "sha256": "52110a70b82eeb106e7be860e67f5a988c385514e1f7f1740affbc2efe8a442b",
       "executable": false
     },
     "DEMO.md": {
@@ -128,7 +128,7 @@
       "executable": false
     },
     "docs/dimensions.md": {
-      "sha256": "2f074edd6ead62b5da26a59489feb524bda8a9dd2ac0e23367355b5d2c848d31",
+      "sha256": "d76b688a9410a2ac7427f4e0374a53b309e1e3f6a1322a07ffb4c255c8a9bdc6",
       "executable": false
     },
     "docs/first-month.md": {
@@ -2932,7 +2932,7 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "3facff86a4131dab49a3158070fdcee54e0514ce9814d3aceab3bc80c29c58e1",
+      "sha256": "513134da6bce4ce9882e0f6740138a1347ea5e37a1ebff0963ff31da0cafcf8c",
       "executable": false
     },
     "src/pantry/automatch.ts": {
@@ -3212,7 +3212,7 @@
       "executable": false
     },
     "src/pantry/dimensions/index.ts": {
-      "sha256": "7c418b90aa845925c2e4f234ca54461884ac5c14d04b88cee8589bea461782df",
+      "sha256": "224a5b466d6b686b4517cefa56a0a06ffcf3e98388c780dd507baf7c465ce8c8",
       "executable": false
     },
     "src/pantry/dimensions/open-items.ts": {
@@ -4488,7 +4488,7 @@
       "executable": false
     },
     "src/ui/dimensions.tsx": {
-      "sha256": "8719ec07824ce444b1f11f58747d1eda78a0898541fec1030ccde0a26621472b",
+      "sha256": "e89a3ccb66edc78e118c96bb0ed7458967f6f3beee63851d04ad21be177a8112",
       "executable": false
     },
     "src/ui/erasure-receipt.tsx": {
@@ -4820,7 +4820,7 @@
       "executable": false
     },
     "tests/api/dimensions-journey.mjs": {
-      "sha256": "659aee4f479a3198817495f3271faadd5f555e862297b2f9e25ef32698a9d445",
+      "sha256": "a718187475c19dfdf7d3b1445c91dc8e96176a6f9f446c1bf54a8779bf035cb4",
       "executable": false
     },
     "tests/api/estimate-siblings.mjs": {
@@ -4992,7 +4992,7 @@
       "executable": false
     },
     "tests/app/dimensions-journey.mjs": {
-      "sha256": "88c85c7b4c002d1d4ffa61a87e5af4c7cf51a71c847733cb8497806436623b2f",
+      "sha256": "d0e12eced71119a4b0d106be5d5589253189fbfcd500cbfbd137028922eb89f7",
       "executable": false
     },
     "tests/app/effects-journey.mjs": {

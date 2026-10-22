@@ -11,6 +11,13 @@ export const dimensionValues = (b: Data) => { const d=dimensionTags(b); return [
 export async function dimensionsView(db:D1Database) {
  return { processor:await all(db,'SELECT * FROM pt_processor_dimensions ORDER BY role'),payroll:await all(db,'SELECT * FROM pt_payroll_dimensions ORDER BY role'),settings:await one(db,'SELECT * FROM pt_dimension_settings WHERE id=1'), values:await all(db,'SELECT * FROM pt_dimensions ORDER BY kind,lower(name)'), required:await all(db,'SELECT * FROM pt_account_dimensions ORDER BY account_id,kind') }
 }
+/** Historical names are report metadata, never choices for new transaction coding. */
+export async function dimensionHistory(db:D1Database) {
+ const rows=await all(db,`SELECT DISTINCT 'class' AS kind,l.class_name AS name FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id WHERE e.status='posted' AND l.class_name<>''
+ UNION SELECT DISTINCT 'location',l.location_name FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id WHERE e.status='posted' AND l.location_name<>''
+ UNION SELECT DISTINCT 'project',l.project_name FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id WHERE e.status='posted' AND l.project_name<>'' ORDER BY kind,name`)
+ return rows.map(row=>({kind:row.kind,name:row.name}))
+}
 const settings:Command={need:'owner',async run(c,b){
  const current=await one(c.db,'SELECT * FROM pt_dimension_settings WHERE id=1')
  requireThat(b.revision===current?.revision,'Dimension settings changed; reload',409)
