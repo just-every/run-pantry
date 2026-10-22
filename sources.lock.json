@@ -4780,7 +4780,7 @@
       "executable": false
     },
     "src/ui/report-delivery.tsx": {
-      "sha256": "8d7d231db63baf4b78a0d7fa1dc0f3a2728004a3061665af5b18f3c5d467a056",
+      "sha256": "282787fbd66c71ff95516d0253a154786eabc095ea1275f5f5c04d2347bf075d",
       "executable": false
     },
     "src/ui/report-detail.tsx": {
@@ -5161,6 +5161,14 @@
     },
     "tests/app/recurring-journals.test.mjs": {
       "sha256": "fb3cbd7c40b9971190a3c415454b4c3223dbbf2df97c35624dc4040b0c7b78d6",
+      "executable": false
+    },
+    "tests/app/report-delivery-seed.mjs": {
+      "sha256": "438aa50a65680ed5e443129e0820fb1be388b165faa67d741705d362b2029793",
+      "executable": false
+    },
+    "tests/app/report-delivery.mjs": {
+      "sha256": "d8c2287a953bc0ea6edd1fe10ef8d9cbab9ae204cb5af707c90002dfb857490c",
       "executable": false
     },
     "tests/app/report-library.test.mjs": {
