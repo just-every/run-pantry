@@ -24,7 +24,15 @@ export async function dimensionsForRestore(context,origin){
  const paymentLines=(await view('journal')).entries.find(e=>e.id===payment.journal_id).lines
  assert.ok(paymentLines.every(l=>l.class_name===tags.className&&l.location_name===tags.locationName&&l.project_name===tags.projectName))
  const recurring=await command('recurring-bill.save',{vendorId:vendor.id,name:'Archived coded renewal',startDate:'2027-01-01',unit:'month',every:1,lines:[{description:'Archive recurring coding',accountId:acct['6200'],amount:'25',...tags}]})
- return {paymentJournal:payment.journal_id,paymentLines,credit,recurring,vendorDefaults:[vendor.default_class,vendor.default_location,vendor.default_project],dimensions:await view('dimensions'),plan,expenseAccount:acct['6200'],vendor:vendor.id,journal:journal.id,historical:historical.id}
+ await command('dimension.save',{kind:'project',name:'Archive corrected project'})
+ const creditLine=(await view('journal')).entries.find(e=>e.id===credit.journal_id).lines.find(l=>l.account_id===acct['6200'])
+ const correction=await command('journal.reclassify',{lineIds:[creditLine.id],dimensionKind:'project',toDimensionName:'Archive corrected project'})
+ const recognitionAccount=await command('account.save',{code:'2490',name:'Archive accrued expenses',type:'liability',subtype:'other'})
+ const schedule=await command('recognition.save',{kind:'accrual',name:'Archive coded recognition',balanceAccountId:recognitionAccount.id,recognitionAccountId:acct['6200'],amount:'2',startDate:'2026-09-30',months:2,...tags})
+ const dimensionAudit=await view('reports/audit-log?from=2026-01-01&to=2026-12-31&dimension=class&dimensionValue=value:Archive%20studio')
+ const correctionEntry=(await view('journal')).entries.find(e=>e.id===correction.reclassified[0].correcting_entry_id)
+ const recognition=(await view('recognition')).schedules.find(s=>s.id===schedule.id)
+ return {dimensionAudit,correctionEntry,schedule:recognition,paymentJournal:payment.journal_id,paymentLines,credit,recurring,vendorDefaults:[vendor.default_class,vendor.default_location,vendor.default_project],dimensions:await view('dimensions'),plan,expenseAccount:acct['6200'],vendor:vendor.id,journal:journal.id,historical:historical.id}
 }
 export async function assertDimensionsRestored(context,origin,expected){
  const get=async(path)=>{const r=await context.request.get(origin+'/api/pantry/'+path);assert.equal(r.status(),200,await r.text());return r.json()}
@@ -36,7 +44,10 @@ export async function assertDimensionsRestored(context,origin,expected){
  assert.deepEqual(sales.vendorCredits.find(c=>c.id===expected.credit.id),expected.credit,'coded vendor credit survives restore')
  const recurring=sales.recurringBills.find(r=>r.id===expected.recurring.id)
  assert.deepEqual(recurring.lines,expected.recurring.lines,'future recurring bill keeps dimension coding')
+ assert.deepEqual((await get('recognition')).schedules.find(s=>s.id===expected.schedule.id),expected.schedule,'recognition coding survives restore')
+ assert.deepEqual(await get('reports/audit-log?from=2026-01-01&to=2026-12-31&dimension=class&dimensionValue=value:Archive%20studio'),expected.dimensionAudit,'frozen audit memberships survive restore')
  const entries=(await get('journal')).entries
+ assert.deepEqual(entries.find(e=>e.id===expected.correctionEntry.id),expected.correctionEntry,'linked document correction roots survive restore')
  assert.deepEqual(entries.find(e=>e.id===expected.paymentJournal).lines,expected.paymentLines,'both sides of a coded recorded payment survive restore unchanged')
  assert.equal(entries.find(e=>e.id===expected.journal).lines[0].class_name,'Archive studio')
  assert.equal(entries.find(e=>e.id===expected.historical).lines[0].class_name,'Archive retired class','inactive historical coding is preserved')

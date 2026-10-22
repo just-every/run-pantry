@@ -5176,7 +5176,7 @@
       "executable": false
     },
     "tests/restore/dimensions.mjs": {
-      "sha256": "2143ccd31a2eb66a8901a1293a4b5fd5a280eae236b6512fdfc6dfaa08c4d530",
+      "sha256": "495962aba0066421ccd1719edb1bea0d8eeffaa27220e8076b84a439d6438538",
       "executable": false
     },
     "tests/restore/estimates.mjs": {
