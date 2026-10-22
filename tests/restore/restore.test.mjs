@@ -149,7 +149,8 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   await command('bill.schedule', { id: bill.id, revision: bill.revision, date: '2026-09-24', note: 'Bank transfer outside Pantry' })
   await command('recurring-bill.save', { name: 'Archived rent', vendorId: vendor.id, startDate: '2026-06-30', endDate: '2026-08-30', every: 1, unit: 'month', termsDays: 15, lines: [{ description: 'Monthly rent', amount: '1200.00', accountId: rent }] })
   await command('recurring-bill.generate', { through: '2026-09-30' })
-  const estimates = await estimatesForRestore(context, server.origin)
+  const siblingInstallations = process.env.PANTRY_PROVE_SIBLINGS === '1' ? await (await import('../siblings/harness.mjs')).realSiblings(t) : undefined
+  const estimates = await estimatesForRestore(context, server.origin, siblingInstallations)
   const captured = await captureForRestore(context, server.origin)
   // Configure real installation-local credentials through the same public
   // settings doors. No model call is made. A held Stripe key, when injected

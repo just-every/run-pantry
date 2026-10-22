@@ -50,9 +50,9 @@ export async function signedEstimate(h, pdf, customer) {
   return { id, token: issued.token }
 }
 
-export async function acceptedProposal(h, customer) {
+export async function acceptedProposal(h, customer, amount = '12000') {
   const client = await h.cmd('client.save', { name: customer.name, email: customer.email })
-  const proposal = await h.cmd('proposal.prepare', { clientId: client.id, title: 'Cedar brand and website', scope: 'Brand strategy, design and launch of the Cedar Workshop website.', optionOne: 'Agreed project', priceOne: '12000', optionTwo: 'Extended project', priceTwo: '18000', depositPercent: '25' })
+  const proposal = await h.cmd('proposal.prepare', { clientId: client.id, title: 'Cedar brand and website', scope: 'Brand strategy, design and launch of the Cedar Workshop website.', optionOne: 'Agreed project', priceOne: amount, optionTwo: 'Extended project', priceTwo: String(Number(amount) * 1.5), depositPercent: '25' })
   await h.cmd('proposal.approve', { id: proposal.id, version: 1, revision: 1 })
   const shared = await h.cmd('proposal.send', { id: proposal.id, version: 2 })
   const path = new URL(shared.shareUrl).pathname

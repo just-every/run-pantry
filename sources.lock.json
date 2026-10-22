@@ -5016,11 +5016,11 @@
       "executable": false
     },
     "tests/restore/estimates.mjs": {
-      "sha256": "e640edd6e1dda77c0c9780ab7fbccef800d766e6b1dc015c3989ec6e8eb9b459",
+      "sha256": "ca3b07af82d4f74daa887d1e17269aa9d003c3acbe3d78b5c4163e99fb970fd8",
       "executable": false
     },
     "tests/restore/restore.test.mjs": {
-      "sha256": "92da94a083d1eae83378b9452b95d2fefca7754fe5c682b60167d00e28e012a1",
+      "sha256": "a3545430f6b1d365b54c607caac48284287f7db2f7b36f9a471ac52473eb7e87",
       "executable": false
     },
     "tests/runtime.mjs": {
@@ -5032,7 +5032,7 @@
       "executable": false
     },
     "tests/siblings/harness.mjs": {
-      "sha256": "3dcd9a349117f098ae6f68fd4dd174d96198990cb161e62cb19edaa82817e6b7",
+      "sha256": "7a320b094ddf47873cd7206a3178c658b1a468f25bff2e5abe1c6a97de6b751a",
       "executable": false
     },
     "tests/site/site.test.mjs": {

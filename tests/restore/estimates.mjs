@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { isIP } from 'node:net'
 
-export async function estimatesForRestore(context, origin) {
+export async function estimatesForRestore(context, origin, siblings) {
   const command = async (op, data) => {
     const r = await context.request.post(`${origin}/api/pantry/command/${op}`, { headers: { origin }, data })
     assert.equal(r.status(), 200, `${op}: ${await r.text()}`); return r.json()
@@ -27,13 +27,37 @@ export async function estimatesForRestore(context, origin) {
   assert.equal(invoice.open_cents, 20000)
   const preview = await (await context.request.get(`${origin}/api/pantry/estimates/${estimate.id}/preview`)).json()
   const pdf = Buffer.from(await (await context.request.get(`${origin}/api/pantry/estimates/${estimate.id}/pdf`)).body())
-  return { peerIP, estimateId: estimate.id, depositId: deposit.id, invoiceId: invoice.id, link, document: preview.document, sha256: preview.sha256, pdf }
+  const external = []
+  if (siblings) {
+    const { signedEstimate, acceptedProposal } = await import('../siblings/harness.mjs')
+    for (const [provider, source, installation] of [
+      ['inkwell', await signedEstimate(siblings.inkwell, pdf, customer), siblings.inkwell],
+      ['platter', await acceptedProposal(siblings.platter, customer, '1200'), siblings.platter],
+    ]) {
+      const prepared = await command('estimate.sibling-preview', { id: estimate.id, revision: estimate.revision, provider, origin: installation.origin, remoteId: source.id, token: source.token })
+      assert.equal(prepared.ok, true, JSON.stringify(prepared))
+      const attached = await command('estimate.sibling-confirm', { id: estimate.id, revision: estimate.revision, previewId: prepared.preview.id, previewRevision: prepared.preview.revision })
+      external.push({ link: attached.link, ...(attached.link.document_href ? { pdf: Buffer.from(await (await context.request.get(origin + attached.link.document_href)).body()) } : {}) })
+    }
+  }
+  return { peerIP, estimateId: estimate.id, depositId: deposit.id, invoiceId: invoice.id, link, document: preview.document, sha256: preview.sha256, pdf, external }
 }
 
 export async function assertEstimatesRestored(context, origin, expected) {
   const get = async path => {
     const r = await context.request.get(`${origin}/api/pantry/${path}`)
     assert.equal(r.status(), 200, await r.text()); return r.json()
+  }
+  if (expected.external.length) {
+    const restored = await get(`estimates/${expected.estimateId}/siblings`)
+    assert.equal(restored.links.length, expected.external.length)
+    assert.deepEqual(restored.previews, [], 'owner preview authority never travels in the archive')
+    assert.deepEqual(restored.attempts, [], 'temporary source errors never travel in the archive')
+    for (const record of expected.external) {
+      const link = restored.links.find(row => row.id === record.link.id)
+      assert.deepEqual(link, record.link)
+      if (record.pdf) assert.deepEqual(Buffer.from(await (await context.request.get(origin + link.document_href)).body()), record.pdf)
+    }
   }
   const estimate = await get(`estimates/${expected.estimateId}`)
   assert.equal(estimate.acceptance.name, 'Casey Archive'); assert.equal(estimate.acceptance.ip, expected.peerIP)
