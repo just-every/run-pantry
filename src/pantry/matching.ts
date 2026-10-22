@@ -62,11 +62,10 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
   const statementTotal=lines.reduce((sum,line)=>sum+line.amount_cents,0)
   const ledgerTotal=postings.reduce((sum,p)=>sum+p.debit_cents-p.credit_cents,0)+requested.reduce((sum,item)=>sum+item.signed,0)
   requireThat(statementTotal===ledgerTotal,`Match does not balance: statement ${usd(statementTotal)}, ledger ${usd(ledgerTotal)}, difference ${usd(statementTotal-ledgerTotal)}`)
-  const codedItems=requested.filter(item=>item.type!=='transfer')
+  const codedItems=requested
   const contributions=distributeDimensionAmounts([
     ...lines.map(line=>({source:line,amount:line.amount_cents})),
     ...postings.map(p=>({source:p,amount:p.credit_cents-p.debit_cents})),
-    ...requested.filter(item=>item.type==='transfer').map(item=>({source:{},amount:-item.signed})),
   ],codedItems.map(item=>item.signed))
   let contributionIndex=0
   const statements: Sql[] = [...bankAuthority(actor, [bankId]),...lines.flatMap(l=>[
@@ -77,7 +76,7 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
     const label = `New item ${i + 1}`, {type,amount,direction}=requested[i]
     const memo = optionalText(item.memo, `${label} memo`, 300)
     const itemCoding=dimensionTags({className:item.className??item.class_name??sourceCoding.className,locationName:item.locationName??item.location_name??sourceCoding.locationName,projectName:item.projectName??item.project_name??sourceCoding.projectName})
-    const bankLines:Line[]=type==='transfer'?[{accountId:bank.account_id,debit:direction==='in'?amount:0,credit:direction==='out'?amount:0,memo}]:contributions[contributionIndex++].map(({amount:share,...tags})=>({...tags,accountId:bank.account_id,debit:Math.max(share,0),credit:Math.max(-share,0),memo}))
+    const bankLines:Line[]=contributions[contributionIndex++].map(({amount:share,...tags})=>({...tags,accountId:bank.account_id,debit:Math.max(share,0),credit:Math.max(-share,0),memo}))
     if (type === 'receipt' || type === 'payment') {
       const p = await paymentStatements(db, actor, { ...itemCoding,direction: type === 'receipt' ? 'received' : 'paid', contactId: item.contactId, date: item.date ?? day, amount: item.amount, bankAccountId: bank.id, reference: item.reference ?? lines[0].reference, memo, allocations: item.allocations }, { bankLines })
       statements.push(...p.statements)
@@ -104,7 +103,7 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
       const entryId = uid(), into = direction === 'in'
       const category:Line={...dimensions,accountId:other.id,debit:into?0:amount-tax,credit:into?amount-tax:0,memo,contactId}
       statements.push(...nativeApprovalAuthority(actor, 'journal', amount, 'record'), ...entryStatements({ id: entryId, date: item.date ?? day, memo: memo || `${type === 'transfer' ? 'Transfer' : other.name} — ${lines[0].description}`, sourceKind: 'bank', documentId: item.documentId ?? null, preparedBy: actor.email, preparedKind: 'person', lines: [
-        ...(into?[bankLines[0],category,...bankLines.slice(1)]:[category,...bankLines]),
+        ...(type==='transfer'?[...bankLines,...bankLines.map(l=>({...l,accountId:other.id,debit:l.credit,credit:l.debit}))]:into?[bankLines[0],category,...bankLines.slice(1)]:[category,...bankLines]),
         ...(tax?[{accountId:code!.account_id,debit:into?0:tax,credit:into?tax:0,memo,...dimensions}]:[]),
       ] }, actor.email))
       created.push({ entryId, signed: into ? amount : -amount, kind: type })

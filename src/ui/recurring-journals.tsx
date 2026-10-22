@@ -1,10 +1,11 @@
+import { DimensionFields } from './dimensions'
 // Close's recurring-journal workspace uses the same journal lines and approval
 // rules as Books. Template changes never approve their own future postings.
 import { useState } from 'react'
 import { Action, Card, Chip, Field, Form, Loading, Table, accountOptions, amountText, command, day, today, usd, useShared, useView, useWho, type D } from './kit'
 
 const STATUS: Record<string, string> = { active: 'Active', 'awaiting-approval': 'Waiting for approval', paused: 'Paused', ended: 'Ended', drafted: 'Draft for approval', posted: 'Posted', blocked: 'Blocked', failed: 'Failed', missed: 'Missed' }
-type InputLine = { accountId: string; debit: string; credit: string; memo: string; contactId?: string | null }
+type InputLine = { accountId: string; debit: string; credit: string; memo: string; contactId?: string | null;className?:string;locationName?:string;projectName?:string }
 const blank = (): InputLine => ({ accountId: '', debit: '', credit: '', memo: '' })
 
 function TemplateEditor({ template, onDone, cancel }: { template?: D; onDone: () => Promise<void>; cancel: () => void }) {
@@ -31,6 +32,7 @@ function TemplateEditor({ template, onDone, cancel }: { template?: D; onDone: ()
         <Field label={`Line ${i + 1} memo`} name={`memo${i}`} value={l.memo} onChange={(e: any) => update(i, { memo: e.target.value })} />
         <Field label={`Line ${i + 1} debit`} name={`debit${i}`} inputMode="decimal" value={l.debit} onChange={(e: any) => update(i, { debit: e.target.value, credit: e.target.value ? '' : l.credit })} />
         <Field label={`Line ${i + 1} credit`} name={`credit${i}`} inputMode="decimal" value={l.credit} onChange={(e: any) => update(i, { credit: e.target.value, debit: e.target.value ? '' : l.debit })} />
+        <DimensionFields line={l} index={i} onChange={patch=>update(i,patch)} />
         {lines.length > 2 && <button type="button" className="btn btn-link" onClick={() => setLines(ls => ls.filter((_, j) => i !== j))}>Remove line {i + 1}</button>}
       </div>)}
       <button type="button" className="btn btn-secondary" onClick={() => setLines(ls => [...ls, blank()])}>Add journal line</button>
@@ -42,7 +44,7 @@ function Coding({ lines }: { lines: D[] }) {
   const { state } = useShared()
   return <Table heads={['Account', 'Memo', 'Debit', 'Credit']} figures={[2, 3]}>
     {lines.map((l: D, i: number) => { const a = state.accounts.find((a: D) => a.id === l.accountId)
-      return <tr key={i}><td>{a?.code} · {a?.name}</td><td>{l.memo || '—'}</td><td className="fig">{l.debit ? usd(l.debit) : '—'}</td><td className="fig">{l.credit ? usd(l.credit) : '—'}</td></tr>
+      return <tr key={i}><td>{a?.code} · {a?.name}</td><td>{l.memo || '—'}<small className="sub block">{[l.className,l.locationName,l.projectName].filter(Boolean).join(' · ')}</small></td><td className="fig">{l.debit ? usd(l.debit) : '—'}</td><td className="fig">{l.credit ? usd(l.credit) : '—'}</td></tr>
     })}
   </Table>
 }

@@ -1,3 +1,4 @@
+import { dimensionTags,dimensionValues } from './dimensions'
 // Recognise money moving between the business's accounts. Evidence names the
 // other account; amount alone never establishes identity. Both matches and the
 // single balanced posting commit together.
@@ -53,8 +54,8 @@ function externalPayee(line: Data, banks: Data[]) {
   }
   return !!payee && !banks.some(b => [b.institution, b.name].some(name => normalize(name) === normalize(payee)))
 }
-const freeLine = (l: Data) => guard(`EXISTS (SELECT 1 FROM pt_bank_lines WHERE id = ? AND posted_date = ? AND amount_cents = ? AND description = ? AND removed_at IS NULL AND excluded_at IS NULL)
-  AND NOT EXISTS (SELECT 1 FROM pt_reconciliations r JOIN pt_statements s ON s.id = r.statement_id WHERE r.bank_account_id = ? AND ? BETWEEN s.start_date AND s.end_date)`, l.id, l.posted_date, l.amount_cents, l.description, l.bank_account_id, l.posted_date)
+const freeLine = (l: Data) => guard(`EXISTS (SELECT 1 FROM pt_bank_lines WHERE id = ? AND posted_date = ? AND amount_cents = ? AND description = ? AND class_name=? AND location_name=? AND project_name=? AND removed_at IS NULL AND excluded_at IS NULL)
+  AND NOT EXISTS (SELECT 1 FROM pt_reconciliations r JOIN pt_statements s ON s.id = r.statement_id WHERE r.bank_account_id = ? AND ? BETWEEN s.start_date AND s.end_date)`, l.id, l.posted_date, l.amount_cents, l.description,...dimensionValues(l), l.bank_account_id, l.posted_date)
 
 /** Pending halves are work, even when no provider is configured or connected now. */
 export async function transferState(db: D1Database) {
@@ -93,7 +94,7 @@ async function pair(db: D1Database, outgoing: Data, incoming: Data, banks: Data[
       AND (SELECT COUNT(*) FROM pt_match_bank_lines WHERE match_id = ? AND active = 1) = 1`, l.match_id, journalId, l.match_id))
   }
   if (!recorded.length) statements.push(...entryStatements({ id: journalId, date: outgoing.posted_date, memo: `Transfer — ${from.name} to ${to.name}`, sourceKind: 'bank', sourceId: id, preparedBy: actor.email, preparedKind: 'person', lines: [
-    { accountId: to.account_id, debit: incoming.amount_cents, credit: 0 }, { accountId: from.account_id, debit: 0, credit: -outgoing.amount_cents },
+    { ...dimensionTags(incoming),accountId: to.account_id, debit: incoming.amount_cents, credit: 0 }, { ...dimensionTags(outgoing),accountId: from.account_id, debit: 0, credit: -outgoing.amount_cents },
   ] }, actor.email))
   else statements.push(guard("EXISTS (SELECT 1 FROM pt_journal_entries WHERE id = ? AND status = 'posted' AND reversed_by_id IS NULL)", journalId))
   for (const [i, l] of [outgoing, incoming].entries()) {
