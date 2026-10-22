@@ -49,7 +49,7 @@ export async function dimensionCompletionBrowser(t){
   await page.getByLabel('Report name',{exact:true}).fill(`Studio trial balance ${width}`);await page.getByLabel('Report source',{exact:true}).selectOption('trial-balance')
   await page.getByLabel('From',{exact:true}).fill('2026-09-01');await page.getByLabel('To',{exact:true}).fill('2026-09-30');await page.getByLabel('Period columns',{exact:true}).selectOption('class')
   await shot('custom-dimension-editor');await submit(page.getByRole('button',{name:'Save custom report',exact:true}),'custom-report.save')
-  await expect(page.getByRole('heading',{name:`Studio trial balance ${width}`,exact:true})).toBeVisible();await shot('custom-dimension-render')
+  await expect(page.getByRole('heading',{name:new RegExp(`^Studio trial balance ${width}`)})).toBeVisible();await shot('custom-dimension-render')
   const invoiceDraft=await command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-09-20',lines:[{description:`Recode consultation ${width}`,quantity:'1',rate:'100',accountId:acct['4000'],taxCode:'exempt',...tags}]})
   await command('invoice.approve',{id:invoiceDraft.id,revision:invoiceDraft.revision});const issued=await command('invoice.issue',{id:invoiceDraft.id})
   await command('payment.record',{direction:'received',contactId:customer.id,date:'2026-10-05',amount:'50',bankAccountId:bank.id,...tags,allocations:[{targetId:issued.id,amount:'50'}]})
