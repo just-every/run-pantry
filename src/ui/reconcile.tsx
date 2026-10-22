@@ -37,7 +37,8 @@ function suggested(open: D[], amount: string, lines: D[]): Record<string, string
 
 export function MatchPanel({ lines, postings, bankId, clear, onDone, suggestedCategory }: { suggestedCategory?: D; lines: D[]; postings: D[]; bankId: string; clear: () => void; onDone: () => Promise<void> }) {
   const { state } = useShared(), [items, setItems] = useState<NewItem[]>(() => suggestedCategory && lines.length === 1 ? [{ type: suggestedCategory.billId ? 'payment' : lines[0].amount_cents < 0 ? 'fee' : 'income', amount: (Math.abs(lines[0].amount_cents) / 100).toFixed(2), accountId: suggestedCategory.accountId, contactId: suggestedCategory.contactId ?? undefined, allocations: suggestedCategory.billId ? { [suggestedCategory.billId]: (Math.abs(lines[0].amount_cents) / 100).toFixed(2) } : undefined, direction: lines[0].amount_cents < 0 ? 'out' : 'in', memo: suggestedCategory.payee }] : []), [error, setError] = useState(''), [busy, setBusy] = useState(false)
-  const sales = useView<D>(items.some(i => i.type === 'receipt' || i.type === 'payment') ? 'sales' : null).data
+  const needsPayments=items.some(i=>i.type==='receipt'||i.type==='payment')
+  const salesView=useView<D>(needsPayments?'sales':null),sales=salesView.data
   // Until the person types what a payment pays, it pays what Pantry suggests from the line and the open items.
   const applies = (it: NewItem) => it.allocations ?? suggested(openItems(sales, it), it.amount, lines)
   const statement = lines.reduce((s, l) => s + l.amount_cents, 0)
@@ -65,7 +66,7 @@ export function MatchPanel({ lines, postings, bankId, clear, onDone, suggestedCa
             {it.type === 'transfer' && <><Field label="Other bank account" name={`other-${k}`} value={it.otherBankAccountId ?? ''} onChange={(e: any) => set(k, { otherBankAccountId: e.target.value })} options={state.bankAccounts.filter((b: D) => b.id !== bankId).map((b: D) => ({ value: b.id, label: b.name }))} /><Field label="Money" name={`dir-${k}`} value={it.direction ?? 'out'} onChange={(e: any) => set(k, { direction: e.target.value })} options={[{ value: 'in', label: 'Came in' }, { value: 'out', label: 'Went out' }]} /></>}
             {(it.type === 'receipt' || it.type === 'payment') && <Field label={it.type === 'receipt' ? 'Customer' : 'Vendor'} name={`contact-${k}`} value={it.contactId ?? ''} onChange={(e: any) => set(k, { contactId: e.target.value, allocations: undefined })} options={contactOptions(state.contacts, it.type === 'receipt' ? 'customer' : 'vendor')} />}
           </div>
-          {(it.type === 'receipt' || it.type === 'payment') && <Applies it={it} open={openItems(sales, it)} applied={applies(it)} onChange={allocations => set(k, { allocations })} />}
+          {(it.type === 'receipt' || it.type === 'payment') && (sales ? <Applies it={it} open={openItems(sales, it)} applied={applies(it)} onChange={allocations => set(k, { allocations })} /> : <p role={salesView.error?'alert':'status'} className={salesView.error?'error':'hint'}>{salesView.error||'Loading open invoices and bills before matching this payment…'}</p>)}
           <button type="button" className="btn btn-link" onClick={() => setItems(xs => xs.filter((_, j) => j !== k))}>Remove</button>
         </div>)}
         <div className="row-actions small">{KINDS.map(([t, label]) => <button key={t} type="button" className="btn btn-secondary btn-small" onClick={() => add(t)}>{label}</button>)}</div>
@@ -73,7 +74,7 @@ export function MatchPanel({ lines, postings, bankId, clear, onDone, suggestedCa
       <div className="match-totals">
         <p className="pair"><span>Statement</span><strong>{usd(statement)}</strong></p><p className="pair"><span>Ledger</span><strong>{usd(ledger)}</strong></p>
         <p className={`pair ${statement === ledger ? 'tone-good' : 'tone-bad'}`}><span>Difference</span><strong>{usd(statement - ledger)}</strong></p>
-        <button type="button" className="btn btn-primary btn-block" disabled={busy || !lines.length || statement !== ledger} onClick={async () => {
+        <button type="button" className="btn btn-primary btn-block" disabled={busy || !lines.length || statement !== ledger || (needsPayments && !sales)} onClick={async () => {
           setBusy(true); setError('')
           const create = items.map(({ allocations, ...i }) => ({ ...i, allocations: Object.entries(i.type === 'receipt' || i.type === 'payment' ? applies({ ...i, allocations }) : {}).filter(([, v]) => v).map(([targetId, amount]) => ({ targetId, amount })) }))
           try { await command('match.approve', { bankLineIds: lines.map(l => l.id), journalLineIds: postings.map(p => p.id), create }); setItems([]); clear(); await onDone() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }

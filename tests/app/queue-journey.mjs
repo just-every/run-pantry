@@ -53,8 +53,14 @@ export async function queueBrowser(t){
   await panel.screenshot({path:`${evidence}/queue-card-${width}.png`});await panel.getByRole('button',{name:'Approve match',exact:true}).click();await expect(panel).toHaveCount(0)
   await choose(descriptions[2]);await page.getByLabel('Exclusion reason',{exact:true}).fill('Personal purchase reviewed by the owner');await page.getByRole('button',{name:'Exclude selected line',exact:true}).click();await expect(panel).toHaveCount(0)
   await page.getByLabel('Show',{exact:true}).selectOption('Excluded');await expect(row(descriptions[2]).getByText('Personal purchase reviewed by the owner',{exact:false})).toBeVisible();await page.screenshot({path:`${evidence}/queue-excluded-${width}.png`,fullPage:true});await page.getByLabel('Show',{exact:true}).selectOption('All')
+  // Delay only this browser's real read. Approval waits for the current open
+  // invoices instead of silently recording an unintended unapplied payment.
+  let releaseSales;const salesGate=new Promise(resolve=>{releaseSales=resolve})
+  await page.route('**/api/pantry/sales',async route=>{await salesGate;await route.continue()})
   await choose(descriptions[3]);await panel.getByRole('button',{name:'+ Customer payment',exact:true}).click();await panel.getByLabel('Customer',{exact:true}).selectOption(customer.id)
+  try{await expect(panel.getByRole('button',{name:'Approve match',exact:true})).toBeDisabled()}finally{releaseSales()}
   await panel.getByRole('button',{name:'Approve match',exact:true}).click();await expect(panel).toHaveCount(0)
+  await page.unroute('**/api/pantry/sales')
   assert.equal((await view('sales')).invoices.find(i=>i.id===invoice.id).open_cents,0)
   const bulk=async count=>{
    const boxes=page.getByRole('checkbox',{name:new RegExp(`^Select ${vendor.name}`)})
