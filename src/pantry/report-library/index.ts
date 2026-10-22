@@ -18,7 +18,7 @@ export async function contractorPayments(db: D1Database, from: string, to: strin
 
 export async function libraryReport(db: D1Database, kind: string, from: string, to: string, basis: Basis, account?: string, payee?: string, dimension?: DimensionScope): Promise<LibraryReport> {
   requireThat(isLibrary(kind), 'Unknown library report', 404)
-  requireThat(!dimension || ['transactions','journal'].includes(kind), 'This library report does not yet support a dimension filter', 409)
+  requireThat(!dimension || ['transactions','journal','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances'].includes(kind), 'This library report does not yet support a dimension filter', 409)
   requireThat(from <= to, 'The end date is on or after the start date')
   let data: Partial<LibraryReport>
   if (['transactions', 'journal'].includes(kind)) data = await ledgerActivity(db, kind, from, to, basis, account, payee, dimension)
@@ -48,6 +48,6 @@ export async function libraryReport(db: D1Database, kind: string, from: string, 
     data = { basis: 'payment', basisLabel: 'Payment basis', note: 'Marked 1099 vendors, grouped by payment calendar year within the inclusive range; card/network payments and unknown methods remain separate. This is a payment summary, not a filing or threshold determination.',
       columns: ['Tax year', 'Vendor', '1099-NEC eligible methods', 'Card/network excluded', 'Method not recorded'], moneyColumns: [2, 3, 4],
       rows: [...grouped].map(([id, r]) => ({ id, cells: [r.year, r.name, r.counted, r.excluded, r.unknown] })), totals: [{ label: 'Eligible-method payments', amount: payments.filter(p => p.class === 'counted').reduce((n, p) => n + p.amount_cents, 0) }] }
-  } else data = await openItems(db, kind, from, to)
+  } else data = await openItems(db, kind, from, to, dimension)
   return { kind, title: LIBRARY[kind] + (dimension ? ` · ${dimension.label}` : ''), from, to, basis: 'accrual', basisLabel: 'Open items - accrual basis', ...data } as LibraryReport
 }

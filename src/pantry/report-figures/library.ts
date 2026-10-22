@@ -42,11 +42,11 @@ export async function libraryFigure(db: D1Database, kind: string, line: string, 
     const wanted = total ? 'counted' : (['', '', 'counted', 'excluded', 'unknown'] as string[])[index]
     return figureResult({ ...base, rows: (await contractorPayments(db, from, to)).filter(p => ids.has(p.group) && p.class === wanted).map(payment) })
   }
-  const s = await openItemSources(db, RECEIVABLE.includes(kind) ? 'receivable' : 'payable', to)
+  const s = await openItemSources(db, RECEIVABLE.includes(kind) ? 'receivable' : 'payable', to, dimension)
   if (kind.endsWith('-balances')) {
     if (total) return figureResult({ ...base, rows: await s.control(), scopeNote: `All posted activity through ${to}.` })
     const receivable = kind === 'customer-balances', subtype = new Set((await all(db, 'SELECT id FROM pt_accounts WHERE subtype = ?', receivable ? 'receivable' : 'payable')).map(a => a.id))
-    const rows = (await reportSourceRows(db, { types: [receivable ? 'asset' : 'liability'], from: FIRST_DAY, to, sign: receivable ? 1 : -1 }, 'accrual')).filter(r => subtype.has(r.account.id) && r.contactId === rowId)
+    const rows = (await reportSourceRows(db, { types: [receivable ? 'asset' : 'liability'], from: FIRST_DAY, to, sign: receivable ? 1 : -1 }, 'accrual')).filter(r => subtype.has(r.account.id) && r.contactId === rowId && (!dimension||String(r[dimension.kind+'_name']??'')===dimension.value))
     return figureResult({ ...base, rows, scopeNote: `Control-account lines for this contact through ${to}.` })
   }
   const items = (s.report.items as Data[]).filter(i => i.doc_date >= from)

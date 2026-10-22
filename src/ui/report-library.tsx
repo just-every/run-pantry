@@ -33,8 +33,9 @@ export function libraryQuery(slug: string, from: string, to: string, basis: 'cas
   if (hasLibraryFilters(slug)) {
     if (account) query.set('account', account)
     if (payee) query.set('payee', payee)
-    if (dimension) { query.set('dimension',dimension); query.set('dimensionValue',dimensionValue??'') }
+
   }
+  if(dimension){query.set('dimension',dimension);query.set('dimensionValue',dimensionValue??'')}
   return query.toString()
 }
 

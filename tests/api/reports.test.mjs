@@ -927,3 +927,6 @@ test('DIM-001 class and location budgets import and split to tied actual, plan, 
 
 import {dimensionTaxAndCash} from './dimension-extensions.mjs'
 test('DIM-001 cash-flow and sales-tax dimension filters keep dated contributions, liability ties, source figures and exports',dimensionTaxAndCash)
+
+import {dimensionAgeing} from './dimension-extensions.mjs'
+test('DIM-001 ageing and open-item library dimensions retain mixed-line shares, unapplied credits, dated reversals and source exports',dimensionAgeing)

@@ -1,3 +1,4 @@
+import type { DimensionScope } from './dimensions/scope'
 // The accountant package as files an accountant opens: one CSV per report, the close
 // checklist, the reconciliations and the documents list, a README saying what is where,
 // and the same package as JSON for software. Every figure comes from accountantPackage.
@@ -23,14 +24,15 @@ const ageing = (a: Data) => csv([['Who', 'Reference', 'Due', 'Days overdue', 'Bu
   ['Total', '', '', '', '', money(a.itemsTotal)], ...(a.unapplied ? [['Received or credited, not yet applied', '', '', '', '', money(-a.unapplied)]] : [])])
 
 /** The package's files and the archive's name. */
-export async function packageZip(db: D1Database, period: string, basis: Basis) {
-  const p = await accountantPackage(db, period, basis), basisName = p.basis
+export async function packageZip(db: D1Database, period: string, basis: Basis, dimension?: DimensionScope) {
+  const p = await accountantPackage(db, period, basis, dimension), basisName = p.basis
   const pl = (r: Data) => statement([['Income', r.income, r.totalIncome], ['Expenses', r.expenses, r.totalExpenses]], ['Net income', r.netIncome])
   const bs = p.balanceSheet
   const files = [
     { name: 'cash-flow.csv', data: cashFlowCsv(p.cashFlow) },
     { name: 'README.txt', data: [
       `Accountant package for ${p.entity.legalName}, ${p.period.start} to ${p.period.end}.`,
+      ...(dimension?[`Financial dimension: ${dimension.label}.`,p.scopeNote]:[]),
       `Ledger reports are on the ${basisName.toLowerCase()}; cash-flow starts from accrual net income. Figures are in US dollars, recalculated from the posted ledger on ${p.generatedAt.slice(0, 10)}.`,
       `The month is ${p.close.status === 'locked' ? 'locked' : 'not locked yet'}.`, '',
       'trial-balance.csv            Debit and credit balance of every account at the end of the month',
@@ -51,7 +53,7 @@ export async function packageZip(db: D1Database, period: string, basis: Basis) {
     { name: 'profit-and-loss.csv', data: pl(p.profitAndLoss.period) },
     { name: 'profit-and-loss-ytd.csv', data: pl(p.profitAndLoss.yearToDate) },
     { name: 'balance-sheet.csv', data: statement([['Assets', bs.assets, bs.totalAssets], ['Liabilities', bs.liabilities, bs.totalLiabilities], ['Equity', bs.equity, bs.totalEquity]], ['Liabilities and equity', bs.totalLiabilities + bs.totalEquity]) },
-    { name: 'general-ledger.csv', data: await ledgerCsv(db, period, basis) },
+    { name: 'general-ledger.csv', data: await ledgerCsv(db, period, basis, dimension) },
     { name: 'receivables-aging.csv', data: ageing(p.receivables) },
     { name: 'payables-aging.csv', data: ageing(p.payables) },
     { name: 'reconciliations.csv', data: csv([['Bank account', 'Statement end', 'Opening', 'Closing', 'Books', 'Outstanding', 'Reconciled by', 'Reconciled at'], ...p.reconciliations.map((r: Data) => [r.bank, r.end_date, money(r.opening_cents), money(r.closing_cents), money(r.book_cents), money(r.outstanding_cents), r.completed_by, r.completed_at])]) },
@@ -63,5 +65,5 @@ export async function packageZip(db: D1Database, period: string, basis: Basis) {
     { name: 'documents.csv', data: csv([['Name', 'Type', 'Bytes', 'SHA-256', 'Attached to', 'Uploaded by', 'Uploaded at'], ...p.documents.map((d: Data) => [d.name, d.media_type, d.size, d.sha256, d.linked_kind ? `${d.linked_kind} ${d.linked_id}` : '', d.uploaded_by, d.uploaded_at])]) },
     { name: 'pantry-package.json', data: JSON.stringify(p, null, 2) },
   ]
-  return { bytes: zip(files.map(f => ({ name: `pantry-close-${period}/${f.name}`, data: f.name.endsWith('.csv') ? `Basis,${f.name.includes('aging') ? 'Open items · accrual basis' : f.name === 'cash-flow.csv' ? 'Indirect method · starts from accrual net income' : basisName}\r\n${f.data}` : f.data }))), basis }
+  return { bytes: zip(files.map(f => ({ name: `pantry-close-${period}/${f.name}`, data: f.name.endsWith('.csv') ? `${dimension?`Dimension scope,${cell(['trial-balance.csv','profit-and-loss.csv','profit-and-loss-ytd.csv','cash-flow.csv','balance-sheet.csv','general-ledger.csv','receivables-aging.csv','payables-aging.csv'].includes(f.name)?dimension.label:'Whole business evidence (not filtered)')}\r\n`:''}Basis,${f.name.includes('aging') ? 'Open items · accrual basis' : f.name === 'cash-flow.csv' ? 'Indirect method · starts from accrual net income' : basisName}\r\n${f.data}` : f.data }))), basis }
 }

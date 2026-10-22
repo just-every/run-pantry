@@ -33,7 +33,7 @@ const DOCUMENT_KINDS = "('invoice', 'credit', 'bill')"
 export const sameOnCash = (e = 'e') => `NOT (${e}.source_kind IN ${DOCUMENT_KINDS} OR (${e}.source_kind = 'reversal' AND EXISTS (SELECT 1 FROM pt_journal_entries o WHERE o.id = ${e}.reverses_id AND o.source_kind IN ${DOCUMENT_KINDS})))`
 
 export type Settlement = {
-  kind: 'payment' | 'payment-reversed' | 'credit' | 'credit-applied' | 'credit-reversed'
+  allocationId?: string; kind: 'payment' | 'payment-reversed' | 'credit' | 'credit-applied' | 'credit-reversed'
   date: string; amount: number
   paymentId: string | null; paymentReference: string; paymentJournalId: string | null; reversalJournalId: string | null
   creditId: string | null; creditNumber: string | null; appliedToId: string | null; appliedToNumber: string | null
@@ -117,7 +117,7 @@ async function events(db: D1Database, docs: Map<string, Doc>): Promise<Event[]> 
     ORDER BY a.allocation_date, a.created_at, a.id`)
   const out: Event[] = []
   for (const a of rows) {
-    const base = { paymentId: a.source_kind === 'payment' ? a.source_id : null, paymentReference: a.payment_reference ?? '', paymentJournalId: a.payment_journal ?? null, reversalJournalId: null,
+    const base = { allocationId:a.id, paymentId: a.source_kind === 'payment' ? a.source_id : null, paymentReference: a.payment_reference ?? '', paymentJournalId: a.payment_journal ?? null, reversalJournalId: null,
       creditId: a.source_kind === 'credit' ? a.source_id : null, creditNumber: a.credit_number ?? null, appliedToId: a.target_id, appliedToNumber: a.target_number ?? null }
     const order = `${a.created_at}|${a.id}`
     if (docs.has(a.target_id)) {

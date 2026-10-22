@@ -1,3 +1,4 @@
+import type { DimensionScope } from './dimensions/scope'
 // The accountant package: one period's close evidence as a JSON document, and
 // its general ledger as CSV. Every figure is recalculated from the ledger.
 import { monthBounds, type Data } from './core'
@@ -11,11 +12,12 @@ import { cashFlow } from './cash-flow'
 import { entryDocuments } from './receipts/attachments'
 import { reconciliationHistory } from './reconciliation-undo'
 
-export async function accountantPackage(db: D1Database, period: string, basis: Basis = 'accrual'): Promise<Data> {
+export async function accountantPackage(db: D1Database, period: string, basis: Basis = 'accrual', dimension?: DimensionScope): Promise<Data> {
   const entity = await requireEntity(db)
   const { start, end } = monthBounds(period)
   return {
     format: 'pantry-accountant-package/1',
+    ...(dimension?{dimension,scopeNote:'Financial reports use the selected line dimension. Close checks, provider balances, reconciliations, audit, approvals and document inventory remain explicitly whole-business evidence.'}:{}),
     generatedAt: new Date().toISOString(),
     // Ledger reports read on this basis; ageing lists open items, which only the accrual books carry.
     basis: BASIS_LABEL[basis],
@@ -23,13 +25,13 @@ export async function accountantPackage(db: D1Database, period: string, basis: B
     period: { id: period, start, end },
     close: await closeState(db, period),
     stripeClearing: await clearingState(db),
-    trialBalance: await trialBalance(db, end, basis),
-    profitAndLoss: { period: await profitAndLoss(db, start, end, basis), yearToDate: await profitAndLoss(db, fiscalYearStart(end, entity.fiscal_year_start), end, basis) },
-    cashFlow: await cashFlow(db, start, end),
-    balanceSheet: await balanceSheet(db, end, entity.fiscal_year_start, basis),
-    receivables: await ageing(db, 'receivable', end),
-    payables: await ageing(db, 'payable', end),
-    generalLedger: await generalLedger(db, start, end, undefined, basis),
+    trialBalance: await trialBalance(db, end, basis, dimension),
+    profitAndLoss: { period: await profitAndLoss(db, start, end, basis, dimension), yearToDate: await profitAndLoss(db, fiscalYearStart(end, entity.fiscal_year_start), end, basis, dimension) },
+    cashFlow: await cashFlow(db, start, end, dimension),
+    balanceSheet: await balanceSheet(db, end, entity.fiscal_year_start, basis, dimension),
+    receivables: await ageing(db, 'receivable', end, dimension),
+    payables: await ageing(db, 'payable', end, dimension),
+    generalLedger: await generalLedger(db, start, end, undefined, basis, dimension),
     reconciliations: (await all(db, 'SELECT r.*, b.name AS bank FROM pt_reconciliations r JOIN pt_bank_accounts b ON b.id = r.bank_account_id WHERE r.end_date <= ? ORDER BY r.end_date', end)).map(r => ({ ...r, proof: JSON.parse(r.proof) })),
     voidedReconciliations: await reconciliationHistory(db, undefined, end),
     reversals: await all(db, "SELECT e.id, e.number, e.entry_date, e.memo, e.reverses_id, o.number AS reverses_number FROM pt_journal_entries e JOIN pt_journal_entries o ON o.id = e.reverses_id WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ?", start, end),
@@ -47,9 +49,9 @@ export async function accountantPackage(db: D1Database, period: string, basis: B
 const cell = (v: unknown) => { const s = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s }
 const amount = (c: number) => (c / 100).toFixed(2)
 
-export async function ledgerCsv(db: D1Database, period: string, basis: Basis = 'accrual') {
+export async function ledgerCsv(db: D1Database, period: string, basis: Basis = 'accrual', dimension?: DimensionScope) {
   const { start, end } = monthBounds(period)
-  const gl = await generalLedger(db, start, end, undefined, basis), label = BASIS_LABEL[basis]
+  const gl = await generalLedger(db, start, end, undefined, basis, dimension), label = BASIS_LABEL[basis]
   const docs = await entryDocuments(db)
   // Each line names its entry's receipts: file name, SHA-256 and the path that opens it in Pantry.
   const receipt = (entryId?: string) => (entryId ? docs[entryId] ?? [] : []).map(d => `${d.name} sha256:${d.sha256} /api/pantry/documents/${d.id}`).join('; ')
@@ -58,5 +60,5 @@ export async function ledgerCsv(db: D1Database, period: string, basis: Basis = '
     rows.push([a.code, a.name, start, '', 'Opening balance', '', '', '', '', amount(a.opening), '', label])
     for (const l of a.rows) rows.push([a.code, a.name, l.entry_date, l.number === null ? '' : String(l.number), l.entry_memo, l.memo, l.contact_name ?? '', l.debit_cents ? amount(l.debit_cents) : '', l.credit_cents ? amount(l.credit_cents) : '', amount(l.running), receipt(l.entry_id), label])
   }
-  return rows.map(r => r.map(cell).join(',')).join('\r\n') + '\r\n'
+  return (dimension?rows.map((r,i)=>[...r,i===0?'Dimension':dimension.label]):rows).map(r => r.map(cell).join(',')).join('\r\n') + '\r\n'
 }

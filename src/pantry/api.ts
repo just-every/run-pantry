@@ -1,3 +1,4 @@
+import { fiscalYearStart } from './reports'
 import { dimensionScope } from './dimensions/scope'
 import { projectProfit } from './dimensions/report'
 import { dimensionCommands, dimensionsView } from './dimensions'
@@ -262,7 +263,7 @@ api.get('/api/pantry/reports/:kind/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const kind=c.req.param('kind')!,basis=await reportBasis(ctx.db,c.req.query('basis'))
   requireThat(!c.req.query('dimensionValue')||c.req.query('dimension'),'Choose a dimension before a value')
-  requireThat(!c.req.query('dimension')||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
+  requireThat(!c.req.query('dimension')||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
   const response=isLibrary(kind)?await libraryExport(ctx.db,await libraryReport(ctx.db,kind,from,to,basis,c.req.query('account'),c.req.query('payee'),await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))),c.req.query('format')??'pdf')
     :await reportExport(ctx.db,kind,from,to,basis,c.req.query('format')??'pdf',c.req.query('columns'),c.req.query('account'),c.req.query('dimension'),c.req.query('dimensionValue'))
   await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:kind.replaceAll('-',' '),from,to,basis,report:kind,dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue'),account:c.req.query('account'),payee:c.req.query('payee'),columns:c.req.query('columns')})
@@ -301,26 +302,28 @@ gustoRoutes(api)
 const suffix = (basis: string) => basis === 'cash' ? '-cash' : ''
 
 api.get('/api/pantry/package/:period', async c => {
-  const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis'))
-  const body = JSON.stringify(await accountantPackage(ctx.db, period, basis), null, 2)
+  const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis')),dimension=await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))
+  const body = JSON.stringify(await accountantPackage(ctx.db, period, basis, dimension), null, 2)
   const range=monthBounds(period)
-  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'accountant-package',name:`Accountant package · ${period}`,from:range.start,to:range.end,basis})
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'accountant-package',name:`Accountant package · ${period}`,from:range.start,to:range.end,basis,dimension:dimension?.kind,dimensionValue:dimension?.id,...(dimension?{reports:['trial-balance','profit-and-loss','balance-sheet','cash-flow','receivables','payables','general-ledger']}: {})})
+  if(dimension){const entity=await one(ctx.db,'SELECT fiscal_year_start FROM pt_entity WHERE id=1');await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`Package year-to-date profit and loss · ${period}`,report:'profit-and-loss',from:fiscalYearStart(range.end,Number(entity?.fiscal_year_start??1)),to:range.end,basis,dimension:dimension.kind,dimensionValue:dimension.id})}
   return new Response(body, { headers: { 'content-type': 'application/json', 'content-disposition': `attachment; filename="pantry-close-${period}${suffix(basis)}.json"`, 'cache-control': 'no-store' } })
 })
 
 // The same package as an accountant opens it: a ZIP of CSV reports, the checklist, a README and the JSON.
 api.get('/api/pantry/package/:period/accountant-package.zip', async c => {
-  const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis'))
-  const { bytes } = await packageZip(ctx.db, period, basis)
+  const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis')),dimension=await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))
+  const { bytes } = await packageZip(ctx.db, period, basis, dimension)
   const range=monthBounds(period)
-  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'accountant-package',name:`Accountant package · ${period}`,from:range.start,to:range.end,basis})
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'accountant-package',name:`Accountant package · ${period}`,from:range.start,to:range.end,basis,dimension:dimension?.kind,dimensionValue:dimension?.id,...(dimension?{reports:['trial-balance','profit-and-loss','balance-sheet','cash-flow','receivables','payables','general-ledger']}: {})})
+  if(dimension){const entity=await one(ctx.db,'SELECT fiscal_year_start FROM pt_entity WHERE id=1');await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`Package year-to-date profit and loss · ${period}`,report:'profit-and-loss',from:fiscalYearStart(range.end,Number(entity?.fiscal_year_start??1)),to:range.end,basis,dimension:dimension.kind,dimensionValue:dimension.id})}
   return new Response(bytes, { headers: { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="pantry-close-${period}${suffix(basis)}.zip"`, 'x-pantry-basis': BASIS_LABEL[basis], 'cache-control': 'no-store' } })
 })
 
 api.get('/api/pantry/package/:period/general-ledger.csv', async c => {
-  const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis'))
-  const csv=await ledgerCsv(ctx.db,period,basis),range=monthBounds(period)
-  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`General ledger · ${period}`,from:range.start,to:range.end,basis,report:'general-ledger'})
+  const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis')),dimension=await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))
+  const csv=await ledgerCsv(ctx.db,period,basis, dimension),range=monthBounds(period)
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`General ledger · ${period}`,from:range.start,to:range.end,basis,report:'general-ledger',dimension:dimension?.kind,dimensionValue:dimension?.id})
   return new Response(csv, { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-general-ledger-${period}${suffix(basis)}.csv"`, 'x-pantry-basis': BASIS_LABEL[basis], 'cache-control': 'no-store' } })
 })
 

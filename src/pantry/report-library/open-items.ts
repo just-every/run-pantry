@@ -1,18 +1,19 @@
+import type { DimensionScope } from '../dimensions/scope'
 import { type Data } from '../core'
 import { all } from '../db'
 import { ageing } from '../reports'
 import type { LibraryReport } from './types'
 
 /** Open documents are filtered by original document date, with balances as of to. */
-export async function openItems(db: D1Database, kind: string, from: string, to: string): Promise<Partial<LibraryReport>> {
+export async function openItems(db: D1Database, kind: string, from: string, to: string, dimension?: DimensionScope): Promise<Partial<LibraryReport>> {
   const receivable = ['receivables-summary', 'open-invoices', 'customer-balances'].includes(kind)
-  const report = await ageing(db, receivable ? 'receivable' : 'payable', to)
+  const report = await ageing(db, receivable ? 'receivable' : 'payable', to, dimension)
   const items = (report.items as Data[]).filter(i => i.doc_date >= from)
   if (kind.endsWith('-balances')) {
     // Control lines carry the contact, including unapplied payments and credits.
     const rows = await all(db, `SELECT c.id, c.name, SUM(l.debit_cents-l.credit_cents) AS net
       FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id JOIN pt_accounts a ON a.id=l.account_id
-      JOIN pt_contacts c ON c.id=l.contact_id WHERE e.status='posted' AND e.entry_date <= ? AND a.subtype=? GROUP BY c.id HAVING net <> 0 ORDER BY c.name`, to, receivable ? 'receivable' : 'payable')
+      JOIN pt_contacts c ON c.id=l.contact_id WHERE e.status='posted' AND e.entry_date <= ? AND a.subtype=? ${dimension?`AND l.${dimension.kind}_name=?`:''} GROUP BY c.id HAVING net <> 0 ORDER BY c.name`, to, receivable ? 'receivable' : 'payable',...(dimension?[dimension.value]:[]))
     return { note: 'Balances as of the end date include all earlier activity and unapplied payments and credits. The start date does not discard opening balances.',
       columns: [receivable ? 'Customer' : 'Vendor', 'Balance'], moneyColumns: [1], rows: rows.map(r => ({ id: r.id, cells: [r.name, (receivable ? 1 : -1) * Number(r.net)] })),
       totals: [{ label: 'Control account balance', amount: report.control?.balance ?? 0 }] }

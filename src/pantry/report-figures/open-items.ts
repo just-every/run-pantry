@@ -1,3 +1,5 @@
+import { dimensionOpenItems } from '../dimensions/open-items'
+import { inDimension, type DimensionScope } from '../dimensions/scope'
 // Receivables and payables ageing: an item's open amount opens to its document
 // less the allocations counted against it; bucket and item totals to their open
 // items; unapplied money to the payments and credits not yet applied; the
@@ -10,27 +12,28 @@ import { attachments, bankMatches, recordLabels } from '../records'
 import { figureResult, less, parseLine } from './result'
 
 type Kind = 'receivable' | 'payable'
-export async function openItemSources(db: D1Database, kind: Kind, asOf: string) {
-  const report = await ageing(db, kind, asOf), labels = await recordLabels(db), docs = await attachments(db), bank = await bankMatches(db)
+export async function openItemSources(db: D1Database, kind: Kind, asOf: string, dimension?: DimensionScope) {
+  const report = await ageing(db, kind, asOf, dimension), labels = await recordLabels(db), docs = await attachments(db), bank = await bankMatches(db)
+  const scoped=dimension?await dimensionOpenItems(db,kind,asOf,dimension):undefined
   const docKind = kind === 'receivable' ? 'invoice' : 'bill'
   const account = report.control ? { id: report.control.id, code: report.control.code, name: report.control.name } : null
-  const row = (key: string, date: string, amount: number, description: string, record: Data) => ({ key, date, account, amount, debit: Math.max(amount, 0), credit: Math.max(-amount, 0), description, lineMemo: '', entry: null, settlement: null,
+  const row = (key: string, date: string, amount: number, description: string, record: Data) => ({ ...(dimension?{[dimension.kind+'_name']:dimension.value}:{}), key, date, account, amount, debit: Math.max(amount, 0), credit: Math.max(-amount, 0), description, lineMemo: '', entry: null, settlement: null,
     record: { ...record, label: labels.label(record.kind, record.id) }, documents: docs.forRecords([record as never]), bank: record.kind === 'payment' ? bank.forPayment(record.id) : [] })
   const itemRow = (i: Data) => row(`item:${i.id}`, i.doc_date, i.open, `${i.ref} · ${i.contact} · due ${i.due_date} · ${i.bucket}`, { kind: docKind, id: i.id })
   const applied = await appliedAsOf(db, kind, asOf)
   const itemDetail = (i: Data) => [row(`doc:${i.id}`, i.doc_date, i.total_cents, `${i.ref} · ${i.contact} · original amount`, { kind: docKind, id: i.id }),
-    ...applied.filter(a => a.target_id === i.id).map(a => row(`applied:${a.id}`, a.allocation_date, -a.amount_cents, `Applied ${a.allocation_date}`,
+    ...applied.filter(a => a.target_id === i.id).map(a => row(`applied:${a.id}`, a.allocation_date, -(scoped?.allocated.get(i.id+':'+a.id)??(scoped?0:a.amount_cents)), `Applied ${a.allocation_date}`,
       a.source_kind === 'payment' ? { kind: 'payment', id: a.source_id } : kind === 'receivable' ? { kind: 'invoice', id: a.source_id } : { kind: 'entry', id: labels.vendorCreditEntries.get(a.source_id) }))]
-  const unapplied = async () => (await unappliedRows(db, kind, asOf)).map(u => row(`${u.part}:${u.id}`, u.date, u.amount, u.part === 'payment' ? `Payment${u.note ? ` ${u.note}` : ''}` : u.part === 'credit' ? 'Credit' : 'Applied to an open item', u.record))
-  const control = async () => report.control ? reportSourceRows(db, { accountId: report.control.id, types: [], from: FIRST_DAY, to: asOf, sign: kind === 'receivable' ? 1 : -1 }, 'accrual') : []
+  const unapplied = async () => (scoped?.unapplied??await unappliedRows(db, kind, asOf)).map(u => row(`${u.part}:${u.id}`, u.date, u.amount, u.part === 'payment' ? `Payment${u.note ? ` ${u.note}` : ''}` : u.part === 'credit' ? 'Credit' : 'Applied to an open item', u.record))
+  const control = async () => report.control ? (await reportSourceRows(db, { accountId: report.control.id, types: [], from: FIRST_DAY, to: asOf, sign: kind === 'receivable' ? 1 : -1 }, 'accrual')).filter(r=>inDimension(r,dimension)) : []
   return { report, itemRow, itemDetail, unapplied, control }
 }
 
-export async function ageingFigure(db: D1Database, report: 'receivables' | 'payables', line: string, asOf: string) {
+export async function ageingFigure(db: D1Database, report: 'receivables' | 'payables', line: string, asOf: string, dimension?: DimensionScope) {
   const kind: Kind = report === 'receivables' ? 'receivable' : 'payable'
   const [part, id] = parseLine(line, [1, 2], 'Choose a figure on this ageing')
-  const s = await openItemSources(db, kind, asOf), r = s.report
-  const base = { report, line, basis: 'accrual' as const, basisLabel: 'Open items · accrual basis', from: null, to: asOf }
+  const s = await openItemSources(db, kind, asOf, dimension), r = s.report
+  const base = { ...(dimension?{context:{dimension:dimension.kind,dimensionValue:dimension.id}}:{}), report, line, basis: 'accrual' as const, basisLabel: 'Open items · accrual basis', from: null, to: asOf }
   if (part === 'item') {
     const item = (r.items as Data[]).find(i => i.id === id)
     requireThat(item, 'Choose an open item on this ageing', 404)

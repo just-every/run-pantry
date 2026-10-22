@@ -162,3 +162,70 @@ export async function dimensionTaxAndCash(t) {
  }
  assert.deepEqual((await h.view('journal')).entries,before)
 }
+
+export async function dimensionAgeing(t) {
+ const {h,acct,bank,tags,other}=await seed(t)
+ const customer=await h.command('contact.save',{kind:'customer',name:'Mixed project customer'}),vendor=await h.command('contact.save',{kind:'vendor',name:'Mixed project vendor'})
+ const draft=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-10-01',lines:[{description:'Studio sale',quantity:'1',rate:'100',accountId:acct['4000'],taxCode:'exempt',...tags},{description:'Support sale',quantity:'1',rate:'300',accountId:acct['4000'],taxCode:'exempt',...other}]})
+ await h.command('invoice.approve',{id:draft.id,revision:draft.revision});const invoice=await h.command('invoice.issue',{id:draft.id})
+ const bill=await h.command('bill.save',{vendorId:vendor.id,reference:'synthetic-pantry-36',billDate:'2026-10-01',post:true,lines:[{description:'Studio cost',amount:'100',accountId:acct['6200'],...tags},{description:'Support cost',amount:'200',accountId:acct['6200'],...other}]})
+ const received=await h.command('payment.record',{direction:'received',contactId:customer.id,date:'2026-10-05',amount:'200',bankAccountId:bank.id,allocations:[{targetId:invoice.id,amount:'200'}]})
+ await h.command('payment.record',{direction:'paid',contactId:vendor.id,date:'2026-10-05',amount:'150',bankAccountId:bank.id,allocations:[{targetId:bill.id,amount:'150'}]})
+ const credit=await h.command('invoice.save-draft',{kind:'credit',creditFor:invoice.id,customerId:customer.id,issueDate:'2026-10-10',lines:[{description:'Support allowance',quantity:'1',rate:'250',accountId:acct['4000'],taxCode:'exempt',...other}]})
+ await h.command('invoice.approve',{id:credit.id,revision:credit.revision});await h.command('invoice.issue',{id:credit.id})
+ await h.command('vendor-credit.record',{vendorId:vendor.id,reference:'synthetic-pantry-37',date:'2026-10-10',amount:'60',accountId:acct['6200'],...tags,allocations:[{targetId:bill.id,amount:'30'}]})
+ await h.command('payment.record',{direction:'received',contactId:customer.id,date:'2026-10-12',amount:'10',bankAccountId:bank.id,allocations:[]})
+ const viewer=await h.member('synthetic-pantry-ageing-reader@example.test','viewer')
+ const before=(await h.view('journal')).entries
+ const reports=['receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances']
+ for(const to of ['2026-10-06','2026-10-15'])for(const [kind,values] of [['class',['Studio','Support','']],['location',['New York','Remote','']],['project',['Cedar','Cypress','']]]){
+  for(const report of reports) {
+   const split=[]
+   for(const name of values) {
+    const q={from:'2026-10-01',to,dimension:kind,dimensionValue:name?'value:'+name:'unassigned'},r=await h.view(`reports/${report}?`+new URLSearchParams(q),viewer);split.push(r)
+    const figures=['receivables','payables'].includes(report)?[...r.items.map(i=>[JSON.stringify(['item',i.id]),i.open]),...r.buckets.map((b,i)=>[JSON.stringify(['bucket',b]),r.totals[i]]),...[['items',r.itemsTotal],['unapplied',r.unapplied],['subledger',r.subledger],['control',r.control.balance]].map(([p,n])=>[JSON.stringify([p]),n])]:[...r.rows.flatMap(row=>r.moneyColumns.map(i=>[JSON.stringify([row.id,String(i)]),row.cells[i]])),...r.totals.map((t,i)=>[JSON.stringify(['total',String(i)]),t.amount])]
+    for(const [line,amount] of figures) {
+     const d=await h.view('reports/detail?'+new URLSearchParams({...q,report,line}),viewer)
+     assert.equal(d.figure,amount);assert.equal(d.ties,true,`${report}/${to}/${kind}/${name}/${line}`)
+     const csv=await h.send('/api/pantry/reports/detail/export?'+new URLSearchParams({...q,report,line}),undefined,{cookie:viewer})
+     assert.equal(csv.status,200)
+    }
+    if(!['receivables','payables'].includes(report))for(const format of ['pdf','csv','xlsx'])assert.equal((await h.send(`/api/pantry/reports/${report}/export?`+new URLSearchParams({...q,format}),undefined,{cookie:viewer})).status,200)
+   }
+   const whole=await h.view(`reports/${report}?`+new URLSearchParams({from:'2026-10-01',to}),viewer)
+   if(['receivables','payables'].includes(report))for(const metric of ['itemsTotal','unapplied','subledger'])assert.equal(split.reduce((n,r)=>n+r[metric],0),whole[metric],`${report} ${kind} ${metric} shares sum to total`)
+   else for(const [i,total] of whole.totals.entries())assert.equal(split.reduce((n,r)=>n+r.totals[i].amount,0),total.amount)
+  }
+ }
+ const scope={to:'2026-10-15',dimension:'class',dimensionValue:'value:Studio'}
+ const ar=await h.view('reports/receivables?'+new URLSearchParams(scope)),ap=await h.view('reports/payables?'+new URLSearchParams(scope))
+ assert.deepEqual([ar.itemsTotal,ar.unapplied,ap.itemsTotal,ap.unapplied],[0,0,4000,3000])
+ const support=await h.view('reports/receivables?to=2026-10-15&dimension=class&dimensionValue=value:Support')
+ assert.deepEqual([support.itemsTotal,support.unapplied],[0,5000],'over-credit remains unapplied on its own source dimension')
+ for(const basis of ['cash','accrual']) {
+  const filter={dimension:'class',dimensionValue:'value:Support',basis},query=new URLSearchParams(filter)
+  const pkg=await h.view('package/2026-10?'+query,viewer)
+  assert.equal(pkg.dimension.label,'class · Support');assert.match(pkg.scopeNote,/whole-business evidence/)
+  for(const [key,report] of [['trialBalance','trial-balance'],['balanceSheet','balance-sheet'],['generalLedger','general-ledger'],['cashFlow','cash-flow'],['receivables','receivables'],['payables','payables']])assert.deepEqual(pkg[key],await h.view(`reports/${report}?`+new URLSearchParams({...filter,from:'2026-10-01',to:'2026-10-31'}),viewer))
+  assert.deepEqual(pkg.profitAndLoss.period,await h.view('reports/profit-and-loss?'+new URLSearchParams({...filter,from:'2026-10-01',to:'2026-10-31'}),viewer))
+  assert.deepEqual(pkg.profitAndLoss.yearToDate,await h.view('reports/profit-and-loss?'+new URLSearchParams({...filter,from:'2026-01-01',to:'2026-10-31'}),viewer))
+  const csv=await h.send('/api/pantry/package/2026-10/general-ledger.csv?'+query,undefined,{cookie:viewer})
+  assert.equal(csv.status,200);assert.ok(csv.value.includes('class · Support'))
+  const response=await fetch(`${h.origin}/api/pantry/package/2026-10/accountant-package.zip?${query}`,{headers:{cookie:viewer}})
+  assert.equal(response.status,200)
+  const archive=Buffer.from(await response.arrayBuffer());let offset=0,checked=0
+  while(archive.readUInt32LE(offset)===0x04034b50) {
+   const size=archive.readUInt32LE(offset+18),nameSize=archive.readUInt16LE(offset+26),extra=archive.readUInt16LE(offset+28),name=archive.subarray(offset+30,offset+30+nameSize).toString(),start=offset+30+nameSize+extra,body=archive.subarray(start,start+size).toString()
+   if(name.endsWith('.csv')){assert.match(body.split('\r\n')[0],/^Dimension scope,/);checked++}
+   if(name.endsWith('profit-and-loss.csv'))assert.ok(body.includes('Dimension scope,class · Support'))
+   if(name.endsWith('close-checklist.csv'))assert.ok(body.includes('Whole business evidence (not filtered)'))
+   if(name.endsWith('README.txt'))assert.ok(body.includes('Financial dimension: class · Support'))
+   offset=start+size
+  }
+  assert.ok(checked>=8)
+ }
+ assert.deepEqual((await h.view('journal')).entries,before)
+ await h.command('journal.reverse',{id:received.journal_id,date:'2026-10-20',memo:'Customer payment returned'})
+ const reopened=await h.view('reports/receivables?to=2026-10-31&dimension=class&dimensionValue=value:Studio')
+ assert.equal(reopened.itemsTotal,5000,'the later payment reversal restores the same cumulative line share')
+}

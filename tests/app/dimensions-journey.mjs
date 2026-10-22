@@ -150,6 +150,22 @@ export async function dimensionsBrowser(t){
    assert.equal(response.status(),200);assert.ok((await response.text()).includes(`class · Studio ${width}`))
    await shot(report+'-filtered')
   }
+  for(const report of ['receivables','payables','open-invoices','unpaid-bills','receivables-summary','payables-summary','customer-balances','vendor-balances']) {
+   await page.goto(origin+'/app/reports?'+new URLSearchParams({report,from:'2026-09-01',to:'2026-09-30',basis:'accrual',dimension:'class',dimensionValue:`value:Studio ${width}`}))
+   await expect(page.getByLabel('Dimension filter',{exact:true})).toHaveValue(JSON.stringify(['class',`value:Studio ${width}`]))
+   await expect(page.locator('.figure-link').first()).toBeVisible()
+   await shot(report+'-filtered')
+   if(report==='receivables') {
+    for(const name of ['General ledger CSV · accrual','Accountant package · September 2026']) {
+     const href=await page.getByRole('link',{name,exact:true}).getAttribute('href')
+     assert.equal(new URL(href,origin).searchParams.get('dimensionValue'),`value:Studio ${width}`)
+     assert.equal((await owner.request.get(new URL(href,origin).href)).status(),200)
+    }
+   }
+   await page.locator('.figure-link').first().click()
+   await expect(page.getByText('Adds up to the report figure',{exact:true})).toBeVisible()
+   await shot(report+'-filtered-sources')
+  }
   const taxCode=await command('tax-code.save',{name:`Dimension tax ${width}`,rate:'10',state:'NY',accountId:acct['2200']})
   const taxable=await command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-10-01',lines:[{description:`Taxable dimension work ${width}`,quantity:'1',rate:'100',accountId:acct['4000'],taxCode:taxCode.id,className:`Studio ${width}`,locationName:`New York ${width}`,projectName:`Cedar website ${width}`}]})
   await command('invoice.approve',{id:taxable.id,revision:taxable.revision});await command('invoice.issue',{id:taxable.id})
@@ -157,7 +173,7 @@ export async function dimensionsBrowser(t){
   for(const basis of ['cash','accrual']) {
    await page.goto(origin+'/app/reports?'+new URLSearchParams({report:'sales-tax',from:'2026-10-01',to:'2026-10-31',basis,dimension:'class',dimensionValue:`value:Studio ${width}`}))
    await expect(page.getByLabel('Dimension filter',{exact:true})).toBeVisible()
-   await expect(page.getByText(`Dimension tax ${width}`,{exact:true}).first()).toBeVisible()
+   await expect(page.getByRole('cell').filter({hasText:new RegExp(`^Dimension tax ${width}`)}).first()).toBeVisible()
    await shot('sales-tax-'+basis+'-filtered')
    const href=await page.getByRole('link',{name:`Download CSV · ${basis}`,exact:true}).getAttribute('href')
    const file=await owner.request.get(new URL(href,origin).href);assert.equal(file.status(),200);assert.ok((await file.text()).includes(`class · Studio ${width}`))

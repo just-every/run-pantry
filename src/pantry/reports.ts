@@ -1,3 +1,4 @@
+import { dimensionOpenItems } from './dimensions/open-items'
 // Reports, all calculated from posted journal lines (and, for ageing, the open
 // items those lines carry). Nothing here stores or accepts a total. Each ledger
 // report reads on the accrual or the cash basis (basis.ts) and names its basis.
@@ -104,21 +105,22 @@ export const BUCKETS = ['Current', '1–30 days', '31–60 days', '61–90 days'
 const bucket = (overdue: number) => overdue <= 0 ? 0 : overdue <= 30 ? 1 : overdue <= 60 ? 2 : overdue <= 90 ? 3 : 4
 
 /** Open items as of a date and their tie-out to the control account. */
-export async function ageing(db: D1Database, kind: 'receivable' | 'payable', asOf: string) {
+export async function ageing(db: D1Database, kind: 'receivable' | 'payable', asOf: string, dimension?: DimensionScope) {
   const items = kind === 'receivable'
     ? await all(db, "SELECT i.id, i.number AS ref, i.issue_date AS doc_date, i.due_date, i.total_cents, c.name AS contact, c.id AS contact_id FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id WHERE i.kind = 'invoice' AND i.status = 'issued' AND i.issue_date <= ? ORDER BY i.due_date, i.number, i.id", asOf)
     : await all(db, "SELECT b.id, b.reference AS ref, b.bill_date AS doc_date, b.due_date, b.total_cents, c.name AS contact, c.id AS contact_id FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id WHERE (b.status = 'posted' OR (b.opening = 1 AND b.status <> 'void')) AND b.bill_date <= ? ORDER BY b.due_date, b.reference, b.id", asOf)
   const applied = new Map<string, number>()
   for (const a of await appliedAsOf(db, kind, asOf)) applied.set(a.target_id, (applied.get(a.target_id) ?? 0) + a.amount_cents)
-  const open = items.map(i => ({ ...i, open: i.total_cents - (applied.get(i.id) ?? 0), overdue: daysBetween(i.due_date, asOf) })).filter(i => i.open !== 0)
+  const scoped=dimension?await dimensionOpenItems(db,kind,asOf,dimension):undefined
+  const open = items.map(i => ({ ...i, total_cents:scoped?.documents.get(i.id)?.amount??i.total_cents, open: scoped?(scoped.documents.get(i.id)?.amount??0)-(scoped.recognized.get(i.id)??0):i.total_cents - (applied.get(i.id) ?? 0), overdue: daysBetween(i.due_date, asOf) })).filter(i => i.open !== 0)
   for (const i of open) (i as Data).bucket = BUCKETS[bucket(i.overdue)]
   // Money received or credited but not yet applied lowers what is owed overall.
-  const unapplied = (await unappliedRows(db, kind, asOf)).reduce((n, r) => n + r.amount, 0)
+  const unapplied = (scoped?.unapplied??await unappliedRows(db, kind, asOf)).reduce((n, r) => n + r.amount, 0)
   const totals = BUCKETS.map(name => open.filter(i => (i as Data).bucket === name).reduce((s, i) => s + i.open, 0))
   const itemsTotal = open.reduce((s, i) => s + i.open, 0)
-  const control = (await balances(db, asOf)).find(b => b.subtype === kind)
+  const control = (await balances(db, asOf,undefined,'accrual',dimension)).find(b => b.subtype === kind)
   const controlBalance = control ? (kind === 'receivable' ? control.net : -control.net) : 0
-  return { basis: 'accrual' as const, kind, asOf, buckets: BUCKETS, items: open, totals, itemsTotal, unapplied, subledger: itemsTotal - unapplied, control: control ? { id: control.id, code: control.code, name: control.name, balance: controlBalance } : null, agrees: !!control && itemsTotal - unapplied === controlBalance }
+  return { ...(dimension?{dimension}:{}), basis: 'accrual' as const, kind, asOf, buckets: BUCKETS, items: open, totals, itemsTotal, unapplied, subledger: itemsTotal - unapplied, control: control ? { id: control.id, code: control.code, name: control.name, balance: controlBalance } : null, agrees: !!control && itemsTotal - unapplied === controlBalance }
 }
 
 export function prevDay(day: string) {
