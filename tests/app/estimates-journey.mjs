@@ -65,7 +65,11 @@ export async function estimatesJourney(t) {
     const publicPdf = await customerContext.request.get(`${origin}${publicPath}/estimate.pdf`)
     assert.equal(publicPdf.status(), 200); assert.deepEqual(await publicPdf.body(), await sentPdf.body())
     await customerPage.getByLabel('Your name', { exact: true }).fill('Casey Cedar')
+    const acceptedResponse = customerPage.waitForResponse(r => r.url().endsWith('/accept') && r.request().method() === 'POST')
     await customerPage.getByRole('button', { name: 'Accept estimate', exact: true }).click()
+    const accepted = await acceptedResponse
+    await customerPage.screenshot({ path: `${evidence}/estimate-accept-result-${width}.png`, fullPage: true })
+    assert.equal(accepted.status(), 200, await accepted.text())
     await expect(customerPage.getByRole('status').filter({ hasText: 'Accepted by Casey Cedar' })).toBeVisible()
     await customerPage.screenshot({ path: `${evidence}/estimate-accepted-${width}.png`, fullPage: true })
 

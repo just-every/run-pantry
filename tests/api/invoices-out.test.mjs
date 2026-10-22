@@ -90,7 +90,7 @@ test('INVOICE-009 the private customer record preserves preferences and follows 
   const cert = at(history.certificates, e => e.id === certificate.id)
   assert.equal(cert.status, 'Valid')
   assert.equal((await h.send(cert.href, undefined, { cookie: h.owner })).value, 'Cedar resale certificate evidence')
-  assert.deepEqual(history.sections, { estimates: { available: false, rows: [] }, statements: { available: false, rows: [] } })
+  assert.deepEqual(history.sections, { estimates: { available: true, rows: [] }, statements: { available: false, rows: [] } })
   await h.view(`customers/${customer.id}`, '', 401)
   await h.view(`customers/missing`, h.owner, 404)
   const viewer = await h.member('customer-reader@example.test', 'viewer')
