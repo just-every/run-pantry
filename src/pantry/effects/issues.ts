@@ -5,12 +5,14 @@ import { date, requireThat, text, type Data } from '../core'
 import type { Basis } from '../basis'
 import { figuresDiffer, reportFigures, type FiguresReader } from './reports'
 import { readReport } from '../report-reader'
+import { projectProfit } from '../dimensions/report'
+import { dimensionScope } from '../dimensions/scope'
 import { budgetReport } from '../budgets/report'
 import { calculateCustomReport } from '../custom-reports/calculate'
 import type { CustomReportDefinition, CustomReportDrillGraph } from '../custom-reports/types'
 import { reportFigure, type FigureQuery } from '../report-figures'
 
-export type ReportIssue = { kind: string; name: string; from: string; to: string; basis: Basis; report?: string; reports?: string[]; account?: string; payee?: string; columns?: string;dimension?:string;dimensionValue?:string; budgetId?: string; definition?: CustomReportDefinition; definitions?: CustomReportDefinition[]; figure?: FigureQuery; customFigure?: { row: string; column: string; node?: string } }
+export type ReportIssue = { kind: string; name: string; from: string; to: string; basis: Basis; report?: string; reports?: string[]; account?: string; payee?: string; columns?: string;dimension?:string;dimensionValue?:string; budgetId?: string; projectName?:string; definition?: CustomReportDefinition; definitions?: CustomReportDefinition[]; figure?: FigureQuery; customFigure?: { row: string; column: string; node?: string } }
 // Activity is audit history, not a ledger-derived financial report. Recording
 // its own export as a financial issue would change the very history exported.
 const auditHistory = (issue: ReportIssue) => issue.report === 'audit-log' || issue.figure?.report === 'audit-log'
@@ -63,6 +65,10 @@ export async function affectedIssues(db: D1Database, projected: D1Database, earl
       const financial = (r: Data) => ({ figure: r.figure, total: r.total, unit: r.unit, from: r.from, to: r.to, operands: r.operands,
         rows: r.rows?.map((row: Data) => ({ date: row.date, amount: row.amount, debit: row.debit, credit: row.credit, description: row.description, lineMemo: row.lineMemo })) })
       changed = figuresDiffer(financial(before), financial(after))
+    } else if (issue.projectName) {
+      const scope=await dimensionScope(db,issue.dimension,issue.dimensionValue),projectedScope=await dimensionScope(projected,issue.dimension,issue.dimensionValue)
+      const [before,after]=await Promise.all([projectProfit(db,issue.projectName,issue.from,issue.to,issue.basis,scope),projectProfit(projected,issue.projectName,issue.from,issue.to,issue.basis,projectedScope)])
+      changed=figuresDiffer(before,after)
     } else if (issue.budgetId) {
       const [before, after] = await Promise.all([budgetReport(db, issue.budgetId, issue.from, issue.to, issue.basis,{dimension:issue.dimension,dimensionValue:issue.dimensionValue}), budgetReport(projected, issue.budgetId, issue.from, issue.to, issue.basis,{dimension:issue.dimension,dimensionValue:issue.dimensionValue})])
       changed = figuresDiffer(before, after)

@@ -12,6 +12,7 @@ export function ProjectProfitability({from,to,basis}:{from:string;to:string;basi
  if(!projects.length)return <p>Add a project in Settings to see its profitability.</p>
  return <>
   <DimensionReportPicker /><DimensionSplitPicker />
+  {name&&<p className="row-actions">{['pdf','csv','xlsx'].map(format=><a key={format} className="btn btn-secondary" download href={`/api/pantry/reports/project-profitability/export?${new URLSearchParams({projectName:name,from,to,basis,format,...(search.dimension?{dimension:search.dimension,dimensionValue:search.dimensionValue??''}:{})})}`}>Project {format==='xlsx'?'Excel':format.toUpperCase()} · {basis}</a>)}</p>}
   {search.split&&<DimensionSplits slug="project-profitability" from={from} to={to} basis={basis} path="dimensions/project/splits" extra={{name:name!}} />}
   <Field label="Project" name="projectName" value={name??''} options={projects.map((p:D)=>({value:p.name,label:p.name+(p.active?'':' (inactive)')}))} onChange={(e:React.ChangeEvent<HTMLSelectElement>)=>navigate({search:s=>({...s,projectName:e.target.value})})} />
   {!r?<Loading error={error} what="project profitability" />:<>

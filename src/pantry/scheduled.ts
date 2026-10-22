@@ -9,5 +9,5 @@ export async function runScheduled(controller:{cron:string;scheduledTime:number}
   const deliveries=runWebhooks(env,controller.scheduledTime)
   if(controller.cron!=='*/30 * * * *'){await deliveries;return}
   await runDue(env,10)
-  await Promise.all([deliveries,runDueWork(env,{scheduled:true}),runAgent(env,{scheduled:true})])
+  await Promise.all([deliveries,runDueWork(env,{scheduled:true,reportAt:new Date(controller.scheduledTime)}),runAgent(env,{scheduled:true})])
 }

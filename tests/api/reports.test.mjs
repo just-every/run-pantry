@@ -938,3 +938,10 @@ test('DIM-001 reconciliation dimension contributions retain statement boundaries
 
 import {dimensionReportSplits} from './dimension-splits.mjs'
 test('DIM-001 every native and scoped report splits existing filtered values, exports and frozen audit memberships',dimensionReportSplits)
+
+import {reportDeliveryMonthLock,reportDeliveryCalendar,reportDeliverySuppression,reportDeliveryUncertain,reportDeliveryRevokedOwner} from './report-delivery-journey.mjs'
+test('REPORT-007 a lender package follows each new month lock once with frozen bytes, live consent and recorded outcomes',reportDeliveryMonthLock)
+test('REPORT-007 weekly and monthly calendar deliveries retain formats, actual dates, basis and concurrent revision refusal',reportDeliveryCalendar)
+test('REPORT-007 development report mail remains visibly suppressed',reportDeliverySuppression)
+test('REPORT-007 uncertain provider outcomes and removed outside recipients never resend automatically',reportDeliveryUncertain)
+test('REPORT-007 scheduled read authority stops when its creating owner identity is revoked',reportDeliveryRevokedOwner)

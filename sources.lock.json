@@ -2932,7 +2932,7 @@
       "executable": false
     },
     "src/pantry/access.ts": {
-      "sha256": "21ab066c22dcebdd420ae21802f33f5e7568610b729a7e56663480a6c0f5ac96",
+      "sha256": "95103a2752b9890ff3d6ef6e1a19d758df32b81d50b0dccacee3e904e445f6f8",
       "executable": false
     },
     "src/pantry/accounts.ts": {
@@ -2944,7 +2944,7 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "51c4d857a60b0ec02e73f07f8f9c52aa0fbced50e79e521e78bdb0e685ff4101",
+      "sha256": "f97fa9d26f67af8f8ceb215d2cec27e4b2534331ecf4aebe8951af0fc0d45786",
       "executable": false
     },
     "src/pantry/automatch.ts": {
@@ -3072,7 +3072,7 @@
       "executable": false
     },
     "src/pantry/contractors.ts": {
-      "sha256": "e609fe0e2a10e94bdd5a750e83b78d8314ce01c97b8ead94556118e2e3368d33",
+      "sha256": "62aa8ff4f0acb6c70f89db2e5874e42a46df67b42ad0b6ef39a073fbb64b4901",
       "executable": false
     },
     "src/pantry/core.ts": {
@@ -3104,7 +3104,7 @@
       "executable": false
     },
     "src/pantry/custom-reports/routes.ts": {
-      "sha256": "abea9115b9f7686436a8197c316f5dae4914815191c53298e11034c74fed3929",
+      "sha256": "dec3b7b75d17ce325f014194eea2530296e1ee87493df85799ba866e9e5c5977",
       "executable": false
     },
     "src/pantry/custom-reports/store.ts": {
@@ -3284,7 +3284,7 @@
       "executable": false
     },
     "src/pantry/due.ts": {
-      "sha256": "7a66b09171c4c625ed1716487a57875c8697d1fa9768ab2d4dcbee3a7d955417",
+      "sha256": "da8fe7c5eaa7a7ac11df76736df85bbc4fb51f91f98c0f865c9e79eb274d90dc",
       "executable": false
     },
     "src/pantry/early-payment-table.ts": {
@@ -3296,7 +3296,7 @@
       "executable": false
     },
     "src/pantry/effects/issues.ts": {
-      "sha256": "665e8ba4d72d406f2bfc73577fa9b0394b725ba76ec15016cfeb25a842454449",
+      "sha256": "3a475aa3124c38a96cae6c823d1d5b8386a9b4ba9f8b87bc01f23c494b22b1af",
       "executable": false
     },
     "src/pantry/effects/preview.ts": {
@@ -3892,7 +3892,7 @@
       "executable": false
     },
     "src/pantry/report-export.ts": {
-      "sha256": "dc5939ae4e15deafd8556f1f474e4f3d2a83115670a0daf16030611c2196294d",
+      "sha256": "f5f8ae09c7488c73660428870ed872c67a90c38981ee2fd1caaa09b76dda5b2c",
       "executable": false
     },
     "src/pantry/report-figures/budget.ts": {
@@ -3980,7 +3980,7 @@
       "executable": false
     },
     "src/pantry/scheduled.ts": {
-      "sha256": "d449c7c520b04396b67fb7eed7c1efb16d1048de09efdd0c417b6cfecfa1e89d",
+      "sha256": "cb05d8496b861a156193071fdee02d2565cc36896362f21957dfca3b90d3251c",
       "executable": false
     },
     "src/pantry/seal.ts": {
@@ -4440,7 +4440,7 @@
       "executable": false
     },
     "src/ui/budgets.tsx": {
-      "sha256": "ab4476addf527a5b1bd1ebcc65fc46dc34219d18917b77999dce60f797ef348e",
+      "sha256": "6b673504f62946b73269217b5a07586e61ac5135fd060c9f2d75721d21aa6711",
       "executable": false
     },
     "src/ui/capture-approval-rules.tsx": {
@@ -4464,7 +4464,7 @@
       "executable": false
     },
     "src/ui/cash-flow.tsx": {
-      "sha256": "143ee18a6ea7b2e2eb96a7bfbffc1bf640f2ebfa7f4ea85edf6f338124af940c",
+      "sha256": "4eb901510fc50a60ff3a415f8934e0a2c38e1ba40aac1be8cd479f1ec6d6776d",
       "executable": false
     },
     "src/ui/checks.tsx": {
@@ -4492,7 +4492,7 @@
       "executable": false
     },
     "src/ui/contractors.tsx": {
-      "sha256": "8d9add6a8ee67efacb8ce4d06ce536a57b53b765d930e392fc03ee7385c38577",
+      "sha256": "4b8ba3230e59ede45371eb1b4a0f2f381b041d78665729260ae0fd2a2537379f",
       "executable": false
     },
     "src/ui/custom-report-drill.tsx": {
@@ -4660,7 +4660,7 @@
       "executable": false
     },
     "src/ui/project-profitability.tsx": {
-      "sha256": "fb9d82b2874f9df8468018a35f887feee78431ff3de53c7e107e90fd1241c0d9",
+      "sha256": "b334136fa98c14a956b0559ae1eece8083d335bbba328bb01f0048dd9000694b",
       "executable": false
     },
     "src/ui/proposals.tsx": {
@@ -4744,7 +4744,7 @@
       "executable": false
     },
     "src/ui/reports.tsx": {
-      "sha256": "48700ba584500f23181d826827de98e549ea302bd57d39162c3533a26321ce32",
+      "sha256": "fd283ae3642d076672b1b36dda3ced0ff80a0924c582b6b636ee216c6c440d86",
       "executable": false
     },
     "src/ui/review.tsx": {
@@ -4944,7 +4944,7 @@
       "executable": false
     },
     "tests/api/reports.test.mjs": {
-      "sha256": "afa2ab40f830aaa14215f50391d0b8d5fd3850bb6a51a1e7d5a8bb620cafc2b9",
+      "sha256": "d63e06094bd882287086c0a2d73a85652b85246d90821e7fe6fbec8abe412a34",
       "executable": false
     },
     "tests/api/resources-journey.mjs": {

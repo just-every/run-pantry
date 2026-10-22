@@ -15,7 +15,7 @@ export function CashFlow({ from, to }: { from: string; to: string }) {
   return <>
     <>{r.dimension&&<p className="hint">Only {r.dimension.label} posting lines are included. The cash tie can differ when other sides are coded elsewhere; choose All dimensions to check the whole statement.</p>}<p><Chip tone={r.ties ? 'good' : 'bad'}>{r.ties ? 'Ties to the balance sheet cash change' : 'Does not tie to the balance sheet'}</Chip></p></>
     <p className="hint">Indirect method: accrual net income adjusted for working capital and noncash activity. Cash and cash equivalents: {r.cashAccounts.map((a: D) => a.name).join(', ') || 'none classified'}. Choose any figure to open its entries.</p>
-    <p><a className="btn btn-secondary" download href={`/api/pantry/reports/cash-flow.csv?from=${from}&to=${to}&${scope}`}>Cash-flow CSV</a></p>
+    <p className="row-actions">{['pdf','csv','xlsx'].map(format=><a key={format} className="btn btn-secondary" download href={`/api/pantry/reports/cash-flow/export?from=${from}&to=${to}&${scope}&format=${format}`}>Cash-flow {format==='xlsx'?'Excel':format.toUpperCase()}</a>)}</p>
     <Table heads={['Activity', 'Amount']} figures={[1]}>
       {[...sections.flatMap(([name, rows, total, id]) => [<tr className="section" key={id}><td colSpan={2}>{name}</td></tr>,
         ...rows.map(l => <tr key={l.id}><td><Figure id={l.id}>{l.name}</Figure></td><td className="fig"><Figure id={l.id}>{usd(l.amount)}</Figure></td></tr>),

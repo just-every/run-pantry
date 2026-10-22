@@ -1,3 +1,4 @@
+import { ReportDelivery } from './report-delivery'
 import { AdjustingReport } from './adjusting-report'
 import { DimensionSplits, DimensionSplitPicker } from './dimension-splits'
 // Reports, all from the same ledger, on the cash or accrual basis, and the
@@ -24,7 +25,7 @@ type Basis = 'cash' | 'accrual'
 
 // [tab, slug, reads on a basis, takes a date range]
 const KINDS: [string, string, boolean, boolean][] = [['Trial balance', 'trial-balance', true, false], ['General ledger', 'general-ledger', true, true], ['Profit and loss', 'profit-and-loss', true, true], ['Balance sheet', 'balance-sheet', true, false],
-  ['Sales by customer', 'sales-by-customer', true, true], ['Sales by item', 'sales-by-item', true, true], ['Expenses by vendor', 'expenses-by-vendor', true, true], ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false], ['Adjusting entries','adjusting-entries',true,false], ['Project profitability', 'project-profitability', true, true], ['Budget versus actual', 'budget-actual', true, true], ['Custom reports', 'custom', false, false], ...LIBRARY_REPORTS]
+  ['Sales by customer', 'sales-by-customer', true, true], ['Sales by item', 'sales-by-item', true, true], ['Expenses by vendor', 'expenses-by-vendor', true, true], ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false], ['Adjusting entries','adjusting-entries',true,false], ['Project profitability', 'project-profitability', true, true], ['Budget versus actual', 'budget-actual', true, true], ['Custom reports', 'custom', false, false], ['Scheduled delivery','delivery',false,false], ...LIBRARY_REPORTS]
 
 /** A figure that opens to its records. */
 function Figure({ line, children }: { line: string; children: React.ReactNode }) {
@@ -120,7 +121,7 @@ function Report({ slug, basis, from, to, columns }: { slug: string; basis: Basis
 export function Reports() {
   const search = useSearch({ from: '/app/reports' }), navigate = useNavigate({ from: '/app/reports' }), { state } = useShared()
   const set = (patch: ReportSearch) => navigate({ search: (s: ReportSearch) => ({ ...s, ...patch }), replace: !('report' in patch || 'line' in patch || 'record' in patch) })
-  const customOnly = customReportsOnly(state.actor), kinds = customOnly ? KINDS.filter(k => k[1] === 'custom') : KINDS.filter(k=>k[1]!=='project-profitability'||state.dimensions?.settings.projects_enabled)
+  const customOnly = customReportsOnly(state.actor), kinds = customOnly ? KINDS.filter(k => k[1] === 'custom') : KINDS.filter(k=>(k[1]!=='project-profitability'||state.dimensions?.settings.projects_enabled)&&(k[1]!=='delivery'||state.actor.role==='owner'))
   const kind = kinds.find(k => k[1] === search.report) ?? kinds[0], [label, slug, based, ranged] = kind
   useEffect(() => {
     if (customOnly && (search.report !== 'custom' || search.line || search.record)) void navigate({ search: (s: ReportSearch) => ({ ...s, report: 'custom', line: undefined, record: undefined }), replace: true })
@@ -139,10 +140,11 @@ export function Reports() {
   return <>
     <PageHead title="Reports" lead="Every report is calculated from the same posted ledger, on the cash or the accrual basis."
       actions={!customOnly && <><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv${q}`} download>General ledger CSV · {basis === 'cash' ? 'cash' : 'accrual'}</a><a className="btn btn-primary" href={`/api/pantry/package/${period}/accountant-package.zip${q}`} download title="A ZIP of CSV reports, the close checklist and a README">Accountant package · {monthName(period)}</a></>} />
+    {!customOnly&&<details><summary>Accountant package formats · {monthName(period)}</summary><p className="row-actions">{['pdf','xlsx','csv'].map(format=><a className="btn btn-secondary" download key={format} href={`/api/pantry/package/${period}/export${q}&format=${format}`}>Close package {format==='xlsx'?'Excel':format.toUpperCase()} · {basis}</a>)}</p></details>}
     <Tabs tabs={kinds.map(k => k[0])} current={label} onChange={t => set({ report: kinds.find(k => k[0] === t)![1], line: undefined, record: undefined,dimension:undefined,dimensionValue:undefined,projectName:undefined,split:undefined })} pick="Report" />
     {customOnly ? <CustomReports /> : search.record ? <RecordView record={search.record} reportLabel={label} /> : detail && slug === 'cash-flow' ? <CashFlowDetail line={search.line!} from={from} to={to} />
       : detail ? <FigureDetail report={slug} line={search.line!} from={figureFrom} to={figureTo} basis={basis} reportLabel={label} />
-      : slug === 'custom' ? <CustomReports /> : slug === 'contractors' ? <Contractors year={taxYear} onYear={y => set({ year: String(y) })} />
+      : slug === 'delivery' ? <ReportDelivery /> : slug === 'custom' ? <CustomReports /> : slug === 'contractors' ? <Contractors year={taxYear} onYear={y => set({ year: String(y) })} />
       : <Card className="report-library" title={<>{label} <Chip tone="info">{library ? libraryBasisLabel(slug, basis) : slug === 'cash-flow' ? 'Indirect method · accrual starting income' : based ? BASIS_NAME[basis] : 'Open items · accrual basis'}</Chip></>} actions={<div className="inline-fields">{based && <BasisSwitch basis={basis} onChange={b => set({ basis: b })} />}
           {['adjusting-entries','audit-log','general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances','reconciliations','deposits','check-detail','contractor-summary','transactions','journal'].includes(slug)&&!['class','location','project'].includes(columns)&&<DimensionReportPicker />}
           {!statement&&!['budget-actual','project-profitability'].includes(slug)&&<DimensionSplitPicker />}
@@ -152,7 +154,7 @@ export function Reports() {
           {filtered && <><Field label="Account filter" name="account" value={search.account ?? ''} empty="All accounts" options={state.accounts.map((a: D) => ({ value: a.id, label: `${a.code} · ${a.name}` }))} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => set({ account: e.target.value || undefined })} />
             <Field label="Payee filter" name="payee" value={search.payee ?? ''} empty="All payees" options={state.contacts.map((c: D) => ({ value: c.id, label: c.name }))} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => set({ payee: e.target.value || undefined })} /></>}
           </div>}>
-          {(library || based && !['budget-actual','project-profitability'].includes(slug)) && <p className="row-actions"><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=pdf`} download>Download PDF{based ? ` · ${basis}` : ''}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=csv`} download>Download CSV{based ? ` · ${basis}` : ''}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=xlsx`} download>Download Excel{based ? ` · ${basis}` : ''}</a></p>}
+          {(library || based && !['budget-actual','project-profitability'].includes(slug) || ['receivables','payables'].includes(slug)) && <p className="row-actions"><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=pdf`} download>Download PDF{based ? ` · ${basis}` : ''}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=csv`} download>Download CSV{based ? ` · ${basis}` : ''}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=xlsx`} download>Download Excel{based ? ` · ${basis}` : ''}</a></p>}
           {search.split&&!['budget-actual','project-profitability'].includes(slug) ? <DimensionSplits slug={slug} from={from} to={to} basis={basis} /> : library ? <ReportLibrary slug={slug} basis={basis} from={from} to={to} /> : <Report slug={slug} basis={basis} from={from} to={to} columns={columns} />}
         </Card>}
   </>

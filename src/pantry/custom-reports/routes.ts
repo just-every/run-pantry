@@ -23,10 +23,10 @@ const pdfResponse = (bytes: Uint8Array<ArrayBuffer>, name: string) => new Respon
 const csvResponse = (csv: string, name: string) => new Response(csv, { headers: {
   'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${name}.csv"`, 'cache-control': 'no-store',
 } })
-const sharingNote = (saved: Data) => saved.shared_roles.length
+export const sharingNote = (saved: Data) => saved.shared_roles.length
   ? `Sharing: ${saved.shared_roles.join(', ')} (read/export only); creator and owner can read/edit.`
   : 'Sharing: personal (creator + owner can read/edit).'
-function exportReport(rendered: { saved: Data; report: CalculatedCustomReport }): CalculatedCustomReport {
+export function exportReport(rendered: { saved: Data; report: CalculatedCustomReport }): CalculatedCustomReport {
   const formulas = (rendered.saved.definition.layout ?? []).filter((row: CustomReportLayoutRow) => row.kind === 'formula')
     .map((row: Data) => `Formula ${row.label}: ${row.expression} (${row.unit})`)
   return { ...rendered.report, notes: [...rendered.report.notes, ...formulas, sharingNote(rendered.saved)] }

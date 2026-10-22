@@ -4,6 +4,7 @@
 import { operatorAuth, runtimeBindings, type Bindings } from '../auth.server'
 import { Fault, requireThat, sha256 } from './core'
 import { guard, one, type AuditActor, type Sql } from './db'
+import { standingReadCondition } from './report-delivery/authority'
 
 export type Need = 'read' | 'record' | 'post' | 'lock' | 'reopen' | 'owner'
 export type Role = 'owner' | 'bookkeeper' | 'accountant' | 'viewer' | 'sales' | 'payables-clerk' | 'time-only'
@@ -65,6 +66,8 @@ const sessionLive = "EXISTS (SELECT 1 FROM oa_sessions se JOIN oa_operators o ON
 
 /** The capability check as a scalar SQL condition, for guards and the import kit's fences. */
 export function authorityCondition(actor: Actor, need: Need): { sql: string; params: unknown[] } {
+  const standing = standingReadCondition(actor, need)
+  if (standing) return standing
   if (actor.kind === 'integration') return {
     sql: `EXISTS (SELECT 1 FROM pt_integrations i WHERE i.id = ? AND i.token_hash = ? AND i.revoked_at IS NULL AND EXISTS (SELECT 1 FROM json_each(i.scopes) WHERE value = ?)${need === 'post' ? " AND EXISTS (SELECT 1 FROM json_each(i.scopes) WHERE value = 'post')" : ''})`,
     params: [actor.id, actor.tokenHash, actor.scope],

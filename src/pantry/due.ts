@@ -19,10 +19,11 @@ import { runDueRecurringJournals } from './recurring-journals'
 import { matchTransfers } from './transfers'
 import { runContinuousChecks } from './continuous/run'
 import { sendDueApprovalReminders } from './receipts/approval-reminders'
+import { runDueReports } from './report-delivery/runs'
 
 const SPACING_MS = 2 * 60 * 1000
 
-export async function runDueWork(env: Bindings, { scheduled = false } = {}) {
+export async function runDueWork(env: Bindings, { scheduled = false, reportAt = new Date() } = {}) {
   const db = env.DB
   if (!scheduled) {
     const claimed = await db.prepare('UPDATE pt_due_work SET started_at = ? WHERE id = 1 AND started_at < ?').bind(now(), new Date(Date.now() - SPACING_MS).toISOString()).run()
@@ -30,7 +31,7 @@ export async function runDueWork(env: Bindings, { scheduled = false } = {}) {
   } else await db.prepare('UPDATE pt_due_work SET started_at = ? WHERE id = 1').bind(now()).run()
   if (!await one(db, 'SELECT 1 FROM pt_entity WHERE id = 1')) return
   const today = businessDay((await sendingSettings(db)).time_zone)
-  for (const [name, job] of [['recurring bills', () => runDueBills(db, today)], ['recognition schedules', () => runDueRecognition(db, today)], ['recurring journals', () => runDueRecurringJournals(db, today)], ['transfers', () => matchTransfers(db)], ['continuous checks', () => runContinuousChecks(db, today)], ['exemption certificates', () => runExemptionReminders(env, db, today)], ['economic nexus', () => runNexusAlerts(env, db)], ['captured draft approvals', () => sendDueApprovalReminders(env, db)], ['recurring invoices', () => runDueRecurring(env, db, today)], ['Stripe payments', () => syncPendingCheckouts(env, db)], ['reminders', () => sendDueReminders(env, db, today)], ['Stripe payouts', () => syncDuePayouts(env, db)], ['Gusto payrolls', () => syncDuePayrolls(env, db)]] as const) {
+  for (const [name, job] of [['scheduled reports', () => runDueReports(env, reportAt)], ['recurring bills', () => runDueBills(db, today)], ['recognition schedules', () => runDueRecognition(db, today)], ['recurring journals', () => runDueRecurringJournals(db, today)], ['transfers', () => matchTransfers(db)], ['continuous checks', () => runContinuousChecks(db, today)], ['exemption certificates', () => runExemptionReminders(env, db, today)], ['economic nexus', () => runNexusAlerts(env, db)], ['captured draft approvals', () => sendDueApprovalReminders(env, db)], ['recurring invoices', () => runDueRecurring(env, db, today)], ['Stripe payments', () => syncPendingCheckouts(env, db)], ['reminders', () => sendDueReminders(env, db, today)], ['Stripe payouts', () => syncDuePayouts(env, db)], ['Gusto payrolls', () => syncDuePayrolls(env, db)]] as const) {
     try { await job() } catch (error) { console.error(`Pantry due work (${name}) failed:`, error) }
   }
 }

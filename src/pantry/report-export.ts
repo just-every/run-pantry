@@ -1,4 +1,6 @@
 // Download the same calculated report as the screen, with an explicit basis.
+import { cashFlow } from './cash-flow'
+import { ageing } from './reports'
 import { dimensionScope } from './dimensions/scope'
 import { xlsxResponse } from './xlsx'
 import { Fault, requireThat, type Data } from './core'
@@ -17,7 +19,7 @@ const money = (n: number) => (n / 100).toFixed(2)
 const cell = (v: unknown) => `"${String(v).replaceAll('"', '""')}"`
 
 export async function reportExport(db: D1Database, kind: string, from: string, to: string, basis: Basis, format: string, columns?: string, account?: string,dimension?:string,dimensionValue?:string) {
-  requireThat(!dimension||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
+  requireThat(!dimension||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','receivables','payables','sales-tax','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
   const scope=await dimensionScope(db,dimension,dimensionValue)
   const entity = await one(db, 'SELECT * FROM pt_entity WHERE id = 1')
   if (columns && columns !== 'single' && (kind === 'profit-and-loss' || kind === 'balance-sheet')) return statementExport(await statementColumns(db, kind, columns, from, to, Number(entity?.fiscal_year_start ?? 1), basis, scope), entity?.legal_name ?? 'Pantry', format)
@@ -51,6 +53,16 @@ export async function reportExport(db: D1Database, kind: string, from: string, t
     title = 'Sales by item'
     const r = await salesByItem(db, from, to, basis, scope)
     rows = r.rows.map(l => row(l.sku ? `${l.name} · ${l.sku}` : l.name, l.amount)); totals = [row('Total', r.total)]
+  } else if (kind === 'cash-flow') {
+    title = 'Statement of cash flows'; basis = 'accrual'
+    const r = await cashFlow(db, from, to, scope)
+    rows = [...statement('Operating', r.operating), ...statement('Investing', r.investing), ...statement('Financing', r.financing)]
+    totals = [row('Operating cash flow',r.totalOperating),row('Investing cash flow',r.totalInvesting),row('Financing cash flow',r.totalFinancing),row('Net change in cash',r.netChange),row('Opening cash',r.opening),row('Closing cash',r.closing)]
+  } else if (kind === 'receivables' || kind === 'payables') {
+    title = kind === 'receivables' ? 'Receivables ageing' : 'Payables ageing'; basis = 'accrual'
+    const r = await ageing(db, kind === 'receivables' ? 'receivable' : 'payable', to, scope)
+    rows = r.items.map((i:Data) => row(`${i.contact} · ${i.ref} · ${i.doc_date} · due ${i.due_date} · ${i.bucket}`, i.open))
+    totals = [...r.buckets.map((name,i)=>row(name,r.totals[i])),row('Open items',r.itemsTotal),row('Unapplied money',r.unapplied),row('Subledger balance',r.subledger),row('Control balance',r.control?.balance??0)]
   } else if (kind === 'sales-tax') {
     title = 'Sales tax by state'
     const r = await salesTax(db, from, to, basis, scope)
@@ -58,11 +70,12 @@ export async function reportExport(db: D1Database, kind: string, from: string, t
     totals = [row('Tax owed', r.totals.owed)]
   } else throw new Fault(404, 'Choose a financial report to export')
   if(scope)title+=` · ${scope.label}`
-  const range = ['trial-balance', 'balance-sheet'].includes(kind) ? `As of ${to}` : `${from} to ${to}`
+  const range = ['trial-balance', 'balance-sheet', 'receivables', 'payables'].includes(kind) ? `As of ${to}` : `${from} to ${to}`
+  const label=kind==='cash-flow'?'Indirect method - accrual starting income':['receivables','payables'].includes(kind)?'Open items - accrual basis':BASIS_LABEL[basis]
   const name = `${kind}-${to}-${basis}.${format}`
-  const headers = { 'content-disposition': `attachment; filename="${name}"`, 'cache-control': 'no-store', 'x-pantry-basis': BASIS_LABEL[basis] }
-  if (format === 'xlsx') return xlsxResponse([[entity?.legal_name ?? 'Pantry', title, range, BASIS_LABEL[basis]], ['Description', 'Amount (USD)', 'Basis'], ...[...rows, ...totals].map(l => [l.description, l.amount / 100, BASIS_LABEL[basis]])], `${kind}-${to}-${basis}`, { 'x-pantry-basis': BASIS_LABEL[basis] })
-  if (format === 'pdf') return new Response(reportPdf({ business: entity?.legal_name ?? 'Pantry', title, basis: BASIS_LABEL[basis], range, rows, totals }), { headers: { ...headers, 'content-type': 'application/pdf' } })
-  if (format === 'csv') return new Response([[title, range, 'Amount (USD)', 'Basis'], ...[...rows, ...totals].map(l => [l.description, '', money(l.amount), BASIS_LABEL[basis]])].map(r => r.map(cell).join(',')).join('\r\n') + '\r\n', { headers: { ...headers, 'content-type': 'text/csv; charset=utf-8' } })
+  const headers = { 'content-disposition': `attachment; filename="${name}"`, 'cache-control': 'no-store', 'x-pantry-basis': label }
+  if (format === 'xlsx') return xlsxResponse([[entity?.legal_name ?? 'Pantry', title, range, label], ['Description', 'Amount (USD)', 'Basis'], ...[...rows, ...totals].map(l => [l.description, l.amount / 100, label])], `${kind}-${to}-${basis}`, { 'x-pantry-basis': label })
+  if (format === 'pdf') return new Response(reportPdf({ business: entity?.legal_name ?? 'Pantry', title, basis: label, range, rows, totals }), { headers: { ...headers, 'content-type': 'application/pdf' } })
+  if (format === 'csv') return new Response([[title, range, 'Amount (USD)', 'Basis'], ...[...rows, ...totals].map(l => [l.description, '', money(l.amount), label])].map(r => r.map(cell).join(',')).join('\r\n') + '\r\n', { headers: { ...headers, 'content-type': 'text/csv; charset=utf-8' } })
   throw new Fault(400, 'Export format is pdf, csv or xlsx')
 }

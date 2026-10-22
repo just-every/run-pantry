@@ -1,3 +1,7 @@
+import { contractorFormExport } from './contractor-export'
+import { reportDeliveryCommands, deliverySettings, deliveryAttachment } from './report-delivery'
+import { nativeReportExport } from './report-export-reader'
+import { accountantExport } from './accountant-export'
 import { adjustingReport } from './dimensions/special-reports'
 import { budgetSplits } from './dimensions/budget-splits'
 import { reportSplits, splitLibrary } from './dimensions/splits'
@@ -112,7 +116,7 @@ const commands: Record<string, Command> = {
   ...dimensionCommands, ...siblingCommands,
   ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
-  ...ruleCommands, ...feedCommands,
+  ...reportDeliveryCommands, ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
 }
 
@@ -150,6 +154,8 @@ async function reader(c: C): Promise<Context> {
 
 const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => { const ctx = await reader(c); return c.json(await projectAccess(ctx, await build(ctx, c))) })
 view('time', async ctx => timeView(ctx))
+view('report-delivery', async ctx => deliverySettings(ctx))
+api.get('/api/pantry/report-delivery/:id/attachment', async c => { const file=await deliveryAttachment(await reader(c),c.req.param('id')); return new Response(file.bytes as Uint8Array<ArrayBuffer>,{headers:{'content-type':file.contentType,'content-disposition':`attachment; filename="${file.filename}"`,'cache-control':'no-store'}}) })
 api.route('/api/pantry/integration/v1', integrations)
 view('webhooks', async ctx => webhookSettings(ctx))
 view('data-flows', async ctx => dataFlows(ctx))
@@ -277,15 +283,10 @@ api.get('/api/pantry/reports/cash-flow.csv', async c => {
   return new Response(csv, { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-cash-flow-${from}-${to}.csv"`, 'cache-control': 'no-store' } })
 })
 api.get('/api/pantry/reports/:kind/export', async c => {
-  const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
-  const kind=c.req.param('kind')!,basis=await reportBasis(ctx.db,c.req.query('basis'))
-  requireThat(!c.req.query('dimensionValue')||c.req.query('dimension'),'Choose a dimension before a value')
-  requireThat(!c.req.query('dimension')||['adjusting-entries','audit-log','general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances','reconciliations','deposits','check-detail','contractor-summary','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
-  const split=!['profit-and-loss','balance-sheet'].includes(kind)&&['class','location','project'].includes(c.req.query('columns')??'')
-  const response=split?await libraryExport(ctx.db,splitLibrary(await readReport(ctx.db,kind,{from,to,basis,columns:c.req.query('columns'),account:c.req.query('account'),payee:c.req.query('payee')}) as Awaited<ReturnType<typeof reportSplits>>),c.req.query('format')??'pdf'):kind==='adjusting-entries'?await libraryExport(ctx.db,await adjustingReport(ctx.db,Number(to.slice(0,4)),basis,await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))),c.req.query('format')??'pdf'):isLibrary(kind)?await libraryExport(ctx.db,await libraryReport(ctx.db,kind,from,to,basis,c.req.query('account'),c.req.query('payee'),await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))),c.req.query('format')??'pdf')
-    :await reportExport(ctx.db,kind,from,to,basis,c.req.query('format')??'pdf',c.req.query('columns'),c.req.query('account'),c.req.query('dimension'),c.req.query('dimensionValue'))
-  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:kind.replaceAll('-',' '),from,to,basis,report:kind,dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue'),account:c.req.query('account'),payee:c.req.query('payee'),columns:c.req.query('columns')})
-  return response
+  const ctx=await reader(c),to=day(c,'to'),from=day(c,'from',to.slice(0,8)+'01')
+  const result=await nativeReportExport(ctx.db,c.req.param('kind')!,{...c.req.query(),from,to},c.req.query('format')??'pdf')
+  await recordReportIssue(ctx.db,who(ctx.actor),result.issue)
+  return result.response
 })
 view('reports/:kind/splits', async (ctx, c) => {
   const to=day(c,'to'),from=day(c,'from',to.slice(0,8)+'01'),basis=await reportBasis(ctx.db,c.req.query('basis'))
@@ -298,6 +299,7 @@ view('reports/:kind', async (ctx, c) => {
 })
 
 // The 1099-NEC filing file carries full TINs: the owner or someone with the posting grant, audited.
+for(const format of ['pdf','xlsx'])api.get(`/api/pantry/reports/contractors/:year/1099-nec.${format}`,async c=>contractorFormExport(await reader(c),Number(c.req.param('year')),format))
 api.get('/api/pantry/reports/contractors/:year/1099-nec.csv', async c => {
   const ctx = await reader(c)
   must(ctx.actor, 'post')
@@ -334,6 +336,12 @@ api.get('/api/pantry/package/:period', async c => {
 })
 
 // The same package as an accountant opens it: a ZIP of CSV reports, the checklist, a README and the JSON.
+api.get('/api/pantry/package/:period/export', async c => {
+  const ctx=await reader(c),period=c.req.param('period'),basis=await reportBasis(ctx.db,c.req.query('basis')),scope=await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))
+  const pkg=await accountantPackage(ctx.db,period,basis,scope),response=accountantExport(pkg,c.req.query('format')??'pdf'),range=monthBounds(period)
+  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'accountant-package',name:`Accountant package · ${period}`,from:range.start,to:range.end,basis,dimension:scope?.kind,dimensionValue:scope?.id,...(scope?{reports:['trial-balance','profit-and-loss','balance-sheet','cash-flow','receivables','payables','general-ledger']}: {})})
+  return response
+})
 api.get('/api/pantry/package/:period/accountant-package.zip', async c => {
   const ctx = await reader(c), period = c.req.param('period'), basis = await reportBasis(ctx.db, c.req.query('basis')),dimension=await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))
   const { bytes } = await packageZip(ctx.db, period, basis, dimension)

@@ -63,7 +63,7 @@ export async function contractors(db: D1Database, year: number, dimension?: Dime
 const cell = (v: unknown) => { const s = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s }
 
 /** The filing CSV: one row per 1099-NEC, with the full TIN. Only after the year ends, only with every form complete. */
-export async function necCsv(db: D1Database, actor: AuditActor, year: number) {
+export async function necRows(db: D1Database, year: number) {
   const report = await contractors(db, year), entity = await requireEntity(db)
   requireThat(report.yearEnded, `The ${year} forms are ready after December 31, ${year}`, 409)
   const incomplete = report.forms.filter(f => !f.ready).map(f => f.name)
@@ -74,8 +74,14 @@ export async function necCsv(db: D1Database, actor: AuditActor, year: number) {
     const t = tax.get(f.id)!
     rows.push([String(year), '1099-NEC', entity.legal_name, entity.state, f.id, t.legal_name, t.tin_kind.toUpperCase(), t.tin_kind === 'ein' ? `${t.tin.slice(0, 2)}-${t.tin.slice(2)}` : `${t.tin.slice(0, 3)}-${t.tin.slice(3, 5)}-${t.tin.slice(5)}`, t.address, t.city, t.state, t.zip, (f.box1 / 100).toFixed(2), '0.00', 'Payment basis'])
   }
-  await run(db, [audit(actor, 'contractor.1099-csv', 'tax-year', String(year), { forms: report.forms.length })])
-  return rows.map(r => r.map(cell).join(',')).join('\r\n') + '\r\n'
+  return rows
+
+}
+
+export async function necCsv(db:D1Database,actor:AuditActor,year:number){
+ const rows=await necRows(db,year)
+ await run(db,[audit(actor,'contractor.1099-csv','tax-year',String(year),{forms:rows.length-1})])
+ return rows.map(r=>r.map(cell).join(',')).join('\r\n')+'\r\n'
 }
 
 /** Mark a vendor as a 1099 contractor (or not) and keep its filing details. A blank TIN keeps the one on file. */
