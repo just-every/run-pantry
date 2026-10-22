@@ -76,7 +76,7 @@ export async function matchDeposits(db: D1Database, lineIds: string[]) {
 export async function depositProposals(db: D1Database, lines: Data[]) {
   const invoices = await openInvoices(db), proposals: Record<string, Data> = {}
   for (const line of lines) {
-    if (line.match_id || line.removed_at) continue
+    if (line.match_id || line.removed_at || line.excluded_at) continue
     const inv = judge(line, invoices).invoice
     if (inv) proposals[line.id] = { lineId: line.id, invoiceId: inv.id, invoice: inv.number, customerId: inv.customer_id, customer: inv.customer_name, amount: line.amount_cents }
   }

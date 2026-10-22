@@ -2912,7 +2912,7 @@
       "executable": false
     },
     "src/pantry/automatch.ts": {
-      "sha256": "73ad9e9bd212e6d9cb206ca5f63adb64ec5e57c731e305bf5507e9b3c929f494",
+      "sha256": "b55b7ec3f92f7eccd9524af1c87a8cf685d57b626769c0db61a81c492ed911fd",
       "executable": false
     },
     "src/pantry/bank-lines.ts": {
@@ -3560,7 +3560,7 @@
       "executable": false
     },
     "src/pantry/matching.ts": {
-      "sha256": "91358608b8b991ca31366fb6076605ceec4446c937e0a4d3d76de9223980969e",
+      "sha256": "8f93fc8ecf33b651c1cd3a02d04f2155a3975c9e1f5114fd9eeb65b973128d72",
       "executable": false
     },
     "src/pantry/nexus-thresholds.ts": {
@@ -3776,7 +3776,7 @@
       "executable": false
     },
     "src/pantry/recorded-payments.ts": {
-      "sha256": "a31164dbd31bdd70e918e61096c2bfba1e03a05083635fb3bdcdeb7790c531ef",
+      "sha256": "8638d36d51c5f0e9c7db5e7a41614cfd37bc818c9eebc80bc887053122614cda",
       "executable": false
     },
     "src/pantry/records.ts": {
@@ -4324,7 +4324,7 @@
       "executable": false
     },
     "src/ui/bank-lines.tsx": {
-      "sha256": "70c9cd882ffeb57a259ac915695285d8fe37587cc7778344598ba08e1ff0bd18",
+      "sha256": "d20ed6bb379d5230e03c698f5d84a3147d9e7ea3455136708b76204373a47308",
       "executable": false
     },
     "src/ui/bank-rules.tsx": {
@@ -4960,7 +4960,7 @@
       "executable": false
     },
     "tests/app/queue-journey.mjs": {
-      "sha256": "015f51b851f2154f40ef0e0a1349993f3c2bf89a3667402003b9ddb8816b0cb7",
+      "sha256": "3e47b5d05fc986e4f78c85dcfa55fb00d74d3d0dfabb38a4d716e7ad6bf7d14f",
       "executable": false
     },
     "tests/app/recurring-journals.test.mjs": {

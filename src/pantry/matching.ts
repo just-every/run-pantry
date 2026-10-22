@@ -6,7 +6,7 @@ import { suggestionDecisions } from './line-suggestions'
 // names (a fee, a receipt the books lack, a transfer), so a payment already
 // recorded is never posted a second time when its bank line arrives.
 import { authority, who } from './access'
-import { cents, optionalText, requireThat, text, uid, usd, now, type Data } from './core'
+import { cents, optionalText, scale, requireThat, text, uid, usd, now, type Data } from './core'
 import { all, assertOpen, audit, changed, guard, one, periodOpen, q, run, type AuditActor, type Sql } from './db'
 import { account } from './accounts'
 import { entry, entryStatements, reversalStatements } from './journal'
@@ -79,7 +79,7 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
       requireThat(type!=='transfer'||(!item.taxCodeId&&!Object.values(dimensions).some(Boolean)),'Transfers do not carry sales tax or category dimensions')
       const code=item.taxCodeId?await one(db,'SELECT * FROM pt_tax_codes WHERE id=? AND active=1',text(item.taxCodeId,'Tax code')):null
       requireThat(!item.taxCodeId||code,'Choose an active sales tax code')
-      const tax=code?Math.round(amount*code.rate_milli_percent/(100000+code.rate_milli_percent)):0
+      const tax=code?scale(amount,code.rate_milli_percent,100000+code.rate_milli_percent):0
       const entryId = uid(), into = direction === 'in'
       statements.push(...nativeApprovalAuthority(actor, 'journal', amount, 'record'), ...entryStatements({ id: entryId, date: item.date ?? day, memo: memo || `${type === 'transfer' ? 'Transfer' : other.name} — ${lines[0].description}`, sourceKind: 'bank', documentId: item.documentId ?? null, preparedBy: actor.email, preparedKind: 'person', lines: [
         { accountId: into ? bank.account_id : other.id, debit: into?amount:amount-tax, credit: 0, memo, contactId: into ? null : contactId, ...(!into?dimensions:{}) },

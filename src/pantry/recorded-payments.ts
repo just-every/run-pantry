@@ -7,7 +7,7 @@ const plain = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]+/g, '')
 
 export async function recordedPaymentCandidates(db: D1Database, lines: Data[]) {
   const offers: Record<string, Data[]> = await checkPaymentCandidates(db, lines)
-  const open = lines.filter(l => !l.match_id && !l.removed_at)
+  const open = lines.filter(l => !l.match_id && !l.removed_at && !l.excluded_at)
   const byId = new Map(open.map(l => [l.id, l]))
   for (let i = 0; i < open.length; i += 90) {
     const chunk = open.slice(i, i + 90)

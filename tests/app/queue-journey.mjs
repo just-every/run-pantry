@@ -30,7 +30,7 @@ export async function queueBrowser(t){
   const amounts=[-6000,-20000,-500,100000,...Array.from({length:46},(_,i)=>-1000-i)]
   const descriptions=[`Split purchase ${width}`,`synthetic-pantry-${width}-card`,`Personal purchase ${width}`,`Customer collection ${width}`,...Array(46).fill(vendor.name)]
   await command('statement.import',{bankAccountId:bank.id,fileName:`synthetic-pantry-${width}.csv`,content:'Posting Date,Description,Amount\n'+amounts.map((n,i)=>`${month}/15/2026,${descriptions[i]},${(n/100).toFixed(2)}`).join('\n'),opening:'0',closing:(amounts.reduce((a,b)=>a+b,0)/100).toFixed(2),start:day,end:day,confirmLast4:'3131'})
-  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(String(e)))
+  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())})
   await page.goto(origin+'/app/bank')
   await page.getByLabel('Account',{exact:true}).selectOption(bank.id)
   await page.getByRole('heading',{name:'Transactions',exact:true}).click()
