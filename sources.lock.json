@@ -684,7 +684,7 @@
       "executable": false
     },
     "migrations/core/0081_estimate_siblings.sql": {
-      "sha256": "f31d68090774d7eedaf2eee9090f53c3c98f290c00e730ccdb2626f212c41da8",
+      "sha256": "c72dadb7621f2ff64eb8b0b8a043cced2598b4cd10a27989e28ff053890f902c",
       "executable": false
     },
     "migrations/core/0082_sibling_retention.sql": {
@@ -3312,7 +3312,7 @@
       "executable": false
     },
     "src/pantry/estimates/siblings/commands.ts": {
-      "sha256": "77abb87968bfbc5190b639239509912eb183ef7291a5231b2ee4a59bc56bb3d6",
+      "sha256": "53a90ec33a365d2f2b41ae8b42c4fac867ab9d1ae4f999ff546ae360b2b4c5f6",
       "executable": false
     },
     "src/pantry/estimates/siblings/custody.ts": {
@@ -3320,7 +3320,7 @@
       "executable": false
     },
     "src/pantry/estimates/siblings/erasure.ts": {
-      "sha256": "6a36059fa22f8e05b4aa998fb53458d1809d130cffd622f9a585613633b5a54e",
+      "sha256": "0abd4c9903f47417a39e32d6f50c8aa10b8040e7fa9ac1ea57c867929085ab8b",
       "executable": false
     },
     "src/pantry/estimates/siblings/index.ts": {
@@ -4744,7 +4744,7 @@
       "executable": false
     },
     "tests/api/estimate-siblings.mjs": {
-      "sha256": "91d198f41b3f28f22adbb01580cd22eb672cdceb6fde91881255c57fe68eecc2",
+      "sha256": "08cf89779f81a7c0c6ecaf429b1ffe4bdc58fe16d28efc455f16e9bb0caad15d",
       "executable": false
     },
     "tests/api/estimates-journey.mjs": {
@@ -4915,8 +4915,12 @@
       "sha256": "2a1164cecabb933bf572c43d0bf36940ed8f07aa79942840d163c82c919d9a41",
       "executable": false
     },
+    "tests/app/estimate-siblings.mjs": {
+      "sha256": "7878f66bab0d020fc5e2d52c9afce40c23b02ed6fc42a2e356a3e34d6dbc1e09",
+      "executable": false
+    },
     "tests/app/estimates-journey.mjs": {
-      "sha256": "89f25948d0838722137699607113a7d4f523ca01216674cc6acba79863534eef",
+      "sha256": "38de159e6588e86eae1d0806351bf8256f9d7b7f79ab7242557601ae8f014386",
       "executable": false
     },
     "tests/app/feed-history.test.mjs": {

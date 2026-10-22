@@ -42,7 +42,7 @@ const preview:Command={need:'owner',async run(c,b){
  }catch(error){
   if(!(error instanceof SourceFailure))throw error
   const failure={id:uid(),estimate_id:e.id,estimate_revision:e.revision,provider:source.provider,origin:source.origin,remote_id:source.remoteId,error_class:error.code,at:now()}
-  await run(c.db,[...owner,q('INSERT INTO pt_estimate_sibling_attempts(id,estimate_id,estimate_revision,provider,origin,remote_id,error_class,at)VALUES(?,?,?,?,?,?,?,?)',failure.id,e.id,e.revision,source.provider,source.origin,source.remoteId,failure.error_class,failure.at),audit(who(c.actor),'estimate.sibling-read-failed','estimate',e.id,{provider:source.provider,errorClass:failure.error_class})])
+  await run(c.db,[...owner,guard('EXISTS(SELECT 1 FROM pt_estimates WHERE id=? AND revision=? AND erased_at IS NULL)',e.id,e.revision),q('INSERT INTO pt_estimate_sibling_attempts(id,estimate_id,estimate_revision,provider,origin,remote_id,error_class,at)VALUES(?,?,?,?,?,?,?,?)',failure.id,e.id,e.revision,source.provider,source.origin,source.remoteId,failure.error_class,failure.at),audit(who(c.actor),'estimate.sibling-read-failed','estimate',e.id,{provider:source.provider,errorClass:failure.error_class})])
   return {ok:false,failure}
  }
 }}

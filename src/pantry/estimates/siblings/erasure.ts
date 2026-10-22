@@ -25,7 +25,7 @@ export async function siblingCopies(db:D1Database,input:Input){
  for(const row of await all(db,'SELECT id,estimate_id,summary,attached_by,revision,erased_at FROM pt_estimate_sibling_links')){
   if(row.erased_at)continue
   const own=!input.member&&estimates.has(row.estimate_id),summary=redact(JSON.parse(row.summary))
-  if(own&&summary.contact_email)summary.contact_email=input.marker
+  if(own)for(const field of ['customer_name','contact_email'])if(summary[field])summary[field]=input.marker
   const next=JSON.stringify(summary),by=input.member&&[input.id,input.memberEmail].includes(row.attached_by)?input.marker:row.attached_by
   if(next===row.summary&&by===row.attached_by)continue
   statements.push(q('UPDATE pt_estimate_sibling_links SET summary=?,attached_by=? WHERE id=? AND revision=? AND summary=? AND attached_by=?',next,by,row.id,row.revision,row.summary,row.attached_by),changed())

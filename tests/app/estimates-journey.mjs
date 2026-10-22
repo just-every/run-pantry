@@ -1,3 +1,4 @@
+import { siblingEdge, siblingBrowser } from './estimate-siblings.mjs'
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { chromium, expect } from '@playwright/test'
@@ -6,9 +7,10 @@ import { TOKEN } from './worker.mjs'
 
 // Actual built Worker, native sign-in and money; only outgoing mail is faked.
 export async function estimatesJourney(t) {
-  const mail = [], evidence = process.env.PANTRY_EVIDENCE_DIR || '/tmp/pantry-estimates'
+  const sibling = {}, mail = [], evidence = process.env.PANTRY_EVIDENCE_DIR || '/tmp/pantry-estimates'
   await mkdir(evidence, { recursive: true })
   const app = await providerWorker({ bindings: { MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'synthetic-pantry-1' }, outbound: async request => {
+    if (['inkwell.example.test', 'platter.example.test'].includes(new URL(request.url).hostname)) return siblingEdge(request, sibling)
     assert.equal(new URL(request.url).hostname, 'api.resend.com')
     mail.push(await request.json()); return Response.json({ id: `synthetic-pantry-${mail.length}` })
   } }); t.after(() => app.close())
@@ -72,6 +74,7 @@ export async function estimatesJourney(t) {
     assert.equal(accepted.status(), 200, await accepted.text())
     await expect(customerPage.getByRole('status').filter({ hasText: 'Accepted by Casey Cedar' })).toBeVisible()
     await customerPage.screenshot({ path: `${evidence}/estimate-accepted-${width}.png`, fullPage: true })
+    await siblingBrowser(page, origin, estimate, customer, await sentPdf.body(), width, evidence, sibling)
 
     await page.goto(`${origin}/app/sales?tab=deposits`)
     await page.getByLabel('Deposit customer', { exact: true }).selectOption(customer.id)
@@ -119,10 +122,20 @@ export async function estimatesJourney(t) {
     await expect(page.getByRole('link', { name: `Estimate EST-${width}`, exact: true })).toBeVisible()
     await shot('history')
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `customer history fits ${width}`)
+    await page.getByRole('link', { name: `Estimate EST-${width}`, exact: true }).click()
+    await expect(page.getByRole('heading', { name: `${customer.name} · EST-${width}`, exact: true })).toBeVisible()
+    const lastInvoice = estimate.conversions.at(-1)
+    await page.getByRole('link', { name: lastInvoice.number, exact: true }).click()
+    await expect(page.getByRole('heading', { name: `${customer.name} — ${lastInvoice.number}`, exact: true })).toBeVisible()
     await page.goto(`${origin}/app/settings`)
     const mailInventory = page.locator('#data-flows [data-service="mail"]')
     await mailInventory.locator('summary').click()
     await mailInventory.screenshot({ path: `${evidence}/estimate-mail-data-${width}.png` })
+    for (const id of ['inkwell', 'platter']) {
+      const inventory = page.locator(`#data-flows [data-service="${id}"]`)
+      await inventory.locator('summary').click()
+      await inventory.screenshot({ path: `${evidence}/estimate-${id}-data-${width}.png` })
+    }
     assert.deepEqual(errors, [])
     await page.close(); await customerContext.close()
   }
