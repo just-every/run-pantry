@@ -91,7 +91,8 @@ export async function access003Journey(h) {
     await h.command('recurring.approve-price', { id: price.id, revision: price.revision, templateRevision: within.revision, limitRevision: (await limit()).revision }, book, status)
   }
   // A valid standing template approval survives a later limit change; schedules do not spend a person's limit.
-  const scheduled = await h.command('recurring.save', { customerId: c.id, startDate: day, endDate: day, every: 1, unit: 'month', mode: 'send', lines: [line('1800')] }, book)
+  const scheduleDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+  const scheduled = await h.command('recurring.save', { customerId: c.id, startDate: scheduleDay, endDate: scheduleDay, every: 1, unit: 'month', mode: 'send', lines: [line('1800')] }, book)
   await h.command('recurring.approve', { id: scheduled.id, revision: scheduled.revision, limitRevision: (await limit()).revision }, book)
   await saveLimit('role:bookkeeper', '0', '0')
   await h.cron()
