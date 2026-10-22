@@ -89,6 +89,7 @@ export function afterTaxShares(lines: Data[], discounts: Discount[], fallback = 
 /** A parsed discount back in the form a draft or template sends it, so a template re-parses it on every occurrence. */
 export const discountInput = (d: Discount) => ({ type: d.type, value: d.type === 'percent' ? String(d.value / 1000) : (d.value / 100).toFixed(2), ...(d.lines ? { lines: d.lines } : {}), ...(d.afterTax ? { afterTax: true } : {}) })
 
+const depositDimensions=(value:Data)=>Object.fromEntries(Object.entries(dimensionTags(value)).filter(([,name])=>name!==''))
 export type Deposit = { className?:string;locationName?:string;projectName?:string; amount: number; method: string; date: string; bankAccountId: string; reference: string }
 
 /** A deposit received when the invoice is issued: amount, method, date (on or before the issue date) and the account it went into. */
@@ -104,11 +105,11 @@ export async function parseDeposit(db: D1Database, raw: unknown, issueDate: stri
   requireThat(day <= issueDate, 'A deposit received at issue is dated on or before the issue date')
   const bank = await one(db, 'SELECT b.id FROM pt_bank_accounts b JOIN pt_accounts a ON a.id = b.account_id WHERE b.id = ? AND a.active = 1', text(d.bankAccountId, 'Deposit-to account'))
   requireThat(bank, 'Choose the active bank account the deposit went into')
-  return { ...dimensionTags(d),amount, method, date: day, bankAccountId: bank.id, reference: optionalText(d.reference, 'Deposit reference', 80) }
+  return { ...depositDimensions(d),amount, method, date: day, bankAccountId: bank.id, reference: optionalText(d.reference, 'Deposit reference', 80) }
 }
 
 /** A template keeps the deposit without a date: each invoice it creates receives it on its own issue date. */
-export const depositInput = (d: Deposit | null) => d ? JSON.stringify({ ...dimensionTags(d),amount: (d.amount / 100).toFixed(2), method: d.method, bankAccountId: d.bankAccountId, ...(d.reference ? { reference: d.reference } : {}) }) : null
+export const depositInput = (d: Deposit | null) => d ? JSON.stringify({ ...depositDimensions(d),amount: (d.amount / 100).toFixed(2), method: d.method, bankAccountId: d.bankAccountId, ...(d.reference ? { reference: d.reference } : {}) }) : null
 
 export const depositLabel = (d: Deposit) => `Deposit received (${d.method === 'ach' ? 'ACH' : d.method}${d.reference ? ' ' + d.reference : ''}, ${longDay(d.date)})`
 

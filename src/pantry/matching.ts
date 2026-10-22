@@ -103,7 +103,7 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
       const entryId = uid(), into = direction === 'in'
       const category:Line={...dimensions,accountId:other.id,debit:into?0:amount-tax,credit:into?amount-tax:0,memo,contactId}
       statements.push(...nativeApprovalAuthority(actor, 'journal', amount, 'record'), ...entryStatements({ id: entryId, date: item.date ?? day, memo: memo || `${type === 'transfer' ? 'Transfer' : other.name} — ${lines[0].description}`, sourceKind: 'bank', documentId: item.documentId ?? null, preparedBy: actor.email, preparedKind: 'person', lines: [
-        ...(type==='transfer'?[...bankLines,...bankLines.map(l=>({...l,accountId:other.id,debit:l.credit,credit:l.debit}))]:into?[bankLines[0],category,...bankLines.slice(1)]:[category,...bankLines]),
+        ...(type==='transfer'?(into?[...bankLines,...bankLines.map(l=>({...l,accountId:other.id,debit:l.credit,credit:l.debit}))]:[...bankLines.map(l=>({...l,accountId:other.id,debit:l.credit,credit:l.debit})),...bankLines]):into?[bankLines[0],category,...bankLines.slice(1)]:[category,...bankLines]),
         ...(tax?[{accountId:code!.account_id,debit:into?0:tax,credit:into?tax:0,memo,...dimensions}]:[]),
       ] }, actor.email))
       created.push({ entryId, signed: into ? amount : -amount, kind: type })

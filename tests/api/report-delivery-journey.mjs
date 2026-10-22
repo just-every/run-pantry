@@ -44,7 +44,7 @@ export async function reportDeliveryMonthLock(t){
  assert.equal(deliveries(h).length,1)
  const attachment=deliveries(h)[0].attachments[0],bytes=Buffer.from(attachment.content,'base64')
  assert.equal(createHash('sha256').update(bytes).digest('hex'),first.sha256,'Actual emailed bytes equal the frozen attachment hash')
- assert.match(bytes.toString(),/cash/);assert.match(bytes.toString(),/Owner reviewed attachment/)
+ assert.match(bytes.toString(),/Cash basis/);assert.match(bytes.toString(),/Owner reviewed attachment/)
  const original=await h.send(`/api/pantry/report-delivery/${first.id}/attachment`,undefined,{cookie:h.owner})
  assert.equal(original.status,200);assert.equal(original.value,bytes.toString())
  await h.view(`report-delivery/${first.id}/attachment`,reader,403)

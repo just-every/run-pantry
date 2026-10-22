@@ -3288,7 +3288,7 @@
       "executable": false
     },
     "src/pantry/discounts.ts": {
-      "sha256": "6faa85a844526a2eac9a89fdfef200746ff3aded67cc03f8842267bd1df3974f",
+      "sha256": "4d7e1927f9d98904af96180ee5d9fe08871fea8d800e8f7765be6afb1bd997e4",
       "executable": false
     },
     "src/pantry/documents.ts": {
@@ -3664,7 +3664,7 @@
       "executable": false
     },
     "src/pantry/matching.ts": {
-      "sha256": "5e927a7f19fc00ddab11c0f93d0a681a651c84dc3ef6bbf3eca48ab01a3abdd5",
+      "sha256": "8e079194819640e15285d77bcde3397488858ea233551f2364b7986905f654d6",
       "executable": false
     },
     "src/pantry/nexus-thresholds.ts": {
@@ -4996,7 +4996,11 @@
       "executable": false
     },
     "tests/api/report-delivery-journey.mjs": {
-      "sha256": "09aa34fa9604db13df5ebd90a6b0ba0759ebee46338627cde30d0898878ca922",
+      "sha256": "20dfce8d14f8e52daae65031ae1e8977e6bde93c4ec2bd9eff2c422638c7d571",
+      "executable": false
+    },
+    "tests/api/report-export-parity.mjs": {
+      "sha256": "b893336e26ee2ce956464f828e7d5aaaee8a6223e4ae9cc688d375a6fa42fc9c",
       "executable": false
     },
     "tests/api/reports.test.mjs": {
