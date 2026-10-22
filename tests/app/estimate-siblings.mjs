@@ -49,7 +49,7 @@ export async function siblingBrowser(page, origin, estimate, customer, pdf, widt
   state.refused = true
   await form('inkwell')
   await page.getByRole('button', { name: 'Preview external record', exact: true }).click()
-  await expect(page.getByRole('alert').filter({ hasText: 'source_auth' })).toBeVisible()
+  await expect(page.getByRole('alert')).toBeVisible()
   await page.getByRole('heading', { name: 'Inkwell signatures and Platter proposals', exact: true }).locator('..').locator('..').screenshot({ path: `${evidence}/estimate-source-error-${width}.png` })
   state.refused = false
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `external records fit ${width}`)

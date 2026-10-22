@@ -4416,7 +4416,7 @@
       "executable": false
     },
     "src/ui/data-flows.tsx": {
-      "sha256": "b95bde40a17698aca52dddabfd6722d6ce57f2fb0afa40f5b9c3df85c8a5e451",
+      "sha256": "b1c0713f862d7f279fdf1a35e7f669cd35190e8e466994d76717f6411d2759b4",
       "executable": false
     },
     "src/ui/deposit-proposal.tsx": {
@@ -4444,7 +4444,7 @@
       "executable": false
     },
     "src/ui/estimate-siblings.tsx": {
-      "sha256": "77ea12c76b2e72dae701cb2e2f7a8aaffde4c4a13b7f7aaf055dd9f60b74305f",
+      "sha256": "0e6a3766f1183173f63316f2c6f88674b4ab1ed3f06def5d5c85aa9687cd88b1",
       "executable": false
     },
     "src/ui/estimates.tsx": {
@@ -4916,7 +4916,7 @@
       "executable": false
     },
     "tests/app/estimate-siblings.mjs": {
-      "sha256": "7878f66bab0d020fc5e2d52c9afce40c23b02ed6fc42a2e356a3e34d6dbc1e09",
+      "sha256": "1022c79cfc6996891f9fed82f05114e94e5132b64103ff3a9313c97a8d12bc20",
       "executable": false
     },
     "tests/app/estimates-journey.mjs": {

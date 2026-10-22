@@ -5,6 +5,19 @@ type Provider = 'inkwell' | 'platter'
 const providerName = (provider: Provider) => provider === 'inkwell' ? 'Inkwell' : 'Platter'
 const sourceStyle = { overflowWrap: 'anywhere' as const }
 
+const sourceErrors: Record<string, string> = {
+  source_auth: 'The source refused this credential. Check its permissions or enter a replacement token.',
+  source_missing: 'The selected source record was not found.', source_unavailable: 'The source could not be reached. Check the installation and request a new preview.',
+  source_timeout: 'The source did not finish answering in time.', source_redirect: 'The source redirected the request. Enter its direct installation origin.',
+  source_too_large: 'The source response exceeds the supported document size.', source_invalid: 'The source did not return a supported record.',
+  source_not_completed: 'Complete the signature envelope in Inkwell before attaching it.', source_not_accepted: 'The proposal has not been accepted in Platter.',
+  source_revision_mismatch: 'The source acceptance does not match its current proposal revision.', currency_mismatch: 'The proposal currency does not match these USD books.',
+  amount_mismatch: 'The accepted proposal amount does not match this estimate.', contact_mismatch: 'The source signer or accepting contact does not match this customer.',
+  original_mismatch: 'The signed envelope began with a different estimate PDF.', signed_mismatch: 'The downloaded signed document does not match Inkwell’s recorded hash.',
+  origin_refused: 'The request left the selected installation origin.',
+}
+const sourceError = (code: string) => sourceErrors[code] ?? `The source request failed (${code}).`
+
 function Source({ record }: { record: D }) {
   return <span style={sourceStyle}><a href={record.origin} target="_blank" rel="noreferrer">{record.origin}</a><small className="sub block">{record.remote_id} · Revision {record.remote_revision}</small></span>
 }
@@ -48,7 +61,7 @@ function OwnerEstimateSiblings({ estimate, onChange }: { estimate: D; onChange: 
         setToken('')
         const result = await command('estimate.sibling-preview', { id: estimate.id, revision: estimate.revision, provider, origin: b.origin, remoteId: b.remoteId, token: accessToken })
         await reload()
-        if (!result.ok) throw new Error(`Source preview failed: ${result.failure.error_class}. Review the source and try again using this form.`)
+        if (!result.ok) throw new Error(sourceError(result.failure.error_class))
         return result
       }} onDone={result => { setSelected(result.preview.id) }}>
         <div className="grid-form">
@@ -74,8 +87,8 @@ function OwnerEstimateSiblings({ estimate, onChange }: { estimate: D; onChange: 
       </Card>
       <Card title="Source request outcomes">
         <p className="hint">If a request failed, check the source and request a new preview using the form above.</p>
-        <Table heads={['When', 'Source', 'Remote record', 'Error class']} empty="No source requests recorded.">
-          {data.attempts.map((a: D) => <tr key={a.id}><td>{day(a.at)}</td><td>{providerName(a.provider)}<small className="sub block" style={sourceStyle}>{a.origin}</small></td><td style={sourceStyle}>{a.remote_id}</td><td>{a.error_class}</td></tr>)}
+        <Table heads={['When', 'Source', 'Remote record', 'Reason']} empty="No source requests recorded.">
+          {data.attempts.map((a: D) => <tr key={a.id}><td>{day(a.at)}</td><td>{providerName(a.provider)}<small className="sub block" style={sourceStyle}>{a.origin}</small></td><td style={sourceStyle}>{a.remote_id}</td><td>{sourceError(a.error_class)}</td></tr>)}
         </Table>
       </Card>
     </>}
