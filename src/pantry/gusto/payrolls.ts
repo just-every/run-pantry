@@ -1,3 +1,4 @@
+import { dimensionTags } from '../dimensions'
 // Gusto payrolls, posted by themselves. Pantry reads each processed payroll
 // with its totals from the connected company, posts it as one balanced entry
 // on its check date, and matches the entry's bank lines to Gusto's debit(s)
@@ -15,8 +16,9 @@ import { payrollEntry, type PayrollEntry, type Role } from './entry'
 const EVERY_MS = 6 * 3600_000, LEASE_MS = 5 * 60_000
 const today = () => new Date().toISOString().slice(0, 10)
 
-export async function gustoSettings(db: D1Database) {
-  return one(db, 'SELECT * FROM pt_gusto WHERE id = 1')
+export async function gustoSettings(db: D1Database):Promise<Data|null> {
+  const row=await one(db, 'SELECT * FROM pt_gusto WHERE id = 1')
+  return row?{...row,dimension_mapping:Object.fromEntries((await all(db,'SELECT * FROM pt_payroll_dimensions')).map(r=>[r.role,dimensionTags(r)]))}:null
 }
 
 /** A working access token: the stored one, or a refreshed pair saved before it is used. */
@@ -45,7 +47,7 @@ function bookStatements(g: Data, p: Payroll, e: PayrollEntry, entryId: string, b
   const period = p.pay_period?.start_date && p.pay_period?.end_date ? ` for ${p.pay_period.start_date} to ${p.pay_period.end_date}` : ''
   const by = pantry('gusto').email
   return entryStatements({ id: entryId, date: p.check_date, memo: `Gusto ${p.off_cycle ? 'off-cycle ' : ''}payroll paid ${p.check_date}${period}`, sourceKind: 'bank', sourceId: uuidOf(p), preparedBy: by, preparedKind: 'import',
-    lines: e.lines.map(l => ({ accountId: account[l.role], debit: Math.max(l.signed, 0), credit: Math.max(-l.signed, 0), memo: l.memo })) }, by)
+    lines: e.lines.map(l => ({ ...g.dimension_mapping?.[l.role],accountId: account[l.role], debit: Math.max(l.signed, 0), credit: Math.max(-l.signed, 0), memo: l.memo })) }, by)
 }
 
 const row = (p: Payroll, e: PayrollEntry, status: 'booked' | 'held', reason: string, entryId: string | null) =>

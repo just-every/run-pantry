@@ -8,7 +8,7 @@ export type DimensionKind = typeof DIMENSIONS[number]
 export const dimensionTags = (b: Data) => ({className:optionalText(b.className??b.class_name,'Class',100),locationName:optionalText(b.locationName??b.location_name,'Location',100),projectName:optionalText(b.projectName??b.project_name,'Project',100)})
 export const dimensionValues = (b: Data) => { const d=dimensionTags(b); return [d.className,d.locationName,d.projectName] }
 export async function dimensionsView(db:D1Database) {
- return { settings:await one(db,'SELECT * FROM pt_dimension_settings WHERE id=1'), values:await all(db,'SELECT * FROM pt_dimensions ORDER BY kind,lower(name)'), required:await all(db,'SELECT * FROM pt_account_dimensions ORDER BY account_id,kind') }
+ return { payroll:await all(db,'SELECT * FROM pt_payroll_dimensions ORDER BY role'),settings:await one(db,'SELECT * FROM pt_dimension_settings WHERE id=1'), values:await all(db,'SELECT * FROM pt_dimensions ORDER BY kind,lower(name)'), required:await all(db,'SELECT * FROM pt_account_dimensions ORDER BY account_id,kind') }
 }
 const settings:Command={need:'owner',async run(c,b){
  const current=await one(c.db,'SELECT * FROM pt_dimension_settings WHERE id=1')
@@ -69,3 +69,13 @@ const receiptTags:Command={need:'record',async run(c,b){
  return (await one(c.db,'SELECT * FROM pt_receipts WHERE id=?',id))!
 }}
 dimensionCommands['receipt.dimensions']=receiptTags
+
+const payrollTags:Command={need:'owner',async run(c,b){
+ const role=text(b.role,'Payroll line role')
+ requireThat(['wages','taxes','benefits','reimbursements','bank','liabilities'].includes(role),'Choose an existing payroll line role')
+ const before=await one(c.db,'SELECT * FROM pt_payroll_dimensions WHERE role=?',role),tags=dimensionTags(b),refusal=await dimensionRefusal(c.db,[],tags)
+ requireThat(!refusal,refusal??'Invalid payroll dimensions',409)
+ await run(c.db,[authority(c.actor,'owner'),q('INSERT INTO pt_payroll_dimensions(role,class_name,location_name,project_name,revision)VALUES(?,?,?,?,?) ON CONFLICT(role) DO UPDATE SET class_name=excluded.class_name,location_name=excluded.location_name,project_name=excluded.project_name,revision=excluded.revision',role,...dimensionValues(tags),uid()),audit(who(c.actor),'dimension.payroll','payroll-coding',role,{before,after:tags})])
+ return dimensionsView(c.db)
+}}
+dimensionCommands['dimension.payroll']=payrollTags

@@ -33,6 +33,7 @@ const reclassify: Command = { need: 'post', async run(c, b) {
   requireThat(lines.length === ids.length, 'A chosen line was not found', 404)
   for (const l of lines) {
     const label = `Entry ${l.number ?? 'draft'} line ${l.line_no}`
+    requireThat(!dimension || !['invoice','credit','bill'].includes(l.source_kind), `${label} needs a document correction so cash recognition follows its settlements`, 409)
     requireThat(l.status === 'posted', `${label} is a draft; edit the draft instead`, 409)
     requireThat(!l.reversed_by_id && l.source_kind !== 'reversal', `${label} is reversed or is a reversal; it cannot be reclassified`, 409)
     requireThat(!l.moved, `${label} was already reclassified; reclassify its correcting entry instead`, 409)

@@ -15,6 +15,7 @@ import { promisify } from 'node:util'
 import { chromium } from '@playwright/test'
 import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { books } from '../app/books.mjs'
+import {dimensionsForRestore,assertDimensionsRestored} from './dimensions.mjs'
 import { estimatesForRestore, assertEstimatesRestored } from './estimates.mjs'
 import { captureForRestore, assertCaptureRestored } from './capture.mjs'
 
@@ -173,6 +174,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   }
   const webhook=await command('webhook.create',{destination:'https://receiver.example.test/pantry',events:['created']})
   await command('contact.save',{kind:'customer',name:'Synthetic Pantry webhook enquiry',email:'synthetic-pantry-webhook@example.test'})
+  const dimensionEvidence=await dimensionsForRestore(context,server.origin)
   const before = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(before.bytes, pdf)
   await context.close(); await server.stop()
@@ -210,6 +212,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   assert.deepEqual(restored.bytes, pdf, 'the document comes back byte for byte')
   await assertCaptureRestored(context, server.origin, captured)
   await assertEstimatesRestored(context, server.origin, estimates)
+  await assertDimensionsRestored(context,server.origin,dimensionEvidence)
   const dataFlows=await (await context.request.get(`${server.origin}/api/pantry/data-flows`)).json()
   assert.ok(dataFlows.services.filter(s=>s.id!=='mail').every(s=>!s.connected),'restored books have no live provider connection')
   assert.equal((await context.request.get(`${server.origin}/api/pantry/integration/v1/invoices`,{headers:{authorization:`Bearer ${archivedIntegration.token}`}})).status(),401)
@@ -239,6 +242,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   const again = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(again.view, before.view, 'starting over brings the same books back')
   assert.deepEqual(again.bytes, pdf)
+  await assertDimensionsRestored(context,server.origin,dimensionEvidence)
 
   // The same public erase operation removes a lead and redacts a posted
   // customer. Their source-bound fence and value-free receipts must travel.

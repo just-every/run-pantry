@@ -32,6 +32,9 @@ export async function dimensionsJourney(t) {
  const missing=await h.command('journal.save-draft',{date:'2026-09-17',memo:'Unclassified draft',lines:[{accountId:acct['6200'],debit:'5'},{accountId:acct['1000'],credit:'5'}]})
  await h.command('journal.post',{id:missing.id,revision:missing.revision},h.owner,409)
  await h.command('journal.save-draft',{date:'2026-09-17',memo:'Unknown class',lines:[{accountId:acct['6200'],debit:'5',className:'Unknown'},{accountId:acct['1000'],credit:'5'}]},h.owner,409)
+ const journalBeforeRefusal=(await h.view('journal')).entries,issuedJournal=journalBeforeRefusal.find(e=>e.id===invoice.journal_id)
+ await h.command('journal.reclassify',{lineIds:[issuedJournal.lines.find(l=>l.account_id===acct['4000']).id],dimensionKind:'class',toDimensionName:'Support'},h.owner,409)
+ assert.equal((await h.view('journal')).entries.length,journalBeforeRefusal.length,'refused document recoding adds no entry')
  for(const basis of ['accrual','cash']) {
   const unsplit=await h.view(`reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=${basis}`)
   for(const kind of ['class','location','project']) {

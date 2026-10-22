@@ -159,6 +159,10 @@ test('REPORT-005 / CLOSE-005 / CLOSE-004 / PAYROLL-001 a Gusto payroll posts as 
   }
   const h = await harness({ bindings: GUSTO, outbound }); t.after(() => h.close())
   const { acct } = await books(h)
+  const dimensions=(await h.view('dimensions')).settings
+  await h.command('dimensions.settings',{revision:dimensions.revision,class:true,location:true,project:true})
+  for(const [kind,name] of [['class','Studio payroll'],['location','New York payroll'],['project','Cedar payroll']])await h.command('dimension.save',{kind,name})
+  for(const role of ['wages','taxes','benefits','reimbursements','bank','liabilities'])await h.command('dimension.payroll',{role,className:'Studio payroll',locationName:'New York payroll',projectName:'Cedar payroll'})
   const bank = await h.command('bank-account.save', { name: 'Operating checking', institution: 'Chase', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-01-01', openingBalance: '30000.00' })
   // September's statement already holds Gusto's four debits for the payroll paid on the 30th.
   const september = csvOf([['09/28/2026', 'GUSTO NET 8F3A1C', -7126.58, 22873.42], ['09/28/2026', 'GUSTO TAX 8F3A1C', -2651.85, 20221.57], ['09/28/2026', 'GUSTO REIMB 8F3A1C', -125, 20096.57], ['09/28/2026', 'GUSTO CHILD SUP 8F3A1C', -100, 19996.57]])
@@ -189,6 +193,9 @@ test('REPORT-005 / CLOSE-005 / CLOSE-004 / PAYROLL-001 a Gusto payroll posts as 
   // One balanced entry on the check date, matched to the four debits by itself.
   const [entry] = await entriesFor(h, p1.uuid)
   assert.equal(entry.entry_date, '2026-09-30')
+  assert.ok(entry.lines.every(l=>l.class_name==='Studio payroll'&&l.location_name==='New York payroll'&&l.project_name==='Cedar payroll'),'every mapped payroll line retains owner-selected dimensions')
+  await h.command('dimension.payroll',{role:'wages',className:'Studio payroll',locationName:'New York payroll',projectName:'Cedar payroll'})
+  assert.deepEqual((await entriesFor(h,p1.uuid))[0].lines,entry.lines,'changing future payroll mapping never rewrites a posted payroll')
   assert.deepEqual(lines(entry), [
     ['Employee benefits', 45000, 0], ['Employee reimbursements', 12500, 0],
     ['Operating checking', 0, 10000], ['Operating checking', 0, 12500], ['Operating checking', 0, 77843], ['Operating checking', 0, 187342], ['Operating checking', 0, 712658],

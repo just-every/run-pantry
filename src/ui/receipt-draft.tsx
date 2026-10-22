@@ -1,3 +1,4 @@
+import { DimensionFields } from './dimensions'
 import { useState } from 'react'
 import { VendorHistory } from './vendor-history'
 import { Action, command, Field, Form, usd, useShared, useView, type D } from './kit'
@@ -35,6 +36,7 @@ export function ReceiptDraft({ r, accounts, onChange }: { r: D; accounts: D[]; o
       <fieldset className="field-wide"><legend>Document lines before tax</legend>{lines.map((l, i) => <div className="grid-form" key={i}>
         <Field label={`Description ${i + 1}`} name={`description-${i}`} value={l.description} required onChange={(e: any) => setLines(ls => ls.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} />
         <Field label={`Account ${i + 1}`} name={`account-${i}`} options={options} value={l.accountId ?? ''} required onChange={(e: any) => setLines(ls => ls.map((x, j) => j === i ? { ...x, accountId: e.target.value } : x))} />
+        <DimensionFields line={l} index={i} onChange={patch=>setLines(ls=>ls.map((x,j)=>j===i?{...x,...patch}:x))} />
         <Field label={`Amount ${i + 1}`} name={`amount-${i}`} value={l.amount} inputMode="decimal" required onChange={(e: any) => setLines(ls => ls.map((x, j) => j === i ? { ...x, amount: e.target.value } : x))} />
         {lines.length > 1 && <button className="btn btn-link" type="button" onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}>Remove line {i + 1}</button>}
       </div>)}<button className="btn btn-secondary" type="button" onClick={() => setLines(ls => [...ls, { description: '', accountId: r.account_id, amount: '' }])}>Add document line</button></fieldset>

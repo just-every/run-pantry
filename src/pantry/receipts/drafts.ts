@@ -1,3 +1,4 @@
+import { dimensionTags, dimensionValues } from '../dimensions'
 // Document drafts share one revision-specific approval path for bills and paid
 // expenses. Source bytes stay linked from preparation through posting.
 import { authority, must, who } from '../access'
@@ -13,7 +14,7 @@ import { acceptedDraft, documentDraftProposal } from './draft-proposal'
 import { captureApprovalCommands, captureBillApproval } from './draft-approval'
 
 const money = (n: number) => (n / 100).toFixed(2)
-export const draftBillLines = (p: Data) => [...p.lines.map((l: Data) => ({ ...l, amount: money(l.amount) })), ...(p.tax ? [{ description: 'Purchase tax', accountId: p.lines[0].accountId, amount: money(p.tax) }] : [])]
+export const draftBillLines = (p: Data) => [...p.lines.map((l: Data) => ({ ...l, amount: money(l.amount) })), ...(p.tax ? [{ ...dimensionTags(p.lines[0]),description: 'Purchase tax', accountId: p.lines[0].accountId, amount: money(p.tax) }] : [])]
 
 const save: Command = { need: 'record', async run(c, b) {
   const r = await one(c.db, "SELECT * FROM pt_receipts WHERE id = ? AND status = 'review'", text(b.id, 'Receipt'))
@@ -34,7 +35,7 @@ const save: Command = { need: 'record', async run(c, b) {
       const current = await bill(c.db, billId); requireThat(current.status === 'draft', 'Bill has already posted', 409)
       await assertOpen(c.db, current.bill_date)
       statements.push(periodOpen(current.bill_date), q("UPDATE pt_bills SET vendor_id = ?, reference = ?, bill_date = ?, due_date = ?, total_cents = ?, prepared_by = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'draft'", p.vendorId, p.reference, p.date, p.dueDate, p.total, c.actor.email, uid(), billId, current.revision), changed(),
-        q('DELETE FROM pt_bill_lines WHERE bill_id = ?', billId), ...draftBillLines(p).map((l, i) => q('INSERT INTO pt_bill_lines (id, bill_id, line_no, description, account_id, amount_cents) VALUES (?, ?, ?, ?, ?, ?)', uid(), billId, i + 1, l.description, l.accountId, Math.round(Number(l.amount) * 100))))
+        q('DELETE FROM pt_bill_lines WHERE bill_id = ?', billId), ...draftBillLines(p).map((l, i) => q('INSERT INTO pt_bill_lines (id, bill_id, line_no, description, account_id, amount_cents,class_name,location_name,project_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', uid(), billId, i + 1, l.description, l.accountId, Math.round(Number(l.amount) * 100),...dimensionValues(l))))
     }
     statements.push(q("UPDATE pt_documents SET linked_kind = 'bill', linked_id = ? WHERE id IN (?, ?)", billId, r.document_id, r.file_document_id))
   } else {
@@ -63,7 +64,7 @@ const post: Command = { need: 'post', async run(c, b) {
     requireThat(current.status === 'draft', 'Bill already posted', 409)
     statements.push(...await captureBillApproval(c.db, d.bill_id), ...postBill(c.actor, { id: current.id, journalId: uid(), payable: payable.id, vendor, reference: current.reference, date: current.bill_date, lines: current.lines, total: current.total_cents }))
   } else {
-    const plan = await matchPlan(c.db, c.actor, { bankLineIds: [d.bank_line_id], journalLineIds: [], create: draftBillLines(p).map(l => ({ type: 'fee', documentId: r.document_id, amount: l.amount, accountId: l.accountId, direction: 'out', memo: l.description })), note: `Approved receipt draft: ${p.vendor}` })
+    const plan = await matchPlan(c.db, c.actor, { bankLineIds: [d.bank_line_id], journalLineIds: [], create: draftBillLines(p).map(l => ({ ...dimensionTags(l),type: 'fee', documentId: r.document_id, amount: l.amount, accountId: l.accountId, direction: 'out', memo: l.description })), note: `Approved receipt draft: ${p.vendor}` })
     linkedId = plan.entryIds[0]; linkedKind = 'journal'; statements.push(...plan.statements)
     statements.push(q("UPDATE pt_documents SET linked_kind = 'journal', linked_id = ? WHERE id IN (?, ?)", linkedId, r.document_id, r.file_document_id))
   }
