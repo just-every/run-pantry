@@ -136,6 +136,7 @@ export async function estimatesJourney(t) {
       await inventory.locator('summary').click()
       await inventory.screenshot({ path: `${evidence}/estimate-${id}-data-${width}.png` })
     }
+    await page.locator('#data-flows').screenshot({ path: `${evidence}/estimate-service-inventory-${width}.png` })
     assert.deepEqual(errors, [])
     await page.close(); await customerContext.close()
   }
