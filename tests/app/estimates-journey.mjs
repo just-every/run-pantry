@@ -73,7 +73,7 @@ export async function estimatesJourney(t) {
     await expect(customerPage.getByRole('status').filter({ hasText: 'Accepted by Casey Cedar' })).toBeVisible()
     await customerPage.screenshot({ path: `${evidence}/estimate-accepted-${width}.png`, fullPage: true })
 
-    await page.goto(`${origin}/app/sales?tab=customer-deposits`)
+    await page.goto(`${origin}/app/sales?tab=deposits`)
     await page.getByLabel('Deposit customer', { exact: true }).selectOption(customer.id)
     await page.getByLabel('Date received', { exact: true }).fill(date)
     await page.getByLabel('Deposit received amount', { exact: true }).fill('3000')
