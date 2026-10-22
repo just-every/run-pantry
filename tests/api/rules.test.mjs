@@ -203,3 +203,6 @@ test('RULE-003 learned line suggestions follow human corrections and show decisi
   assert.equal(q.lines.find(l => l.id === adobe[6].id).match_id, null)
   assert.ok((await h.view('reports/trial-balance?to=2026-09-30&basis=accrual')).balanced)
 })
+
+import {queueJourney} from './queue-journey.mjs'
+test('RULE-001 one review queue keeps fifty lines, splits, exclusions, reviewed bulk decisions and undo consistent with the books',queueJourney)

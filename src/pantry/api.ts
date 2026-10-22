@@ -23,6 +23,7 @@ import { billLifecycleCommands, capturedBillInbox } from './bill-lifecycle'
 import { recurringBillCommands, recurringBillsView } from './recurring-bills'
 import { payableCommands, billsView, paymentsView } from './payables'
 import { bankCommands, bankView } from './bank'
+import { queueCommands } from './bank-queue'
 import { matchCommands } from './matching'
 import { reconcileCommands, reconciliationState } from './reconcile'
 import { yearEndCommands, yearEndState, adjustingEntries } from './year-end'
@@ -103,7 +104,7 @@ import { customerDepositCommands, customerDepositsView } from './customer-deposi
 const commands: Record<string, Command> = {
   ...siblingCommands,
   ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
-  ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
+  ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
 }

@@ -9,12 +9,12 @@ import { depositProposals } from './automatch'
 import { transferState } from './transfers'
 
 export async function bankLinesView(db: D1Database): Promise<Data> {
-  const lines = await all(db, `SELECT l.id, l.bank_account_id, l.posted_date, l.amount_cents, l.description, l.payee, l.source, l.statement_id, l.feed_txn_id, l.removed_at, l.rules_off,
+  const lines = await all(db, `SELECT l.id, l.bank_account_id, l.posted_date, l.amount_cents, l.description, l.payee, l.source, l.statement_id, l.feed_txn_id, l.removed_at, l.rules_off,l.excluded_at,l.excluded_reason,l.excluded_kind,l.excluded_by,l.exclusion_revision,
       b.name AS bank_name, m.id AS match_id, m.rule_id, m.reconciliation_id, m.approved_by, m.automatic, m.payment_id, m.rule_revision, m.rule_snapshot, json_extract(m.rule_snapshot, '$.name') AS rule_name
     FROM pt_bank_lines l JOIN pt_bank_accounts b ON b.id = l.bank_account_id
     LEFT JOIN pt_match_bank_lines mb ON mb.bank_line_id = l.id AND mb.active = 1 LEFT JOIN pt_matches m ON m.id = mb.match_id
     WHERE l.removed_at IS NULL OR mb.match_id IS NOT NULL
-    ORDER BY l.posted_date DESC, l.id LIMIT 300`)
+    ORDER BY l.posted_date DESC, l.id`)
   const matches = [...new Set(lines.map(l => l.match_id).filter(Boolean))] as string[]
   const filedTo = new Map<string, string[]>()
   for (let i = 0; i < matches.length; i += 90) {

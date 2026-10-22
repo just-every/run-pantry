@@ -111,7 +111,7 @@ const precedes = (a: Rule, b: Rule) => a.priority - b.priority || (String(a.crea
 const splitHold = (rule: Rule, line: Data) => rule.split_mode === 'amount' && rule.splits.reduce((n, s) => n + s.amountCents!, 0) !== Math.abs(line.amount_cents) ? 'Split amounts must equal the statement line amount' : null
 
 /** Lines no match holds, the bank has not removed and no undo has taken out of rules. */
-const OPEN_LINES = `SELECT l.* FROM pt_bank_lines l WHERE l.removed_at IS NULL AND l.rules_off = 0
+const OPEN_LINES = `SELECT l.* FROM pt_bank_lines l WHERE l.removed_at IS NULL AND l.excluded_at IS NULL AND l.rules_off = 0
   AND NOT EXISTS (SELECT 1 FROM pt_match_bank_lines m WHERE m.bank_line_id = l.id AND m.active = 1)
   AND NOT EXISTS (SELECT 1 FROM pt_transfer_halves h WHERE h.bank_line_id = l.id AND h.status IN ('pending', 'exception'))`
 
@@ -144,6 +144,7 @@ export async function fileStatements(db: D1Database, rule: Rule, line: Data, fil
   ]
   const entryId = uid(), matchId = uid()
   return [filer.authority, standingFence(standingAuthority(filer.actor.email, 'bank', [bank.id])), periodOpen(line.posted_date), notReconciled(line),
+    guard('EXISTS(SELECT 1 FROM pt_bank_lines WHERE id=? AND excluded_at IS NULL)',line.id),
     guard('NOT EXISTS (SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = ? AND active = 1)', line.id),
     guard("NOT EXISTS (SELECT 1 FROM pt_transfer_halves WHERE bank_line_id = ? AND status IN ('pending', 'exception'))", line.id),
     guard('EXISTS (SELECT 1 FROM pt_bank_rules WHERE id = ? AND revision = ? AND active = 1)', rule.id, rule.revision),
@@ -187,7 +188,7 @@ const personFiler = (c: Context) => (): Filer => ({ actor: who(c.actor), authori
 /** Open matches, and the six latest matching charges including already-filed history. */
 async function preview(db: D1Database, rule: Rule, others: Rule[]) {
   const candidates = (await all(db, `${OPEN_LINES} ORDER BY l.posted_date DESC, l.id`)).filter(l => ruleMatches(rule, l))
-  const earlier = (await all(db, 'SELECT l.* FROM pt_bank_lines l WHERE l.removed_at IS NULL ORDER BY l.posted_date DESC, l.id')).filter(l => ruleMatches(rule, l)).slice(0, 6)
+  const earlier = (await all(db, 'SELECT l.* FROM pt_bank_lines l WHERE l.removed_at IS NULL AND l.excluded_at IS NULL ORDER BY l.posted_date DESC, l.id')).filter(l => ruleMatches(rule, l)).slice(0, 6)
   const files: Data[] = [], held: Data[] = [], preceded: Data[] = [], suggested: Data[] = []
   const deposits = await depositProposals(db, candidates), recorded = await recordedPaymentCandidates(db, candidates)
   for (const l of candidates) {

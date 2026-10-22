@@ -53,7 +53,7 @@ function externalPayee(line: Data, banks: Data[]) {
   }
   return !!payee && !banks.some(b => [b.institution, b.name].some(name => normalize(name) === normalize(payee)))
 }
-const freeLine = (l: Data) => guard(`EXISTS (SELECT 1 FROM pt_bank_lines WHERE id = ? AND posted_date = ? AND amount_cents = ? AND description = ? AND removed_at IS NULL)
+const freeLine = (l: Data) => guard(`EXISTS (SELECT 1 FROM pt_bank_lines WHERE id = ? AND posted_date = ? AND amount_cents = ? AND description = ? AND removed_at IS NULL AND excluded_at IS NULL)
   AND NOT EXISTS (SELECT 1 FROM pt_reconciliations r JOIN pt_statements s ON s.id = r.statement_id WHERE r.bank_account_id = ? AND ? BETWEEN s.start_date AND s.end_date)`, l.id, l.posted_date, l.amount_cents, l.description, l.bank_account_id, l.posted_date)
 
 /** Pending halves are work, even when no provider is configured or connected now. */
@@ -62,7 +62,7 @@ export async function transferState(db: D1Database) {
     CASE WHEN h.status IN ('pending', 'exception') AND EXISTS (SELECT 1 FROM pt_periods WHERE status = 'locked' AND l.posted_date BETWEEN start_date AND end_date) THEN 'Reopen the locked period before pairing' ELSE NULL END AS blocked,
     p.status AS pair_status, p.journal_id, p.created_entry
     FROM pt_transfer_halves h JOIN pt_bank_lines l ON l.id = h.bank_line_id LEFT JOIN pt_bank_accounts b ON b.id = h.expected_bank_account_id
-    LEFT JOIN pt_transfer_pairs p ON p.id = h.pair_id WHERE l.removed_at IS NULL
+    LEFT JOIN pt_transfer_pairs p ON p.id = h.pair_id WHERE l.removed_at IS NULL AND l.excluded_at IS NULL
       AND (h.status NOT IN ('pending', 'exception') OR NOT EXISTS (SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = l.id AND active = 1))`)
 }
 
@@ -118,7 +118,7 @@ export async function matchTransfers(db: D1Database) {
     EXISTS (SELECT 1 FROM pt_reconciliations r JOIN pt_statements s ON s.id = r.statement_id WHERE r.bank_account_id = l.bank_account_id AND l.posted_date BETWEEN s.start_date AND s.end_date) AS reconciled
     FROM pt_bank_lines l LEFT JOIN pt_transfer_halves h ON h.bank_line_id = l.id
     LEFT JOIN pt_match_bank_lines mb ON mb.bank_line_id = l.id AND mb.active = 1
-    WHERE l.removed_at IS NULL AND l.rules_off = 0 AND (h.status IS NULL OR h.status IN ('pending', 'exception'))
+    WHERE l.removed_at IS NULL AND l.excluded_at IS NULL AND l.rules_off = 0 AND (h.status IS NULL OR h.status IN ('pending', 'exception'))
       AND EXISTS (SELECT 1 FROM pt_bank_accounts b JOIN pt_accounts a ON a.id = b.account_id WHERE b.id = l.bank_account_id AND a.active = 1)`)
   const identified: Data[] = []
   const today = now().slice(0, 10)

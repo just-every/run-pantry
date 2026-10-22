@@ -10,7 +10,7 @@ import type { Command } from './context'
 import { entryDocuments } from './receipts/attachments'
 import { reverseEarlyDiscounts } from './early-payment'
 
-export type Line = { accountId: string; debit: number; credit: number; memo?: string; contactId?: string | null }
+export type Line = { accountId: string; debit: number; credit: number; memo?: string; contactId?: string | null; className?: string; locationName?: string; projectName?: string }
 export type Entry = {
   id: string; date: string; memo: string; sourceKind: string; sourceId?: string | null
   preparedBy: string; preparedKind: 'person' | 'agent' | 'import'; proposalId?: string | null; documentId?: string | null; revision?: string
@@ -23,8 +23,8 @@ export function entryStatements(e: Entry, postedBy?: string): Sql[] {
   const statements: Sql[] = [
     q('INSERT INTO pt_journal_entries (id, entry_date, memo, source_kind, source_id, status, prepared_by, prepared_kind, proposal_id, document_id, revision, created_at, adjusting) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       e.id, e.date, e.memo, e.sourceKind, e.sourceId ?? null, 'draft', e.preparedBy, e.preparedKind, e.proposalId ?? null, e.documentId ?? null, e.revision ?? uid(), now(), e.adjusting ? 1 : 0),
-    ...e.lines.map((l, i) => q('INSERT INTO pt_journal_lines (id, entry_id, line_no, account_id, debit_cents, credit_cents, memo, contact_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      uid(), e.id, i + 1, l.accountId, l.debit, l.credit, l.memo ?? '', l.contactId ?? null)),
+    ...e.lines.map((l, i) => q('INSERT INTO pt_journal_lines (id, entry_id, line_no, account_id, debit_cents, credit_cents, memo, contact_id, class_name, location_name, project_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      uid(), e.id, i + 1, l.accountId, l.debit, l.credit, l.memo ?? '', l.contactId ?? null, l.className ?? '', l.locationName ?? '', l.projectName ?? '')),
   ]
   if (postedBy) statements.push(...postStatements(e.id, postedBy))
   return statements
@@ -71,7 +71,7 @@ export async function entry(db: D1Database, id: string) {
 }
 
 const draftSnapshot = (e: Data) => ({ revision: e.revision, date: e.entry_date, memo: e.memo, documentId: e.document_id, status: e.status, adjusting: Boolean(e.adjusting),
-  lines: e.lines.map((l: Data) => ({ accountId: l.account_id, debit: l.debit_cents, credit: l.credit_cents, memo: l.memo, contactId: l.contact_id })) })
+  lines: e.lines.map((l: Data) => ({ accountId: l.account_id, debit: l.debit_cents, credit: l.credit_cents, memo: l.memo, contactId: l.contact_id, className:l.class_name,locationName:l.location_name,projectName:l.project_name })) })
 
 async function assertAdjustingDate(db: D1Database, day: string) {
   const entity = await one(db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
@@ -105,7 +105,7 @@ const saveDraft: Command = { need: 'record', async run(c, b) {
   await run(c.db, [authority(c.actor, 'record'), ...scope,
     q('UPDATE pt_journal_entries SET entry_date = ?, memo = ?, document_id = ?, adjusting = ?, prepared_by = ?, revision = ? WHERE id = ? AND revision = ? AND status = ?', day, memo, documentId, adjusting ? 1 : 0, c.actor.email, revision, current.id, b.revision, 'draft'), changed(),
     q('DELETE FROM pt_journal_lines WHERE entry_id = ?', current.id),
-    ...lines.map((l, i) => q('INSERT INTO pt_journal_lines (id, entry_id, line_no, account_id, debit_cents, credit_cents, memo, contact_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', uid(), current.id, i + 1, l.accountId, l.debit, l.credit, l.memo ?? '', l.contactId ?? null)),
+    ...lines.map((l, i) => q('INSERT INTO pt_journal_lines (id, entry_id, line_no, account_id, debit_cents, credit_cents, memo, contact_id, class_name, location_name, project_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', uid(), current.id, i + 1, l.accountId, l.debit, l.credit, l.memo ?? '', l.contactId ?? null, l.className ?? '', l.locationName ?? '', l.projectName ?? '')),
     audit(who(c.actor), 'journal.edit', 'journal', current.id, { date: day, memo, before: draftSnapshot(current), after: { revision, date: day, memo, documentId, adjusting, status: 'draft', lines } })])
   return entry(c.db, current.id)
 } }
@@ -140,7 +140,7 @@ export async function reversalStatements(db: D1Database, actor: AuditActor, orig
   requireThat(!matched, 'This entry is matched to a bank statement line; undo the match first', 409)
   const id = uid()
   const paymentBanks=original.source_kind==='payment'?await all(db,'SELECT bank_account_id FROM pt_payments WHERE journal_id=?',original.id):[]
-  const lines: Line[] = original.lines.map((l: Data) => ({ accountId: l.account_id, debit: l.credit_cents, credit: l.debit_cents, memo: l.memo, contactId: l.contact_id }))
+  const lines: Line[] = original.lines.map((l: Data) => ({ accountId: l.account_id, debit: l.credit_cents, credit: l.debit_cents, memo: l.memo, contactId: l.contact_id, className:l.class_name,locationName:l.location_name,projectName:l.project_name }))
   return { id, statements: [
     ...bankAuthority(actor,paymentBanks.map(p=>p.bank_account_id)),
     ...nativeApprovalAuthority(actor, original.source_kind === 'bill' ? 'bill' : original.source_kind === 'payment' ? 'payment' : 'journal', lines.reduce((sum, l) => sum + l.debit, 0), original.source_kind === 'bank' ? 'record' : undefined),

@@ -52,7 +52,7 @@ export function judge(line: Data, invoices: Candidate[]): { invoice?: Candidate;
 export async function matchDeposits(db: D1Database, lineIds: string[]) {
   const matched: Data[] = []
   if (!lineIds.length) return { matched, needsPerson: [], proposed: [] }
-  const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE amount_cents > 0 AND removed_at IS NULL AND id IN (${lineIds.map(() => '?').join(',')}) ORDER BY posted_date, id`, ...lineIds)
+  const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE amount_cents > 0 AND removed_at IS NULL AND excluded_at IS NULL AND id IN (${lineIds.map(() => '?').join(',')}) ORDER BY posted_date, id`, ...lineIds)
   for (const line of lines) {
     if (await one(db, 'SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = ? AND active = 1', line.id)) continue
     const decision = judge(line, await openInvoices(db)), inv = decision.invoice
@@ -89,7 +89,7 @@ export async function depositProposals(db: D1Database, lines: Data[]) {
 export async function matchRecorded(db: D1Database, lineIds: string[]) {
   const matched: Data[] = []
   if (!lineIds.length) return matched
-  const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE removed_at IS NULL AND id IN (${lineIds.map(() => '?').join(',')}) ORDER BY posted_date, id`, ...lineIds)
+  const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE removed_at IS NULL AND excluded_at IS NULL AND id IN (${lineIds.map(() => '?').join(',')}) ORDER BY posted_date, id`, ...lineIds)
   for (const line of lines) {
     if (await one(db, 'SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = ? AND active = 1', line.id)) continue
     const candidates = (await recordedPaymentCandidates(db, [line]))[line.id] ?? []

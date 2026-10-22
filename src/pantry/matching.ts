@@ -7,7 +7,7 @@ import { suggestionDecisions } from './line-suggestions'
 // recorded is never posted a second time when its bank line arrives.
 import { authority, who } from './access'
 import { cents, optionalText, requireThat, text, uid, usd, now, type Data } from './core'
-import { all, assertOpen, audit, changed, one, q, run, type AuditActor, type Sql } from './db'
+import { all, assertOpen, audit, changed, guard, one, periodOpen, q, run, type AuditActor, type Sql } from './db'
 import { account } from './accounts'
 import { entry, entryStatements, reversalStatements } from './journal'
 import { paymentStatements } from './payables'
@@ -31,6 +31,7 @@ export function matchInput(b: Data): MatchInput {
 export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchInput, { automatic = false, recordedReceipt = false } = {}) {
   const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE id IN (${input.bankLineIds.map(() => '?').join(',')})`, ...input.bankLineIds)
   requireThat(lines.length === input.bankLineIds.length, 'A statement line was not found', 404)
+  requireThat(lines.every(l => !l.excluded_at),'Restore an excluded line before filing it',409)
   requireThat(lines.every(l => !l.removed_at), 'A bank line was removed; reload before matching', 409)
   const bankId = lines[0].bank_account_id
   requireThat(lines.every(l => l.bank_account_id === bankId), 'Match lines from one bank account at a time')
@@ -48,7 +49,10 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
   requireThat(!usedPostings.length, 'A ledger posting is already matched', 409)
 
   const day = lines.map(l => l.posted_date).sort().at(-1)!
-  const statements: Sql[] = [...bankAuthority(actor, [bankId])], created: { entryId: string; signed: number; kind: string; paymentId?: string }[] = []
+  const statements: Sql[] = [...bankAuthority(actor, [bankId]),...lines.flatMap(l=>[
+    periodOpen(l.posted_date),guard('EXISTS(SELECT 1 FROM pt_bank_lines WHERE id=? AND posted_date=? AND amount_cents=? AND description=? AND removed_at IS NULL AND excluded_at IS NULL)',l.id,l.posted_date,l.amount_cents,l.description),
+    guard('NOT EXISTS(SELECT 1 FROM pt_reconciliations r JOIN pt_statements s ON s.id=r.statement_id WHERE r.bank_account_id=? AND ? BETWEEN s.start_date AND s.end_date)',l.bank_account_id,l.posted_date)
+  ])], created: { entryId: string; signed: number; kind: string; paymentId?: string }[] = []
   for (const [i, item] of input.create.entries()) {
     const label = `New item ${i + 1}`, type = text(item.type, `${label} type`)
     const amount = cents(item.amount, `${label} amount`), memo = optionalText(item.memo, `${label} memo`, 300)
@@ -71,10 +75,16 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
       }
       const contactId = item.contactId ? text(item.contactId, `${label} payee`) : null
       if (contactId) requireThat(await one(db, 'SELECT 1 FROM pt_contacts WHERE id = ? AND active = 1 AND kind = ?', contactId, direction === 'in' ? 'customer' : 'vendor'), 'Choose an active payee')
+      const dimensions=Object.fromEntries(['className','locationName','projectName'].map(k=>[k,optionalText(item[k],k,120)]))
+      requireThat(type!=='transfer'||(!item.taxCodeId&&!Object.values(dimensions).some(Boolean)),'Transfers do not carry sales tax or category dimensions')
+      const code=item.taxCodeId?await one(db,'SELECT * FROM pt_tax_codes WHERE id=? AND active=1',text(item.taxCodeId,'Tax code')):null
+      requireThat(!item.taxCodeId||code,'Choose an active sales tax code')
+      const tax=code?Math.round(amount*code.rate_milli_percent/(100000+code.rate_milli_percent)):0
       const entryId = uid(), into = direction === 'in'
       statements.push(...nativeApprovalAuthority(actor, 'journal', amount, 'record'), ...entryStatements({ id: entryId, date: item.date ?? day, memo: memo || `${type === 'transfer' ? 'Transfer' : other.name} — ${lines[0].description}`, sourceKind: 'bank', documentId: item.documentId ?? null, preparedBy: actor.email, preparedKind: 'person', lines: [
-        { accountId: into ? bank.account_id : other.id, debit: amount, credit: 0, memo, contactId: into ? null : contactId },
-        { accountId: into ? other.id : bank.account_id, debit: 0, credit: amount, memo, contactId: into ? contactId : null },
+        { accountId: into ? bank.account_id : other.id, debit: into?amount:amount-tax, credit: 0, memo, contactId: into ? null : contactId, ...(!into?dimensions:{}) },
+        { accountId: into ? other.id : bank.account_id, debit: 0, credit: into?amount-tax:amount, memo, contactId: into ? contactId : null, ...(into?dimensions:{}) },
+        ...(tax?[{accountId:code!.account_id,debit:into?0:tax,credit:into?tax:0,memo,...dimensions}]:[]),
       ] }, actor.email))
       created.push({ entryId, signed: into ? amount : -amount, kind: type })
     } else requireThat(false, `${label}: type is receipt, payment, fee, income or transfer`)
@@ -90,6 +100,7 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
     ...postings.map(p => q('INSERT INTO pt_match_postings (match_id, journal_line_id, active) VALUES (?, ?, 1)', id, p.id)),
     // The new postings' bank-account lines join the match inside the same batch.
     ...created.map(x => q('INSERT INTO pt_match_postings (match_id, journal_line_id, active) SELECT ?, id, 1 FROM pt_journal_lines WHERE entry_id = ? AND account_id = ?', id, x.entryId, bank.account_id)),
+    ...created.map(x=>q('INSERT INTO pt_match_created_entries(match_id,entry_id,payment_id)VALUES(?,?,?)',id,x.entryId,x.paymentId??null)),
     audit(who(actor), automatic ? 'match.automatic' : 'match.approve', 'match', id, { statementLines: lines.length, postings: postings.length, created: created.map(x => x.kind), amount: statementTotal, proposal: input.proposalId ?? null }),
   )
   return { id, statements, statementTotal, entryIds: created.map(x => x.entryId) }
@@ -118,12 +129,18 @@ const undoMatch: Command = { need: 'record', async run(c, b) {
   const days = await all(c.db, 'SELECT l.posted_date FROM pt_match_bank_lines m JOIN pt_bank_lines l ON l.id = m.bank_line_id WHERE m.match_id = ?', match.id)
   for (const d of days) await assertOpen(c.db, d.posted_date)
   const reversal: Sql[] = []
-  if (match.payment_id) {
-    const payment = (await one(c.db, 'SELECT * FROM pt_payments WHERE id = ?', match.payment_id))!
-    const original = await entry(c.db, payment.journal_id)
-    const r = await reversalStatements(c.db, c.actor, original, original.entry_date, `Undo of a bank match: ${original.memo}`, { unmatching: true })
-    reversal.push(...r.statements, q('UPDATE pt_payments SET reversal_id = ? WHERE id = ? AND reversal_id IS NULL', r.id, payment.id), changed(),
-      ...await reverseEarlyDiscounts(c.db, who(c.actor), payment.id, original.entry_date, 'the bank match that recorded its payment was undone'))
+  const created=await all(c.db,'SELECT entry_id,payment_id FROM pt_match_created_entries WHERE match_id=?',match.id)
+  // Older automatic receipt matches predate the explicit created-entry relation.
+  if(match.payment_id&&!created.some(x=>x.payment_id===match.payment_id)){
+    const p=await one(c.db,'SELECT journal_id FROM pt_payments WHERE id=?',match.payment_id)
+    requireThat(p,'The matched payment is missing',409);created.push({entry_id:p.journal_id,payment_id:match.payment_id})
+  }
+  for(const record of created){
+    const original=await entry(c.db,record.entry_id)
+    const r=await reversalStatements(c.db,c.actor,original,original.entry_date,`Undo of a bank match: ${original.memo}`,{unmatching:true})
+    reversal.push(...r.statements)
+    if(record.payment_id)reversal.push(q('UPDATE pt_payments SET reversal_id=? WHERE id=? AND reversal_id IS NULL',r.id,record.payment_id),changed(),
+      ...await reverseEarlyDiscounts(c.db,who(c.actor),record.payment_id,original.entry_date,'the bank match that recorded its payment was undone'))
   }
   await run(c.db, [authority(c.actor, 'record'), ...bankAuthority(c.actor, [match.bank_account_id]),
     q("UPDATE pt_matches SET status = 'undone', revision = ? WHERE id = ? AND status = 'approved' AND reconciliation_id IS NULL", uid(), match.id), changed(),

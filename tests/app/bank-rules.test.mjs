@@ -104,3 +104,6 @@ test('RULE-003 history suggestions prefill human filing, follow a changed sixth 
     await context.close()
   }
 })
+
+import {queueBrowser} from './queue-journey.mjs'
+test('RULE-001 fifty-line review, split coding, card payment, personal exclusion, bulk acceptance and undo at 1440 and 390',queueBrowser)

@@ -9,7 +9,7 @@ import { ReconciliationUndo } from './reconciliation-undo'
 import { ProposalApproval } from './proposals'
 import { Icon } from './icons'
 
-type NewItem = { type: string; amount: string; accountId?: string; contactId?: string; otherBankAccountId?: string; direction?: string; memo?: string; allocations?: Record<string, string> }
+type NewItem = { type: string; amount: string; accountId?: string; contactId?: string; otherBankAccountId?: string; direction?: string; memo?: string; taxCodeId?: string; className?: string; locationName?: string; projectName?: string; allocations?: Record<string, string> }
 
 // The buttons that add what the books lack, and the name each new item goes by.
 const KINDS: [string, string, string][] = [['fee', '+ Expense or fee', 'New expense, charge or bank fee'], ['income', '+ Bank income', 'New bank income'], ['transfer', '+ Transfer', 'New transfer'],
@@ -55,6 +55,13 @@ export function MatchPanel({ lines, postings, bankId, clear, onDone, suggestedCa
             <Field label="Amount" name={`amount-${k}`} value={it.amount} onChange={(e: any) => set(k, { amount: e.target.value })} inputMode="decimal" />
             {(it.type === 'fee' || it.type === 'income') && <Field label="Account" name={`account-${k}`} value={it.accountId ?? ''} onChange={(e: any) => set(k, { accountId: e.target.value })} options={accountOptions(state.accounts, a => !['bank', 'receivable', 'payable'].includes(a.subtype))} />}
             {(it.type === 'fee' || it.type === 'income') && <Field label="Payee" name={`payee-${k}`} empty="No named payee" value={it.contactId ?? ''} onChange={(e: any) => set(k, { contactId: e.target.value })} options={contactOptions(state.contacts, it.type === 'fee' ? 'vendor' : 'customer')} />}
+            {(it.type === 'fee' || it.type === 'income') && <>
+              <Field label="Sales tax included" name={`tax-${k}`} empty="No sales tax" value={it.taxCodeId ?? ''} onChange={(e:any)=>set(k,{taxCodeId:e.target.value})} options={state.taxCodes.filter((c:D)=>c.active).map((c:D)=>({value:c.id,label:c.name}))} />
+              <Field label="Memo" name={`memo-${k}`} value={it.memo ?? ''} onChange={(e:any)=>set(k,{memo:e.target.value})} />
+              <Field label="Class" name={`class-${k}`} value={it.className ?? ''} onChange={(e:any)=>set(k,{className:e.target.value})} />
+              <Field label="Location" name={`location-${k}`} value={it.locationName ?? ''} onChange={(e:any)=>set(k,{locationName:e.target.value})} />
+              <Field label="Project" name={`project-${k}`} value={it.projectName ?? ''} onChange={(e:any)=>set(k,{projectName:e.target.value})} />
+            </>}
             {it.type === 'transfer' && <><Field label="Other bank account" name={`other-${k}`} value={it.otherBankAccountId ?? ''} onChange={(e: any) => set(k, { otherBankAccountId: e.target.value })} options={state.bankAccounts.filter((b: D) => b.id !== bankId).map((b: D) => ({ value: b.id, label: b.name }))} /><Field label="Money" name={`dir-${k}`} value={it.direction ?? 'out'} onChange={(e: any) => set(k, { direction: e.target.value })} options={[{ value: 'in', label: 'Came in' }, { value: 'out', label: 'Went out' }]} /></>}
             {(it.type === 'receipt' || it.type === 'payment') && <Field label={it.type === 'receipt' ? 'Customer' : 'Vendor'} name={`contact-${k}`} value={it.contactId ?? ''} onChange={(e: any) => set(k, { contactId: e.target.value, allocations: undefined })} options={contactOptions(state.contacts, it.type === 'receipt' ? 'customer' : 'vendor')} />}
           </div>

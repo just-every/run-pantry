@@ -31,7 +31,7 @@ function vendorFor(line: Data, vendors: Data[], aliases: Data[]) {
 
 /** Public queue read. Re-read persisted lines so stale caller fields cannot advise on filed lines. */
 export async function lineSuggestions(db: D1Database, lines: Data[]): Promise<Record<string, LineSuggestion>> {
-  const ids = [...new Set(lines.filter(l => !l.pending).map(l => String(l.id)))]
+  const ids = [...new Set(lines.filter(l => !l.pending && !l.excluded_at).map(l => String(l.id)))]
   if (!ids.length) return {}
   const [active, accounts, vendors, aliases, history] = await Promise.all([
     rules(db),
@@ -79,7 +79,7 @@ export async function lineSuggestions(db: D1Database, lines: Data[]): Promise<Re
   for (let i = 0; i < ids.length; i += 90) {
     const chunk = ids.slice(i, i + 90)
     const [open, documents] = await Promise.all([
-      all(db, `SELECT l.* FROM pt_bank_lines l WHERE l.id IN (${placeholders(chunk)}) AND l.removed_at IS NULL
+      all(db, `SELECT l.* FROM pt_bank_lines l WHERE l.id IN (${placeholders(chunk)}) AND l.removed_at IS NULL AND l.excluded_at IS NULL
         AND NOT EXISTS (SELECT 1 FROM pt_match_bank_lines mb WHERE mb.bank_line_id = l.id AND mb.active = 1)
         AND NOT EXISTS (SELECT 1 FROM pt_transfer_halves h WHERE h.bank_line_id = l.id AND h.status IN ('pending', 'exception'))`, ...chunk),
       all(db, `SELECT r.*, d.name, b.id AS bill_id, b.vendor_id AS bill_vendor_id FROM pt_receipts r JOIN pt_documents d ON d.id = r.document_id
