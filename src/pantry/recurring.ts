@@ -12,6 +12,7 @@ import { addDays, date, Fault, longDay, monthName, now, optionalText, requireTha
 import { all, approval, audit, changed, guard, one, periodOpen, q, run, type Sql } from './db'
 import { contact } from './contacts'
 import { documentSelectionStatements } from './invoice-documents'
+import { dimensionTags } from './dimensions'
 import { discountColumns, issueStatements, lineStatements, nextNumber, parseInvoice } from './invoices'
 import { deliver } from './delivery'
 import { customerRecipients } from './customer-profile'
@@ -63,7 +64,7 @@ async function parseTemplate(db: D1Database, b: Data) {
   requireThat(mode === 'draft' || mode === 'send', 'Each invoice is created as a draft or sent automatically')
   requireThat(mode === 'draft' || customerRecipients(p.customer).length, `${p.customer.name} has no billing email address; add one to send invoices automatically`)
   // The template keeps the lines as parsed, so an item's defaults are fixed at the approved revision.
-  const lines = p.lines.map(l => ({ description: l.description, quantity: String(l.qty / 1000), rate: (l.unit / 100).toFixed(2), accountId: l.accountId, taxCode: l.chosenTaxCode, ...(l.itemId ? { itemId: l.itemId } : {}), ...(l.kind === 'delivery' ? { kind: 'delivery' } : {}) }))
+  const lines = p.lines.map(l => ({ ...dimensionTags(l),description: l.description, quantity: String(l.qty / 1000), rate: (l.unit / 100).toFixed(2), accountId: l.accountId, taxCode: l.chosenTaxCode, ...(l.itemId ? { itemId: l.itemId } : {}), ...(l.kind === 'delivery' ? { kind: 'delivery' } : {}) }))
   const early = p.terms ? JSON.stringify({ percent: percentLabel(p.terms.percentMilli).slice(0, -1), days: p.terms.days }) : null
   return { p, start, end, unit, every, terms: termDays, mode, lines, discounts: JSON.stringify(p.discounts.map(discountInput)), deposit: depositInput(p.deposit), early, treatments: treatmentRevisions(p.offer), memo: p.memo }
 }

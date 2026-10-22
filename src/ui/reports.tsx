@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { Card, Chip, Field, Loading, PageHead, Table, Tabs, day, monthName, today, usd, useShared, useView, type D } from './kit'
 import { BASIS_NAME, FigureDetail, RecordView } from './report-detail'
+import { ProjectProfitability } from './project-profitability'
 import { Budgets } from './budgets'
 import { CustomReports } from './custom-reports'
 import { customReportsOnly } from './role-navigation'
@@ -15,12 +16,12 @@ import { AskAccountant } from './ask-accountant'
 import { ColumnPicker, StatementColumns, columnMode, type ColumnMode, type ColumnStatement } from './statement-columns'
 import { LIBRARY_REPORTS, ReportLibrary, hasLibraryFilters, isLibraryReport, libraryBasisLabel, libraryQuery } from './report-library'
 
-export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string; columns?: string; account?: string; payee?: string; customId?: string; row?: string; column?: string; node?: string; origin?: string; budget?: string;dimension?:string;dimensionValue?:string }
+export type ReportSearch = { report?: string; basis?: string; from?: string; to?: string; line?: string; record?: string; year?: string; columns?: string; account?: string; payee?: string; customId?: string; row?: string; column?: string; node?: string; origin?: string; budget?: string;dimension?:string;dimensionValue?:string;projectName?:string }
 type Basis = 'cash' | 'accrual'
 
 // [tab, slug, reads on a basis, takes a date range]
 const KINDS: [string, string, boolean, boolean][] = [['Trial balance', 'trial-balance', true, false], ['General ledger', 'general-ledger', true, true], ['Profit and loss', 'profit-and-loss', true, true], ['Balance sheet', 'balance-sheet', true, false],
-  ['Sales by customer', 'sales-by-customer', true, true], ['Sales by item', 'sales-by-item', true, true], ['Expenses by vendor', 'expenses-by-vendor', true, true], ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false], ['Budget versus actual', 'budget-actual', true, true], ['Custom reports', 'custom', false, false], ...LIBRARY_REPORTS]
+  ['Sales by customer', 'sales-by-customer', true, true], ['Sales by item', 'sales-by-item', true, true], ['Expenses by vendor', 'expenses-by-vendor', true, true], ['Cash flow', 'cash-flow', false, true], ['Receivables aging', 'receivables', false, false], ['Payables aging', 'payables', false, false], ['Sales tax by state', 'sales-tax', true, true], ['1099 contractors', 'contractors', false, false], ['Project profitability', 'project-profitability', true, true], ['Budget versus actual', 'budget-actual', true, true], ['Custom reports', 'custom', false, false], ...LIBRARY_REPORTS]
 
 /** A figure that opens to its records. */
 function Figure({ line, children }: { line: string; children: React.ReactNode }) {
@@ -88,7 +89,8 @@ const periodOf = (v: string) => { const m = DAY.exec(v); return `${String(Number
 function Report({ slug, basis, from, to, columns }: { slug: string; basis: Basis; from: string; to: string; columns: ColumnMode }) {
   const search = useSearch({ from: '/app/reports' })
   const ranged = KINDS.find(k => k[1] === slug)![3]
-  const { data: r, error } = useView<D>(slug === 'budget-actual' ? null : `reports/${slug}?to=${to}${ranged || columns !== 'single' ? `&from=${from}` : ''}&basis=${basis}${columns !== 'single' ? `&columns=${columns}` : ''}${slug === 'general-ledger' && search.account ? `&account=${encodeURIComponent(search.account)}` : ''}`)
+  const { data: r, error } = useView<D>(['budget-actual','project-profitability'].includes(slug) ? null : `reports/${slug}?to=${to}${ranged || columns !== 'single' ? `&from=${from}` : ''}&basis=${basis}${columns !== 'single' ? `&columns=${columns}` : ''}${slug === 'general-ledger' && search.account ? `&account=${encodeURIComponent(search.account)}` : ''}`)
+  if (slug === 'project-profitability') return <ProjectProfitability from={from} to={to} basis={basis} />
   if (slug === 'budget-actual') return <Budgets from={from} to={to} basis={basis} />
   if (!r) return <Loading error={error} what="the report" />
   if (columns !== 'single') return <StatementColumns report={r as ColumnStatement} />
@@ -113,7 +115,7 @@ function Report({ slug, basis, from, to, columns }: { slug: string; basis: Basis
 export function Reports() {
   const search = useSearch({ from: '/app/reports' }), navigate = useNavigate({ from: '/app/reports' }), { state } = useShared()
   const set = (patch: ReportSearch) => navigate({ search: (s: ReportSearch) => ({ ...s, ...patch }), replace: !('report' in patch || 'line' in patch || 'record' in patch) })
-  const customOnly = customReportsOnly(state.actor), kinds = customOnly ? KINDS.filter(k => k[1] === 'custom') : KINDS
+  const customOnly = customReportsOnly(state.actor), kinds = customOnly ? KINDS.filter(k => k[1] === 'custom') : KINDS.filter(k=>k[1]!=='project-profitability'||state.dimensions?.settings.projects_enabled)
   const kind = kinds.find(k => k[1] === search.report) ?? kinds[0], [label, slug, based, ranged] = kind
   useEffect(() => {
     if (customOnly && (search.report !== 'custom' || search.line || search.record)) void navigate({ search: (s: ReportSearch) => ({ ...s, report: 'custom', line: undefined, record: undefined }), replace: true })
@@ -143,7 +145,7 @@ export function Reports() {
           {filtered && <><Field label="Account filter" name="account" value={search.account ?? ''} empty="All accounts" options={state.accounts.map((a: D) => ({ value: a.id, label: `${a.code} · ${a.name}` }))} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => set({ account: e.target.value || undefined })} />
             <Field label="Payee filter" name="payee" value={search.payee ?? ''} empty="All payees" options={state.contacts.map((c: D) => ({ value: c.id, label: c.name }))} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => set({ payee: e.target.value || undefined })} /></>}
           </div>}>
-          {(library || based && slug !== 'budget-actual') && <p className="row-actions"><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=pdf`} download>Download PDF{based ? ` · ${basis}` : ''}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=csv`} download>Download CSV{based ? ` · ${basis}` : ''}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=xlsx`} download>Download Excel{based ? ` · ${basis}` : ''}</a></p>}
+          {(library || based && !['budget-actual','project-profitability'].includes(slug)) && <p className="row-actions"><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=pdf`} download>Download PDF{based ? ` · ${basis}` : ''}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=csv`} download>Download CSV{based ? ` · ${basis}` : ''}</a><a className="btn btn-secondary" href={`/api/pantry/reports/${slug}/export?${exportQuery}&format=xlsx`} download>Download Excel{based ? ` · ${basis}` : ''}</a></p>}
           {library ? <ReportLibrary slug={slug} basis={basis} from={from} to={to} /> : <Report slug={slug} basis={basis} from={from} to={to} columns={columns} />}
         </Card>}
   </>

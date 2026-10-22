@@ -400,6 +400,10 @@ test('API-001 / REPORT-002 scoped financial reports read native nonzero books, b
 test('API-001 / INVOICE-010 scoped issuance counts the deposit toward the frozen early-payment offer and settles once like native invoices', async t => {
   const h = await harness(); t.after(h.close)
   const { acct } = await books(h)
+  const ds=(await h.view('dimensions')).settings
+  await h.command('dimensions.settings',{revision:ds.revision,class:true,location:true,project:true})
+  for(const [kind,name] of [['class','Scoped studio'],['location','Scoped New York'],['project','Scoped project']])await h.command('dimension.save',{kind,name})
+  const coding={className:'Scoped studio',locationName:'Scoped New York',projectName:'Scoped project'}
   const customer = await h.command('contact.save', { kind: 'customer', name: 'Magnolia Design' })
   const bank = await h.command('bank-account.save', { name: 'Operating checking', institution: 'Community Bank', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-01-01', openingBalance: '0' })
   const discounts = await h.command('account.save', { code: '4950', name: 'Sales discounts', type: 'income' })
@@ -412,8 +416,8 @@ test('API-001 / INVOICE-010 scoped issuance counts the deposit toward the frozen
     assert.equal(response.status, 200, JSON.stringify(response.value)); return response.value
   }
   const body = { customerId: customer.id, issueDate: '2026-10-17', dueDate: '2026-11-16', destinationState: 'CA',
-    lines: [{ description: 'Design services', quantity: '1', rate: '1000.00', accountId: acct['4000'], taxCode: tax.id },
-      { kind: 'delivery', description: 'Delivery', quantity: '1', rate: '40.00', accountId: acct['4000'], taxCode: tax.id }],
+    lines: [{ ...coding,description: 'Design services', quantity: '1', rate: '1000.00', accountId: acct['4000'], taxCode: tax.id },
+      { ...coding,kind: 'delivery', description: 'Delivery', quantity: '1', rate: '40.00', accountId: acct['4000'], taxCode: tax.id }],
     discounts: [{ type: 'percent', value: '10' }], deposit: { amount: '300.00', method: 'check', bankAccountId: bank.id, reference: '1042' }, earlyPayment: { percent: '2', days: 10 } }
   const nativeDraft = await h.command('invoice.save-draft', { ...body, number: 'NATIVE-TERMS' })
   await h.command('invoice.approve', { id: nativeDraft.id, revision: nativeDraft.revision })
@@ -421,6 +425,8 @@ test('API-001 / INVOICE-010 scoped issuance counts the deposit toward the frozen
   const apiBody = { ...body, number: 'API-TERMS', post: true }
   const [scoped, replay] = await Promise.all([call('invoices', apiBody, 'terms-invoice'), call('invoices', apiBody, 'terms-invoice')])
   assert.equal(scoped.id, replay.id)
+  const scopedEntry=(await h.view('journal')).entries.find(e=>e.id===scoped.journal_id)
+  assert.ok(scopedEntry.lines.filter(l=>l.account_id!==acct['1200']).every(l=>l.class_name===coding.className&&l.location_name===coding.locationName&&l.project_name===coding.projectName),'scoped posting keeps native source coding on sales, discounts and tax')
   const deposits = await call('payments?invoiceId=' + scoped.id)
   assert.equal(deposits.payments.length, 1)
   assert.equal(deposits.payments[0].allocations[0].early_counted, 1, 'the issue-time deposit counts toward the early-payment offer')

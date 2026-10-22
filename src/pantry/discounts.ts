@@ -70,6 +70,21 @@ export function applyDiscounts(raw: unknown, lines: Priced[], credit: boolean): 
   return { discounts, afterTax }
 }
 
+/** Attribute after-tax discounts to their reviewed source lines without changing totals. */
+export function afterTaxShares(lines: Data[], discounts: Discount[], fallback = 0) {
+  const shares = lines.map(() => 0)
+  const after = discounts.filter(d => d.afterTax)
+  if (!after.length && fallback) {
+    return spreadByWeight(lines.map(l => Number(l.amount_cents ?? l.amount) - Number(l.discount_cents ?? l.discount ?? 0)), fallback)
+  }
+  for (const d of after) {
+    const targets = d.lines ?? lines.map((l, i) => (l.line_kind ?? l.kind ?? 'item') === 'item' ? i + 1 : 0).filter(Boolean)
+    const parts = spreadByWeight(targets.map(n => Number(lines[n-1].amount_cents ?? lines[n-1].amount) - Number(lines[n-1].discount_cents ?? lines[n-1].discount ?? 0)), d.amount)
+    targets.forEach((n,i) => { shares[n-1] += parts[i] })
+  }
+  return shares
+}
+
 /** A parsed discount back in the form a draft or template sends it, so a template re-parses it on every occurrence. */
 export const discountInput = (d: Discount) => ({ type: d.type, value: d.type === 'percent' ? String(d.value / 1000) : (d.value / 100).toFixed(2), ...(d.lines ? { lines: d.lines } : {}), ...(d.afterTax ? { afterTax: true } : {}) })
 

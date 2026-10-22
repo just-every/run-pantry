@@ -11,6 +11,7 @@
 // bank items, journals, opening balances) reads the same on both bases.
 import { requireThat } from './core'
 import { all, one } from './db'
+import { afterTaxShares } from './discounts'
 
 export type Basis = 'accrual' | 'cash'
 export const BASIS_LABEL: Record<Basis, string> = { accrual: 'Accrual basis', cash: 'Cash basis' }
@@ -73,21 +74,24 @@ async function documents(db: D1Database): Promise<Map<string, Doc>> {
   const docs = new Map<string, Doc>()
   const control = new Map((await all(db, "SELECT subtype, id FROM pt_accounts WHERE subtype IN ('receivable', 'payable')")).map(a => [a.subtype, a.id]))
   // Only documents something has settled matter on the cash basis.
-  const invoices = await all(db, `SELECT i.id, i.kind, i.number, i.total_cents, i.journal_id, i.customer_id, i.after_tax_discount_cents, i.discount_account_id, c.name AS contact_name FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id
+  const invoices = await all(db, `SELECT i.id, i.kind, i.number, i.total_cents, i.journal_id, i.customer_id, i.after_tax_discount_cents, i.discounts, i.discount_account_id, c.name AS contact_name FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id
     WHERE i.journal_id IS NOT NULL AND (i.id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice') OR i.id IN (SELECT source_id FROM pt_allocations WHERE source_kind = 'credit'))`)
-  const invoiceLines = await all(db, `SELECT l.invoice_id, l.description, l.amount_cents, l.discount_cents, l.tax_cents, l.tax_code, l.account_id, l.item_id, l.early_treatment, l.class_name,l.location_name,l.project_name, t.account_id AS tax_account FROM pt_invoice_lines l LEFT JOIN pt_tax_codes t ON t.id = l.tax_code
+  const invoiceLines = await all(db, `SELECT l.invoice_id, l.line_kind, l.description, l.amount_cents, l.discount_cents, l.tax_cents, l.tax_code, l.account_id, l.item_id, l.early_treatment, l.class_name,l.location_name,l.project_name, t.account_id AS tax_account FROM pt_invoice_lines l LEFT JOIN pt_tax_codes t ON t.id = l.tax_code
     WHERE l.invoice_id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice' UNION SELECT source_id FROM pt_allocations WHERE source_kind = 'credit') ORDER BY l.invoice_id, l.line_no`)
   for (const i of invoices) {
     // An invoice debits receivables and credits income and tax; a credit note the reverse.
     const s: 1 | -1 = i.kind === 'invoice' ? 1 : -1
     const parts: Component[] = []
-    for (const l of invoiceLines.filter(x => x.invoice_id === i.id)) {
+    const sourceLines=invoiceLines.filter(x=>x.invoice_id===i.id),after=afterTaxShares(sourceLines,JSON.parse(i.discounts??'[]'),i.after_tax_discount_cents)
+    for (const l of sourceLines) {
       parts.push({ class_name:l.class_name,location_name:l.location_name,project_name:l.project_name,accountId: l.account_id, sign: (-s) as 1 | -1, magnitude: l.amount_cents, role: 'sale', description: l.description, taxCode: l.tax_code, itemId: l.item_id, early: l.early_treatment })
       // A before-tax discount (INVOICE-010) is a debit to the discounts account that lowers the line's taxable sale.
-      if (l.discount_cents) parts.push({ accountId: i.discount_account_id, sign: s, magnitude: l.discount_cents, role: 'sale', description: `Discount · ${l.description}`, taxCode: l.tax_code })
-      if (l.tax_cents) parts.push({ accountId: l.tax_account, sign: (-s) as 1 | -1, magnitude: l.tax_cents, role: 'tax', description: `Sales tax · ${l.description}`, taxCode: l.tax_code, early: l.early_treatment })
+      if (l.discount_cents) parts.push({ class_name:l.class_name,location_name:l.location_name,project_name:l.project_name,accountId: i.discount_account_id, sign: s, magnitude: l.discount_cents, role: 'sale', description: `Discount · ${l.description}`, taxCode: l.tax_code })
+      if (l.tax_cents) parts.push({ class_name:l.class_name,location_name:l.location_name,project_name:l.project_name,accountId: l.tax_account, sign: (-s) as 1 | -1, magnitude: l.tax_cents, role: 'tax', description: `Sales tax · ${l.description}`, taxCode: l.tax_code, early: l.early_treatment })
     }
-    if (i.after_tax_discount_cents) parts.push({ accountId: i.discount_account_id, sign: s, magnitude: i.after_tax_discount_cents, role: 'discount', description: `Discount after tax · ${i.number}`, taxCode: null })
+    const groupedAfter=new Map<string,{class_name:string;location_name:string;project_name:string;magnitude:number}>()
+    sourceLines.forEach((l,n)=>{if(!after[n])return;const key=JSON.stringify([l.class_name,l.location_name,l.project_name]),previous=groupedAfter.get(key);if(previous)previous.magnitude+=after[n];else groupedAfter.set(key,{class_name:l.class_name,location_name:l.location_name,project_name:l.project_name,magnitude:after[n]})})
+    for(const part of groupedAfter.values())parts.push({...part,accountId:i.discount_account_id,sign:s,role:'discount',description:`Discount after tax · ${i.number}`,taxCode:null})
     docs.set(i.id, { kind: i.kind, id: i.id, ref: i.number, journalId: i.journal_id, total: i.total_cents, contactId: i.customer_id, contactName: i.contact_name,
       control: { accountId: control.get('receivable')!, sign: s, magnitude: i.total_cents, role: 'control', description: `${i.number} ${i.contact_name}`, taxCode: null }, parts })
   }

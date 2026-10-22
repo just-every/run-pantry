@@ -47,6 +47,15 @@ export async function dimensionsJourney(t) {
    for(const format of ['csv','pdf','xlsx'])assert.equal((await h.send(`/api/pantry/reports/profit-and-loss/export?from=2026-09-01&to=2026-09-30&basis=${basis}&columns=${kind}&format=${format}`,undefined,{cookie:h.owner})).status,200)
   }
  }
+ await h.command('discount-settings.save',{discountAccountId:acct['4900']})
+ const discountedDraft=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-10-01',lines:[{description:'Studio work',quantity:'1',rate:'1200',accountId:acct['4000'],taxCode:'exempt',...tags},{description:'Support work',quantity:'1',rate:'800',accountId:acct['4000'],taxCode:'exempt',className:'Support',locationName:'Remote',projectName:'Cypress care'}],discounts:[{type:'percent',value:'10'},{type:'amount',value:'100',lines:[2],afterTax:true}]})
+ await h.command('invoice.approve',{id:discountedDraft.id,revision:discountedDraft.revision})
+ const discounted=await h.command('invoice.issue',{id:discountedDraft.id})
+ await h.command('payment.record',{direction:'received',contactId:customer.id,date:'2026-10-02',amount:'850',bankAccountId:bank.id,allocations:[{targetId:discounted.id,amount:'850'}]})
+ for(const basis of ['cash','accrual']){
+  const split=await h.view(`reports/profit-and-loss?from=2026-10-01&to=2026-10-31&basis=${basis}&columns=class`),net=split.totals.find(t=>t.id==='net-income')
+  for(const [name,expected] of [['Studio',108000],['Support',62000]])assert.equal(net.values[split.columns.findIndex(c=>c.label===name)],basis==='cash'?expected/2:expected,'before/after-tax discounts keep source dimensions on both bases')
+ }
  const service=await h.command('item.save',{kind:'service',name:'Design hours',rate:'100',accountId:acct['4000'],taxCategory:'non-taxable'})
  const project=await h.command('time-project.save',{customerId:customer.id,name:'Cedar website'})
  await h.command('time.save',{customerId:customer.id,projectId:project.id,itemId:service.id,date:'2026-09-18',hours:'4'})

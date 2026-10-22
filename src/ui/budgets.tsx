@@ -5,7 +5,7 @@ import { Card, Chip, Field, Form, Loading, Table, amountText, command, monthName
 type Cell = { accountId: string; month: string; amount: string;className?:string;locationName?:string }
 function Editor({ selected, done, cancel }: { selected?: D; done: (saved: D) => Promise<void>; cancel: () => void }) {
   const { state } = useShared(), accounts = state.accounts.filter((a: D) => a.active && ['income', 'expense'].includes(a.type))
-  const [mode, setMode] = useState('entered'), [source, setSource] = useState(''), [plan, setPlan] = useState<D | null>(null), [mapping, setMapping] = useState<D>({})
+  const [mode, setMode] = useState('entered'), [source, setSource] = useState(''), [plan, setPlan] = useState<D | null>(null), [mapping, setMapping] = useState<D>({}), [departmentMapping,setDepartmentMapping]=useState<D>({})
   const [start, setStart] = useState(selected?.start_month ?? `${new Date().getFullYear()}-${String(state.settings?.entity?.fiscal_year_start ?? 1).padStart(2, '0')}`)
   const months = Array.from({ length: 12 }, (_, i) => { const [y, m] = start.split('-').map(Number); return new Date(Date.UTC(y, m - 1 + i, 1)).toISOString().slice(0, 7) })
   const [cells, setCells] = useState<Cell[]>(selected?.cells.map((c: D) => ({ accountId: c.account_id, month: c.month, amount: amountText(c.amount_cents),className:c.class_name,locationName:c.location_name })) ?? [])
@@ -13,7 +13,7 @@ function Editor({ selected, done, cancel }: { selected?: D; done: (saved: D) => 
     <Form label="Save budget" submit={async b => {
       let easel: D | undefined
       if (mode === 'easel') { try { easel = JSON.parse(source) } catch { throw new Error('Paste the Easel scenario JSON response') } }
-      return command('budget.save', { ...b, id: selected?.id, revision: selected?.revision, startMonth: start, cells, ...(mode === 'actuals' ? { copyActuals: true } : mode === 'csv' ? { csv: source } : mode === 'easel' ? { easel, mapping } : {}) })
+      return command('budget.save', { ...b, id: selected?.id, revision: selected?.revision, startMonth: start, cells, ...(mode === 'actuals' ? { copyActuals: true } : mode === 'csv' ? { csv: source } : mode === 'easel' ? { easel, mapping, departmentMapping } : {}) })
     }} onDone={done} secondary={<button className="btn btn-secondary" type="button" onClick={cancel}>Cancel</button>}>
       <div className="grid-form">
         <Field label="Budget name" name="name" defaultValue={selected?.name} required />
@@ -23,10 +23,14 @@ function Editor({ selected, done, cancel }: { selected?: D; done: (saved: D) => 
         {mode === 'actuals' && <Field label="Percentage change" name="percentChange" defaultValue="5" inputMode="decimal" hint="Each prior-year account/month amount is adjusted and rounded to cents." />}
       </div>
       {(mode === 'csv' || mode === 'easel') && <>
-        <p className="hint">{mode === 'csv' ? 'CSV columns: Account,Month,Amount, with optional Class and Location. Use chart codes, YYYY-MM and signed USD amounts. Each account/month/class/location occurs once.' : 'Save the JSON from your Easel installation’s /api/easel/scenario/SCENARIO-ID response. Only USD plans are accepted; departments are summed into each mapped account.'}</p>
+        <p className="hint">{mode === 'csv' ? 'CSV columns: Account,Month,Amount, with optional Class and Location. Use chart codes, YYYY-MM and signed USD amounts. Each account/month/class/location occurs once.' : 'Save the JSON from your Easel installation’s /api/easel/scenario/SCENARIO-ID response. Only USD plans are accepted; map lines to accounts and optionally departments to classes or locations; matching cells are summed.'}</p>
         <Field label="Import file" name="file" type="file" accept={mode === 'csv' ? '.csv,text/csv' : '.json,application/json'} onChange={async (e: any) => { const file = e.target.files?.[0]; if (!file) return; const content = await file.text(); setSource(content); try { setPlan(JSON.parse(content)) } catch { setPlan(null) } }} />
         <Field label={mode === 'csv' ? 'CSV contents' : 'Easel scenario JSON'} name="source" type="textarea" value={source} onChange={(e: any) => { setSource(e.target.value); try { setPlan(JSON.parse(e.target.value)) } catch { setPlan(null) } }} required />
         {mode === 'easel' && plan?.lines?.map((line: D) => <Field key={line.id} label={`Account for ${line.name}`} name={`map-${line.id}`} required value={mapping[line.id] ?? ''} onChange={(e: any) => setMapping(m => ({ ...m, [line.id]: e.target.value }))} options={accounts.map((a: D) => ({ value: a.id, label: `${a.code} · ${a.name}` }))} />)}
+        {mode==='easel'&&[...new Set<string>((plan?.calculation?.cells??[]).map((c:D)=>String(c.department??'')))].filter(Boolean).map(department=><div className="grid-form" key={department}>
+          <strong>Department {department}</strong>
+          {['class','location'].filter(kind=>state.dimensions?.settings[kind==='class'?'classes_enabled':'locations_enabled']).map(kind=><Field key={kind} label={`${kind==='class'?'Class':'Location'} for department ${department}`} name={`department-${department}-${kind}`} value={departmentMapping[department]?.[`${kind}Name`]??''} empty="Unassigned" options={state.dimensions.values.filter((v:D)=>v.kind===kind&&v.active).map((v:D)=>({value:v.name,label:v.name}))} onChange={(e:any)=>setDepartmentMapping(m=>({...m,[department]:{...m[department],[`${kind}Name`]:e.target.value}}))} />)}
+        </div>)}
       </>}
       {mode === 'entered' && <>
         <p className="hint">Amounts are signed USD in the account’s natural direction. Blank months are zero. Changing a budget never changes posted books.</p>

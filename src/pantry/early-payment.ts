@@ -8,6 +8,7 @@
 // discount to the discounts account and, on reduce lines only, the matching tax.
 // It is all or nothing, never after the window, and a reversed payment that
 // takes the settlements back below that amount reverses the credit with it.
+import { dimensionTags, dimensionValues } from './dimensions'
 import { authority, who } from './access'
 import { addDays, daysBetween, longDay, now, optionalText, requireThat, scale, text, uid, usd, date, type Data } from './core'
 import { all, audit, changed, guard, one, q, run, type AuditActor, type Sql } from './db'
@@ -131,7 +132,7 @@ export async function takeEarlyDiscounts(db: D1Database, actor: AuditActor, list
     const originals = full.lines as Data[]
     const lines = offer!.lines.filter(l => l.discount > 0).map(l => {
       const original = originals.find(o => o.line_no === l.lineNo)!
-      return { id: uid(), ref: original.id, account_id: offer!.accountId!, amount_cents: l.discount, description: `Early-payment discount ${percentLabel(offer!.percentMilli)} · ${original.description}`, tax_code: original.tax_code as string | null, tax_cents: l.reduction, treatment: l.code ? l.code.treatment : 'exempt' }
+      return { ...dimensionTags(original),id: uid(), ref: original.id, account_id: offer!.accountId!, amount_cents: l.discount, description: `Early-payment discount ${percentLabel(offer!.percentMilli)} · ${original.description}`, tax_code: original.tax_code as string | null, tax_cents: l.reduction, treatment: l.code ? l.code.treatment : 'exempt' }
     })
     const id = uid(), revision = uid(), number = await nextNumber(db, 'credit')
     const approvalId = (await one(db, "SELECT id FROM pt_approvals WHERE subject_kind = 'invoice' AND subject_id = ? AND decision = 'approved' ORDER BY at DESC, rowid DESC LIMIT 1", full.id))?.id ?? null
@@ -144,8 +145,8 @@ export async function takeEarlyDiscounts(db: D1Database, actor: AuditActor, list
       guard("EXISTS (SELECT 1 FROM pt_invoices WHERE id = ? AND revision = ? AND status = 'issued' AND early_withdrawn_by IS NULL)", full.id, full.revision),
       q("INSERT INTO pt_invoices (id, kind, number, customer_id, destination_state, issue_date, due_date, status, memo, credit_for, subtotal_cents, tax_cents, total_cents, opening, prepared_by, approved_by, approved_revision, revision, created_at, early_discount, early_detail) VALUES (?, 'credit', ?, ?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 1, ?)",
         id, number, full.customer_id, full.destination_state ?? '', day, day, `Early-payment discount on ${full.number}, taken on ${longDay(day)} (window ended ${longDay(offer!.windowEnd)})`, full.id, offer!.discount, offer!.reduction, credited, actor.email, full.approved_by, revision, revision, now(), JSON.stringify(detail)),
-      ...lines.map((l, i) => q("INSERT INTO pt_invoice_lines (id, invoice_id, line_no, description, quantity_milli, unit_cents, amount_cents, account_id, tax_code, tax_cents, chosen_tax_code, line_kind, discount_cents, early_treatment, early_line_ref) VALUES (?, ?, ?, ?, 1000, ?, ?, ?, ?, ?, ?, 'item', 0, ?, ?)",
-        l.id, id, i + 1, l.description, l.amount_cents, l.amount_cents, l.account_id, l.tax_code, l.tax_cents, l.tax_code, l.treatment, l.ref)))
+      ...lines.map((l, i) => q("INSERT INTO pt_invoice_lines (id, invoice_id, line_no, description, quantity_milli, unit_cents, amount_cents, account_id, tax_code, tax_cents, chosen_tax_code, line_kind, discount_cents, early_treatment, early_line_ref, class_name, location_name, project_name) VALUES (?, ?, ?, ?, 1000, ?, ?, ?, ?, ?, ?, 'item', 0, ?, ?, ?, ?, ?)",
+        l.id, id, i + 1, l.description, l.amount_cents, l.amount_cents, l.account_id, l.tax_code, l.tax_cents, l.tax_code, l.treatment, l.ref,...dimensionValues(l))))
     const issued = await issueStatements(db, { id, kind: 'credit', number, customer_id: full.customer_id, customer_name: full.customer_name, issue_date: day, total_cents: credited, credit_for: full.id, revision,
       destination_state: full.destination_state, early_for_number: full.number, lines }, actor)
     before.push(...issued.statements, audit(actor, 'invoice.early-discount', 'invoice', full.id, { credit: number, ...detail }))

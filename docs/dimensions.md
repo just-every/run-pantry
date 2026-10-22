@@ -1,0 +1,13 @@
+# Classes, locations and projects
+
+An owner enables each dimension in Settings, adds named values, and chooses which accounts require them. New invoice and bill lines, journal postings and bank filings refuse missing required values or inactive values. Deactivating a name preserves historical coding; add a new name instead of renaming posted evidence. Turning a dimension off suspends its new-line requirement without deleting history.
+
+Choose coding on invoice, bill, journal and receipt lines. Bank rules can match exact dimension values and set them on each split; a blank action keeps the incoming value. The first matching rule keeps precedence and each filing retains its reviewed rule revision. Vendor defaults, document coding and the latest human filing feed suggestions; people retain control of accepting them. Payroll coding in Settings maps each future payroll line role; it does not rewrite posted payroll.
+
+Reports offers P&L columns by class, location or project on cash and accrual. Unassigned postings remain visible and columns sum to Total. Figures and downloads retain the selected column. Project profitability links income, costs and profit to those same source lines. Its time table uses the native time project with the same name, and values unbilled hours at current service rates.
+
+Annual budgets accept optional class and location on each account/month amount. CSV adds optional `Class` and `Location` columns to `Account,Month,Amount`. Easel import maps each line to an account and can explicitly map departments to classes and locations. Prior-year copying retains its source coding. Budget versus actual filters a dimension value, including Unassigned, and carries it into plan, actual, variance, percentage and downloaded evidence.
+
+Books → Review can move bank or manual journal lines to another dimension with linked correcting entries. Original postings stay unchanged; locked periods refuse correction. Posted invoices, credits and bills currently require a document correction because their cash recognition follows settlements.
+
+DIM-001 remains partial. Other report families and their custom/package variants, remaining provider/credit/recurring-bill source coding, and settlement-aware document recoding still need completion and public-door proof. See CONTRACT.md and ACCEPTANCE.md for the exact evidence and remaining Gap.

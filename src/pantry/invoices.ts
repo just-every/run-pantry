@@ -16,7 +16,7 @@ import type { Command } from './context'
 import { documentSelectionStatements, issuedDocumentStatements } from './invoice-documents'
 import { customValues, nextInvoiceNumber, selectedTemplate } from './invoice-templates'
 import { applicableExemption, assertInvoiceExemption, destinationState, exemptionDay, exemptionFence } from './exemptions'
-import { applyDiscounts, discountSettings, parseDeposit, type Deposit } from './discounts'
+import { afterTaxShares, applyDiscounts, discountSettings, parseDeposit, type Deposit } from './discounts'
 import { paymentStatements } from './payables'
 import { computeOffer, offerRefusal, parseTerms, treatmentFence, withdrawalStatements, type Offer } from './early-payment'
 
@@ -180,8 +180,8 @@ const approve: Command = { need: 'post', async run(c, b) {
 
 /** The invoice fields issuing reads; an invoice being created in the same batch passes them directly. */
 export type Issuable = { id: string; kind: string; number: string; customer_id: string; customer_name: string; issue_date: string; total_cents: number; credit_for?: string | null; revision: string; destination_state?: string; exemption_evidence?: string | null
-  discount_cents?: number; after_tax_discount_cents?: number; discount_account_id?: string | null; deposit?: Deposit | null; early_offer?: Offer | null; early_for_number?: string
-  lines: { account_id: string; amount_cents: number; description: string; tax_code: string | null; tax_cents: number; class_name?:string;location_name?:string;project_name?:string }[] }
+  discounts?: import('./discounts').Discount[]; discount_cents?: number; after_tax_discount_cents?: number; discount_account_id?: string | null; deposit?: Deposit | null; early_offer?: Offer | null; early_for_number?: string
+  lines: { account_id: string; amount_cents: number; description: string; tax_code: string | null; tax_cents: number; discount_cents?:number;line_kind?:string; class_name?:string;location_name?:string;project_name?:string }[] }
 
 /** Issue posts the approved revision: receivable against income and sales tax (reversed for a credit). */
 export async function issueStatements(db: D1Database, current: Issuable, actor: AuditActor, preparedBy = actor.email, parsed?: Data): Promise<{ journalId: string; statements: Sql[] }> {
@@ -191,13 +191,22 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
   const credit = current.kind === 'credit'
   const side = (amount: number, debit: boolean) => debit ? { debit: amount, credit: 0 } : { debit: 0, credit: amount }
   const lines: Line[] = [{ accountId: receivable.id, ...side(current.total_cents, !credit), memo: `${current.number} ${current.customer_name}`, contactId: current.customer_id }]
-  for (const l of current.lines) lines.push({ ...dimensionTags(l), accountId: l.account_id, ...side(l.amount_cents, credit), memo: l.description })
-  // Discounts post to the discounts account after the sale lines, so sale line N stays journal line N + 1.
-  const discounted = (current.discount_cents ?? 0) + (current.after_tax_discount_cents ?? 0)
-  if (discounted) lines.push({ accountId: current.discount_account_id!, ...side(discounted, !credit), memo: `Discounts ${current.number}` })
-  const tax = new Map<string, number>()
-  for (const l of current.lines) if (l.tax_cents) tax.set(taxAccounts.get(l.tax_code!)!, (tax.get(taxAccounts.get(l.tax_code!)!) ?? 0) + l.tax_cents)
-  for (const [accountId, amount] of tax) lines.push({ accountId, ...side(amount, credit), memo: `Sales tax ${current.number}` })
+  const coded = current.lines.map((l,i) => ({...l,line_kind:parsed?.lines?.[i]?.kind??l.line_kind,...dimensionTags(parsed?.lines?.[i] ?? l),discount_cents: parsed?.lines?.[i]?.discount ?? l.discount_cents ?? 0}))
+  for (const l of coded) lines.push({ ...dimensionTags(l), accountId: l.account_id, ...side(l.amount_cents, credit), memo: l.description })
+  // Keep sale line ordinals stable. Group additional postings only when their
+  // account and all three reviewed dimension values agree.
+  const extra = new Map<string, Line>()
+  const add = (accountId:string,amount:number,debit:boolean,memo:string,source:Data) => {
+    if (!amount) return
+    const tags=dimensionTags(source),key=JSON.stringify([accountId,debit,...dimensionValues(tags)])
+    const previous=extra.get(key)
+    if(previous){previous.debit+=debit?amount:0;previous.credit+=debit?0:amount}
+    else extra.set(key,{...tags,accountId,...side(amount,debit),memo})
+  }
+  const after=afterTaxShares(coded,parsed?.discounts??current.discounts??[],current.after_tax_discount_cents??0)
+  coded.forEach((l,i)=>add(current.discount_account_id!,l.discount_cents+after[i],!credit,`Discounts ${current.number}`,l))
+  for (const l of coded) add(taxAccounts.get(l.tax_code!)!,l.tax_cents,credit,`Sales tax ${current.number}`,l)
+  lines.push(...extra.values())
   const issuedRevision = uid()
   const documents = await issuedDocumentStatements(db, current, issuedRevision, parsed)
   const journalId = uid(), statements: Sql[] = [

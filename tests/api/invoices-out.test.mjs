@@ -198,8 +198,12 @@ test('INVOICE-005 a recurring invoice creates drafts for approval, or once a sec
   const h = await harness(); t.after(() => h.close())
   const { acct, c } = await setup(h), day = today()
   const bea = await h.member('bea@example.test', 'bookkeeper'), ann = await h.member('ann@example.test', 'accountant', { canPost: true })
+  const ds=(await h.view('dimensions')).settings
+  await h.command('dimensions.settings',{revision:ds.revision,class:true,location:true,project:true})
+  for(const [kind,name] of [['class','Recurring studio'],['location','Recurring New York'],['project','Recurring project']])await h.command('dimension.save',{kind,name})
+  const coding={className:'Recurring studio',locationName:'Recurring New York',projectName:'Recurring project'}
   const start = addMonths(day, -2)
-  let monthly = await h.command('recurring.save', { customerId: c['Cedar Studio'].id, startDate: start, every: 1, unit: 'month', mode: 'send', lines: [line('Monthly retainer', '2400.00', acct['4000'])] }, bea)
+  let monthly = await h.command('recurring.save', { customerId: c['Cedar Studio'].id, startDate: start, every: 1, unit: 'month', mode: 'send', lines: [{...line('Monthly retainer', '2400.00', acct['4000']),...coding}] }, bea)
   assert.equal(monthly.status, 'awaiting-approval'); assert.equal(monthly.next_date, start)
   await h.cron()
   assert.equal((await h.view('sales')).invoices.length, 0, 'nothing is sent before the template is approved')
@@ -216,13 +220,19 @@ test('INVOICE-005 a recurring invoice creates drafts for approval, or once a sec
   for (let i = 0; i < 50 && (generated.length < 3 || invoiceMails().length < 3); i++) { await new Promise(r => setTimeout(r, 100)); generated = (await h.view('sales')).invoices.filter(i => i.recurring_id === monthly.id) }
   assert.deepEqual(generated.map(i => i.issue_date).sort(), [start, addMonths(start, 1), addMonths(start, 2)])
   assert.ok(generated.every(i => i.status === 'issued' && i.total_cents === 240000 && i.approved_by === 'ann@example.test' && i.sent_at))
+  const ledger=(await h.view('journal')).entries
+  for(const generatedInvoice of generated){
+   assert.equal(generatedInvoice.lines[0].class_name,coding.className)
+   const sale=ledger.find(e=>e.id===generatedInvoice.journal_id).lines.find(l=>l.account_id===acct['4000'])
+   assert.deepEqual([sale.class_name,sale.location_name,sale.project_name],Object.values(coding))
+  }
   await h.cron()
   assert.deepEqual(invoiceMails().map(m => m.to[0]), ['ap@cedar.example', 'ap@cedar.example', 'ap@cedar.example'], 'each occurrence is sent once')
   const view = at((await h.view('sales')).recurring, r => r.id === monthly.id)
   assert.equal(view.next_date, addMonths(start, 3)); assert.deepEqual(view.runs_list.map(r => r.status), ['sent', 'sent', 'sent'])
 
   // A price change returns it to approval; nothing sends at the new price until someone approves.
-  const edited = await h.command('recurring.save', { id: monthly.id, revision: view.revision, customerId: c['Cedar Studio'].id, startDate: start, every: 1, unit: 'month', mode: 'send', lines: [line('Monthly retainer', '2600.00', acct['4000'])] }, bea)
+  const edited = await h.command('recurring.save', { id: monthly.id, revision: view.revision, customerId: c['Cedar Studio'].id, startDate: start, every: 1, unit: 'month', mode: 'send', lines: [{...line('Monthly retainer', '2600.00', acct['4000']),...coding}] }, bea)
   assert.equal(edited.status, 'awaiting-approval')
 
   // Draft mode: each occurrence waits for approval by someone other than the template's preparer.
