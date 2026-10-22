@@ -1,3 +1,4 @@
+import { dimensionTags, dimensionValues } from '../dimensions'
 import { addDays, cents, date, list, requireThat, text, uid, type Data } from '../core'
 import { all, guard, one, type Sql } from '../db'
 import { parseLines, type Line } from '../journal'
@@ -28,13 +29,13 @@ function monthly(start: string, n: number, end = false) {
 
 export const snapshot = (s: Schedule) => JSON.stringify({ revision: s.revision, kind: s.kind, name: s.name, balance_account_id: s.balance_account_id,
   recognition_account_id: s.recognition_account_id, amount_cents: s.amount_cents, start_date: s.start_date, months: s.months,
-  source_journal_id: s.source_journal_id, source_line_id: s.source_line_id, source_date: s.source_date, plan: s.plan, prepared_by: s.prepared_by })
+  source_journal_id: s.source_journal_id, source_line_id: s.source_line_id, source_date: s.source_date, ...(dimensionValues(s).some(Boolean)?{dimensions:dimensionTags(s)}:{}), plan: s.plan, prepared_by: s.prepared_by })
 
 export function linesFor(s: Schedule, p: Installment): Line[] {
   const positiveBalance = s.kind === 'deferred' || p.phase === 'reverse'
   return [
-    { accountId: s.balance_account_id, debit: positiveBalance ? p.amount_cents : 0, credit: positiveBalance ? 0 : p.amount_cents },
-    { accountId: s.recognition_account_id, debit: positiveBalance ? 0 : p.amount_cents, credit: positiveBalance ? p.amount_cents : 0 },
+    { ...dimensionTags(s),accountId: s.balance_account_id, debit: positiveBalance ? p.amount_cents : 0, credit: positiveBalance ? 0 : p.amount_cents },
+    { ...dimensionTags(s),accountId: s.recognition_account_id, debit: positiveBalance ? 0 : p.amount_cents, credit: positiveBalance ? p.amount_cents : 0 },
   ]
 }
 export const inputLines = (lines: Line[]) => lines.map(l => ({ ...l, debit: (l.debit / 100).toFixed(2), credit: (l.credit / 100).toFixed(2) }))
@@ -87,17 +88,18 @@ export async function parsePlan(db: D1Database, b: Data): Promise<Schedule> {
       }
     }
   }
-  const s: Schedule = { kind, name: text(b.name, 'Schedule name', 200), balance_account_id: text(b.balanceAccountId, 'Balance-sheet account'), recognition_account_id: text(b.recognitionAccountId, 'Recognition account'), amount_cents: amount, start_date: start, months, plan, source_journal_id: null, source_line_id: null, source_date: null }
-  await validateAccounts(db, s)
+  const s: Schedule = { ...Object.fromEntries(['class','location','project'].map(k=>[k+'_name',dimensionTags(b)[(k+'Name') as 'className']])),kind, name: text(b.name, 'Schedule name', 200), balance_account_id: text(b.balanceAccountId, 'Balance-sheet account'), recognition_account_id: text(b.recognitionAccountId, 'Recognition account'), amount_cents: amount, start_date: start, months, plan, source_journal_id: null, source_line_id: null, source_date: null }
   if (kind !== 'accrual') {
     const source = text(b.sourceJournalId, 'Posted funding journal')
-    const rows = await all(db, `SELECT l.id, j.entry_date FROM pt_journal_lines l JOIN pt_journal_entries j ON j.id = l.entry_id
+    const rows = await all(db, `SELECT l.*, j.entry_date FROM pt_journal_lines l JOIN pt_journal_entries j ON j.id = l.entry_id
       WHERE j.id = ? AND j.status = 'posted' AND j.reversed_by_id IS NULL AND l.account_id = ? AND l.debit_cents = ? AND l.credit_cents = ?`, source, s.balance_account_id, kind === 'prepaid' ? amount : 0, kind === 'deferred' ? amount : 0)
     requireThat(rows.length === 1, 'The posted funding journal must have one matching balance-sheet line for this exact amount')
     requireThat(rows[0].entry_date <= start, 'Funding must be posted on or before the schedule start')
     const allocation = await one(db, 'SELECT id FROM pt_recognition_schedules WHERE source_line_id = ?', rows[0].id)
     requireThat(!allocation || allocation.id === b.id, 'That funding line is already allocated to another recognition schedule', 409)
+    if(!dimensionValues(b).some(Boolean))Object.assign(s,{class_name:rows[0].class_name,location_name:rows[0].location_name,project_name:rows[0].project_name})
     Object.assign(s, { source_journal_id: source, source_line_id: rows[0].id, source_date: rows[0].entry_date })
   } else requireThat(!b.sourceJournalId, 'Accruals create their own origin and reversal; do not select a funding journal')
+  await validateAccounts(db,s)
   return s
 }

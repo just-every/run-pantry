@@ -7,7 +7,7 @@ import type { Checks } from './plan'
 
 export type Rec = { kind: string; sourceId: string; payload: Data; artifact: string; row: number }
 export type Account = { name: string; code: string; type: string; subtype: string; detail: string; description: string }
-export type TbRow = { account: string; debit: number; credit: number; row: number }
+export type TbRow = { className?:string;locationName?:string;projectName?:string;account: string; debit: number; credit: number; row: number }
 /** Something in the files that does not come in, with how many and why. */
 export type Left = { what: string; count: number; why: string }
 

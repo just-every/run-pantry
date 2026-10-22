@@ -1,4 +1,5 @@
 import { authority, who } from '../access'
+import { dimensionTags } from '../dimensions'
 import type { Command } from '../context'
 import { cents, date, list, now, optionalText, requireThat, text, uid, type Data } from '../core'
 import { audit, changed, guard, one, periodOpen, q, run, type Sql } from '../db'
@@ -26,7 +27,7 @@ export const issueChecks: Command = { need: 'record', async run(c, b) {
     let expenseBillId: string | null = null
     if (item.kind === 'expense') {
       const expense = await billStatements(c, { vendorId: contactId, reference: `Check ${number} expense`, billDate: day, post: true,
-        memo, lines: [{ accountId: item.accountId, amount: item.amount, description: text(item.description ?? memo, 'Expense description', 500) }] })
+        memo, lines: [{ ...dimensionTags(item),accountId: item.accountId, amount: item.amount, description: text(item.description ?? memo, 'Expense description', 500) }] })
       expenseBillId = expense.id
       statements.push(...expense.statements)
     } else {
@@ -39,7 +40,7 @@ export const issueChecks: Command = { need: 'record', async run(c, b) {
         statements.push(guard("EXISTS (SELECT 1 FROM pt_bills WHERE id = ? AND vendor_id = ? AND status = 'posted')", allocation.targetId, contactId))
       }
     }
-    const p = await paymentStatements(c.db, c.actor, { direction: 'paid', contactId, date: day, amount: item.amount, bankAccountId: bank.id,
+    const p = await paymentStatements(c.db, c.actor, { ...dimensionTags(item),direction: 'paid', contactId, date: day, amount: item.amount, bankAccountId: bank.id,
       reference: String(number), method: 'check', memo, allocations: expenseBillId ? [] : item.allocations })
     statements.push(...p.statements)
     if (expenseBillId) statements.push(q("INSERT INTO pt_allocations (id, source_kind, source_id, target_kind, target_id, amount_cents, allocation_date, created_by, created_at) VALUES (?, 'payment', ?, 'bill', ?, ?, ?, ?, ?)", uid(), p.id, expenseBillId, amount, day, c.actor.email, now()))

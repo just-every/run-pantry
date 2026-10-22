@@ -1,3 +1,5 @@
+import { DimensionReportPicker } from './dimensions'
+import { DimensionSplitPicker,DimensionSplits } from './dimension-splits'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { Field, Loading, Metrics, Table, day, usd, useShared, useView, type D } from './kit'
 
@@ -5,10 +7,12 @@ export function ProjectProfitability({from,to,basis}:{from:string;to:string;basi
  const {state}=useShared(),search=useSearch({from:'/app/reports'}),navigate=useNavigate({from:'/app/reports'})
  const projects=state.dimensions?.values.filter((v:D)=>v.kind==='project')??[]
  const name=projects.some((p:D)=>p.name===search.projectName)?search.projectName:projects[0]?.name
- const {data:r,error}=useView<D>(name?`dimensions/project?${new URLSearchParams({name,from,to,basis})}`:null)
- const figure=(line:string,value:number)=><Link to="/app/reports" search={{report:'profit-and-loss',from,to,basis,columns:'project',column:'value:'+name,line}}>{usd(value)}</Link>
+ const {data:r,error}=useView<D>(name?`dimensions/project?${new URLSearchParams({name,from,to,basis,...(search.dimension?{dimension:search.dimension,dimensionValue:search.dimensionValue??''}:{})})}`:null)
+ const figure=(line:string,value:number)=><Link to="/app/reports" search={{...search,report:'project-profitability',projectName:name,from,to,basis,line:line==='expenses'?'costs':line==='net-income'?'profit':line}}>{usd(value)}</Link>
  if(!projects.length)return <p>Add a project in Settings to see its profitability.</p>
  return <>
+  <DimensionReportPicker /><DimensionSplitPicker />
+  {search.split&&<DimensionSplits slug="project-profitability" from={from} to={to} basis={basis} path="dimensions/project/splits" extra={{name:name!}} />}
   <Field label="Project" name="projectName" value={name??''} options={projects.map((p:D)=>({value:p.name,label:p.name+(p.active?'':' (inactive)')}))} onChange={(e:React.ChangeEvent<HTMLSelectElement>)=>navigate({search:s=>({...s,projectName:e.target.value})})} />
   {!r?<Loading error={error} what="project profitability" />:<>
    <Metrics items={[{label:'Income',value:figure('income',r.income)},{label:'Costs',value:figure('expenses',r.costs)},{label:'Profit',value:figure('net-income',r.profit)},{label:'Billable time',value:`${(r.minutes/60).toFixed(2)} hours`},{label:'Unbilled time',value:`${(r.unbilledMinutes/60).toFixed(2)} hours`,note:usd(r.unbilledCents)+' at current service rates'}]} />

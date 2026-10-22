@@ -935,3 +935,6 @@ import {dimensionPaymentReports,dimensionReconciliationReports} from './dimensio
 test('DIM-001 recorded and scoped payment coding preserves bank-side deposits, checks, contractor summaries and replay',dimensionPaymentReports)
 
 test('DIM-001 reconciliation dimension contributions retain statement boundaries, saved proof and source exports',dimensionReconciliationReports)
+
+import {dimensionReportSplits} from './dimension-splits.mjs'
+test('DIM-001 every native and scoped report splits existing filtered values, exports and frozen audit memberships',dimensionReportSplits)

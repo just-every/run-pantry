@@ -1,4 +1,6 @@
 import { nativeApprovalAuthority } from './access-policy/approvals'
+import { dimensionTags, dimensionValues } from './dimensions'
+import { distributeDimensionAmounts } from './dimensions/allocations'
 import { bankAuthority } from './access-policy/banks'
 import { suggestionDecisions } from './line-suggestions'
 // Matching statement lines to ledger postings. A match links what the bank
@@ -9,7 +11,7 @@ import { authority, who } from './access'
 import { cents, optionalText, scale, requireThat, text, uid, usd, now, type Data } from './core'
 import { all, assertOpen, audit, changed, guard, one, periodOpen, q, run, type AuditActor, type Sql } from './db'
 import { account } from './accounts'
-import { entry, entryStatements, reversalStatements } from './journal'
+import { entry, entryStatements, reversalStatements, type Line } from './journal'
 import { paymentStatements } from './payables'
 import type { Command } from './context'
 import { reverseEarlyDiscounts } from './early-payment'
@@ -29,7 +31,7 @@ export function matchInput(b: Data): MatchInput {
 
 /** Validate a match and build its batch. Pantry's own matches are `automatic` and name the receipt they record. */
 export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchInput, { automatic = false, recordedReceipt = false } = {}) {
-  const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE id IN (${input.bankLineIds.map(() => '?').join(',')})`, ...input.bankLineIds)
+  const lines = await all(db, `SELECT * FROM pt_bank_lines WHERE id IN (${input.bankLineIds.map(() => '?').join(',')}) ORDER BY posted_date,id`, ...input.bankLineIds)
   requireThat(lines.length === input.bankLineIds.length, 'A statement line was not found', 404)
   requireThat(lines.every(l => !l.excluded_at),'Restore an excluded line before filing it',409)
   requireThat(lines.every(l => !l.removed_at), 'A bank line was removed; reload before matching', 409)
@@ -49,20 +51,38 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
   requireThat(!usedPostings.length, 'A ledger posting is already matched', 409)
 
   const day = lines.map(l => l.posted_date).sort().at(-1)!
+  const sourceCoding = lines.every(line=>JSON.stringify(dimensionValues(line))===JSON.stringify(dimensionValues(lines[0]))) ? dimensionTags(lines[0]) : dimensionTags({})
+  const requested = input.create.map((item,i) => {
+    const type=text(item.type,`New item ${i+1} type`),amount=cents(item.amount,`New item ${i+1} amount`)
+    requireThat(['receipt','payment','fee','income','transfer'].includes(type),`New item ${i+1}: type is receipt, payment, fee, income or transfer`)
+    const direction=type==='receipt'?'in':type==='payment'?'out':text(item.direction??(type==='income'?'in':'out'),`New item ${i+1} direction`)
+    requireThat(direction==='in'||direction==='out',`New item ${i+1}: money comes in or goes out`)
+    return {type,amount,direction,signed:direction==='in'?amount:-amount}
+  })
+  const statementTotal=lines.reduce((sum,line)=>sum+line.amount_cents,0)
+  const ledgerTotal=postings.reduce((sum,p)=>sum+p.debit_cents-p.credit_cents,0)+requested.reduce((sum,item)=>sum+item.signed,0)
+  requireThat(statementTotal===ledgerTotal,`Match does not balance: statement ${usd(statementTotal)}, ledger ${usd(ledgerTotal)}, difference ${usd(statementTotal-ledgerTotal)}`)
+  const codedItems=requested.filter(item=>item.type!=='transfer')
+  const contributions=distributeDimensionAmounts([
+    ...lines.map(line=>({source:line,amount:line.amount_cents})),
+    ...postings.map(p=>({source:p,amount:p.credit_cents-p.debit_cents})),
+    ...requested.filter(item=>item.type==='transfer').map(item=>({source:{},amount:-item.signed})),
+  ],codedItems.map(item=>item.signed))
+  let contributionIndex=0
   const statements: Sql[] = [...bankAuthority(actor, [bankId]),...lines.flatMap(l=>[
-    periodOpen(l.posted_date),guard('EXISTS(SELECT 1 FROM pt_bank_lines WHERE id=? AND posted_date=? AND amount_cents=? AND description=? AND removed_at IS NULL AND excluded_at IS NULL)',l.id,l.posted_date,l.amount_cents,l.description),
+    periodOpen(l.posted_date),guard('EXISTS(SELECT 1 FROM pt_bank_lines WHERE id=? AND posted_date=? AND amount_cents=? AND description=? AND class_name=? AND location_name=? AND project_name=? AND removed_at IS NULL AND excluded_at IS NULL)',l.id,l.posted_date,l.amount_cents,l.description,...dimensionValues(l)),
     guard('NOT EXISTS(SELECT 1 FROM pt_reconciliations r JOIN pt_statements s ON s.id=r.statement_id WHERE r.bank_account_id=? AND ? BETWEEN s.start_date AND s.end_date)',l.bank_account_id,l.posted_date)
   ])], created: { entryId: string; signed: number; kind: string; paymentId?: string }[] = []
   for (const [i, item] of input.create.entries()) {
-    const label = `New item ${i + 1}`, type = text(item.type, `${label} type`)
-    const amount = cents(item.amount, `${label} amount`), memo = optionalText(item.memo, `${label} memo`, 300)
+    const label = `New item ${i + 1}`, {type,amount,direction}=requested[i]
+    const memo = optionalText(item.memo, `${label} memo`, 300)
+    const itemCoding=dimensionTags({className:item.className??item.class_name??sourceCoding.className,locationName:item.locationName??item.location_name??sourceCoding.locationName,projectName:item.projectName??item.project_name??sourceCoding.projectName})
+    const bankLines:Line[]=type==='transfer'?[{accountId:bank.account_id,debit:direction==='in'?amount:0,credit:direction==='out'?amount:0,memo}]:contributions[contributionIndex++].map(({amount:share,...tags})=>({...tags,accountId:bank.account_id,debit:Math.max(share,0),credit:Math.max(-share,0),memo}))
     if (type === 'receipt' || type === 'payment') {
-      const p = await paymentStatements(db, actor, { direction: type === 'receipt' ? 'received' : 'paid', contactId: item.contactId, date: item.date ?? day, amount: item.amount, bankAccountId: bank.id, reference: item.reference ?? lines[0].reference, memo, allocations: item.allocations })
+      const p = await paymentStatements(db, actor, { ...itemCoding,direction: type === 'receipt' ? 'received' : 'paid', contactId: item.contactId, date: item.date ?? day, amount: item.amount, bankAccountId: bank.id, reference: item.reference ?? lines[0].reference, memo, allocations: item.allocations }, { bankLines })
       statements.push(...p.statements)
       created.push({ entryId: p.journalId, signed: p.signed, kind: type, paymentId: p.id })
     } else if (type === 'fee' || type === 'income' || type === 'transfer') {
-      const direction = text(item.direction ?? (type === 'income' ? 'in' : 'out'), `${label} direction`)
-      requireThat(direction === 'in' || direction === 'out', `${label}: money comes in or goes out`)
       let other: Data
       if (type === 'transfer') {
         const to = await one(db, 'SELECT * FROM pt_bank_accounts WHERE id = ?', text(item.otherBankAccountId, `${label} other bank account`))
@@ -75,24 +95,21 @@ export async function matchPlan(db: D1Database, actor: AuditActor, input: MatchI
       }
       const contactId = item.contactId ? text(item.contactId, `${label} payee`) : null
       if (contactId) requireThat(await one(db, 'SELECT 1 FROM pt_contacts WHERE id = ? AND active = 1 AND kind = ?', contactId, direction === 'in' ? 'customer' : 'vendor'), 'Choose an active payee')
-      const dimensions=Object.fromEntries(['className','locationName','projectName'].map(k=>[k,optionalText(item[k],k,120)]))
-      requireThat(type!=='transfer'||(!item.taxCodeId&&!Object.values(dimensions).some(Boolean)),'Transfers do not carry sales tax or category dimensions')
+      const selected=dimensionTags(item)
+      requireThat(type!=='transfer'||(!item.taxCodeId&&!Object.values(selected).some(Boolean)),'Transfers do not carry sales tax or category dimensions')
+      const dimensions=type==='transfer'?{}:itemCoding
       const code=item.taxCodeId?await one(db,'SELECT * FROM pt_tax_codes WHERE id=? AND active=1',text(item.taxCodeId,'Tax code')):null
       requireThat(!item.taxCodeId||code,'Choose an active sales tax code')
       const tax=code?scale(amount,code.rate_milli_percent,100000+code.rate_milli_percent):0
       const entryId = uid(), into = direction === 'in'
+      const category:Line={...dimensions,accountId:other.id,debit:into?0:amount-tax,credit:into?amount-tax:0,memo,contactId}
       statements.push(...nativeApprovalAuthority(actor, 'journal', amount, 'record'), ...entryStatements({ id: entryId, date: item.date ?? day, memo: memo || `${type === 'transfer' ? 'Transfer' : other.name} — ${lines[0].description}`, sourceKind: 'bank', documentId: item.documentId ?? null, preparedBy: actor.email, preparedKind: 'person', lines: [
-        { accountId: into ? bank.account_id : other.id, debit: into?amount:amount-tax, credit: 0, memo, contactId: into ? null : contactId, ...(!into?dimensions:{}) },
-        { accountId: into ? other.id : bank.account_id, debit: 0, credit: into?amount-tax:amount, memo, contactId: into ? contactId : null, ...(into?dimensions:{}) },
+        ...(into?[bankLines[0],category,...bankLines.slice(1)]:[category,...bankLines]),
         ...(tax?[{accountId:code!.account_id,debit:into?0:tax,credit:into?tax:0,memo,...dimensions}]:[]),
       ] }, actor.email))
       created.push({ entryId, signed: into ? amount : -amount, kind: type })
     } else requireThat(false, `${label}: type is receipt, payment, fee, income or transfer`)
   }
-  const statementTotal = lines.reduce((s, l) => s + l.amount_cents, 0)
-  const ledgerTotal = postings.reduce((s, p) => s + p.debit_cents - p.credit_cents, 0) + created.reduce((s, x) => s + x.signed, 0)
-  requireThat(statementTotal === ledgerTotal, `Match does not balance: statement ${usd(statementTotal)}, ledger ${usd(ledgerTotal)}, difference ${usd(statementTotal - ledgerTotal)}`)
-
   const id = uid()
   statements.push(
     q("INSERT INTO pt_matches (id, bank_account_id, status, proposal_id, note, approved_by, approved_at, revision, automatic, payment_id) VALUES (?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?)", id, bank.id, input.proposalId ?? null, input.note ?? '', actor.email, now(), uid(), automatic ? 1 : 0, automatic || recordedReceipt ? created.find(x => x.paymentId)?.paymentId ?? null : null),

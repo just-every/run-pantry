@@ -32,9 +32,11 @@ const masked = (tin: string, kind: string) => kind === 'ein' ? `••-•••
 export async function vendorYear(db: D1Database, year: number, dimension?: DimensionScope) {
   const from = `${year}-01-01`, to = `${year}-12-31`, limit = threshold(year)
   const vendors = await all(db, `SELECT c.id, c.name, c.is_1099, c.revision, t.legal_name, t.tin_kind, t.tin, t.address, t.city, t.state, t.zip FROM pt_contacts c LEFT JOIN pt_contractor_tax t ON t.contact_id = c.id WHERE c.kind = 'vendor' ORDER BY c.name`)
-  const payments = await all(db, "SELECT p.id,p.contact_id,p.payment_date,p.amount_cents,p.method,p.reference,p.reversal_id,l.class_name,l.location_name,l.project_name FROM pt_payments p JOIN pt_bank_accounts b ON b.id=p.bank_account_id JOIN pt_journal_lines l ON l.entry_id=p.journal_id AND l.account_id=b.account_id WHERE p.direction = 'paid' AND p.payment_date BETWEEN ? AND ? ORDER BY p.payment_date,p.created_at,p.id", from, to)
+  const payments = await all(db, "SELECT p.id,p.contact_id,p.payment_date,SUM(l.credit_cents-l.debit_cents) AS amount_cents,p.method,p.reference,p.reversal_id,l.class_name,l.location_name,l.project_name FROM pt_payments p JOIN pt_bank_accounts b ON b.id=p.bank_account_id JOIN pt_journal_lines l ON l.entry_id=p.journal_id AND l.account_id=b.account_id WHERE p.direction = 'paid' AND p.payment_date BETWEEN ? AND ? GROUP BY p.id,l.class_name,l.location_name,l.project_name ORDER BY p.payment_date,p.created_at,p.id", from, to)
   return vendors.map(v => {
-    const whole = payments.filter(p => p.contact_id === v.id), own=whole.filter(p=>inDimension(p,dimension))
+    const whole = payments.filter(p => p.contact_id === v.id), selected=whole.filter(p=>inDimension(p,dimension)),grouped=new Map<string,Data>()
+    for(const p of selected){const previous=grouped.get(p.id);if(previous)previous.amount_cents+=p.amount_cents;else grouped.set(p.id,{...p})}
+    const own=[...grouped.values()]
     const wholeBox1=whole.filter(p=>!p.reversal_id&&COUNTED.has(p.method)).reduce((n,p)=>n+p.amount_cents,0),wholeUnknown=whole.filter(p=>!p.reversal_id&&p.method==='unrecorded').reduce((n,p)=>n+p.amount_cents,0)
     const live = own.filter(p => !p.reversal_id), sum = (f: (p: Data) => boolean) => live.filter(f).reduce((s, p) => s + p.amount_cents, 0)
     const box1 = sum(p => COUNTED.has(p.method)), excluded = sum(p => EXCLUDED.has(p.method)), unrecorded = sum(p => p.method === 'unrecorded')

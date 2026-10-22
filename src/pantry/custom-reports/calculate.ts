@@ -1,3 +1,4 @@
+import { dimensionScopes } from '../dimensions/splits'
 import { dimensionScope } from '../dimensions/scope'
 import { BASIS_LABEL, reportBasis } from '../basis'
 import { date, requireThat, text, type Data } from '../core'
@@ -45,7 +46,7 @@ export function validateCustomReportDefinition(value: unknown): CustomReportDefi
   requireThat(d.basis === undefined || d.basis === 'cash' || d.basis === 'accrual', 'Basis is cash or accrual')
   requireThat(d.grouping === undefined || ['account', 'section', 'customer'].includes(d.grouping), 'Choose account, section or customer grouping')
   requireThat(d.comparison === undefined || COMPARISONS.includes(d.comparison), 'Choose supported report columns')
-  requireThat(!d.comparison || d.comparison === 'single' || isStatement(d.source), 'Comparison columns require profit and loss or balance sheet')
+  requireThat(!d.comparison || d.comparison === 'single' || ['class','location','project'].includes(d.comparison) || isStatement(d.source), 'Comparison columns require profit and loss or balance sheet')
   requireThat(d.comparison !== 'customer' || d.source === 'profit-and-loss', 'Customer columns require profit and loss')
   requireThat(d.grouping !== 'customer' || d.source === 'profit-and-loss' || isContact(d.source), 'Customer grouping is unavailable for this source')
   selection(d.filters); strings(d.filters?.contactIds, 'Contact IDs')
@@ -137,6 +138,14 @@ export async function calculateCustomReport(db: D1Database, definition: CustomRe
       snapshots.set(column.id, await sourceLines(db, d, column.from, column.to, basis, startMonth, accounts, ['customer','class','location','project'].includes(comparison) ? column.id : undefined))
     }
     if (comparison === 'prior-period' || comparison === 'prior-year') available.push({ id: 'change', label: 'Change · USD', unit: 'money' }, { id: 'percent', label: 'Change (%)', unit: 'percent' })
+  }
+  if(['class','location','project'].includes(comparison)&&!isStatement(d.source)){
+    for(const scope of await dimensionScopes(db,comparison)){
+      available.push({id:scope.id,label:`${scope.value||'Unassigned'} · USD`,unit:'money',from:d.from,to:d.to})
+      snapshots.set(scope.id,await sourceLines(db,d,d.from,d.to,basis,startMonth,accounts,scope.id))
+    }
+    available.push({id:'total',label:'Total · USD',unit:'money',from:d.from,to:d.to})
+    snapshots.set('total',await sourceLines(db,d,d.from,d.to,basis,startMonth,accounts,'total'))
   }
   available.push({ id: 'share', label: 'Share of absolute amounts (%)', unit: 'percent' })
   const wanted = d.allColumns ? available.map(column => column.id) : d.columns ?? ['code', 'name', 'amount']

@@ -1,3 +1,4 @@
+import { dimensionTags } from '../dimensions'
 // A source's parsed records → the reviewed import plan: the tie-outs a person
 // and accountant review, the import kit's source bundle with the exact uploaded
 // bytes, and the native rows each accepted record becomes.
@@ -31,7 +32,9 @@ export function checks(r: Parsed): Checks {
     { key: 'ar', title: 'Open invoices equal receivables', ok: invoices === ar, detail: `Open invoices ${usd(invoices)}; trial balance receivables ${usd(ar)}` },
     { key: 'ap', title: 'Unpaid bills equal payables', ok: bills === ap, detail: `Unpaid bills ${usd(bills)}; trial balance payables ${usd(ap)}` },
   ]
-  const tbBanks = r.tbRows.filter(x => r.accountNames.get(x.account.toLowerCase())?.subtype === 'bank')
+  const groupedBanks=new Map<string,{account:string;debit:number;credit:number}>()
+  for(const t of r.tbRows.filter(x=>r.accountNames.get(x.account.toLowerCase())?.subtype==='bank')){const previous=groupedBanks.get(t.account);if(previous){previous.debit+=t.debit;previous.credit+=t.credit}else groupedBanks.set(t.account,{...t})}
+  const tbBanks=[...groupedBanks.values()]
   for (const t of tbBanks) {
     const b = ok('bank').find(x => x.payload.account === t.account)
     out.push({ key: `bank:${t.account}`, title: `${t.account} agrees to its reconciled statement`, ok: !!b && b.payload.statementBalance === t.debit - t.credit,
@@ -84,7 +87,7 @@ export function mapping(source: Source, r: Parsed, preparedBy: string): ImportMa
       return { effects: [{ targetKind: 'cutover', targetId: ids.cutover(day), value: {
         cutover: { source: source.key, cutover_date: day, opening_entry_id: entryId, summary: `Opening balances from the ${from} trial balance as of ${day}`, status: 'staged', accepted_by: null, accepted_at: null },
         entry: { id: entryId, number: null, entry_date: day, memo: `Opening balances — ${from} trial balance as of ${day}`, source_kind: 'opening', source_id: ids.cutover(day), status: 'draft', prepared_by: preparedBy, prepared_kind: 'import', proposal_id: null, document_id: null, posted_by: null, posted_at: null, reverses_id: null, reversed_by_id: null, created_at: day },
-        lines: x.rows.map((t: Data, i: number) => ({ line_no: i + 1, account_id: ids.account(t.account), debit_cents: t.debit, credit_cents: t.credit, memo: 'Opening balance', contact_id: null })),
+        lines: x.rows.map((t: Data, i: number) => ({ class_name:dimensionTags(t).className,location_name:dimensionTags(t).locationName,project_name:dimensionTags(t).projectName,line_no: i + 1, account_id: ids.account(t.account), debit_cents: t.debit, credit_cents: t.credit, memo: 'Opening balance', contact_id: null })),
       } }] }
     }
     if (rec.kind === 'history') return { effects: [{ targetKind: 'history', targetId: ids.history(x.row), value: { cutover_id: ids.cutover(day), account: x.account, txn_date: x.date, txn_type: x.type, num: x.num, name: x.name, memo: x.memo, split: x.split, amount_cents: x.amount, source_row: x.row } }] }

@@ -460,3 +460,6 @@ test('CAPTURE-001 camera split, HEIC, multi-page PDF and multi-file drop keep or
 test('DIM-001 required bill coding and dimension statements at 1440 and 390',async t=>{
  const {dimensionsBrowser}=await import('./dimensions-journey.mjs');await dimensionsBrowser(t)
 })
+
+import {dimensionCompletionBrowser} from './dimension-completion.mjs'
+test('DIM-001 dimension splits, document recoding and generated coding through the built screens at 1440 and 390',dimensionCompletionBrowser)

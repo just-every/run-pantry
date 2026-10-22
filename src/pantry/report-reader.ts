@@ -1,3 +1,5 @@
+import { adjustingReport } from './dimensions/special-reports'
+import { reportSplits } from './dimensions/splits'
 // The native and scoped API use the same posted-data report dispatch.
 import { dimensionScope } from './dimensions/scope'
 import { Fault, requireThat } from './core'
@@ -15,14 +17,19 @@ import { salesByItem } from './items/report'
 export const FINANCIAL_REPORTS = [
   'trial-balance', 'general-ledger', 'profit-and-loss', 'balance-sheet',
   'sales-by-customer', 'expenses-by-vendor', 'sales-by-item', 'cash-flow',
-  'sales-tax', 'receivables', 'payables', ...Object.keys(LIBRARY).filter(kind => kind !== 'audit-log'),
+  'sales-tax', 'adjusting-entries', 'receivables', 'payables', ...Object.keys(LIBRARY).filter(kind => kind !== 'audit-log'),
 ] as const
 
 type Options = { from: string; to: string; basis: Basis; account?: string; payee?: string; columns?: string;dimension?:string;dimensionValue?:string }
 
-export async function readReport(db: D1Database, kind: string, { from, to, basis, account, payee, columns,dimension,dimensionValue }: Options) {
-  requireThat(!dimension||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances','reconciliations','deposits','check-detail','contractor-summary','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
+export async function readReport(db: D1Database, kind: string, { from, to, basis, account, payee, columns,dimension,dimensionValue }: Options):Promise<import('./core').Data> {
+  if(!['profit-and-loss','balance-sheet'].includes(kind)&&['class','location','project'].includes(columns??'')){
+    requireThat(!dimension,'Choose dimension splits or a filter, not both')
+    return reportSplits(db,kind,columns!,{from,to,basis,account,payee},scope=>readReport(db,kind,{from,to,basis,account,payee,dimension:scope?.kind,dimensionValue:scope?.id}))
+  }
+  requireThat(!dimension||['adjusting-entries','audit-log','general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances','reconciliations','deposits','check-detail','contractor-summary','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
   const scope=await dimensionScope(db,dimension,dimensionValue)
+  if(kind==='adjusting-entries')return adjustingReport(db,Number(to.slice(0,4)),basis,scope)
   if (isLibrary(kind)) return libraryReport(db, kind, from, to, basis, account, payee, scope)
   const e = await one(db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
   if (kind === 'sales-by-customer' || kind === 'expenses-by-vendor') return contactTotals(db, kind === 'sales-by-customer' ? 'customer' : 'vendor', from, to, basis, scope)

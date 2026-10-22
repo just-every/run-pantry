@@ -1,3 +1,5 @@
+import { cashLines } from './basis'
+import { settlementFence } from './dimensions/corrections'
 import { DIMENSIONS, dimensionTags, dimensionRefusal } from './dimensions'
 // Accountant review tools: bulk reclassification by linked correcting entries,
 // review notes on entries, and everything changed since a reviewer's last
@@ -27,13 +29,15 @@ const reclassify: Command = { need: 'post', async run(c, b) {
   requireThat(dimension||to, 'Reclassify to an active ordinary account (not bank, receivable, payable, sales tax or retained earnings)')
   const reason = optionalText(b.memo, 'Reason', 300)
   const lines = await all(c.db, `SELECT l.*, e.number, e.entry_date, e.status, e.reversed_by_id, e.source_kind, a.code AS account_code, a.name AS account_name, a.subtype,
+      COALESCE((SELECT customer_id FROM pt_invoices WHERE journal_id=e.id),(SELECT vendor_id FROM pt_bills WHERE journal_id=e.id),(SELECT vendor_id FROM pt_vendor_credits WHERE journal_id=e.id)) AS source_contact_id,
+      (SELECT document_line_id FROM pt_reclassifications WHERE correcting_entry_id=e.id) AS document_line_id,
       (SELECT 1 FROM pt_reclassifications r WHERE r.original_line_id = l.id) AS moved
     FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id JOIN pt_accounts a ON a.id = l.account_id
     WHERE l.id IN (${ids.map(() => '?').join(',')})`, ...ids)
   requireThat(lines.length === ids.length, 'A chosen line was not found', 404)
   for (const l of lines) {
     const label = `Entry ${l.number ?? 'draft'} line ${l.line_no}`
-    requireThat(!dimension || !['invoice','credit','bill'].includes(l.source_kind), `${label} needs a document correction so cash recognition follows its settlements`, 409)
+    requireThat(!l.document_line_id || dimension && l.line_no===1, `${label} is a document correction; move its destination dimension line`, 409)
     requireThat(l.status === 'posted', `${label} is a draft; edit the draft instead`, 409)
     requireThat(!l.reversed_by_id && l.source_kind !== 'reversal', `${label} is reversed or is a reversal; it cannot be reclassified`, 409)
     requireThat(!l.moved, `${label} was already reclassified; reclassify its correcting entry instead`, 409)
@@ -42,22 +46,29 @@ const reclassify: Command = { need: 'post', async run(c, b) {
     await assertOpen(c.db, l.entry_date)
   }
   const batch = uid(), statements: Sql[] = [authority(c.actor, 'post'), ...await ledgerBankAuthority(c.db, c.actor, [...(to?[to.id]:[]), ...lines.map(l => l.account_id)], 'post')]
+  const recognized=dimension?await cashLines(c.db,'0000-01-01','9999-12-31'):[]
+  if(dimension)statements.push(await settlementFence(c.db))
   for (const l of lines) {
+    const documentLine=dimension?(l.document_line_id??(['invoice','credit','bill'].includes(l.source_kind)?l.id:null)):null
+    if(documentLine){
+      const root=await one(c.db,'SELECT entry_id FROM pt_journal_lines WHERE id=?',documentLine)
+      for(const day of new Set(recognized.filter(r=>r.docJournalId===root?.entry_id).map(r=>r.date))){await assertOpen(c.db,day);statements.push(periodOpen(day))}
+    }
     const id = uid(), revision = uid(), amount = l.debit_cents || l.credit_cents, debit = l.debit_cents > 0
     const destination=dimension?{...dimensionTags(l),[`${dimension}Name`]:target}:dimensionTags(l)
     const refusal=await dimensionRefusal(c.db,[to?.id??l.account_id],destination);requireThat(!refusal,refusal??'Invalid dimensions',409)
     const moved: Line[] = [
-      { ...destination,accountId: to?.id??l.account_id, debit: debit ? amount : 0, credit: debit ? 0 : amount, memo: l.memo, contactId: l.contact_id },
-      { ...dimensionTags(l),accountId: l.account_id, debit: debit ? 0 : amount, credit: debit ? amount : 0, memo: l.memo, contactId: l.contact_id },
+      { ...destination,accountId: to?.id??l.account_id, debit: debit ? amount : 0, credit: debit ? 0 : amount, memo: l.memo, contactId: l.contact_id??l.source_contact_id },
+      { ...dimensionTags(l),accountId: l.account_id, debit: debit ? 0 : amount, credit: debit ? amount : 0, memo: l.memo, contactId: l.contact_id??l.source_contact_id },
     ]
     statements.push(...nativeApprovalAuthority(c.actor, 'journal', amount), periodOpen(l.entry_date), guard("EXISTS (SELECT 1 FROM pt_journal_entries WHERE id = ? AND status = 'posted' AND reversed_by_id IS NULL)", l.entry_id),
       ...entryStatements({ id, revision, date: l.entry_date, memo: `Reclassify entry ${l.number} line ${l.line_no}: ${l.account_code} ${l.account_name} → ${dimension?`${dimension} ${target}`:`${to!.code} ${to!.name}`} ${reason ? ` — ${reason}` : ''}`,
         sourceKind: 'manual', sourceId: l.entry_id, preparedBy: c.actor.email, preparedKind: 'person', lines: moved }, c.actor.email),
-      q('INSERT INTO pt_reclassifications (id, batch_id, original_entry_id, original_line_id, correcting_entry_id, from_account_id, to_account_id, amount_cents, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        uid(), batch, l.entry_id, l.id, id, l.account_id, to?.id??l.account_id, amount, c.actor.email, now()),
+      q('INSERT INTO pt_reclassifications (id, batch_id, original_entry_id, original_line_id, correcting_entry_id, from_account_id, to_account_id, amount_cents, created_by, created_at, document_line_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        uid(), batch, l.entry_id, l.id, id, l.account_id, to?.id??l.account_id, amount, c.actor.email, now(), documentLine),
       approval(who(c.actor), 'journal', id, revision, 'reclassify', 'approved', reason))
   }
-  statements.push(audit(who(c.actor), 'journal.reclassify', 'reclassification', batch, { to: `${dimension?`${dimension} ${target}`:`${to!.code} ${to!.name}`} `, lines: lines.length, reason }))
+  statements.push(audit(who(c.actor), 'journal.reclassify', 'reclassification', batch, { to: `${dimension?`${dimension} ${target}`:`${to!.code} ${to!.name}`} `, lines: lines.length, reason, dimensions: lines.map(l=>({before:dimensionTags(l),after:dimension?{...dimensionTags(l),[`${dimension}Name`]:target}:dimensionTags(l)})) }))
   await run(c.db, statements)
   return { batch, reclassified: await all(c.db, 'SELECT * FROM pt_reclassifications WHERE batch_id = ? ORDER BY created_at, id', batch) }
 } }

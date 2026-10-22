@@ -1,4 +1,5 @@
 import { authority, who } from '../access'
+import { dimensionTags, dimensionRefusal } from '../dimensions'
 import { nativeApprovalAuthority } from '../access-policy/approvals'
 import { bankAuthority } from '../access-policy/banks'
 import { contact } from '../contacts'
@@ -22,12 +23,14 @@ const record:Command={need:'post',async run(c,b){
   requireThat(bank?.active&&bank.type==='asset','Choose an active bank asset account',409)
   const liability=await one(c.db,"SELECT * FROM pt_accounts WHERE id=? AND type='liability' AND subtype='other' AND active=1",text(b.liabilityAccountId,'Customer-deposit liability account'))
   requireThat(liability,'Choose an active other-liability account for customer deposits',409)
+  const tags=dimensionTags(b),refusal=await dimensionRefusal(c.db,[bank.account_id,liability.id],tags)
+  requireThat(!refusal,refusal??'Invalid deposit dimensions',409)
   const id=uid(),journalId=uid(),memo=optionalText(b.memo,'Memo',500)
   await run(c.db,[authority(c.actor,'post'),...nativeApprovalAuthority(c.actor,'payment',amount,'post'),...bankAuthority(c.actor,[bank.id],'post'),
     guard("EXISTS(SELECT 1 FROM pt_accounts WHERE id=? AND active=1 AND type='liability' AND subtype='other')",liability.id),
-    ...entryStatements({id:journalId,date:day,memo:`Advance deposit from ${customer.name}`,sourceKind:'manual',sourceId:id,preparedBy:c.actor.email,preparedKind:'person',lines:[{accountId:bank.account_id,debit:amount,credit:0,contactId:customer.id},{accountId:liability.id,debit:0,credit:amount,contactId:customer.id}]},c.actor.email),
+    ...entryStatements({id:journalId,date:day,memo:`Advance deposit from ${customer.name}`,sourceKind:'manual',sourceId:id,preparedBy:c.actor.email,preparedKind:'person',lines:[{...tags,accountId:bank.account_id,debit:amount,credit:0,contactId:customer.id},{...tags,accountId:liability.id,debit:0,credit:amount,contactId:customer.id}]},c.actor.email),
     q('INSERT INTO pt_customer_deposits(id,customer_id,date,amount_cents,bank_account_id,liability_account_id,method,reference,memo,journal_id,revision,recorded_by,created_at)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',id,customer.id,day,amount,bank.id,liability.id,method,reference,memo,journalId,uid(),c.actor.email,now()),
-    audit(who(c.actor),'customer-deposit.record','customer-deposit',id,{customerId:customer.id,amount,date:day,journalId})])
+    audit(who(c.actor),'customer-deposit.record','customer-deposit',id,{...tags,customerId:customer.id,amount,date:day,journalId})])
   return customerDeposit(c.db,id)
 }}
 const apply:Command={need:'post',async run(c,b){

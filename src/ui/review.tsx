@@ -15,10 +15,10 @@ function Reclassify({ onDone }: { onDone: () => Promise<void> }) {
   if (!journal.data) return <Loading error={journal.error} what="the journal" />
   const ordinary = (a: D) => a.subtype === 'other'
   const movable = journal.data.entries.filter((e: D) => e.status === 'posted' && !e.reversed_by_id && e.source_kind !== 'reversal')
-    .flatMap((e: D) => e.lines.filter((l: D) => l.account_id === from && !l.reclassified_by).map((l: D) => ({ ...l, entry: e })))
+    .flatMap((e: D) => e.lines.filter((l: D) => l.account_id === from && !l.reclassified_by && (!l.document_correction_root || mode!=='account'&&l.line_no===1)).map((l: D) => ({ ...l, entry: e })))
   const toggle = (id: string) => setPicked(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
   return <Card title="Reclassify in bulk">
-    <p className="hint">Each chosen line moves by its own posted correcting entry, dated on the original’s date and linked to it; the original stays as posted. Lines in locked months are refused: ask for the month to be reopened first.</p>
+    <p className="hint">Each chosen line moves by its own posted correcting entry, dated on the original’s date and linked to it; the original stays as posted. Lines in locked months are refused: ask for the month to be reopened first. Invoice, credit and bill dimension corrections also require every affected settlement month to be open. Recode the destination line of a document correction to change it again.</p>
     <Field label="Reclassify by" name="reclassifyMode" value={mode} onChange={(e:any)=>setMode(e.target.value)} options={[{value:'account',label:'Account'},...[['class','classes_enabled'],['location','locations_enabled'],['project','projects_enabled']].filter(([,flag])=>state.dimensions?.settings[flag]).map(([value])=>({value,label:value[0].toUpperCase()+value.slice(1)}))]} />
     <Field label="From account" name="from" value={from} onChange={(e: any) => { setFrom(e.target.value); setPicked(new Set()) }} options={accountOptions(state.accounts, ordinary)} />
     {from && <Table heads={['', 'Date', 'Entry', 'Description', 'Amount']} figures={[4]} empty="No posted lines on this account can be reclassified." caption="Lines to reclassify">

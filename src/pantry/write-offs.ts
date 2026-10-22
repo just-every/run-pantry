@@ -78,7 +78,7 @@ const writeOff: Command = { need: 'post', async run(c, b) {
       const id = uid(), journalId = uid()
       statements.push(
         ...entryStatements({ id: journalId, date: day, memo, sourceKind: 'credit', sourceId: id, preparedBy: c.actor.email, preparedKind: 'person', lines: [
-          { accountId: payable!.id, debit: item.open, credit: 0, memo, contactId: item.contact_id },
+          { ...tags,accountId: payable!.id, debit: item.open, credit: 0, memo, contactId: item.contact_id },
           { ...tags,accountId: account.id, debit: 0, credit: item.open, memo },
         ] }, c.actor.email),
         q('INSERT INTO pt_vendor_credits (id, vendor_id, reference, credit_date, amount_cents, account_id, journal_id, created_by, created_at, write_off,class_name,location_name,project_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1,?,?,?)', id, item.contact_id, `Write-off ${item.reference} ${batch.slice(0, 8)}`, day, item.open, account.id, journalId, c.actor.email, now(),...dimensionValues(tags)),

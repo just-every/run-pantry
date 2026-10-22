@@ -1,3 +1,4 @@
+import { dimensionTags } from '../dimensions'
 // Source-neutral spreadsheet rows become the same staged records as the report
 // kits. Every physical data row survives in the preview, including zero balances.
 import { canonicalJson, sha256 } from '../../modules/import-kit/src/d1/index'
@@ -99,8 +100,9 @@ function parse(p: SpreadsheetPackage): Parsed {
   rows('trialBalance', (x, row) => {
     const account = knownAccount(x.account), debit = cents(x.debit || '0', 'Debit', { zero: true }), credit = cents(x.credit || '0', 'Credit', { zero: true })
     requireThat(!(debit && credit), 'A trial balance row has a debit or a credit')
-    requireThat(!tbAccounts.has(account.name), `Duplicate name "${account.name}" in the opening trial balance`)
-    tbAccounts.add(account.name); const t = { account: account.name, debit, credit, row }; tbRows.push(t); return t
+    const tags=dimensionTags(x),key=JSON.stringify([account.name,...Object.values(tags)])
+    requireThat(!tbAccounts.has(key), `Duplicate name "${account.name}" in the opening trial balance`)
+    tbAccounts.add(key); const t = { ...tags,account: account.name, debit, credit, row }; tbRows.push(t); return t
   })
   for (const [key, kind, partyKind, role] of [['openInvoices', 'invoice', 'customer', 'receivable'], ['unpaidBills', 'bill', 'vendor', 'payable']] as const) rows(key, x => {
     const party = text(x.party, `${partyKind} name`, 200)

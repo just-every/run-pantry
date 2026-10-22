@@ -1,6 +1,7 @@
 // A cash receipt becomes a normal journal draft, with its source bytes kept.
 // Posting remains the journal's separate, revision-specific human approval.
 import { authority, who } from '../access'
+import { dimensionTags } from '../dimensions'
 import { account } from '../accounts'
 import { cents, date, now, optionalText, requireThat, text, uid } from '../core'
 import { assertOpen, audit, changed, guard, one, periodOpen, q, run } from '../db'
@@ -30,8 +31,8 @@ const cashDraft: Command = { need: 'record', async run(c, b) {
   const id = uid(), revision = uid(), memo = `${vendor} · cash receipt`
   const documents = [...new Set<string>([r.document_id, r.file_document_id].filter(Boolean))]
   const lines = [
-    { accountId: expense.id, debit: total, credit: 0, memo: vendor, contactId: r.vendor_id ?? null },
-    { accountId: funding.id, debit: 0, credit: total, memo: vendor },
+    { ...dimensionTags(r),accountId: expense.id, debit: total, credit: 0, memo: vendor, contactId: r.vendor_id ?? null },
+    { ...dimensionTags(r),accountId: funding.id, debit: 0, credit: total, memo: vendor },
   ]
   await run(c.db, [
     authority(c.actor, 'record'), periodOpen(day),

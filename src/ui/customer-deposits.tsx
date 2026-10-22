@@ -1,3 +1,4 @@
+import { DimensionFormFields } from './dimensions'
 import { useState } from 'react'
 import { accountOptions, Card, command, contactOptions, Field, Form, Loading, Table, day, today, usd, useShared, useView, type D } from './kit'
 import { mayRecordDeposits, paymentMethods } from './estimate-economics'
@@ -41,7 +42,8 @@ export function CustomerDeposits({ sales, onChange }: { sales: D; onChange: () =
         <Field label="Bank account received into" name="bankAccountId" required options={state.bankAccounts.map((b: D) => ({ value: b.id, label: b.name }))} />
         <Field label="Customer deposit liability account" name="liabilityAccountId" required options={accountOptions(state.accounts, a => a.type === 'liability' && a.subtype === 'other')} />
         <Field label="How the deposit was paid" name="method" required options={paymentMethods} />
-        <Field label="Deposit reference" name="reference" required />
+        <DimensionFormFields label="Advance deposit" />
+      <Field label="Deposit reference" name="reference" required />
         <Field label="Deposit memo" name="memo" type="textarea" wide />
       </div>
       {!state.bankAccounts.length && <p className="callout callout-warn">Add a bank account under Bank before recording money received.</p>}

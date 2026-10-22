@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import {books,harness} from './harness.mjs'
 
-async function seed(t,options={}){
+export async function dimensionSeed(t,options={}){
  const h=await harness(options);t.after(()=>h.close());const {acct}=await books(h)
  const settings=(await h.view('dimensions')).settings
  await h.command('dimensions.settings',{revision:settings.revision,class:true,location:true,project:true})
@@ -14,7 +14,7 @@ async function lines(h,bank,rows,name='synthetic-pantry-61'){
  return (await h.view('bank/lines')).lines
 }
 export async function dimensionRules(t){
- const {h,acct,bank,tags,other}=await seed(t)
+ const {h,acct,bank,tags,other}=await dimensionSeed(t)
  const imported=await lines(h,bank,Array.from({length:7},(_,i)=>[`11/${String(i+1).padStart(2,'0')}/2026`,'Dimension routine',-10]))
  for(const [i,l] of imported.entries())await h.command('bank-line.dimensions',{id:l.id,...(i<6?tags:other)})
  const body={name:'Dimension review',descriptionContains:'Dimension routine',direction:'out',accountId:acct['6200'],priority:0,mode:'suggest',dimensionConditions:tags,dimensionActions:other}
@@ -53,7 +53,7 @@ export async function dimensionRules(t){
 }
 export async function dimensionSuggestions(t){
  let answer={receipt:true,vendor:'Paper merchant',date:'2026-11-07',total:'10.00',tax:'0.00',currency:'USD',category:'6200',note:''}
- const {h,acct,bank,tags,other}=await seed(t,{outbound:async request=>{
+ const {h,acct,bank,tags,other}=await dimensionSeed(t,{outbound:async request=>{
   assert.equal(new URL(request.url).hostname,'api.anthropic.com')
   return Response.json({id:'synthetic-pantry-63',type:'message',role:'assistant',content:[{type:'text',text:JSON.stringify(answer)}],stop_reason:'end_turn'})
  }})
@@ -82,7 +82,7 @@ export async function dimensionSuggestions(t){
  q=await h.view('bank/lines');assert.equal(q.suggestionRates.find(r=>r.source==='document').changed,1)
 }
 export async function dimensionBudgets(t){
- const {h,acct,tags,other}=await seed(t)
+ const {h,acct,tags,other}=await dimensionSeed(t)
  for(const [account,amount,dims,side] of [[acct['4000'],'200',other,'credit'],[acct['6200'],'50',tags,'debit']]){
   const journal=await h.command('journal.save-draft',{date:'2026-09-15',memo:'Dimension budget actual',lines:[{accountId:account,[side]:amount,...dims},{accountId:acct['1000'],[side==='debit'?'credit':'debit']:amount}]});await h.command('journal.post',{id:journal.id,revision:journal.revision})
  }
@@ -115,7 +115,7 @@ export async function dimensionBudgets(t){
 }
 
 export async function dimensionTaxAndCash(t) {
- const {h,acct,bank,tags,other}=await seed(t)
+ const {h,acct,bank,tags,other}=await dimensionSeed(t)
  const reader=await h.member('synthetic-pantry-tax-reader@example.test','viewer')
  const customer=await h.command('contact.save',{kind:'customer',name:'Dimension taxable customer'})
  const tax=await h.command('tax-code.save',{name:'Dimension NY',rate:'10',state:'NY',accountId:acct['2200']})
@@ -164,7 +164,7 @@ export async function dimensionTaxAndCash(t) {
 }
 
 export async function dimensionAgeing(t) {
- const {h,acct,bank,tags,other}=await seed(t)
+ const {h,acct,bank,tags,other}=await dimensionSeed(t)
  const customer=await h.command('contact.save',{kind:'customer',name:'Mixed project customer'}),vendor=await h.command('contact.save',{kind:'vendor',name:'Mixed project vendor'})
  const draft=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-10-01',lines:[{description:'Studio sale',quantity:'1',rate:'100',accountId:acct['4000'],taxCode:'exempt',...tags},{description:'Support sale',quantity:'1',rate:'300',accountId:acct['4000'],taxCode:'exempt',...other}]})
  await h.command('invoice.approve',{id:draft.id,revision:draft.revision});const invoice=await h.command('invoice.issue',{id:draft.id})
@@ -231,7 +231,7 @@ export async function dimensionAgeing(t) {
 }
 
 export async function dimensionPaymentReports(t) {
- const {h,acct,bank,tags,other}=await seed(t)
+ const {h,acct,bank,tags,other}=await dimensionSeed(t)
  const vendor=await h.command('contact.save',{kind:'vendor',name:'Dimension contractor'}),customer=await h.command('contact.save',{kind:'customer',name:'Dimension payer'})
  await h.command('contractor.save',{contactId:vendor.id,is1099:true})
  const pay=(direction,amount,method,coding={},reference='synthetic-pantry-38')=>h.command('payment.record',{direction,amount,method,reference,contactId:direction==='paid'?vendor.id:customer.id,date:'2026-10-05',bankAccountId:bank.id,...coding,allocations:[]})
@@ -277,7 +277,7 @@ export async function dimensionPaymentReports(t) {
 }
 
 export async function dimensionReconciliationReports(t) {
- const {h,acct,tags,other}=await seed(t)
+ const {h,acct,tags,other}=await dimensionSeed(t)
  // Reconciliations retain a saved whole-statement proof and expose coded book contributions.
  acct['1010']=(await h.command('account.save',{code:'1010',name:'Project reserve',type:'asset',subtype:'bank'})).id
  const reserve=await h.command('bank-account.save',{name:'Dimension reserve',institution:'Synthetic bank',accountId:acct['1010'],numberLast4:'4242',openingDate:'2026-01-01',openingBalance:'0'})

@@ -14,9 +14,11 @@ export async function itemGrouping(db: D1Database) {
   // An issued document posts its receivable on line 1 and its Nth sale line on journal line N + 1; a reversal keeps that order.
   const sold = new Map((await all(db, `SELECT i.journal_id, l.line_no, l.account_id, l.item_id FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
     WHERE i.journal_id IS NOT NULL AND l.item_id IS NOT NULL`)).map(r => [`${r.journal_id}:${r.line_no + 1}`, r]))
+  const corrections=new Map((await all(db,'SELECT r.correcting_entry_id,l.entry_id,l.line_no FROM pt_reclassifications r JOIN pt_journal_lines l ON l.id=r.document_line_id WHERE r.document_line_id IS NOT NULL')).map(r=>[r.correcting_entry_id,r]))
   return {
     of: (line: Data) => {
-      const posted = sold.get(`${line.reverses_id ?? line.entry_id}:${line.line_no}`)
+      const root=corrections.get(line.reverses_id??line.entry_id)
+      const posted = sold.get(root?`${root.entry_id}:${root.line_no}`:`${line.reverses_id ?? line.entry_id}:${line.line_no}`)
       const itemId: string | null = String(line.id).startsWith('cash-') ? line.item_id ?? null : posted && posted.account_id === line.account_id ? posted.item_id : null
       return itemId && items.has(itemId) ? itemId : 'unassigned'
     },

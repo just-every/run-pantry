@@ -1,4 +1,5 @@
 import { dimensionRefusal, dimensionsView, dimensionTags, dimensionValues } from './dimensions'
+import { dimensionAmounts } from './dimensions/allocations'
 // Payables and recorded money movement. Bills post expense against payables;
 // payments record money that moved outside Pantry and allocate it to open items.
 import { nativeApprovalAuthority } from './access-policy/approvals'
@@ -35,7 +36,7 @@ export async function parseBill(db: D1Database, b: Data) {
   const lines = list<Data>(b.lines, 'Bill lines', 100).map((l, i) => {
     const a = accounts.get(text(l.accountId, `Line ${i + 1} account`))
     requireThat(a && a.active && !['receivable', 'payable', 'bank'].includes(a.subtype), `Line ${i + 1}: choose an active expense or asset account`)
-    return { ...dimensionTags({...l,className:l.className??b.className}), description: text(l.description, `Line ${i + 1} description`, 500), accountId: a.id, amount: cents(l.amount, `Line ${i + 1} amount`) }
+    return { ...dimensionTags({...l,className:l.className??b.className,locationName:l.locationName??b.locationName,projectName:l.projectName??b.projectName}), description: text(l.description, `Line ${i + 1} description`, 500), accountId: a.id, amount: cents(l.amount, `Line ${i + 1} amount`) }
   })
   const catalogue=await dimensionsView(db)
   for(const line of lines){const refusal=await dimensionRefusal(db,[line.accountId],line,catalogue);requireThat(!refusal,refusal??'Invalid dimensions',409)}
@@ -67,7 +68,9 @@ const saveBill: Command = { need: 'record', async run(c, b) {
 } }
 
 export function postBill(actor: Actor, b: { id: string; journalId: string; payable: string; vendor: Data; reference: string; date: string; lines: Data[]; total: number }): Sql[] {
-  const lines: Line[] = [...b.lines.map(l => ({ ...dimensionTags(l), accountId: l.account_id, debit: l.amount_cents, credit: 0, memo: l.description })), { accountId: b.payable, debit: 0, credit: b.total, memo: `${b.vendor.name} ${b.reference}`, contactId: b.vendor.id }]
+  const controls = dimensionAmounts(b.lines.map(l => ({ source:l, amount:l.amount_cents })))
+    .map(({ amount,...tags }) => ({ ...tags, accountId:b.payable, debit:0, credit:amount, memo:`${b.vendor.name} ${b.reference}`, contactId:b.vendor.id }))
+  const lines: Line[] = [...b.lines.map(l => ({ ...dimensionTags(l), accountId: l.account_id, debit: l.amount_cents, credit: 0, memo: l.description })), ...controls]
   return [...nativeApprovalAuthority(actor, 'bill', b.total), ...entryStatements({ id: b.journalId, date: b.date, memo: `Bill ${b.reference} — ${b.vendor.name}`, sourceKind: 'bill', sourceId: b.id, preparedBy: actor.email, preparedKind: 'person', lines }, actor.email),
     q("UPDATE pt_bills SET status = 'posted', journal_id = ?, revision = ? WHERE id = ? AND status = 'draft'", b.journalId, uid(), b.id), changed()]
 }
@@ -113,7 +116,7 @@ const allocationInsert = (actor: AuditActor, paymentId: string, kind: string, a:
 
 /** Statements recording one external payment and its allocations; used directly, from bank matching and by Pantry itself (Stripe, automatic matches).
  *  `sessionCounts` is Pantry's own word (never a client's) that a Stripe Checkout session qualified for an early-payment offer. */
-export async function paymentStatements(db: D1Database, actor: AuditActor, b: Data, opts: { sessionCounts?: boolean; bankCoding?: Data; controlCoding?: Data } = {}) {
+export async function paymentStatements(db: D1Database, actor: AuditActor, b: Data, opts: { sessionCounts?: boolean; bankCoding?: Data; controlCoding?: Data; bankLines?: Line[] } = {}) {
   const direction = text(b.direction, 'Direction')
   requireThat(direction === 'received' || direction === 'paid', 'A payment is received or paid')
   const who_ = await contact(db, text(b.contactId, direction === 'received' ? 'Customer' : 'Vendor'), direction === 'received' ? 'customer' : 'vendor')
@@ -131,9 +134,10 @@ export async function paymentStatements(db: D1Database, actor: AuditActor, b: Da
   const id = uid(), journalId = uid(), received = direction === 'received'
   // An allocation that first meets an invoice's early-payment offer posts its discount first and is capped (INVOICE-010).
   const early = received ? await takeEarlyDiscounts(db, actor, allocated.list, day, { sessionCounts: opts.sessionCounts, payments: id }) : { allocations: allocated.list.map(a => ({ ...a, counted: false })), before: [], after: [] }
-  const lines: Line[] = received
-    ? [{ ...(opts.bankCoding??dimensionTags(b)), accountId: bank.account_id, debit: amount, credit: 0, memo: `Received from ${who_.name}` }, { ...(opts.controlCoding??dimensionTags(b)), accountId: control.id, debit: 0, credit: amount, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }]
-    : [{ ...(opts.controlCoding??dimensionTags(b)), accountId: control.id, debit: amount, credit: 0, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }, { ...(opts.bankCoding??dimensionTags(b)), accountId: bank.account_id, debit: 0, credit: amount, memo: `Paid to ${who_.name}` }]
+  const bankLines: Line[] = opts.bankLines ?? [{ ...(opts.bankCoding??dimensionTags(b)), accountId:bank.account_id, debit:received?amount:0, credit:received?0:amount, memo:`${received?'Received from':'Paid to'} ${who_.name}` }]
+  requireThat(bankLines.length>0&&bankLines.every(l=>l.accountId===bank.account_id&&Number.isSafeInteger(l.debit)&&Number.isSafeInteger(l.credit)&&l.debit>=0&&l.credit>=0&&((l.debit>0)!==(l.credit>0)))&&bankLines.reduce((sum,l)=>sum+l.debit-l.credit,0)===(received?amount:-amount),'Payment bank contributions do not equal its amount')
+  const controlLine: Line = { ...(opts.controlCoding??dimensionTags(b)), accountId:control.id, debit:received?0:amount, credit:received?amount:0, memo:`Payment ${optionalText(b.reference,'Reference',80)}`, contactId:who_.id }
+  const lines: Line[] = received ? [bankLines[0],controlLine,...bankLines.slice(1)] : [controlLine,...bankLines]
   const statements: Sql[] = [
     ...nativeApprovalAuthority(actor, 'payment', amount), ...bankAuthority(actor, [bank.id]),
     ...entryStatements({ id: journalId, date: day, memo: `${received ? 'Payment from' : 'Payment to'} ${who_.name}`, sourceKind: 'payment', sourceId: id, preparedBy: actor.email, preparedKind: actor.kind === 'system' ? 'import' : 'person', lines }, actor.email),

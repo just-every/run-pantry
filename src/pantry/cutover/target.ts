@@ -23,7 +23,7 @@ const KINDS: Record<string, Kind> = {
 }
 const CUTOVER = ['source', 'cutover_date', 'opening_entry_id', 'summary', 'status', 'accepted_by', 'accepted_at']
 const ENTRY = ['id', 'number', 'entry_date', 'memo', 'source_kind', 'source_id', 'status', 'prepared_by', 'prepared_kind', 'proposal_id', 'document_id', 'posted_by', 'posted_at', 'reverses_id', 'reversed_by_id', 'created_at']
-const LINE = ['line_no', 'account_id', 'debit_cents', 'credit_cents', 'memo', 'contact_id']
+const LINE = ['line_no', 'account_id', 'debit_cents', 'credit_cents', 'memo', 'contact_id','class_name','location_name','project_name']
 
 const pick = (row: Record<string, unknown>, columns: string[]) => Object.fromEntries(columns.map(c => [c, row[c] ?? null]))
 const same = (columns: string[], value: Record<string, unknown>) => ({ where: columns.map(c => `${c} IS ?`).join(' AND '), params: columns.map(c => value[c] ?? null) })
@@ -77,7 +77,7 @@ export function targetsFor(prefix: string): D1TargetAdapter {
         return [
           sql("DELETE FROM pt_journal_lines WHERE entry_id = ?", v.entry.id),
           sql(`INSERT INTO pt_journal_entries (${ENTRY.join(', ')}, revision) VALUES (${ENTRY.map(() => '?').join(', ')}, ?) ON CONFLICT(id) DO UPDATE SET ${ENTRY.filter(c => c !== 'id').map(c => `${c} = excluded.${c}`).join(', ')}, revision = excluded.revision`, ...ENTRY.map(c => v.entry[c] ?? null), row.revision),
-          ...v.lines.map((l: any) => sql(`INSERT INTO pt_journal_lines (id, entry_id, ${LINE.join(', ')}) VALUES (?, ?, ${LINE.map(() => '?').join(', ')})`, `${v.entry.id}-${l.line_no}`, v.entry.id, ...LINE.map(c => l[c] ?? null))),
+          ...v.lines.map((l: any) => sql(`INSERT INTO pt_journal_lines (id, entry_id, ${LINE.join(', ')}) VALUES (?, ?, ${LINE.map(() => '?').join(', ')})`, `${v.entry.id}-${l.line_no}`, v.entry.id, ...LINE.map(c => l[c] ?? (c.endsWith('_name')?'':null)))),
           sql(`INSERT INTO pt_cutovers (id, ${CUTOVER.join(', ')}, revision) VALUES (?, ${CUTOVER.map(() => '?').join(', ')}, ?) ON CONFLICT(id) DO UPDATE SET ${CUTOVER.map(c => `${c} = excluded.${c}`).join(', ')}, revision = excluded.revision`, row.targetId, ...CUTOVER.map(c => v.cutover[c] ?? null), row.revision),
         ]
       }

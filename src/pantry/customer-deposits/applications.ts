@@ -1,4 +1,5 @@
 import { nativeApprovalAuthority } from '../access-policy/approvals'
+import { dimensionTags } from '../dimensions'
 import { bankAuthority } from '../access-policy/banks'
 import { who, type Actor } from '../access'
 import { controlAccount } from '../accounts'
@@ -32,14 +33,14 @@ export async function depositApplicationStatements(db:D1Database,actor:Actor|Aud
     guard('EXISTS(SELECT 1 FROM pt_accounts WHERE id=? AND type=\'liability\' AND active=1)',liability.id),
     guard('EXISTS(SELECT 1 FROM pt_customer_deposits WHERE id=? AND revision=?)',d.id,d.revision),
     ...entryStatements({id:journalId,date:day,memo:`Customer deposit applied to ${inv.number}`,sourceKind:'payment',sourceId:paymentId,preparedBy:actor.email,preparedKind:'person',lines:[
-      {accountId:liability.id,debit:applied,credit:0,contactId:d.customer_id},{accountId:receivable.id,debit:0,credit:applied,contactId:d.customer_id}]},actor.email),
+      {...dimensionTags(d),accountId:liability.id,debit:applied,credit:0,contactId:d.customer_id},{...dimensionTags(d),accountId:receivable.id,debit:0,credit:applied,contactId:d.customer_id}]},actor.email),
     q("INSERT INTO pt_payments(id,direction,contact_id,payment_date,amount_cents,bank_account_id,reference,memo,method,journal_id,recorded_by,created_at,customer_deposit_id)VALUES(?,'received',?,?,?,?,?,?,?,?,?,?,?)",paymentId,d.customer_id,day,applied,d.bank_account_id,d.reference,`Advance deposit applied to ${inv.number}`,d.method,journalId,actor.email,now(),d.id),
     ...early.before,
     q("INSERT INTO pt_allocations(id,source_kind,source_id,target_kind,target_id,amount_cents,allocation_date,created_by,created_at,early_counted)VALUES(?,'payment',?,'invoice',?,?,?,?,?,?)",uid(),paymentId,inv.id,applied,day,actor.email,now(),early.allocations[0].counted?1:0),
     q('INSERT INTO pt_customer_deposit_applications(id,deposit_id,invoice_id,payment_id,amount_cents,date,request_id,request_hash,created_at)VALUES(?,?,?,?,?,?,?,?,?)',appId,id,inv.id,paymentId,applied,day,requestId,requestHash,now()),
     guard(`(SELECT COALESCE(SUM(a.amount_cents),0) FROM pt_customer_deposit_applications a JOIN pt_payments p ON p.id=a.payment_id WHERE a.deposit_id=? AND p.reversal_id IS NULL)+(SELECT COALESCE(SUM(x.amount_cents),0) FROM pt_invoice_deposit_plans x JOIN pt_invoices i ON i.id=x.invoice_id WHERE x.deposit_id=? AND i.status<>'issued')<=(SELECT amount_cents FROM pt_customer_deposits WHERE id=?)`,id,id,id),
     guard(`EXISTS(SELECT 1 FROM pt_invoices WHERE id=? AND status='issued' AND customer_id=?) AND (SELECT total_cents FROM pt_invoices WHERE id=?) >= (SELECT COALESCE(SUM(a.amount_cents),0) FROM pt_allocations a LEFT JOIN pt_payments p ON p.id=a.source_id AND a.source_kind='payment' WHERE a.target_kind='invoice' AND a.target_id=? AND a.voided_by IS NULL AND (a.source_kind='credit' OR p.reversal_id IS NULL))`,inv.id,d.customer_id,inv.id,inv.id),
-    ...early.after,audit(who(actor),'customer-deposit.apply','customer-deposit',d.id,{invoiceId:inv.id,paymentId,amount:applied,date:day})]
+    ...early.after,audit(who(actor),'customer-deposit.apply','customer-deposit',d.id,{...dimensionTags(d),invoiceId:inv.id,paymentId,amount:applied,date:day})]
   return {paymentId,statements}
 }
 export async function depositForIssue(db:D1Database,actor:Actor|AuditActor,inv:Data):Promise<Sql[]>{

@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict'
+import {dimensionSeed} from './dimension-extensions.mjs'
+
+export async function dimensionGenerated(t){
+ const {h,acct,bank,tags,other}=await dimensionSeed(t)
+ const customer=await h.command('contact.save',{kind:'customer',name:'Cedar Workshop'}),vendor=await h.command('contact.save',{kind:'vendor',name:'Brightline Software'})
+ const liability=await h.command('account.save',{code:'2400',name:'Customer advances',type:'liability',subtype:'other'})
+ const prepaid=await h.command('account.save',{code:'1510',name:'Prepaid software',type:'asset',subtype:'other'})
+ const allRequired=[acct['1000'],acct['1200'],acct['2000'],acct['4000'],acct['6200'],liability.id,prepaid.id]
+ for(const accountId of allRequired)await h.command('dimension.require',{accountId,kinds:['class']})
+ const entries=async()=> (await h.view('journal')).entries
+ const coded=async(id,expected=tags)=>{const e=(await entries()).find(e=>e.id===id);assert.ok(e);assert.ok(e.lines.every(l=>Object.entries(expected).every(([k,v])=>l[k.replace('Name','_name')]===v)),e.memo);return e}
+ const draft=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-09-01',lines:[{description:'Studio work',quantity:'1',rate:'100',accountId:acct['4000'],taxCode:'exempt',...tags},{description:'Remote work',quantity:'1',rate:'50',accountId:acct['4000'],taxCode:'exempt',...other}],deposit:{amount:'10',method:'ach',bankAccountId:bank.id,date:'2026-09-01',...tags}})
+ await h.command('invoice.approve',{id:draft.id,revision:draft.revision});const invoice=await h.command('invoice.issue',{id:draft.id})
+ const posted=(await entries()).find(e=>e.id===invoice.journal_id)
+ assert.deepEqual(posted.lines.filter(l=>l.account_id===acct['1200']).map(l=>[l.class_name,l.debit_cents]).sort(),[['Studio',10000],['Support',5000]])
+ assert.equal(posted.lines.find(l=>l.line_no===2).memo,'Studio work');assert.equal(posted.lines.find(l=>l.line_no===3).memo,'Remote work')
+ const depositPayment=(await h.view('sales')).payments.find(p=>p.allocations.some(a=>a.target_id===invoice.id));await coded(depositPayment.journal_id)
+ const bill=await h.command('bill.save',{vendorId:vendor.id,billDate:'2026-09-02',reference:'synthetic-pantry-74',post:true,lines:[{description:'Studio software',amount:'20',accountId:acct['6200'],...tags},{description:'Remote software',amount:'10',accountId:acct['6200'],...other}]})
+ const bp=(await entries()).find(e=>e.id===bill.journal_id)
+ assert.deepEqual(bp.lines.filter(l=>l.account_id===acct['2000']).map(l=>[l.class_name,l.credit_cents]).sort(),[['Studio',2000],['Support',1000]])
+ const credit=await h.command('vendor-credit.record',{vendorId:vendor.id,reference:'synthetic-pantry-75',date:'2026-09-03',amount:'5',accountId:acct['6200'],...tags,allocations:[{targetId:bill.id,amount:'5'}]});await coded(credit.journal_id)
+ const advance=await h.command('customer-deposit.record',{customerId:customer.id,date:'2026-09-04',amount:'20',bankAccountId:bank.id,liabilityAccountId:liability.id,method:'ach',reference:'synthetic-pantry-76',...tags});await coded(advance.journal_id)
+ await h.command('customer-deposit.apply',{depositId:advance.id,invoiceId:invoice.id,amount:'20',date:'2026-09-05',requestId:'synthetic-pantry-77'})
+ const applied=(await h.view('sales')).payments.find(p=>p.customer_deposit_id===advance.id);await coded(applied.journal_id)
+ const settings=await h.command('check.settings',{bankAccountId:bank.id,nextNumber:1001,stock:'voucher',positivePay:{name:'Synthetic bank layout',account:'synthetic-pantry-78',columns:['number','amount','date','status'].map(field=>({field,header:field})),header:true,delimiter:',',dateFormat:'YYYY-MM-DD',amountFormat:'decimal',issueCode:'ISSUE',voidCode:'VOID'}})
+ const batch=await h.command('check.issue',{bankAccountId:bank.id,revision:settings.revision,date:'2026-09-06',items:[{kind:'expense',contactId:vendor.id,amount:'12',accountId:acct['6200'],description:'Check for studio subscription',...tags}]})
+ assert.ok(batch.checks.length)
+ const check=(await h.view('sales')).payments.find(p=>p.reference==='1001');await coded(check.journal_id)
+ const checkBill=(await h.view('sales')).bills.find(b=>b.reference==='Check 1001 expense');await coded(checkBill.journal_id)
+ const form=new FormData();form.set('source','upload');form.set('file',new Blob([Buffer.from('%PDF-1.4 Synthetic cash receipt')],{type:'application/pdf'}),'synthetic-pantry-81.pdf')
+ const capturedResponse=await fetch(h.origin+'/api/pantry/receipts/capture',{method:'POST',headers:{origin:h.origin,cookie:h.owner},body:form});assert.equal(capturedResponse.status,200)
+ const captured=await capturedResponse.json(),receipt=(await h.view('receipts')).review.find(r=>r.id===captured.id)
+ const codedReceipt=await h.command('receipt.dimensions',{id:receipt.id,revision:receipt.revision,...tags})
+ const cashDraft=await h.command('receipt.cash-draft',{id:receipt.id,revision:codedReceipt.revision,vendor:'Studio stationery',date:'2026-09-08',total:'3',currency:'USD',accountId:acct['6200'],fundingAccountId:acct['3000']})
+ await h.command('journal.post',{id:cashDraft.id,revision:cashDraft.revision});await coded(cashDraft.id)
+ const funding=await h.command('journal.save-draft',{date:'2026-09-01',memo:'Prepaid subscription funding',lines:[{accountId:prepaid.id,debit:'12',...tags},{accountId:acct['1000'],credit:'12',...tags}]});await h.command('journal.post',{id:funding.id,revision:funding.revision})
+ let schedule=await h.command('recognition.save',{kind:'prepaid',name:'Studio subscription recognition',balanceAccountId:prepaid.id,recognitionAccountId:acct['6200'],sourceJournalId:funding.id,amount:'12',startDate:'2026-09-30',months:2})
+ assert.equal(schedule.class_name,'Studio');await h.command('recognition.approve',{id:schedule.id,revision:schedule.revision})
+ await h.cron(Date.parse('2026-10-22T12:00:00Z'))
+ const recognition=(await entries()).filter(e=>e.memo.startsWith('Studio subscription recognition:'))
+ assert.ok(recognition.length);for(const e of recognition)await coded(e.id)
+ // Required bank/control values refuse incomplete generated work without any partial journal.
+ const before=(await entries()).length
+ await h.command('customer-deposit.record',{customerId:customer.id,date:'2026-09-08',amount:'1',bankAccountId:bank.id,liabilityAccountId:liability.id,method:'ach',reference:'synthetic-pantry-79'},h.owner,409)
+ assert.equal((await entries()).length,before)
+ const imported=await h.command('statement.import',{bankAccountId:bank.id,fileName:'synthetic-pantry-80.csv',content:'Posting Date,Description,Amount\n11/01/2026,Studio receipt,100\n11/01/2026,Remote receipt,200',opening:'0',closing:'300',start:'2026-11-01',end:'2026-11-30',confirmLast4:'3131'})
+ const feed=(await h.view('bank/lines')).lines.filter(l=>l.statement_id===imported.statement.id)
+ for(const line of feed)await h.command('bank-line.dimensions',{id:line.id,...(line.amount_cents===10000?tags:other)})
+ const match=await h.command('match.approve',{bankLineIds:feed.map(l=>l.id),create:[{type:'receipt',amount:'300',contactId:customer.id,allocations:[],...tags}]})
+ const feedReceipt=(await h.view('sales')).payments.find(p=>p.amount_cents===30000)
+ const receiptEntry=(await entries()).find(e=>e.id===feedReceipt.journal_id)
+ assert.deepEqual(receiptEntry.lines.filter(l=>l.account_id===acct['1000']).map(l=>[l.class_name,l.debit_cents]).sort(),[['Studio',10000],['Support',20000]])
+ await h.command('match.undo',{id:match.id,reason:'Review source coding'})
+ assert.equal((await h.view('sales')).payments.find(p=>p.id===feedReceipt.id).reversal_id!==null,true)
+}

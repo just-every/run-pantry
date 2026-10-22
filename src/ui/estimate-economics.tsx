@@ -1,3 +1,4 @@
+import { DimensionFields } from './dimensions'
 import { accountOptions, Card, Field, useShared, type D } from './kit'
 
 export const paymentMethods = [{ value: 'check', label: 'Check' }, { value: 'ach', label: 'ACH' }, { value: 'wire', label: 'Wire' }, { value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }, { value: 'payment-network', label: 'Payment network' }]
@@ -33,6 +34,7 @@ export function EstimateEconomics({ discounts, setDiscounts, deposit, setDeposit
           <Field label="Deposit at issue date" name="depositIssueDate" type="date" value={deposit.date} onChange={(e: any) => setDeposit({ ...deposit, date: e.target.value })} required />
           <Field label="Deposit at issue method" name="depositIssueMethod" options={paymentMethods} value={deposit.method} onChange={(e: any) => setDeposit({ ...deposit, method: e.target.value })} required />
           <Field label="Deposit-to bank account" name="depositIssueBank" options={state.bankAccounts.map((b: D) => ({ value: b.id, label: b.name }))} value={deposit.bankAccountId} onChange={(e: any) => setDeposit({ ...deposit, bankAccountId: e.target.value })} required />
+          <DimensionFields label="Deposit at issue" line={deposit} index={0} onChange={patch=>setDeposit({...deposit,...patch})} />
           <Field label="Deposit at issue reference" name="depositIssueReference" value={deposit.reference ?? ''} onChange={(e: any) => setDeposit({ ...deposit, reference: e.target.value })} />
         </div>}
       </> : <p className="hint">Recording a deposit requires financial posting access.{deposit ? ' This estimate already carries a deposit term; a person with that access must review any change.' : ''}</p>}

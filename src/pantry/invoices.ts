@@ -1,4 +1,5 @@
 import { dimensionTags, dimensionValues } from './dimensions'
+import { dimensionAmounts } from './dimensions/allocations'
 import { depositForIssue } from './customer-deposits/applications'
 // Receivables: draft → approved → issued invoices, and credits that reduce them.
 // A line without a decided tax treatment stops the invoice at review; Pantry
@@ -190,8 +191,12 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
   const taxAccounts = new Map((await all(db, 'SELECT id, account_id FROM pt_tax_codes')).map(t => [t.id, t.account_id]))
   const credit = current.kind === 'credit'
   const side = (amount: number, debit: boolean) => debit ? { debit: amount, credit: 0 } : { debit: 0, credit: amount }
-  const lines: Line[] = [{ accountId: receivable.id, ...side(current.total_cents, !credit), memo: `${current.number} ${current.customer_name}`, contactId: current.customer_id }]
   const coded = current.lines.map((l,i) => ({...l,line_kind:parsed?.lines?.[i]?.kind??l.line_kind,...dimensionTags(parsed?.lines?.[i] ?? l),discount_cents: parsed?.lines?.[i]?.discount ?? l.discount_cents ?? 0}))
+  const after=afterTaxShares(coded,parsed?.discounts??current.discounts??[],current.after_tax_discount_cents??0)
+  const controls = dimensionAmounts(coded.map((l,i) => ({ source:l, amount:l.amount_cents-l.discount_cents-after[i]+l.tax_cents })))
+    .map(({ amount,...tags }) => ({ ...tags, accountId:receivable.id, ...side(Math.abs(amount), amount > 0 ? !credit : credit), memo:`${current.number} ${current.customer_name}`, contactId:current.customer_id }))
+  // Keep the first control at line 1 and the original sale lines at 2 onward.
+  const lines: Line[] = [controls[0]]
   for (const l of coded) lines.push({ ...dimensionTags(l), accountId: l.account_id, ...side(l.amount_cents, credit), memo: l.description })
   // Keep sale line ordinals stable. Group additional postings only when their
   // account and all three reviewed dimension values agree.
@@ -203,10 +208,9 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
     if(previous){previous.debit+=debit?amount:0;previous.credit+=debit?0:amount}
     else extra.set(key,{...tags,accountId,...side(amount,debit),memo})
   }
-  const after=afterTaxShares(coded,parsed?.discounts??current.discounts??[],current.after_tax_discount_cents??0)
   coded.forEach((l,i)=>add(current.discount_account_id!,l.discount_cents+after[i],!credit,`Discounts ${current.number}`,l))
   for (const l of coded) add(taxAccounts.get(l.tax_code!)!,l.tax_cents,credit,`Sales tax ${current.number}`,l)
-  lines.push(...extra.values())
+  lines.push(...extra.values(), ...controls.slice(1))
   const issuedRevision = uid()
   const documents = await issuedDocumentStatements(db, current, issuedRevision, parsed)
   const journalId = uid(), statements: Sql[] = [
@@ -215,7 +219,7 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
     q("UPDATE pt_invoices SET status = 'issued', journal_id = ?, issued_by = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'approved'", journalId, actor.email, issuedRevision, current.id, current.revision), changed(), ...documents]
   if (current.deposit) {
     // The deposit received at issue is a payment applied to this invoice from its issue date.
-    const d = current.deposit, deposit = await paymentStatements(db, actor, { direction: 'received', contactId: current.customer_id, date: d.date, amount: (d.amount / 100).toFixed(2), method: d.method,
+    const d = current.deposit, deposit = await paymentStatements(db, actor, { ...dimensionTags(d), direction: 'received', contactId: current.customer_id, date: d.date, amount: (d.amount / 100).toFixed(2), method: d.method,
       bankAccountId: d.bankAccountId, reference: d.reference || current.number, memo: `Deposit received at issue of ${current.number}` })
     statements.push(...deposit.statements, q("INSERT INTO pt_allocations (id, source_kind, source_id, target_kind, target_id, amount_cents, allocation_date, created_by, created_at) VALUES (?, 'payment', ?, 'invoice', ?, ?, ?, ?, ?)", uid(), deposit.id, current.id, d.amount, current.issue_date, actor.email, now()),
       q('UPDATE pt_invoices SET deposit_payment_id = ? WHERE id = ?', deposit.id, current.id), changed(),

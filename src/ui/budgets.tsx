@@ -1,3 +1,4 @@
+import { DimensionSplitPicker, DimensionSplits } from './dimension-splits'
 import { useState } from 'react'
 import { Link, useSearch, useNavigate } from '@tanstack/react-router'
 import { Card, Chip, Field, Form, Loading, Table, amountText, command, monthName, usd, useShared, useView, type D } from './kit'
@@ -62,11 +63,12 @@ function Detail({ id, from, to, basis, edit }: { id: string; from: string; to: s
     <p>Annual plan: {monthName(plan.start_month)} to {monthName(plan.months.at(-1))}. Prepared on the {plan.basis} basis. Actuals use the report’s selected basis.</p>
     <p className="hint">Variance is actual minus budget; percent divides by the absolute budget. A zero budget is not comparable. Partial months use inclusive calendar days, rounded to cents per account/month.</p>
     {!valid ? <p>Choose report dates within this budget year.</p> : !report ? <Loading error={error} what="budget versus actual" /> : <>
-      <Field label="Budget dimension" name="budgetDimension" value={search.dimension?JSON.stringify([search.dimension,search.dimensionValue]):''} onChange={(e:any)=>{const [dimension,dimensionValue]=e.target.value?JSON.parse(e.target.value):[];void navigate({search:{...search,dimension,dimensionValue,line:undefined,record:undefined}})}} empty="All dimensions" options={report.dimensionOptions.map((d:D)=>({value:JSON.stringify([d.kind,d.id]),label:`${d.kind} · ${d.name}`}))} />
+      <Field label="Budget dimension" name="budgetDimension" value={search.dimension?JSON.stringify([search.dimension,search.dimensionValue]):''} onChange={(e:any)=>{const [dimension,dimensionValue]=e.target.value?JSON.parse(e.target.value):[];void navigate({search:{...search,dimension,dimensionValue,split:undefined,line:undefined,record:undefined}})}} empty="All dimensions" options={report.dimensionOptions.map((d:D)=>({value:JSON.stringify([d.kind,d.id]),label:`${d.kind} · ${d.name}`}))} />
+      <DimensionSplitPicker kinds={['class','location']} />
       <a className="btn btn-secondary" href={`/api/pantry/budgets/${id}/report.csv?from=${from}&to=${to}&basis=${basis}${dimensionQuery}`} download>Download budget CSV · {basis}</a>
-      <Table heads={['Account', 'Budget', 'Actual', 'Variance', 'Variance %']} figures={[1, 2, 3, 4]} empty="No planned or posted amounts in this range.">
+      {search.split?<><a className="btn btn-secondary" href={`/api/pantry/budgets/${id}/splits/export?from=${from}&to=${to}&basis=${basis}&split=${search.split}`}>Download budget split CSV</a><DimensionSplits slug="budget-actual" from={from} to={to} basis={basis} path={`budgets/${id}/splits`} /></>:<Table heads={['Account', 'Budget', 'Actual', 'Variance', 'Variance %']} figures={[1, 2, 3, 4]} empty="No planned or posted amounts in this range.">
         {[...[...report.rows, { id: 'net-income', code: '', name: 'Net income', ...report.netIncome }].map((r: D) => <tr key={r.id} className={r.id === 'net-income' ? 'total' : undefined}><td>{r.code ? `${r.code} · ` : ''}{r.name}</td><td className="fig">{open(r.id, 'budget', usd(r.budget))}</td><td className="fig">{open(r.id, 'actual', usd(r.actual))}</td><td className="fig">{open(r.id, 'variance', usd(r.variance))}</td><td className="fig">{open(r.id, 'percent', pct(r.percent))}</td></tr>)]}
-      </Table>
+      </Table>}
     </>}
   </Card>
 }

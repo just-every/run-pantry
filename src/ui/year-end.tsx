@@ -17,6 +17,7 @@ function YearEndPanel({ year }: { year: number }) {
       {s.checks.map((c: D) => <tr key={c.key}><td>{c.title}</td><td><Chip tone={c.ok ? 'good' : 'warn'}>{c.ok ? 'Ready for review' : 'Resolve'}</Chip></td><td>{c.detail}</td></tr>)}
     </Table>
     <p>Recorded payroll totals: gross {usd(s.payrollTotals.gross)} · employer taxes {usd(s.payrollTotals.employerTax)} · withheld {usd(s.payrollTotals.withheld)} · net pay {usd(s.payrollTotals.net)} · bank debits {usd(s.payrollTotals.debit)}.</p>
+    <p><Link to="/app/reports" search={{report:'adjusting-entries',from:s.start,to:s.end,basis}}>Filter and split adjusting entries by dimension</Link></p>
     <h3>Adjusting entries <Chip tone="info">{basis === 'cash' ? 'Cash basis' : 'Accrual basis'}</Chip></h3>
     <div className="field inline"><label htmlFor="adjusting-basis">Adjusting report basis</label><select id="adjusting-basis" value={basis} onChange={e => setBasis(e.target.value)}><option value="cash">Cash</option><option value="accrual">Accrual</option></select></div>
     <p className="hint">Manual adjusting journals have the same lines on both bases. The earnings roll above uses the accrual books.</p>

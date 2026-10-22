@@ -1,10 +1,11 @@
 // D1 access: every write is one atomic batch. Conditions that must still hold
 // when the batch commits (current authority, unchanged revisions, open periods)
 // go in as guard rows; one false guard rolls the whole batch back.
+import { auditDimensionStatements } from './dimensions/audit'
 import { Fault, longDay, monthName, uid, now, type Data } from './core'
 
 type AuditEvent = { id: string; at: string; actor: AuditActor; action: string; subjectKind: string; subjectId: string; detail: Data }
-export type Sql = { sql: string; params: unknown[]; auditEvent?: AuditEvent; auditBefore?: Sql; auditVersion?: Sql }
+export type Sql = { sql: string; params: unknown[]; auditEvent?: AuditEvent; auditBefore?: Sql; auditVersion?: Sql; auditAfter?: Sql[] }
 export const q = (sql: string, ...params: unknown[]): Sql => ({ sql, params })
 
 export const guard = (condition: string, ...params: unknown[]): Sql =>
@@ -33,7 +34,7 @@ export async function batchStatements(db: D1Database, statements: Sql[]): Promis
   const events = enriched.filter(s => s.auditEvent)
   const before = events.flatMap(s => s.auditBefore ? [s.auditBefore] : [])
   const writes = enriched.filter(s => !s.auditEvent)
-  const history = events.flatMap(s => s.auditVersion ? [s.auditVersion, s] : [s])
+  const history = events.flatMap(s => s.auditVersion ? [s.auditVersion, s, ...(s.auditAfter ?? [])] : [s, ...(s.auditAfter ?? [])])
   const cleanup = events.filter(s => s.auditBefore).map(s => q('DELETE FROM pt_audit_before WHERE event_id = ?', s.auditEvent!.id))
   return [...before, ...writes, ...history, ...cleanup, q('DELETE FROM pt_guard')]
 }
@@ -114,7 +115,7 @@ async function auditStatement(db: D1Database, e: AuditEvent): Promise<Sql> {
     VALUES (?, ?, ?, ?, ?, ?, ?, ${detailSql}, COALESCE(${revision.sql}, ?, ?), ${approvalId.sql}, ?, ?, ?, ${authorityRevision.sql})`,
     e.id, e.at, e.actor.email, e.actor.kind, e.action, e.subjectKind, e.subjectId, JSON.stringify(d), ...(snapshot ? [e.id, ...snapshot.params] : []), ...revision.params,
     d.revision ?? d.after?.revision ?? d.before?.revision ?? null, e.id, ...approvalId.params, origin, authorityKind, authorityId, ...authorityRevision.params)
-  return { ...result, auditEvent: e, auditVersion: q('INSERT INTO pt_record_revisions (subject_kind, subject_id, revision) VALUES (?, ?, ?) ON CONFLICT (subject_kind, subject_id) DO UPDATE SET revision = excluded.revision', e.subjectKind, e.subjectId, e.id), ...(snapshot ? { auditBefore: q(`INSERT INTO pt_audit_before (event_id, state) VALUES (?, ${snapshot.sql})`, e.id, ...snapshot.params) } : {}) }
+  return { ...result, auditEvent: e, auditAfter: auditDimensionStatements(e.id, e.subjectKind, e.subjectId, e.detail), auditVersion: q('INSERT INTO pt_record_revisions (subject_kind, subject_id, revision) VALUES (?, ?, ?) ON CONFLICT (subject_kind, subject_id) DO UPDATE SET revision = excluded.revision', e.subjectKind, e.subjectId, e.id), ...(snapshot ? { auditBefore: q(`INSERT INTO pt_audit_before (event_id, state) VALUES (?, ${snapshot.sql})`, e.id, ...snapshot.params) } : {}) }
 }
 
 export const approval = (actor: AuditActor, subjectKind: string, subjectId: string, subjectRevision: string, action: string, decision: 'approved' | 'rejected', note = '') =>

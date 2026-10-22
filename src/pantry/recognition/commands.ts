@@ -1,3 +1,4 @@
+import { dimensionValues } from '../dimensions'
 import { nativeApprovalAuthority } from '../access-policy/approvals'
 import { ledgerBankAuthority } from '../access-policy/banks'
 import { authority, who } from '../access'
@@ -17,11 +18,11 @@ const save: Command = { need: 'record', async run(c, b) {
     requireThat(!await one(c.db, "SELECT 1 FROM pt_recognition_runs WHERE schedule_id = ? AND status = 'posted'", before.id), 'A schedule with successful postings cannot change; create a separate correcting or new plan', 409)
   }
   const s: Schedule = { ...p, id: before?.id ?? uid(), revision: uid(), prepared_by: c.actor.email, status: 'awaiting-approval' }
-  const fields = [s.kind, s.name, s.balance_account_id, s.recognition_account_id, s.amount_cents, s.start_date, s.months, JSON.stringify(s.plan), s.source_journal_id, s.source_line_id, s.source_date, s.prepared_by, s.revision, now()]
+  const fields = [s.kind, s.name, s.balance_account_id, s.recognition_account_id, s.amount_cents, s.start_date, s.months, JSON.stringify(s.plan), s.source_journal_id, s.source_line_id, s.source_date, ...dimensionValues(s),s.prepared_by, s.revision, now()]
   await run(c.db, [authority(c.actor, 'record'), ...await ledgerBankAuthority(c.db, c.actor, [s.balance_account_id, s.recognition_account_id]), ...accountFences(s), ...sourceFence(s),
     ...(before ? [guard("NOT EXISTS (SELECT 1 FROM pt_recognition_runs WHERE schedule_id = ? AND status = 'posted')", s.id),
-      q("UPDATE pt_recognition_schedules SET kind = ?, name = ?, balance_account_id = ?, recognition_account_id = ?, amount_cents = ?, start_date = ?, months = ?, plan = ?, source_journal_id = ?, source_line_id = ?, source_date = ?, prepared_by = ?, revision = ?, updated_at = ?, status = 'awaiting-approval', approved_by = NULL, approved_revision = NULL, approved_snapshot = NULL WHERE id = ? AND revision = ?", ...fields, s.id, b.revision), changed()]
-      : [q("INSERT INTO pt_recognition_schedules (kind, name, balance_account_id, recognition_account_id, amount_cents, start_date, months, plan, source_journal_id, source_line_id, source_date, prepared_by, revision, updated_at, id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'awaiting-approval', ?)", ...fields, s.id, now())]),
+      q("UPDATE pt_recognition_schedules SET kind = ?, name = ?, balance_account_id = ?, recognition_account_id = ?, amount_cents = ?, start_date = ?, months = ?, plan = ?, source_journal_id = ?, source_line_id = ?, source_date = ?, class_name=?,location_name=?,project_name=?,prepared_by = ?, revision = ?, updated_at = ?, status = 'awaiting-approval', approved_by = NULL, approved_revision = NULL, approved_snapshot = NULL WHERE id = ? AND revision = ?", ...fields, s.id, b.revision), changed()]
+      : [q("INSERT INTO pt_recognition_schedules (kind, name, balance_account_id, recognition_account_id, amount_cents, start_date, months, plan, source_journal_id, source_line_id, source_date, class_name,location_name,project_name,prepared_by, revision, updated_at, id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'awaiting-approval', ?)", ...fields, s.id, now())]),
     audit(who(c.actor), before ? 'recognition.edit' : 'recognition.create', 'recognition', s.id, { revision: s.revision, before, after: s })])
   return schedule(c.db, s.id)
 } }

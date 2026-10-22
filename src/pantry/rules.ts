@@ -1,4 +1,4 @@
-import { dimensionTags, dimensionRefusal } from './dimensions'
+import { dimensionTags, dimensionValues, dimensionRefusal } from './dimensions'
 // Bank rules: the business's own instructions for filing routine statement
 // lines. A rule names conditions (payee, description text, amount, direction,
 // bank account) and how a matching line is filed (one category or a split, a
@@ -149,11 +149,11 @@ export async function fileStatements(db: D1Database, rule: Rule, line: Data, fil
   const tags={...dimensionTags(line),...(typeof rule.dimension_actions==='string'?JSON.parse(rule.dimension_actions):rule.dimension_actions??{})}
   const lines = [
     ...parts.filter(p => p.amount > 0).map(p => ({ ...tags,accountId: p.accountId, debit: out ? p.amount : 0, credit: out ? 0 : p.amount, memo, contactId: rule.contact_id ?? null })),
-    { accountId: bank.account_id, debit: out ? 0 : abs, credit: out ? abs : 0, memo },
+    { ...dimensionTags(line),accountId: bank.account_id, debit: out ? 0 : abs, credit: out ? abs : 0, memo },
   ]
   const entryId = uid(), matchId = uid()
   return [filer.authority, standingFence(standingAuthority(filer.actor.email, 'bank', [bank.id])), periodOpen(line.posted_date), notReconciled(line),
-    guard('EXISTS(SELECT 1 FROM pt_bank_lines WHERE id=? AND excluded_at IS NULL)',line.id),
+    guard('EXISTS(SELECT 1 FROM pt_bank_lines WHERE id=? AND excluded_at IS NULL AND class_name=? AND location_name=? AND project_name=?)',line.id,...dimensionValues(line)),
     guard('NOT EXISTS (SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = ? AND active = 1)', line.id),
     guard("NOT EXISTS (SELECT 1 FROM pt_transfer_halves WHERE bank_line_id = ? AND status IN ('pending', 'exception'))", line.id),
     guard('EXISTS (SELECT 1 FROM pt_bank_rules WHERE id = ? AND revision = ? AND active = 1)', rule.id, rule.revision),

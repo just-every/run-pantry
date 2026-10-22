@@ -1,3 +1,4 @@
+import { documentCoding } from './dimensions/corrections'
 // Cash or accrual: one ledger, two ways of reading it. The books are always
 // accrual; the cash basis is calculated from them and never written back.
 //
@@ -30,7 +31,7 @@ export async function reportBasis(db: D1Database, value: unknown): Promise<Basis
 
 const DOCUMENT_KINDS = "('invoice', 'credit', 'bill')"
 /** SQL condition: entry `e` reads the same on the cash basis (it is not a document's own entry or its reversal). */
-export const sameOnCash = (e = 'e') => `NOT (${e}.source_kind IN ${DOCUMENT_KINDS} OR (${e}.source_kind = 'reversal' AND EXISTS (SELECT 1 FROM pt_journal_entries o WHERE o.id = ${e}.reverses_id AND o.source_kind IN ${DOCUMENT_KINDS})))`
+export const sameOnCash = (e = 'e') => `NOT (${e}.source_kind IN ${DOCUMENT_KINDS} OR EXISTS (SELECT 1 FROM pt_reclassifications dc WHERE dc.correcting_entry_id=${e}.id AND dc.document_line_id IS NOT NULL) OR (${e}.source_kind = 'reversal' AND EXISTS (SELECT 1 FROM pt_journal_entries o WHERE o.id = ${e}.reverses_id AND o.source_kind IN ${DOCUMENT_KINDS})))`
 
 export type Settlement = {
   allocationId?: string; kind: 'payment' | 'payment-reversed' | 'credit' | 'credit-applied' | 'credit-reversed'
@@ -52,7 +53,7 @@ export type CashLine = {
   settlement: Settlement
 }
 
-type Component = { class_name?:string;location_name?:string;project_name?:string; accountId: string; sign: 1 | -1; magnitude: number; role: CashLine['role']; description: string; taxCode: string | null; itemId?: string | null; early?: string | null }
+type Component = { ordinal?:number; class_name?:string;location_name?:string;project_name?:string; accountId: string; sign: 1 | -1; magnitude: number; role: CashLine['role']; description: string; taxCode: string | null; itemId?: string | null; early?: string | null }
 type Doc = { kind: CashLine['docKind']; id: string; ref: string; journalId: string; total: number; contactId: string; contactName: string; control: Component; parts: Component[] }
 type Event = { docId: string; date: string; order: string; delta: number; settlement: Settlement }
 
@@ -76,7 +77,7 @@ async function documents(db: D1Database): Promise<Map<string, Doc>> {
   // Only documents something has settled matter on the cash basis.
   const invoices = await all(db, `SELECT i.id, i.kind, i.number, i.total_cents, i.journal_id, i.customer_id, i.after_tax_discount_cents, i.discounts, i.discount_account_id, c.name AS contact_name FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id
     WHERE i.journal_id IS NOT NULL AND (i.id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice') OR i.id IN (SELECT source_id FROM pt_allocations WHERE source_kind = 'credit'))`)
-  const invoiceLines = await all(db, `SELECT l.invoice_id, l.line_kind, l.description, l.amount_cents, l.discount_cents, l.tax_cents, l.tax_code, l.account_id, l.item_id, l.early_treatment, l.class_name,l.location_name,l.project_name, t.account_id AS tax_account FROM pt_invoice_lines l LEFT JOIN pt_tax_codes t ON t.id = l.tax_code
+  const invoiceLines = await all(db, `SELECT l.invoice_id, l.line_no, l.line_kind, l.description, l.amount_cents, l.discount_cents, l.tax_cents, l.tax_code, l.account_id, l.item_id, l.early_treatment, l.class_name,l.location_name,l.project_name, t.account_id AS tax_account FROM pt_invoice_lines l LEFT JOIN pt_tax_codes t ON t.id = l.tax_code
     WHERE l.invoice_id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice' UNION SELECT source_id FROM pt_allocations WHERE source_kind = 'credit') ORDER BY l.invoice_id, l.line_no`)
   for (const i of invoices) {
     // An invoice debits receivables and credits income and tax; a credit note the reverse.
@@ -84,7 +85,7 @@ async function documents(db: D1Database): Promise<Map<string, Doc>> {
     const parts: Component[] = []
     const sourceLines=invoiceLines.filter(x=>x.invoice_id===i.id),after=afterTaxShares(sourceLines,JSON.parse(i.discounts??'[]'),i.after_tax_discount_cents)
     for (const l of sourceLines) {
-      parts.push({ class_name:l.class_name,location_name:l.location_name,project_name:l.project_name,accountId: l.account_id, sign: (-s) as 1 | -1, magnitude: l.amount_cents, role: 'sale', description: l.description, taxCode: l.tax_code, itemId: l.item_id, early: l.early_treatment })
+      parts.push({ ordinal:Number(l.line_no)+1,class_name:l.class_name,location_name:l.location_name,project_name:l.project_name,accountId: l.account_id, sign: (-s) as 1 | -1, magnitude: l.amount_cents, role: 'sale', description: l.description, taxCode: l.tax_code, itemId: l.item_id, early: l.early_treatment })
       // A before-tax discount (INVOICE-010) is a debit to the discounts account that lowers the line's taxable sale.
       if (l.discount_cents) parts.push({ class_name:l.class_name,location_name:l.location_name,project_name:l.project_name,accountId: i.discount_account_id, sign: s, magnitude: l.discount_cents, role: 'sale', description: `Discount · ${l.description}`, taxCode: l.tax_code })
       if (l.tax_cents) parts.push({ class_name:l.class_name,location_name:l.location_name,project_name:l.project_name,accountId: l.tax_account, sign: (-s) as 1 | -1, magnitude: l.tax_cents, role: 'tax', description: `Sales tax · ${l.description}`, taxCode: l.tax_code, early: l.early_treatment })
@@ -97,15 +98,15 @@ async function documents(db: D1Database): Promise<Map<string, Doc>> {
   }
   const bills = await all(db, `SELECT b.id, b.reference, b.total_cents, b.journal_id, b.vendor_id, c.name AS contact_name FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id
     WHERE b.journal_id IS NOT NULL AND b.id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'bill')`)
-  const billLines = await all(db, "SELECT bill_id, description, amount_cents, account_id, class_name,location_name,project_name FROM pt_bill_lines WHERE bill_id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'bill') ORDER BY bill_id, line_no")
+  const billLines = await all(db, "SELECT bill_id, line_no, description, amount_cents, account_id, class_name,location_name,project_name FROM pt_bill_lines WHERE bill_id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'bill') ORDER BY bill_id, line_no")
   for (const b of bills) docs.set(b.id, { kind: 'bill', id: b.id, ref: b.reference, journalId: b.journal_id, total: b.total_cents, contactId: b.vendor_id, contactName: b.contact_name,
     control: { accountId: control.get('payable')!, sign: -1, magnitude: b.total_cents, role: 'control', description: `${b.contact_name} ${b.reference}`, taxCode: null },
-    parts: billLines.filter(l => l.bill_id === b.id).map(l => ({ class_name:l.class_name,location_name:l.location_name,project_name:l.project_name,accountId: l.account_id, sign: 1, magnitude: l.amount_cents, role: 'expense', description: l.description, taxCode: null })) })
+    parts: billLines.filter(l => l.bill_id === b.id).map(l => ({ ordinal:Number(l.line_no),class_name:l.class_name,location_name:l.location_name,project_name:l.project_name,accountId: l.account_id, sign: 1, magnitude: l.amount_cents, role: 'expense', description: l.description, taxCode: null })) })
   const vendorCredits = await all(db, `SELECT v.*, c.name AS contact_name FROM pt_vendor_credits v JOIN pt_contacts c ON c.id = v.vendor_id
     WHERE v.id IN (SELECT source_id FROM pt_allocations WHERE source_kind = 'credit' AND target_kind = 'bill')`)
   for (const v of vendorCredits) docs.set(v.id, { kind: 'credit', id: v.id, ref: v.reference, journalId: v.journal_id, total: v.amount_cents, contactId: v.vendor_id, contactName: v.contact_name,
     control: { accountId: control.get('payable')!, sign: 1, magnitude: v.amount_cents, role: 'control', description: `${v.contact_name} ${v.reference}`, taxCode: null },
-    parts: [{ class_name:v.class_name,location_name:v.location_name,project_name:v.project_name,accountId: v.account_id, sign: -1, magnitude: v.amount_cents, role: 'expense', description: `Vendor credit ${v.reference}`, taxCode: null }] })
+    parts: [{ ordinal:1,class_name:v.class_name,location_name:v.location_name,project_name:v.project_name,accountId: v.account_id, sign: -1, magnitude: v.amount_cents, role: 'expense', description: `Vendor credit ${v.reference}`, taxCode: null }] })
   return docs
 }
 
@@ -137,6 +138,7 @@ async function events(db: D1Database, docs: Map<string, Doc>): Promise<Event[]> 
 /** Every recognised share on the cash basis dated from..to (inclusive). */
 export async function cashLines(db: D1Database, from: string, to: string): Promise<CashLine[]> {
   const docs = await documents(db)
+  const coding=await documentCoding(db),posted=await all(db,'SELECT * FROM pt_journal_lines ORDER BY entry_id,line_no')
   const settled = new Map<string, number>(), out: CashLine[] = []
   for (const e of await events(db, docs)) {
     const d = docs.get(e.docId)!
@@ -145,8 +147,16 @@ export async function cashLines(db: D1Database, from: string, to: string): Promi
     if (e.date < from || e.date > to) continue
     const was = spread(d.parts, d.control, d.total, before), now = spread(d.parts, d.control, d.total, after)
     const common = { date: e.date, docKind: d.kind, docId: d.id, docRef: d.ref, docJournalId: d.journalId, docTotal: d.total, contactId: d.contactId, contactName: d.contactName, settledBefore: before, settledAfter: after, settlement: e.settlement }
-    out.push({ ...common, accountId: d.control.accountId, net: d.control.sign * e.delta, role: 'control', description: d.control.description, taxCode: null })
-    d.parts.forEach((p, i) => { const share = now[i] - was[i]; if (share) out.push({ ...common,class_name:p.class_name??'',location_name:p.location_name??'',project_name:p.project_name??'', accountId: p.accountId, net: -d.control.sign * share, role: p.role, description: p.description, taxCode: p.taxCode, itemId: p.itemId ?? null, early: p.early ?? null }) })
+    const source=posted.filter(l=>l.entry_id===d.journalId)
+    d.parts.forEach((p, i) => {
+      const share = now[i] - was[i]; if (!share) return
+      const original=p.ordinal?source.find(l=>l.line_no===p.ordinal):source.find(l=>l.account_id===p.accountId&&(l.debit_cents-l.credit_cents)*p.sign>0&&['class','location','project'].every(k=>(l[k+'_name']??'')===(p[k+'_name' as keyof Component]??''))&&(p.role==='tax'?l.memo.startsWith('Sales tax '):l.memo.startsWith('Discounts ')))
+      const corrected=original?coding.get(original.id):undefined,tags=corrected??p
+      // Split recognized controls by the original reviewed component shares.
+      // Recoding an income/expense component does not silently recode its AR/AP.
+      out.push({ ...common,class_name:p.class_name??'',location_name:p.location_name??'',project_name:p.project_name??'',accountId:d.control.accountId,net:d.control.sign*share,role:'control',description:d.control.description,taxCode:null })
+      out.push({ ...common,class_name:tags.class_name??'',location_name:tags.location_name??'',project_name:tags.project_name??'', accountId: p.accountId, net: -d.control.sign * share, role: p.role, description: p.description+(corrected?` · dimension correction entry ${corrected.number}`:''), taxCode: p.taxCode, itemId: p.itemId ?? null, early: p.early ?? null })
+    })
   }
   return out
 }

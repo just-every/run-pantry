@@ -260,3 +260,9 @@ test('ACCESS-001 narrower roles, amount approval routing, bank privacy and time-
 
 import { dimensionsJourney } from './dimensions-journey.mjs'
 test('DIM-001 native catalogue, required line coding, tied statement columns and project profitability', dimensionsJourney)
+
+import {dimensionRecoding} from './dimension-recoding.mjs'
+test('DIM-001 linked document recoding follows settlement dates, future payments, returns and atomic concurrent refusals',dimensionRecoding)
+
+import {dimensionGenerated} from './dimension-generated.mjs'
+test('DIM-001 generated controls, advances, checks, recognition and mixed feed postings retain source dimensions atomically',dimensionGenerated)

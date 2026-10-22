@@ -1,3 +1,4 @@
+import { documentComponentCoding } from './dimensions/corrections'
 import { inDimension, type DimensionScope } from './dimensions/scope'
 // Sales tax by state for a period, from invoice and credit lines, tied to the
 // ledger's sales tax liability accounts. On the accrual basis tax is owed when
@@ -29,13 +30,13 @@ export type Contribution = { set: 'accrual' | 'paid' | 'accrualEarly' | 'cashEar
 
 /** Every line the report adds up, so each figure and its drill-through read the same contributions. */
 export async function salesTaxContributions(db: D1Database, from: string, to: string, dimension?: DimensionScope): Promise<Contribution[]> {
-  const out: Contribution[] = []
+  const out: Contribution[] = [],coding=await documentComponentCoding(db)
   const put = (set: Contribution['set'], key: string, metric: string, amount: number, source: Data) => { if (amount && inDimension(source.kind==='settled'?source.line:source,dimension)) out.push({ set, key, metric, amount, source }) }
   const early = (set: 'accrualEarly' | 'cashEarly', key: string, treatment: string, amount: number, tax: number, source: Data) => {
     if (treatment === 'reduce') { put(set, key, 'reduced', amount, source); put(set, key, 'taxReduced', tax, source) } else put(set, key, treatment === 'retain' ? 'kept' : 'exempt', amount, source)
   }
   // Invoiced in the period (credits count against it): taxable sales and tax charged.
-  const invoiced = await all(db, `SELECT i.id, i.number, i.kind, i.issue_date, i.credit_for, i.early_discount, l.id AS line_id,l.class_name,l.location_name,l.project_name, l.description, l.early_treatment, l.tax_code, l.amount_cents - l.discount_cents AS amount_cents, l.tax_cents FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
+  const invoiced = await all(db, `SELECT i.id, i.journal_id,l.line_no, i.number, i.kind, i.issue_date, i.credit_for, i.early_discount, l.id AS line_id,l.class_name,l.location_name,l.project_name, l.description, l.early_treatment, l.tax_code, l.amount_cents, l.discount_cents, l.tax_cents FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id
     WHERE i.status = 'issued' AND i.journal_id IS NOT NULL AND i.write_off = 0 AND i.issue_date BETWEEN ? AND ? ORDER BY i.issue_date, i.number, l.line_no`, from, to)
   // A reversed early-payment discount gives back its reduction in the reversal's period.
   const reversed = await all(db, `SELECT i.id, i.number, i.kind, i.credit_for, r.id AS reversal_id, r.entry_date, l.id AS line_id,l.class_name,l.location_name,l.project_name, l.description, l.early_treatment, l.tax_code, l.amount_cents, l.tax_cents FROM pt_invoice_lines l JOIN pt_invoices i ON i.id = l.invoice_id JOIN pt_journal_entries r ON r.id = i.early_reversal_id
@@ -47,9 +48,10 @@ export async function salesTaxContributions(db: D1Database, from: string, to: st
   }
   for (const l of invoiced) {
     const key = l.tax_code ?? 'exempt', source = { kind: 'invoiced', ...l }
+    const sale={...source,...Object.fromEntries(Object.entries(coding(l)).map(([k,v])=>[k.replace('Name','_name'),v]))},discount={...source,line_id:l.line_id+':discount',...Object.fromEntries(Object.entries(coding(l,'discount')).map(([k,v])=>[k.replace('Name','_name'),v]))}
     if (l.early_discount) { early('accrualEarly', key, l.early_treatment, l.amount_cents, l.tax_cents, source); if (l.early_treatment !== 'reduce') continue }
     const sign = l.kind === 'credit' ? -1 : 1
-    put('accrual', key, 'taxable', sign * l.amount_cents, source); put('accrual', key, 'charged', sign * l.tax_cents, source)
+    put('accrual', key, 'taxable', sign * l.amount_cents, sale);if(l.discount_cents)put('accrual',key,'taxable',-sign*l.discount_cents,discount); put('accrual', key, 'charged', sign * l.tax_cents, source)
   }
   // Paid in the period: the settled shares of each line and of its tax.
   const writeOffs = await writeOffCredits(db)

@@ -1,3 +1,4 @@
+import { inDimension,type DimensionScope } from './dimensions/scope'
 // A fiscal year closes through its existing monthly checks and grants. One
 // atomic batch locks all twelve months, with no closing journal or lock bypass.
 import { authority, who } from './access'
@@ -14,12 +15,13 @@ import type { Command } from './context'
 // ledger, settings, readiness and permission changes still invalidate it.
 const REVIEWED_CHANGES = "SELECT COUNT(*) FROM pt_audit WHERE action <> 'report.issued'"
 
-export async function adjustingEntries(db: D1Database, year: number) {
+export async function adjustingEntries(db: D1Database, year: number, dimension?:DimensionScope) {
   const entity = await requireEntity(db), bounds = yearBounds(year, entity.fiscal_year_start)
   const entries = await all(db, "SELECT * FROM pt_journal_entries WHERE adjusting = 1 AND status = 'posted' AND entry_date BETWEEN ? AND ? ORDER BY number, id", bounds.start, bounds.end)
   const lines = await all(db, `SELECT l.*, a.code, a.name FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id JOIN pt_accounts a ON a.id = l.account_id WHERE e.adjusting = 1 AND e.status = 'posted' AND e.entry_date BETWEEN ? AND ? ORDER BY e.number, l.line_no`, bounds.start, bounds.end)
-  for (const e of entries) e.lines = lines.filter(l => l.entry_id === e.id)
-  return { ...bounds, entries, debit: lines.reduce((s, l) => s + l.debit_cents, 0), credit: lines.reduce((s, l) => s + l.credit_cents, 0) }
+  const selected=lines.filter(l=>inDimension(l,dimension))
+  for (const e of entries) e.lines = selected.filter(l => l.entry_id === e.id)
+  return { ...bounds, entries:entries.filter(e=>e.lines.length), debit: selected.reduce((s, l) => s + l.debit_cents, 0), credit: selected.reduce((s, l) => s + l.credit_cents, 0) }
 }
 
 export async function yearEndState(db: D1Database, year: number): Promise<Data> {

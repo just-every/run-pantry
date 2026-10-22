@@ -61,9 +61,9 @@ for (const kind of FINANCIAL_REPORTS) paths[`/reports/${kind}`] = { get: operati
   query('basis', { enum: ['cash', 'accrual'] }, 'Explicit choice wins; omitted basis uses the declared tax method, or accrual when undeclared. Open items/reconciliation remain accrual, contractor-summary uses payment basis, and indirect cash flow starts from accrual net income.'),
   query('account', string, 'Ledger account filter for general-ledger, transactions and journal.'),
   query('payee', string, 'Exact contact ID filter for transactions and journal.'),
-  query('dimension',{enum:['class','location','project']},'Line filter on ledger, statements, sales/spend/item groups, cash-flow, sales-tax, ageing/open-item library, transactions and journal; other report families refuse it.'),
+  query('dimension',{enum:['class','location','project']},'Line filter for every financial report, including adjusting entries. Audit history is native-only; full financial authority remains required.'),
   query('dimensionValue',string,'Use unassigned or value:CATALOGUE-NAME with dimension.'),
-  query('columns', { enum: ['single', 'prior-period', 'prior-year', 'months', 'quarters', 'ytd', 'customer','class','location','project'] }, 'Statement column mode; Customer columns apply to profit-and-loss only; dimension columns also apply to balance-sheet. Dimensions must be enabled; choose a dimension filter or dimension columns.'),
+  query('columns', { enum: ['single', 'prior-period', 'prior-year', 'months', 'quarters', 'ytd', 'customer','class','location','project'] }, 'Statement column mode; Customer columns apply to profit-and-loss only. Class/location/project also split every financial report into the same filtered values, source selectors and an unsplit report. Dimensions must be enabled; choose a dimension filter or dimension columns.'),
 ], undefined, 'Returns the same native report fields, integer-cent figures, basis labels, source links and date-range semantics as the corresponding session-authenticated report. Links target the native app and retain its session requirements. This scope does not expose audit history, full TIN exports, custom-report shares, close packages or other native routes. No pagination applies to calculated report results.') }
 
 // All newly delegated records use an explicit field schema and the same bounded envelope.

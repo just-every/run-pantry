@@ -1,3 +1,4 @@
+import { DimensionSplitPicker,DimensionSplits } from './dimension-splits'
 import { DimensionReportPicker } from './dimensions'
 // 1099 contractors: vendors marked for a 1099-NEC, their payments in a calendar
 // year counted by the IRS rules Pantry can apply, the threshold flag, and in
@@ -52,7 +53,8 @@ export function Contractors({ year, onYear }: { year: number; onYear: (y: number
   const open = (id: string, metric: string, amount: number) => <Link to="/app/reports" search={{ ...search, report: 'contractors', year: String(year), line: JSON.stringify([id, metric]), record: undefined }} className="figure-link" onClick={e => e.stopPropagation()}>{usd(amount)}</Link>
   return <>
     <div className="callout"><div><strong>Pantry does not file with the IRS.</strong><span>It keeps your contractors' payments and W-9 details, flags who needs a 1099-NEC and, after the year ends, gives you each form's figures and a CSV to file through the IRS or a filing service. Box 1 counts check, ACH, wire and cash payments; card and payment-network payments are left out because the processor reports them on Form 1099-K. Whether a vendor needs a 1099 at all (services, not goods; most corporations are exempt) is your and your accountant's call.</span></div></div>
-    <div className="inline-fields year-pick"><DimensionReportPicker /><div className="field inline"><label htmlFor="tax-year">Tax year</label><select id="tax-year" value={year} onChange={e => onYear(Number(e.target.value))}>{years.map(y => <option key={y} value={y}>{y}</option>)}</select></div></div>
+    <div className="inline-fields year-pick"><DimensionReportPicker /><DimensionSplitPicker /><div className="field inline"><label htmlFor="tax-year">Tax year</label><select id="tax-year" value={year} onChange={e => onYear(Number(e.target.value))}>{years.map(y => <option key={y} value={y}>{y}</option>)}</select></div></div>
+    {search.split&&<DimensionSplits slug="contractors" from={`${year}-01-01`} to={`${year}-12-31`} basis="cash" />}
     {r?.dimension&&<p className="hint">Dimension subset: {r.dimension.label}. Payment figures below use the selected bank-line coding. Threshold decisions and filing figures always use each vendor’s whole year of payments.</p>}
     {!r ? <Loading error={error} what="1099 contractors" /> : <>
       <Metrics items={[{ label: 'Threshold', value: usd(r.threshold), note: r.thresholdNote }, { label: 'Contractors', value: String(r.contractors.length), note: 'marked for a 1099-NEC' }, { label: `At or over ${usd(r.threshold)}`, value: String(r.forms.length), note: r.yearEnded ? <>file by {day(r.dueBy)}</> : 'so far this year' }]} />

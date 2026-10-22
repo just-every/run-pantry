@@ -1,3 +1,4 @@
+import { DimensionFormFields } from './dimensions'
 import { useState } from 'react'
 import { Action, Card, Chip, Field, Form, Loading, Table, accountOptions, amountText, command, day, usd, useShared, useView, useWho, type D } from './kit'
 
@@ -24,6 +25,7 @@ function ScheduleEditor({ schedule: s, sources, to, cancel, onDone }: { schedule
       ...(kind !== 'accrual' ? { sourceJournalId: source?.journal_id } : {}),
     })} onDone={onDone} secondary={<button type="button" className="btn btn-secondary" onClick={cancel}>Cancel</button>}>
       <div className="grid-form">
+        <DimensionFormFields label="Recognition" defaults={s??{}} />
         <Field label="Schedule name" name="name" defaultValue={s?.name} required />
         <Field label="Schedule type" name="kind" value={kind} onChange={(e: any) => { setKind(e.target.value); setBalance(''); setRecognition(''); setSourceLine(''); setPlan('monthly') }} required options={Object.entries(KINDS).map(([value, label]) => ({ value, label }))} />
         <Field label="Balance-sheet account" name="balanceAccountId" value={balance} onChange={(e: any) => { setBalance(e.target.value); setSourceLine('') }} required options={accountOptions(state.accounts, a => a.type === (kind === 'prepaid' ? 'asset' : 'liability') && !['receivable', 'payable'].includes(a.subtype))} />

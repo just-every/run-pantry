@@ -135,6 +135,7 @@ const post: Command = { need: 'post', async run(c, b) {
 export async function reversalStatements(db: D1Database, actor: AuditActor, original: Data, day: string, memo: string, { unmatching = false } = {}) {
   requireThat(original.status === 'posted', 'Only posted entries are reversed; edit or discard a draft', 409)
   requireThat(!original.reversed_by_id, 'Entry is already reversed', 409)
+  requireThat(!await one(db,'SELECT 1 FROM pt_reclassifications WHERE correcting_entry_id=? AND document_line_id IS NOT NULL',original.id),'Recode the destination line of this document dimension correction instead of reversing its settlement history',409)
   requireThat(day >= original.entry_date, 'A reversal is dated on or after the original entry')
   await assertOpen(db, day)
   const matched = !unmatching && await one(db, 'SELECT 1 FROM pt_match_postings mp JOIN pt_journal_lines l ON l.id = mp.journal_line_id WHERE l.entry_id = ? AND mp.active = 1', original.id)
@@ -191,7 +192,8 @@ export async function journalView(db: D1Database) {
   const ids = entries.map(e => e.id)
   const marks = ids.map(() => '?').join(',')
   const lines = ids.length ? await all(db, `SELECT l.*, a.code AS account_code, a.name AS account_name, a.subtype AS account_subtype,
-      (SELECT r.correcting_entry_id FROM pt_reclassifications r WHERE r.original_line_id = l.id) AS reclassified_by
+      (SELECT r.correcting_entry_id FROM pt_reclassifications r WHERE r.original_line_id = l.id) AS reclassified_by,
+      (SELECT r.document_line_id FROM pt_reclassifications r WHERE r.correcting_entry_id=l.entry_id) AS document_correction_root
     FROM pt_journal_lines l JOIN pt_accounts a ON a.id = l.account_id WHERE l.entry_id IN (${marks}) ORDER BY l.line_no`, ...ids) : []
   const notes = ids.length ? await all(db, `SELECT * FROM pt_review_notes WHERE entry_id IN (${marks}) ORDER BY created_at, id`, ...ids) : []
   const docs = await entryDocuments(db)

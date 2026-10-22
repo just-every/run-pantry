@@ -1,3 +1,4 @@
+import { DimensionFormFields } from './dimensions'
 import { useState } from 'react'
 import { Action, Card, Chip, Field, Form, Loading, Table, accountOptions, amountText, command, contactOptions, day, today, usd, useShared, useView, type D } from './kit'
 
@@ -40,8 +41,8 @@ function Write({ bankId, profile, bills, reload }: { bankId: string; profile: D;
   const { state } = useShared(), [kind, setKind] = useState('bill'), [selected, setSelected] = useState<string[]>([])
   return <Card title="Write checks"><p>Next number: <strong>{profile.next_number}</strong>. Each selected bill gets its own check. Recording an expense creates and settles its bill in the same action.</p>
     <Form label="Issue checks" onDone={async () => { setSelected([]); await reload() }} className="grid-form" submit={b => command('check.issue', { bankAccountId: bankId, revision: profile.revision, date: b.date,
-      items: kind === 'bill' ? bills.filter(bill => selected.includes(bill.id)).map(bill => ({ kind, contactId: bill.vendor_id, amount: amountText(bill.open_cents), memo: b.memo || bill.reference, allocations: [{ targetId: bill.id, amount: amountText(bill.open_cents) }] }))
-        : [{ kind, contactId: b.contactId, amount: b.amount, accountId: b.accountId, description: b.description, memo: b.memo }] })}>
+      items: kind === 'bill' ? bills.filter(bill => selected.includes(bill.id)).map(bill => ({ className:b.className,locationName:b.locationName,projectName:b.projectName,kind, contactId: bill.vendor_id, amount: amountText(bill.open_cents), memo: b.memo || bill.reference, allocations: [{ targetId: bill.id, amount: amountText(bill.open_cents) }] }))
+        : [{ className:b.className,locationName:b.locationName,projectName:b.projectName,kind, contactId: b.contactId, amount: b.amount, accountId: b.accountId, description: b.description, memo: b.memo }] })}>
       <Field label="Write as" name="kind" value={kind} options={[{ value: 'bill', label: 'Bill payments' }, { value: 'expense', label: 'Expense' }]} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setKind(e.target.value)} />
       <Field label="Check date" name="date" type="date" required defaultValue={today()} />
       {kind === 'bill' ? <div className="field field-wide"><Table heads={['Pay', 'Bill', 'Vendor', 'Open']} figures={[3]} empty="No unpaid recorded bills.">
@@ -52,6 +53,7 @@ function Write({ bankId, profile, bills, reload }: { bankId: string; profile: D;
         <Field label="Expense amount" name="amount" inputMode="decimal" required />
         <Field label="Expense description" name="description" required />
       </>}
+      <DimensionFormFields label="Check" />
       <Field label="Check memo" name="memo" wide />
     </Form>
   </Card>

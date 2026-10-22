@@ -3,10 +3,10 @@ import { Action, Card, command, Field, Form, Table, useShared, type D } from './
 const KINDS = [['class','Class','classes_enabled'],['location','Location','locations_enabled'],['project','Project','projects_enabled']] as const
 
 // Use the existing forms, fields and responsive tables; no new visual system.
-export function DimensionFields({line,index,onChange}:{line:D;index:number;onChange:(patch:D)=>void}) {
+export function DimensionFields({line,index,onChange,label='Line'}:{line:D;index:number;label?:string;onChange:(patch:D)=>void}) {
  const {state}=useShared(),d=state.dimensions
  if(!d)return null
- return <>{KINDS.filter(([, ,flag])=>d.settings[flag]).map(([kind,label])=><Field key={kind} label={`Line ${index+1} ${kind}`} name={`line-${index}-${kind}`} value={line[`${kind}Name`]??''} onChange={(e:any)=>onChange({[`${kind}Name`]:e.target.value})} options={[{value:'',label:`No ${kind}`},...d.values.filter((v:D)=>v.kind===kind&&(v.active||v.name===line[`${kind}Name`])).map((v:D)=>({value:v.name,label:v.name+(v.active?'':' (inactive)')}))]} />)}</>
+ return <>{KINDS.filter(([, ,flag])=>d.settings[flag]).map(([kind,label])=><Field key={kind} label={`${label}${label==='Line'?' '+(index+1):''} ${kind}`} name={`${label.toLowerCase().replaceAll(' ','-')}-${index}-${kind}`} value={line[`${kind}Name`]??''} onChange={(e:any)=>onChange({[`${kind}Name`]:e.target.value})} options={[{value:'',label:`No ${kind}`},...d.values.filter((v:D)=>v.kind===kind&&(v.active||v.name===line[`${kind}Name`])).map((v:D)=>({value:v.name,label:v.name+(v.active?'':' (inactive)')}))]} />)}</>
 }
 export function DimensionSettings() {
  const {state,reload}=useShared(),d=state.dimensions
@@ -63,5 +63,5 @@ export function DimensionSelection({label='Dimension filter',value,onChange}:{la
 }
 export function DimensionReportPicker(){
  const search=useSearch({from:'/app/reports'}),navigate=useNavigate({from:'/app/reports'})
- return <DimensionSelection value={search.dimension?JSON.stringify([search.dimension,search.dimensionValue]):''} onChange={value=>{const [dimension,dimensionValue]=value?JSON.parse(value):[];void navigate({search:s=>({...s,dimension,dimensionValue,line:undefined,record:undefined})})}} />
+ return <DimensionSelection value={search.dimension?JSON.stringify([search.dimension,search.dimensionValue]):''} onChange={value=>{const [dimension,dimensionValue]=value?JSON.parse(value):[];void navigate({search:s=>({...s,dimension,dimensionValue,split:undefined,line:undefined,record:undefined})})}} />
 }

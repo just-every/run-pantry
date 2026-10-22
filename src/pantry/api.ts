@@ -1,3 +1,6 @@
+import { adjustingReport } from './dimensions/special-reports'
+import { budgetSplits } from './dimensions/budget-splits'
+import { reportSplits, splitLibrary } from './dimensions/splits'
 import { fiscalYearStart } from './reports'
 import { dimensionScope } from './dimensions/scope'
 import { projectProfit } from './dimensions/report'
@@ -162,7 +165,12 @@ api.get('/api/pantry/estimate-siblings/:id/document', async c => {
 })
 view('estimates', async ctx => estimatesView(ctx))
 view('dimensions',async ctx=>dimensionsView(ctx.db))
-view('dimensions/project',async(ctx,c)=>projectProfit(ctx.db,c.req.query('name')??'',day(c,'from'),day(c,'to'),await reportBasis(ctx.db,c.req.query('basis'))))
+view('dimensions/project',async(ctx,c)=>projectProfit(ctx.db,c.req.query('name')??'',day(c,'from'),day(c,'to'),await reportBasis(ctx.db,c.req.query('basis')),await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))))
+view('dimensions/project/splits',async(ctx,c)=>{
+ const from=day(c,'from'),to=day(c,'to'),basis=await reportBasis(ctx.db,c.req.query('basis'))
+ return reportSplits(ctx.db,'project-profitability',c.req.query('split')??'',{from,to,basis},scope=>projectProfit(ctx.db,c.req.query('name')??'',from,to,basis,scope))
+})
+
 view('estimates/:id', async (ctx, c) => estimate(ctx.db, c.req.param('id')!))
 view('customer-deposits', async ctx => customerDepositsView(ctx))
 registerInvoiceDocumentRoutes(api, reader)
@@ -189,7 +197,7 @@ view('bank/feeds', async ctx => feedsView(ctx))
 view('reconciliation/:statement', async (ctx, c) => { const r = await reconciliationState(ctx.db, c.req.param('statement')!); return { ...r, depositNotes: await depositNotes(ctx.db, r.lines), depositProposals: await depositProposals(ctx.db, r.lines), recordedPayments: await recordedPaymentCandidates(ctx.db, r.lines) } })
 view('year-end/:year', async (ctx, c) => yearEndState(ctx.db, Number(c.req.param('year'))))
 api.get('/api/pantry/year-end/:year/adjusting-entries.pdf', async c => {
-  const ctx = await reader(c), basis = await reportBasis(ctx.db, c.req.query('basis')), r = await adjustingEntries(ctx.db, Number(c.req.param('year'))), entity = await one(ctx.db, 'SELECT legal_name FROM pt_entity WHERE id = 1')
+  const ctx = await reader(c), basis = await reportBasis(ctx.db, c.req.query('basis')), r = await adjustingEntries(ctx.db, Number(c.req.param('year')),await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))), entity = await one(ctx.db, 'SELECT legal_name FROM pt_entity WHERE id = 1')
   await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`Adjusting entries · ${r.year}`,from:r.start,to:r.end,basis,report:'general-ledger'})
   return new Response(reportPdf({ business: entity!.legal_name, title: 'Adjusting entries', basis: BASIS_LABEL[basis], range: `${r.start} to ${r.end}`,
     rows: r.entries.flatMap(e => e.lines.flatMap((l: Data) => [
@@ -214,6 +222,11 @@ checksRoutes(api)
 view('checks', async ctx => checksView(ctx.db))
 view('budgets', async ctx => budgetsView(ctx.db))
 view('budgets/:id', async (ctx, c) => budget(ctx.db, c.req.param('id')!))
+view('budgets/:id/splits',async(ctx,c)=>budgetSplits(ctx.db,c.req.param('id')!,day(c,'from'),day(c,'to'),await reportBasis(ctx.db,c.req.query('basis')),c.req.query('split')??''))
+api.get('/api/pantry/budgets/:id/splits/export',async c=>{
+ const ctx=await reader(c),r=await budgetSplits(ctx.db,c.req.param('id')!,day(c,'from'),day(c,'to'),await reportBasis(ctx.db,c.req.query('basis')),c.req.query('split')??'')
+ return libraryExport(ctx.db,splitLibrary(r),c.req.query('format')??'csv')
+})
 view('budgets/:id/report', async (ctx, c) => budgetReport(ctx.db, c.req.param('id')!, day(c, 'from'), day(c, 'to'), await reportBasis(ctx.db, c.req.query('basis')),{dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue')}))
 api.get('/api/pantry/budgets/:id/report.csv', async c => {
   const ctx = await reader(c), r = await budgetReport(ctx.db, c.req.param('id')!, day(c, 'from'), day(c, 'to'), await reportBasis(ctx.db, c.req.query('basis')),{dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue')})
@@ -223,7 +236,7 @@ api.get('/api/pantry/budgets/:id/report.csv', async c => {
 view('recognition', async (ctx, c) => recognitionView(ctx.db, day(c, 'to')))
 // A figure's address: its report and line, the range and basis, and the filters, columns, budget or tax year it was read under.
 const figureQuery = async (db: D1Database, c: C, from: string, to: string): Promise<FigureQuery> => ({ report: c.req.query('report') ?? '', line: c.req.query('line') ?? '', from, to, basis: await reportBasis(db, c.req.query('basis')),
-  account: c.req.query('account'), columns: c.req.query('columns'), column: c.req.query('column'), budget: c.req.query('budget'),dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue'), year: c.req.query('year'), payee: c.req.query('payee') })
+  account: c.req.query('account'), columns: c.req.query('columns'), column: c.req.query('column'), budget: c.req.query('budget'),projectName:c.req.query('projectName'),dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue'), year: c.req.query('year'), payee: c.req.query('payee') })
 api.get('/api/pantry/reports/detail/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const entity = await one(ctx.db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')
@@ -243,8 +256,12 @@ view('reports/detail', async (ctx, c) => {
   return reportFigure(ctx.db, await figureQuery(ctx.db, c, from, to), Number(e?.fiscal_year_start ?? 1))
 })
 view('reports/record/:kind/:id', async (ctx, c) => recordView(ctx.db, c.req.param('kind')!, c.req.param('id')!))
-view('reports/adjusting-entries', async (ctx, c) => ({ ...await adjustingEntries(ctx.db, year(c)), basis: await reportBasis(ctx.db, c.req.query('basis')) }))
+view('reports/adjusting-entries',async(ctx,c)=>{const to=day(c,'to',`${year(c)}-12-31`),from=day(c,'from',to.slice(0,4)+'-01-01');return readReport(ctx.db,'adjusting-entries',{from,to,basis:await reportBasis(ctx.db,c.req.query('basis')),columns:c.req.query('columns'),dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue')})})
 view('reports/contractors', async (ctx, c) => contractors(ctx.db, year(c),await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))))
+view('reports/contractors/splits',async(ctx,c)=>{
+ const y=year(c),options={from:`${y}-01-01`,to:`${y}-12-31`,basis:'cash' as const}
+ return reportSplits(ctx.db,'contractors',c.req.query('split')??'',options,scope=>contractors(ctx.db,y,scope))
+})
 api.get('/api/pantry/reports/cash-flow/detail/export', async c => {
   const ctx = await reader(c)
   const detail = await cashFlowDetail(ctx.db, day(c, 'from'), day(c, 'to'), c.req.query('line') ?? '',await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue')))
@@ -263,11 +280,17 @@ api.get('/api/pantry/reports/:kind/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const kind=c.req.param('kind')!,basis=await reportBasis(ctx.db,c.req.query('basis'))
   requireThat(!c.req.query('dimensionValue')||c.req.query('dimension'),'Choose a dimension before a value')
-  requireThat(!c.req.query('dimension')||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances','reconciliations','deposits','check-detail','contractor-summary','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
-  const response=isLibrary(kind)?await libraryExport(ctx.db,await libraryReport(ctx.db,kind,from,to,basis,c.req.query('account'),c.req.query('payee'),await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))),c.req.query('format')??'pdf')
+  requireThat(!c.req.query('dimension')||['adjusting-entries','audit-log','general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances','reconciliations','deposits','check-detail','contractor-summary','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
+  const split=!['profit-and-loss','balance-sheet'].includes(kind)&&['class','location','project'].includes(c.req.query('columns')??'')
+  const response=split?await libraryExport(ctx.db,splitLibrary(await readReport(ctx.db,kind,{from,to,basis,columns:c.req.query('columns'),account:c.req.query('account'),payee:c.req.query('payee')}) as Awaited<ReturnType<typeof reportSplits>>),c.req.query('format')??'pdf'):kind==='adjusting-entries'?await libraryExport(ctx.db,await adjustingReport(ctx.db,Number(to.slice(0,4)),basis,await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))),c.req.query('format')??'pdf'):isLibrary(kind)?await libraryExport(ctx.db,await libraryReport(ctx.db,kind,from,to,basis,c.req.query('account'),c.req.query('payee'),await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))),c.req.query('format')??'pdf')
     :await reportExport(ctx.db,kind,from,to,basis,c.req.query('format')??'pdf',c.req.query('columns'),c.req.query('account'),c.req.query('dimension'),c.req.query('dimensionValue'))
   await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:kind.replaceAll('-',' '),from,to,basis,report:kind,dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue'),account:c.req.query('account'),payee:c.req.query('payee'),columns:c.req.query('columns')})
   return response
+})
+view('reports/:kind/splits', async (ctx, c) => {
+  const to=day(c,'to'),from=day(c,'from',to.slice(0,8)+'01'),basis=await reportBasis(ctx.db,c.req.query('basis'))
+  const options={from,to,basis,account:c.req.query('account'),payee:c.req.query('payee')}
+  return reportSplits(ctx.db,c.req.param('kind')!,c.req.query('split')??'',options,scope=>readReport(ctx.db,c.req.param('kind')!,{...options,dimension:scope?.kind,dimensionValue:scope?.id}))
 })
 view('reports/:kind', async (ctx, c) => {
   const to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')

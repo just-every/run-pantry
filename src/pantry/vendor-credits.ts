@@ -35,7 +35,7 @@ export async function prepareVendorCredit(c: Context, b: Data) {
   const payable = await controlAccount(c.db, 'payable'), id = uid(), journalId = uid()
   const statements = [authority(c.actor, 'record'), periodOpen(day),
     ...entryStatements({ id: journalId, date: day, memo: `Vendor credit ${reference} — ${vendor.name}`, sourceKind: 'credit', sourceId: id, preparedBy: c.actor.email, preparedKind: c.actor.kind === 'integration' ? 'import' : 'person', lines: [
-      { accountId: payable.id, debit: amount, credit: 0, memo: reference, contactId: vendor.id },
+      { ...tags,accountId: payable.id, debit: amount, credit: 0, memo: reference, contactId: vendor.id },
       { ...tags,accountId: account.id, debit: 0, credit: amount, memo: reference },
     ] }, c.actor.email),
     q('INSERT INTO pt_vendor_credits (id, vendor_id, reference, credit_date, amount_cents, account_id, journal_id, created_by, created_at,class_name,location_name,project_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?,?,?)', id, vendor.id, reference, day, amount, account.id, journalId, c.actor.email, now(),...dimensionValues(tags)),
