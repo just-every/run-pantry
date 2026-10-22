@@ -8,6 +8,7 @@ import { percentLabel } from '../discounts'
 
 export async function estimateDocument(db:D1Database,row:Data,p:Data,templateId?:string):Promise<InvoiceDocument> {
   const doc=await buildInvoiceDocument(db,{...row,kind:'invoice'},p,templateId)
+  if(p.validity)doc.facts.push(['Valid until',`${p.validity.validUntil} (inclusive, ${p.validity.timeZone})`])
   doc.title=`Estimate ${row.number}`
   doc.facts=doc.facts.map(([label,value])=>[label==='Issued'?'Estimated':label==='Due'?'Invoice due date':label,value])
   if(p.terms)doc.notes.push(`Proposed early-payment term: ${percentLabel(p.terms.percentMilli)} within ${p.terms.days} days of the converted invoice. This estimate has no payment offer.`)

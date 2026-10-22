@@ -14,13 +14,15 @@ function EstimatePanel({ estimate: e, deposits, onEdit, onChange }: { estimate: 
     <Card title={`${e.customer_name} · ${e.number}`} actions={<Chip tone={e.status === 'accepted' ? 'good' : e.status === 'sent' ? 'info' : 'neutral'}>{e.status === 'accepted' ? 'Accepted' : e.status === 'sent' ? 'Sent' : 'Draft'}</Chip>}>
 
       <p>Estimate date {day(e.issue_date)} · Invoice terms to {day(e.due_date)}.</p>
+      {e.validity && <p>Valid until {day(e.validity.validUntil)} (inclusive, {e.validity.timeZone}).</p>}
+      {e.expired && <p className="callout callout-warn" role="status">This estimate has expired. Edit, review and send a new revision for acceptance.</p>}
       <Table heads={['Description', 'Quantity', 'Amount', 'Sales tax']} figures={[1, 2, 3]}>
         {e.lines.map((l: D, i: number) => <tr key={l.id ?? i}><td>{l.description}{l.kind === 'delivery' && <small className="sub block">Delivery charge</small>}</td><td className="fig">{l.quantity_milli / 1000}</td><td className="fig">{usd(l.amount_cents)}</td><td className="fig">{l.tax_code === 'exempt' ? 'Exempt' : l.tax_code ? usd(l.tax_cents) : 'Tax treatment needed'}</td></tr>)}
       </Table>
       {e.status !== 'accepted' && state.actor.can.record && <>
         <p className="hint">Review the saved document below before sending. Sending retains this exact revision and emails the customer's billing and CC contacts, or their primary email.</p>
         <label className="check"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} /> I reviewed this saved estimate revision and document.</label>
-        <Action tone="primary" disabled={!reviewed} run={async () => { await command('estimate.send', { id: e.id, revision: e.revision }); setReviewed(false); await onChange() }}>{e.status === 'sent' ? 'Send estimate again' : 'Send estimate'}</Action>
+        <Action tone="primary" disabled={!reviewed || e.expired} run={async () => { await command('estimate.send', { id: e.id, revision: e.revision }); setReviewed(false); await onChange() }}>{e.status === 'sent' ? 'Send estimate again' : 'Send estimate'}</Action>
       </>}
 
     </Card>

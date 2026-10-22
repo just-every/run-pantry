@@ -58,6 +58,7 @@ export async function estimateCustomerPage(row: Data, doc: InvoiceDocument, toke
     <div class="notes">${doc.notes.map(n => `<p>${escape(n)}</p>`).join('')}</div>
     <div class="acceptance">${row.status === 'accepted'
       ? `<p class="accepted" role="status">Accepted by ${escape(row.accepted_name)} on ${escape(row.accepted_at)}. Revision ${escape(row.accepted_revision)}.</p>`
+      : row.expired ? `<p class="accepted" role="status">This estimate has expired. Ask the business for a new estimate.</p>`
       : `<form method="post" action="/e/${escape(token)}/accept"><input type="hidden" name="revision" value="${escape(row.revision)}"><label for="accept-name">Your name</label><input id="accept-name" name="name" required maxlength="200" autocomplete="name"><p>Typing your name and selecting Accept estimate signs revision ${escape(row.revision)} of this estimate electronically. Your name, time and IP address are kept as evidence.</p><button type="submit">Accept estimate</button></form>`}</div>
     <p class="download"><a href="/e/${escape(token)}/estimate.pdf">Download estimate PDF</a></p>`
   const html = `<!doctype html><html lang="en"${frame.htmlClass}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escape(doc.title)}</title>${fontHead}${frame.head}<style>${STYLE}</style></head><body><main class="invoice estimate">${body}</main></body></html>`

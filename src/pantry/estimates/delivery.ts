@@ -9,6 +9,7 @@ import { invoicePdf } from '../invoice-pdf'
 import { bytesBase64 } from '../invoice-logo'
 import { sendingSettings } from '../delivery'
 import type { Context } from '../context'
+import { estimateExpired } from './validity'
 import { estimate, estimateRaw } from './store'
 import { estimateDocument } from './documents'
 
@@ -16,6 +17,7 @@ export async function sendEstimate(c:Context,b:Data) {
   requireThat(c.actor.kind==='person','A person sends the estimate',403)
   const {row,p}=await estimateRaw(c.db,text(b.id,'Estimate'))
   requireThat(row.revision===b.revision,'Estimate changed; reload before sending',409)
+  requireThat(!estimateExpired(p),'This estimate has expired; save and review a new revision before sending',409)
   requireThat(row.status!=='accepted','This estimate was already accepted',409)
   const customer=await one(c.db,"SELECT * FROM pt_contacts WHERE id=? AND active=1",row.customer_id)
   requireThat(customer,'Customer is inactive',409)
@@ -30,6 +32,7 @@ export async function sendEstimate(c:Context,b:Data) {
   const hash=retained?.sha256??await sha256(pdf),at=now()
   const deliveries=recipients.map(recipient=>({id:uid(),recipient}))
   await run(c.db,[authority(c.actor,'record'),...(p.deposit?bankAuthority(c.actor,[p.deposit.bankAccountId]):[]),
+    ...(p.validity?[guard("strftime('%Y-%m-%dT%H:%M:%fZ','now') < ?",p.validity.expiresAt)]:[]),
     guard("EXISTS(SELECT 1 FROM pt_estimates WHERE id=? AND revision=? AND status IN ('draft','sent') AND erased_at IS NULL)",row.id,row.revision),
     ...(retained?[]:[q('INSERT INTO pt_estimate_documents(estimate_id,revision,document,pdf_base64,sha256,retained_at)VALUES(?,?,?,?,?,?)',row.id,row.revision,JSON.stringify(document),bytesBase64(pdf),hash,at)]),
     q("UPDATE pt_estimates SET status='sent',link_token=?,sent_at=COALESCE(sent_at,?) WHERE id=? AND revision=?",token,at,row.id,row.revision),changed(),

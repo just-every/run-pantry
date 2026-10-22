@@ -255,3 +255,59 @@ export async function estimateErasureJourney(h){
  await h.command('erasure.execute',{kind:'contact',id:unused.id,fingerprint:preview.fingerprint,requester:'privacy@example.test',reason:'Remove unused enquiry',channel:'email',confirm:'ERASE'})
  assert.equal((await h.send(sent.public_path)).status,404)
 }
+
+
+// Dates cross a real public acceptance request; only the test transport's clock
+// changes, so this also covers an already-open page posting after the deadline.
+export async function estimateExpiryJourney(h, x) {
+ const {body}=x
+ const form=(revision,at)=>({raw:new URLSearchParams({revision,name:'Casey Deadline'}).toString(),headers:{'content-type':'application/x-www-form-urlencoded','x-synthetic-pantry-clock':at}})
+ const command=async(op,data,at,status=200)=>{
+  const r=await h.send('/api/pantry/command/'+op,data,{cookie:h.owner,headers:{'x-synthetic-pantry-clock':at}})
+  assert.equal(r.status,status,JSON.stringify(r.value));return r.value
+ }
+ const current=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
+ const until=new Date(Date.parse(current+'T12:00:00Z')+86400000).toISOString().slice(0,10)
+ await h.command('estimate.save-draft',{...body,validUntil:'2026-10-14'},h.owner,400)
+ await h.command('estimate.save-draft',{...body,validUntil:'2026-02-30'},h.owner,400)
+ const first=await h.command('estimate.save-draft',{...body,validUntil:until})
+ const after=first.validity.expiresAt,before=new Date(Date.parse(after)-1).toISOString()
+ assert.deepEqual(first.validity,{validUntil:until,timeZone:'America/New_York',expiresAt:after})
+ const sent=await command('estimate.send',{id:first.id,revision:first.revision},before)
+ const page=await h.send(sent.public_path,undefined,{headers:{'x-synthetic-pantry-clock':before}})
+ assert.ok(page.value.includes(until+' (inclusive, America/New_York)'));assert.match(page.value,/Accept estimate/)
+ const pdf=await h.send(sent.public_path+'/estimate.pdf')
+ assert.ok(pdf.value.includes(until));assert.ok(pdf.value.includes('America/New_York'))
+ // Freeze the original zone even if the owner later changes sending settings.
+ const {sending:settings}=await h.view('invoicing')
+ await h.command('sending.save',{revision:settings.revision,remindersOn:false,reminderDays:settings.reminder_days,timeZone:'America/Los_Angeles',replyTo:settings.reply_to})
+ assert.deepEqual((await h.view(`estimates/${first.id}`)).validity,first.validity)
+ const accepted=await h.send(sent.public_path+'/accept',undefined,form(first.revision,before))
+ assert.equal(accepted.status,200,JSON.stringify(accepted.value))
+ const retained=await h.view(`estimates/${first.id}`)
+ assert.equal(retained.acceptance.at,before)
+ assert.equal((await h.send(sent.public_path+'/accept',undefined,form(first.revision,after))).status,200,'already accepted evidence stays accessible after expiry')
+ const converted=await command('estimate.convert',{id:first.id,revision:first.revision,requestId:'synthetic-pantry-expiry-convert',issueDate:after.slice(0,10),mode:'full'},after)
+ assert.equal(converted.invoice.total_cents,first.total_cents,'valid acceptance remains convertible after expiry')
+ // A separate sent revision lapses with no acceptance, no accepted PDF and no email.
+ const second=await h.command('estimate.save-draft',{...body,validUntil:until})
+ const secondAfter=second.validity.expiresAt,secondBefore=new Date(Date.parse(secondAfter)-1).toISOString()
+ const secondSent=await command('estimate.send',{id:second.id,revision:second.revision},secondBefore)
+ const mail=h.mail.length
+ const expired=await h.send(secondSent.public_path,undefined,{headers:{'x-synthetic-pantry-clock':secondAfter}})
+ assert.equal(expired.status,200);assert.match(expired.value,/This estimate has expired/);assert.doesNotMatch(expired.value,/<form/)
+ const refused=await h.send(secondSent.public_path+'/accept',undefined,form(second.revision,secondAfter))
+ assert.equal(refused.status,409);assert.match(refused.value.error,/expired/)
+ const unchanged=await h.view(`estimates/${second.id}`)
+ assert.equal(unchanged.status,'sent');assert.equal(unchanged.acceptance,null);assert.equal(unchanged.accepted_pdf_sha256,null)
+ assert.equal(h.mail.length,mail);assert.equal(unchanged.deliveries.filter(d=>d.kind==='acceptance').length,0)
+ assert.ok((await h.send(secondSent.public_path+'/estimate.pdf')).value.includes('America/Los_Angeles'))
+ assert.equal((await h.send(`/api/pantry/estimates/${second.id}/pdf`,undefined,{cookie:h.owner})).status,200)
+ await command('estimate.send',{id:second.id,revision:second.revision},secondAfter,409)
+ const revised=await h.command('estimate.save-draft',{...second.input,id:second.id,revision:second.revision,validUntil:until})
+ assert.notEqual(revised.revision,second.revision);assert.equal((await h.send(secondSent.public_path)).status,404)
+ assert.equal((await h.command('estimate.save-draft',body)).validity,null,'no expiry preserves existing estimates')
+ await h.command('sending.save',{revision:(await h.view('invoicing')).sending.revision,remindersOn:false,reminderDays:settings.reminder_days,timeZone:'America/New_York',replyTo:settings.reply_to})
+ const spring=await h.command('estimate.save-draft',{...body,validUntil:'2027-03-14'})
+ assert.equal(spring.validity.expiresAt,'2027-03-15T04:00:00.000Z','spring daylight-saving day ends on the saved calendar')
+}

@@ -9,12 +9,13 @@ import { Miniflare, convertV4MiniflareOptions } from 'miniflare'
 import { unstable_getMiniflareWorkerOptions, unstable_splitSqlQuery } from 'wrangler'
 import { TOKEN } from './worker.mjs'
 
-export async function providerWorker({ bindings, outbound }) {
+export async function providerWorker({ bindings, outbound, clock = false }) {
   const socket = createServer(); await new Promise(r => socket.listen(0, '127.0.0.1', r))
   const port = socket.address().port; await new Promise(r => socket.close(r))
   const origin = `http://127.0.0.1:${port}`, dir = await mkdtemp(join(tmpdir(), 'pantry-provider-app-'))
   const options = unstable_getMiniflareWorkerOptions('dist/server/wrangler.json')
-  const bundle = await build({ entryPoints: [options.main], bundle: true, write: false, format: 'esm', platform: 'neutral', conditions: ['workerd', 'worker', 'browser'], external: ['node:*', 'cloudflare:*'], target: 'es2023', logLevel: 'error' })
+  const entry = clock ? { stdin: { contents: `import worker from ${JSON.stringify(options.main)}; import { fixtureTime } from './tests/clock.ts'; export default {...worker, fetch(request, env, ctx) { return fixtureTime(request, request => worker.fetch(request, env, ctx)) }};`, resolveDir: process.cwd(), sourcefile: 'fixture-clock-worker.ts' } } : { entryPoints: [options.main] }
+  const bundle = await build({ ...entry, bundle: true, write: false, format: 'esm', platform: 'neutral', conditions: ['workerd', 'worker', 'browser'], external: ['node:*', 'cloudflare:*'], target: 'es2023', logLevel: 'error' })
   const mf = new Miniflare({ ...convertV4MiniflareOptions({
     host: '127.0.0.1', port, modules: true, script: bundle.outputFiles[0].text,
     compatibilityDate: options.workerOptions.compatibilityDate, compatibilityFlags: options.workerOptions.compatibilityFlags,

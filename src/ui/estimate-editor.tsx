@@ -53,7 +53,7 @@ export function EstimateEditor({ estimate, onDone, onCancel }: { estimate?: D; o
     e.preventDefault(); const fields = Object.fromEntries(new FormData(e.currentTarget)); setBusy(true); setError('')
     try {
       const saved = await command('estimate.save-draft', { id: estimate?.id, revision: estimate?.revision, customerId: customer, number: fields.number, issueDate: issue, dueDate: dueShown,
-        destinationState: fields.destinationState, templateId: effectiveTemplateId, customFields: Object.fromEntries((template?.fields ?? []).map((f: D) => [f.key, customFields[f.key] ?? f.defaultValue])),
+        validUntil: fields.validUntil, destinationState: fields.destinationState, templateId: effectiveTemplateId, customFields: Object.fromEntries((template?.fields ?? []).map((f: D) => [f.key, customFields[f.key] ?? f.defaultValue])),
         lines: [...lines, ...delivery], discounts: discounts.map(d => ({ ...d, ...(Array.isArray(d.lines) ? { lines: d.lines.map(Number) } : {}) })), deposit, earlyPayment: early, memo: fields.memo })
       await onDone(saved)
     } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
@@ -65,6 +65,7 @@ export function EstimateEditor({ estimate, onDone, onCancel }: { estimate?: D; o
           <Field label="Customer" name="customerId" value={customer} onChange={(e: any) => { setCustomer(e.target.value); setTemplateId(''); setCustomFields({}) }} options={contactOptions(state.contacts, 'customer')} required />
           <Field label="Estimate number" name="number" defaultValue={estimate?.number ?? ''} hint="Leave blank for the next estimate number." />
           <Field label="Estimate date" name="issueDate" type="date" value={issue} onChange={(e: any) => setIssue(e.target.value)} required />
+          <Field label="Valid until" name="validUntil" type="date" defaultValue={input.validUntil ?? ''} min={issue} hint="Optional. Acceptance ends after this date in the business time zone saved with this revision." />
           <Field label="Invoice due date" name="dueDate" type="date" value={dueShown} onChange={(e: any) => setDue(e.target.value)} hint="Initial terms for conversion; review the invoice dates when billing." required />
           <Field label="Ship-to / destination state" name="destinationState" defaultValue={input.destinationState ?? ''} maxLength={2} hint="Two-letter US state code for customer exemption treatment." />
         </div>

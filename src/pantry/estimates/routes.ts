@@ -4,8 +4,9 @@ import { runtimeBindings } from '../../auth.server'
 import type { Context } from '../context'
 import { pantry } from '../access'
 import { now, requireThat, sha256, text, uid } from '../core'
-import { all, audit, changed, q, run } from '../db'
+import { all, audit, changed, guard, q, run } from '../db'
 import { invoicePdf } from '../invoice-pdf'
+import { estimateExpired } from './validity'
 import { confirmAcceptance } from './delivery'
 import { base64Bytes, bytesBase64 } from '../invoice-logo'
 import { acceptedEstimatePdf, estimatePreview, publicEstimate } from './documents'
@@ -24,7 +25,7 @@ async function acceptanceBody(request:Request){
 }
 async function customerPage(db:D1Database,token:string){
  const {row,document:doc}=await publicEstimate(db,token)
- return estimateCustomerPage(row,doc,token)
+ return estimateCustomerPage({...row,expired:estimateExpired(JSON.parse(row.pricing))},doc,token)
 }
 export function registerEstimateRoutes(api:Hono<{Bindings:Bindings}>,reader:(c:any)=>Promise<Context>){
  api.get('/api/pantry/estimates/:id/preview',async c=>{
@@ -53,6 +54,8 @@ export function registerEstimateRoutes(api:Hono<{Bindings:Bindings}>,reader:(c:a
   const name=text(body.name,'Your name',200),revision=text(body.revision,'Estimate revision',100)
   requireThat(row.revision===revision,'This estimate changed; reload before accepting',409)
   if(row.status==='accepted'){requireThat(row.accepted_revision===revision&&row.accepted_name===name,'This estimate already has an acceptance',409);return customerPage(c.env.DB,token)}
+  const pricing=JSON.parse(row.pricing)
+  requireThat(!estimateExpired(pricing),'This estimate has expired; ask the business for a new estimate',409)
   // Only the platform-provided peer header is trusted. A caller-supplied body
   // or X-Forwarded-For value never becomes acceptance evidence.
   const ip=c.req.header('cf-connecting-ip'),at=now()
@@ -62,7 +65,7 @@ export function registerEstimateRoutes(api:Hono<{Bindings:Bindings}>,reader:(c:a
   const pdf=invoicePdf(acceptedDocument as typeof document),hash=await sha256(pdf)
   const recipients=await all(c.env.DB,"SELECT DISTINCT recipient FROM pt_estimate_deliveries WHERE estimate_id=? AND revision=? AND kind='estimate'",row.id,revision)
   const deliveries=recipients.map(r=>({id:uid(),recipient:r.recipient}))
-  await run(c.env.DB,[q("UPDATE pt_estimates SET status='accepted',accepted_name=?,accepted_at=?,accepted_ip=?,accepted_revision=? WHERE id=? AND revision=? AND link_token=? AND status='sent' AND erased_at IS NULL",name,at,ip,revision,row.id,revision,token),changed(),
+  await run(c.env.DB,[...(pricing.validity?[guard("strftime('%Y-%m-%dT%H:%M:%fZ','now') < ?",pricing.validity.expiresAt)]:[]),q("UPDATE pt_estimates SET status='accepted',accepted_name=?,accepted_at=?,accepted_ip=?,accepted_revision=? WHERE id=? AND revision=? AND link_token=? AND status='sent' AND erased_at IS NULL",name,at,ip,revision,row.id,revision,token),changed(),
     q('UPDATE pt_estimate_documents SET accepted_document=?,accepted_pdf_base64=?,accepted_sha256=?,accepted_at=? WHERE estimate_id=? AND revision=? AND sha256=? AND accepted_sha256 IS NULL AND erased_at IS NULL',JSON.stringify(acceptedDocument),bytesBase64(pdf),hash,at,row.id,revision,saved.sha256),changed(),
     ...deliveries.map(d=>q("INSERT INTO pt_estimate_deliveries(id,estimate_id,revision,recipient,status,at,attachment_sha256,kind)VALUES(?,?,?,?,'sending',?,?,'acceptance')",d.id,row.id,revision,d.recipient,at,hash)),
     audit(pantry('customer'),'estimate.accept','estimate',row.id,{revision,acceptedAt:at,acceptedPdfSha256:hash})])

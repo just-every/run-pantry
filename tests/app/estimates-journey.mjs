@@ -10,7 +10,7 @@ import { TOKEN } from './worker.mjs'
 export async function estimatesJourney(t) {
   const sibling = {}, mail = [], evidence = process.env.PANTRY_EVIDENCE_DIR || '/tmp/pantry-estimates'
   await mkdir(evidence, { recursive: true })
-  const app = await providerWorker({ bindings: { MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'synthetic-pantry-1' }, outbound: async request => {
+  const app = await providerWorker({ clock: true, bindings: { MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'synthetic-pantry-1' }, outbound: async request => {
     if (['inkwell.example.test', 'platter.example.test'].includes(new URL(request.url).hostname)) return siblingEdge(request, sibling)
     assert.equal(new URL(request.url).hostname, 'api.resend.com')
     mail.push(await request.json()); return Response.json({ id: `synthetic-pantry-${mail.length}` })
@@ -31,6 +31,7 @@ export async function estimatesJourney(t) {
   const bank = await command('bank-account.save', { name: 'Operating checking', institution: 'Juniper Bank', accountId: accounts['1000'], numberLast4: '4821', openingDate: '2026-01-01', openingBalance: '0' })
   const liability = await command('account.save', { code: '2310', name: 'Customer deposits held', type: 'liability', subtype: 'other' })
   const service = await command('item.save', { name: 'Brand and website project', kind: 'service', rate: '12000', accountId: accounts['4000'], taxCategory: 'non-taxable' })
+  const validUntil = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10)
   for (const width of [1440, 390]) {
     const customer = await command('contact.save', { kind: 'customer', name: `Cedar Workshop ${width}`, email: `synthetic-pantry-${width}@example.test` })
     const page = await owner.newPage(); await page.setViewportSize({ width, height: 1000 })
@@ -41,6 +42,7 @@ export async function estimatesJourney(t) {
     await page.getByLabel('Customer', { exact: true }).selectOption(customer.id)
     await page.getByLabel('Estimate number', { exact: true }).fill(`EST-${width}`)
     await page.getByLabel('Estimate date', { exact: true }).fill(date)
+    await page.getByLabel('Valid until', { exact: true }).fill(validUntil)
     await page.getByLabel('Line 1 product or service', { exact: true }).selectOption(service.id)
     await page.getByLabel('Memo on the estimate', { exact: true }).fill('Brand strategy, design and launch of the Cedar Workshop website.')
     await shot('editor')
@@ -50,6 +52,8 @@ export async function estimatesJourney(t) {
     await shot('draft')
     let estimate = (await view('estimates')).estimates.find(e => e.number === `EST-${width}`)
     assert.equal(estimate.total_cents, 1200000)
+    assert.equal(estimate.validity.validUntil, validUntil)
+    await expect(page.getByText(`${validUntil} (inclusive, America/New_York)`, { exact: true })).toBeVisible()
     await page.getByLabel('I reviewed this saved estimate revision and document.', { exact: true }).check()
     await page.getByRole('button', { name: 'Send estimate', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Retained sent estimate', exact: true })).toBeVisible()
@@ -153,6 +157,30 @@ export async function estimatesJourney(t) {
       await inventory.screenshot({ path: `${evidence}/estimate-${id}-data-${width}.png` })
     }
     await page.locator('#data-flows').screenshot({ path: `${evidence}/estimate-service-inventory-${width}.png` })
+    // A page opened before lapse cannot accept once the saved window ends.
+    const expiring = await command('estimate.save-draft', { ...estimate.input, number: `EXP-${width}`, validUntil })
+    const expiringSent = await command('estimate.send', { id: expiring.id, revision: expiring.revision })
+    await customerPage.goto(`${origin}${expiringSent.public_path}`)
+    await expect(customerPage.getByLabel('Your name', { exact: true })).toBeVisible()
+    const clock = { 'x-synthetic-pantry-clock': expiring.validity.expiresAt }
+    await customerContext.setExtraHTTPHeaders(clock)
+    const late = await customerContext.request.post(`${origin}${expiringSent.public_path}/accept`, { headers: { origin }, form: { name: 'Casey Cedar', revision: expiring.revision } })
+    assert.equal(late.status(), 409, await late.text())
+    await customerPage.reload()
+    await expect(customerPage.getByRole('status').filter({ hasText: 'This estimate has expired.' })).toBeVisible()
+    assert.equal(await customerPage.getByRole('button', { name: 'Accept estimate', exact: true }).count(), 0)
+    await customerPage.screenshot({ path: `${evidence}/estimate-expired-customer-${width}.png`, fullPage: true })
+    assert.equal(await customerPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    await owner.setExtraHTTPHeaders(clock)
+    await page.goto(`${origin}/app/sales?tab=estimates&estimate=${expiring.id}`)
+    await expect(page.getByRole('status').filter({ hasText: 'This estimate has expired.' })).toBeVisible()
+    assert.equal(await page.getByRole('button', { name: 'Send estimate again', exact: true }).isDisabled(), true)
+    await shot('expired-owner')
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    await page.getByRole('button', { name: 'Edit estimate', exact: true }).click()
+    assert.equal(await page.getByLabel('Valid until', { exact: true }).inputValue(), validUntil)
+    await shot('expiry-edit')
+    await owner.setExtraHTTPHeaders({})
     assert.deepEqual(errors, [])
     await page.close(); await customerContext.close()
   }

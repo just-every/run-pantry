@@ -1,6 +1,7 @@
 import { requireThat, text, type Data } from '../core'
 import { all, one } from '../db'
 import type { Context } from '../context'
+import { estimateExpired } from './validity'
 import { customerDepositsView } from '../customer-deposits'
 
 export async function estimate(db: D1Database, rawId: string): Promise<Data> {
@@ -12,7 +13,7 @@ export async function estimate(db: D1Database, rawId: string): Promise<Data> {
   const doc = await one(db,'SELECT sha256,accepted_sha256 FROM pt_estimate_documents WHERE estimate_id=? AND revision=?',id,row.revision)
   const deliveries = await all(db,'SELECT * FROM pt_estimate_deliveries WHERE estimate_id=? ORDER BY at,id',id)
   const { link_token, accepted_name, accepted_at, accepted_ip, accepted_revision, pricing, ...safe } = row
-  return { ...safe, input, lines: p.lines.map((l:Data,i:number)=>({...l,line_no:i+1,quantity_milli:l.qty,unit_cents:l.unit,amount_cents:l.amount,tax_code:l.taxCode,tax_cents:l.tax,discount_cents:l.discount,item_id:l.itemId,line_kind:l.kind})), subtotal_cents:p.subtotal,tax_cents:p.tax,discounts:p.discounts,deposit:p.deposit,early_terms:p.terms,
+  return { ...safe, input, validity:p.validity??null,expired:row.status!=='accepted'&&estimateExpired(p), lines: p.lines.map((l:Data,i:number)=>({...l,line_no:i+1,quantity_milli:l.qty,unit_cents:l.unit,amount_cents:l.amount,tax_code:l.taxCode,tax_cents:l.tax,discount_cents:l.discount,item_id:l.itemId,line_kind:l.kind})), subtotal_cents:p.subtotal,tax_cents:p.tax,discounts:p.discounts,deposit:p.deposit,early_terms:p.terms,
     acceptance: accepted_at ? { name:accepted_name,at:accepted_at,ip:accepted_ip,revision:accepted_revision } : null,
     conversions:conversions.map(x=>({...x,early_terms:x.early_terms?JSON.parse(x.early_terms):null})),billed_cents:billed,remaining_cents:row.total_cents-billed,deliveries,
     public_path:link_token ? `/e/${link_token}` : null,pdf_sha256:doc?.sha256 ?? null,accepted_pdf_sha256:doc?.accepted_sha256 ?? null }

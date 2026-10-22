@@ -766,9 +766,10 @@ test('INVOICE-010 early-payment terms (with SALESTAX-001/002/004, INVOICE-001/00
 
 test('INVOICE-006 estimates accept exact revisions, reserve progress once and apply advance liabilities without receiving cash twice',async t=>{
  const h=await harness();t.after(()=>h.close())
- const {estimatesJourney,estimateInheritedJourney,estimateErasureJourney}=await import('./estimates-journey.mjs')
+ const {estimatesJourney,estimateInheritedJourney,estimateErasureJourney,estimateExpiryJourney}=await import('./estimates-journey.mjs')
  const x=await estimatesJourney(h),archive=await harness();t.after(()=>archive.close())
  await Promise.all([estimateInheritedJourney(h,x),estimateErasureJourney(archive)])
+ await estimateExpiryJourney(h,x)
 })
 import { estimateSiblingsJourney } from './estimate-siblings.mjs'
 

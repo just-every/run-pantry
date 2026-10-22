@@ -11,7 +11,7 @@ export async function estimatesForRestore(context, origin, siblings) {
   const liability = await command('account.save', { code: '2320', name: 'Archive customer deposits', type: 'liability', subtype: 'other' })
   const income = state.accounts.find(a => a.code === '4000').id
   const bank = state.bankAccounts.find(b => b.account_id === state.accounts.find(a => a.code === '1000').id)
-  let estimate = await command('estimate.save-draft', { customerId: customer.id, issueDate: '2026-09-14', lines: [{ description: 'Archive design engagement', quantity: '1', rate: '1200', accountId: income, taxCode: 'exempt' }] })
+  let estimate = await command('estimate.save-draft', { customerId: customer.id, issueDate: '2026-09-14', validUntil: new Date(Date.now()+7*86400000).toISOString().slice(0,10), lines: [{ description: 'Archive design engagement', quantity: '1', rate: '1200', accountId: income, taxCode: 'exempt' }] })
   estimate = await command('estimate.send', { id: estimate.id, revision: estimate.revision })
   const link = estimate.public_path
   const acceptance = await context.request.post(`${origin}${link}/accept`, { headers: { origin, 'cf-connecting-ip': '192.0.2.55', 'x-forwarded-for': '198.51.100.88' }, form: { name: 'Casey Archive', revision: estimate.revision } })
@@ -42,7 +42,7 @@ export async function estimatesForRestore(context, origin, siblings) {
       external.push({ link: attached.link, ...(attached.link.document_href ? { pdf: Buffer.from(await (await context.request.get(origin + attached.link.document_href)).body()) } : {}) })
     }
   }
-  return { acceptedPdf, acceptedSha256:accepted.accepted_pdf_sha256, peerIP, estimateId: estimate.id, depositId: deposit.id, invoiceId: invoice.id, link, document: preview.document, sha256: preview.sha256, pdf, external }
+  return { validity:estimate.validity, acceptedPdf, acceptedSha256:accepted.accepted_pdf_sha256, peerIP, estimateId: estimate.id, depositId: deposit.id, invoiceId: invoice.id, link, document: preview.document, sha256: preview.sha256, pdf, external }
 }
 
 export async function assertEstimatesRestored(context, origin, expected) {
@@ -62,6 +62,7 @@ export async function assertEstimatesRestored(context, origin, expected) {
     }
   }
   const estimate = await get(`estimates/${expected.estimateId}`)
+  assert.deepEqual(estimate.validity,expected.validity)
   assert.equal(estimate.acceptance.name, 'Casey Archive'); assert.equal(estimate.acceptance.ip, expected.peerIP)
   assert.equal(estimate.public_path, null)
   assert.equal(estimate.accepted_pdf_sha256,expected.acceptedSha256)
