@@ -3275,6 +3275,10 @@
       "sha256": "a6608cb064dadafa5e56e6cab809d8e29ef73021c48c75738c04ad5f9076f8dd",
       "executable": false
     },
+    "src/pantry/estimates/customer-page.ts": {
+      "sha256": "47de7d3ffa03e2418aedf8cdab660593ff921107069cce4ec1b51b90aee5f8b3",
+      "executable": false
+    },
     "src/pantry/estimates/delivery.ts": {
       "sha256": "2e7ba847a89f5c1402df66c72c346e082a905d86968a813bdb72ad148543f1a6",
       "executable": false
@@ -3296,7 +3300,7 @@
       "executable": false
     },
     "src/pantry/estimates/routes.ts": {
-      "sha256": "a0165628ac1ec8d3a76ef01045193dce66f79e4615110ed9eae86a44e5ebdd6f",
+      "sha256": "bb3a85c94e223d77792584503ab098b1afec930f612ad90c81ed3d16e829ac51",
       "executable": false
     },
     "src/pantry/estimates/store.ts": {

@@ -1,15 +1,13 @@
 import type { Hono } from 'hono'
 import type { Bindings } from '../../auth.server'
 import { runtimeBindings } from '../../auth.server'
-import { themeFrame } from '../../base/theme-frame'
-import { fontHead } from '../../base/font-head'
-import branding from '../../branding.json'
 import type { Context } from '../context'
 import { pantry } from '../access'
 import { now, requireThat, text } from '../core'
 import { audit, changed, q, run } from '../db'
 import { base64Bytes } from '../invoice-logo'
 import { estimatePreview, publicEstimate } from './documents'
+import { estimateCustomerPage } from './customer-page'
 
 async function acceptanceBody(request:Request){
  const reader=request.body?.getReader();if(!reader)return ''
@@ -22,14 +20,9 @@ async function acceptanceBody(request:Request){
  for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength}
  return new TextDecoder().decode(bytes)
 }
-const escape=(value:unknown)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!))
-async function page(title:string,body:string){
- const frame=await themeFrame({href:'/rer-theme.css',productName:branding.name,accentColor:branding.primaryColor})
- return new Response(`<!doctype html><html lang="en"${frame.htmlClass}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escape(title)}</title>${fontHead}${frame.head}</head><body><main class="invoice"><h1>${escape(title)}</h1>${body}</main></body></html>`,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'same-origin','x-content-type-options':'nosniff','x-robots-tag':'noindex, nofollow','content-security-policy':`default-src 'none'; frame-src 'self'; ${frame.policy}; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`}})
-}
 async function customerPage(db:D1Database,token:string){
  const {row,document:doc}=await publicEstimate(db,token)
- return page(doc.title,`<p>${escape(doc.business)}</p><dl>${doc.facts.map(([k,v])=>`<dt>${escape(k)}</dt><dd>${escape(v)}</dd>`).join('')}</dl><table><thead><tr><th>Description</th><th>Quantity</th><th>Amount</th></tr></thead><tbody>${doc.lines.map(l=>`<tr><td>${escape(l.description)}</td><td>${escape(l.quantity)}</td><td>${escape(l.amount)}</td></tr>`).join('')}</tbody></table><dl>${doc.totals.map(([k,v])=>`<dt>${escape(k)}</dt><dd>${escape(v)}</dd>`).join('')}</dl>${doc.notes.map(n=>`<p>${escape(n)}</p>`).join('')}${row.status==='accepted'?`<p role="status">Accepted by ${escape(row.accepted_name)} on ${escape(row.accepted_at)}.</p>`:`<form method="post" action="/e/${escape(token)}/accept"><input type="hidden" name="revision" value="${escape(row.revision)}"><label for="accept-name">Your name</label><input id="accept-name" name="name" required maxlength="200" autocomplete="name"><p>Accept the estimate above by typing your name. Your name, time and IP address are retained as acceptance evidence.</p><button type="submit">Accept estimate</button></form>`}<p><a href="/e/${escape(token)}/estimate.pdf">Download estimate PDF</a></p>`)
+ return estimateCustomerPage(row,doc,token)
 }
 export function registerEstimateRoutes(api:Hono<{Bindings:Bindings}>,reader:(c:any)=>Promise<Context>){
  api.get('/api/pantry/estimates/:id/preview',async c=>{
