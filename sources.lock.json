@@ -5116,7 +5116,7 @@
       "executable": false
     },
     "tests/app/dimensions-journey.mjs": {
-      "sha256": "c6c250cb465518134c0136905c49f2fc82b0ef693dc8acb6d4b3983d3cfb5566",
+      "sha256": "21bb70e520143d51b722ca73139066aadc64720fe6dcf5374565d0faa496e0e7",
       "executable": false
     },
     "tests/app/effects-journey.mjs": {
@@ -5212,7 +5212,7 @@
       "executable": false
     },
     "tests/clock.ts": {
-      "sha256": "e3eb2c19e16677b9c3256bbf2499a4b01f786efc9dfc2706507d8f6000dfec45",
+      "sha256": "980f541e0b588eb592131646357f9624ec56731ea062779aaf310b8a25cd9736",
       "executable": false
     },
     "tests/incremental-typecheck.test.mjs": {
