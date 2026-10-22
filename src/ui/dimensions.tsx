@@ -6,7 +6,7 @@ const KINDS = [['class','Class','classes_enabled'],['location','Location','locat
 export function DimensionFields({line,index,onChange,label='Line'}:{line:D;index:number;label?:string;onChange:(patch:D)=>void}) {
  const {state}=useShared(),d=state.dimensions
  if(!d)return null
- return <>{KINDS.filter(([, ,flag])=>d.settings[flag]).map(([kind,label])=><Field key={kind} label={`${label}${label==='Line'?' '+(index+1):''} ${kind}`} name={`${label.toLowerCase().replaceAll(' ','-')}-${index}-${kind}`} value={line[`${kind}Name`]??''} onChange={(e:any)=>onChange({[`${kind}Name`]:e.target.value})} options={[{value:'',label:`No ${kind}`},...d.values.filter((v:D)=>v.kind===kind&&(v.active||v.name===line[`${kind}Name`])).map((v:D)=>({value:v.name,label:v.name+(v.active?'':' (inactive)')}))]} />)}</>
+ return <>{KINDS.filter(([, ,flag])=>d.settings[flag]).map(([kind])=><Field key={kind} label={`${label}${label==='Line'?' '+(index+1):''} ${kind}`} name={`${label.toLowerCase().replaceAll(' ','-')}-${index}-${kind}`} value={line[`${kind}Name`]??''} onChange={(e:any)=>onChange({[`${kind}Name`]:e.target.value})} options={[{value:'',label:`No ${kind}`},...d.values.filter((v:D)=>v.kind===kind&&(v.active||v.name===line[`${kind}Name`])).map((v:D)=>({value:v.name,label:v.name+(v.active?'':' (inactive)')}))]} />)}</>
 }
 export function DimensionSettings() {
  const {state,reload}=useShared(),d=state.dimensions
