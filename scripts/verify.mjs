@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const sequence = ['build', 'typecheck', 'test:typecheck', 'test:pantry', 'test:site', 'test:runtime', 'test:app']
 const pnpm = name => ['pnpm', ['run', name]]
-export const shards = ['source', 'api-1', 'api-2', 'api-3', 'app-1', 'app-2', 'app-3', 'app-4', 'app-5', 'app-6']
+export const shards = ['source', 'api-1', 'api-2', 'api-3', 'app-1', 'app-2', 'app-3', 'app-4', 'app-5', 'app-6', 'app-7', 'app-8']
 
 export function verificationPlan(shard = process.env.VERIFY_SHARD ?? 'all') {
   // Keep the complete local command and its order. CI partitions only test files;
@@ -14,7 +14,7 @@ export function verificationPlan(shard = process.env.VERIFY_SHARD ?? 'all') {
   if (shard === 'all') return sequence.map(pnpm)
   // Called through rer verify so its hosted-output and hydration checks still run.
   if (shard === 'source') return sequence.filter(name => !['test:pantry', 'test:app'].includes(name)).map(pnpm)
-  const match = /^(api|app)-([1-6])$/.exec(shard)
+  const match = /^(api|app)-([1-8])$/.exec(shard)
   if (!match) throw new Error(`Unknown VERIFY_SHARD ${JSON.stringify(shard)}; choose ${shards.join(', ')}, or all`)
   const [, group, index] = match
   const part = Number(index)
@@ -23,19 +23,19 @@ export function verificationPlan(shard = process.env.VERIFY_SHARD ?? 'all') {
   // File-only modulo sharding left all of them on app-1 (over 14 minutes).
   // Partition its top-level registrations without moving evidence paths or
   // changing any assertion; other browser files get three separate jobs.
-  if (group === 'app' && part <= 3) {
+  if (group === 'app' && part <= 5) {
     const source = readFileSync(resolve(root, 'tests/app/app.test.mjs'), 'utf8')
     const names = [...source.matchAll(/^test\('([^'\n]+)'[,)]/gm)].map(match => match[1])
     const registrations = [...source.matchAll(/^test\(/gm)].length
     if (!names.length || names.length !== registrations) throw new Error('Every app.test.mjs registration needs a literal name for CI partitioning')
-    const selected = names.filter((_, position) => position % 3 === part - 1)
+    const selected = names.filter((_, position) => position % 5 === part - 1)
     const escape = name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const pattern = `^(?:${selected.map(escape).join('|')})(?:$| )`
     return [pnpm('build'), [process.execPath, ['--test', `--test-name-pattern=${pattern}`, 'tests/app/app.test.mjs']]]
   }
   const files = readdirSync(resolve(root, 'tests', group)).filter(name => name.endsWith('.test.mjs')).sort()
     .filter(name => group !== 'app' || name !== 'app.test.mjs')
-    .filter((_, position) => position % 3 === (group === 'app' ? part - 4 : part - 1)).map(name => `tests/${group}/${name}`)
+    .filter((_, position) => position % 3 === (group === 'app' ? part - 6 : part - 1)).map(name => `tests/${group}/${name}`)
   if (!files.length) throw new Error(`Verification shard ${shard} has no test files`)
   const test = [process.execPath, ['--test', ...(group === 'api' ? ['--test-concurrency=1'] : []), ...files]]
   // Browser journeys exercise the real emitted Worker and assets, built in this job.
