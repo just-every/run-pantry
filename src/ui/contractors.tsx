@@ -1,3 +1,4 @@
+import { DimensionReportPicker } from './dimensions'
 // 1099 contractors: vendors marked for a 1099-NEC, their payments in a calendar
 // year counted by the IRS rules Pantry can apply, the threshold flag, and in
 // January the forms' figures and the filing CSV. Pantry files nothing itself.
@@ -41,20 +42,22 @@ function Payments({ c, onDone }: { c: D; onDone: () => Promise<void> }) {
 }
 
 export function Contractors({ year, onYear }: { year: number; onYear: (y: number) => void }) {
-  const { state } = useShared(), { data: r, error, reload } = useView<D>(`reports/contractors?year=${year}`)
+  const search=useSearch({from:'/app/reports'}),scope=new URLSearchParams(search.dimension?{dimension:search.dimension,dimensionValue:search.dimensionValue??''}:{}).toString()
+  const { state } = useShared(), { data: r, error, reload } = useView<D>(`reports/contractors?year=${year}&${scope}`)
   const [selected, setSelected] = useState<string | null>(null), [adding, setAdding] = useState('')
   const thisYear = new Date().getFullYear()
   const years = Array.from({ length: 4 }, (_, i) => thisYear - 2 + i).filter(y => y <= thisYear)
-  const current = r?.contractors.find((c: D) => c.id === selected), search = useSearch({ from: '/app/reports' })
+  const current = r?.contractors.find((c: D) => c.id === selected)
   // Each 1099 figure opens to the year's payments that make it.
   const open = (id: string, metric: string, amount: number) => <Link to="/app/reports" search={{ ...search, report: 'contractors', year: String(year), line: JSON.stringify([id, metric]), record: undefined }} className="figure-link" onClick={e => e.stopPropagation()}>{usd(amount)}</Link>
   return <>
     <div className="callout"><div><strong>Pantry does not file with the IRS.</strong><span>It keeps your contractors' payments and W-9 details, flags who needs a 1099-NEC and, after the year ends, gives you each form's figures and a CSV to file through the IRS or a filing service. Box 1 counts check, ACH, wire and cash payments; card and payment-network payments are left out because the processor reports them on Form 1099-K. Whether a vendor needs a 1099 at all (services, not goods; most corporations are exempt) is your and your accountant's call.</span></div></div>
-    <div className="inline-fields year-pick"><div className="field inline"><label htmlFor="tax-year">Tax year</label><select id="tax-year" value={year} onChange={e => onYear(Number(e.target.value))}>{years.map(y => <option key={y} value={y}>{y}</option>)}</select></div></div>
+    <div className="inline-fields year-pick"><DimensionReportPicker /><div className="field inline"><label htmlFor="tax-year">Tax year</label><select id="tax-year" value={year} onChange={e => onYear(Number(e.target.value))}>{years.map(y => <option key={y} value={y}>{y}</option>)}</select></div></div>
+    {r?.dimension&&<p className="hint">Dimension subset: {r.dimension.label}. Payment figures below use the selected bank-line coding. Threshold decisions and filing figures always use each vendor’s whole year of payments.</p>}
     {!r ? <Loading error={error} what="1099 contractors" /> : <>
       <Metrics items={[{ label: 'Threshold', value: usd(r.threshold), note: r.thresholdNote }, { label: 'Contractors', value: String(r.contractors.length), note: 'marked for a 1099-NEC' }, { label: `At or over ${usd(r.threshold)}`, value: String(r.forms.length), note: r.yearEnded ? <>file by {day(r.dueBy)}</> : 'so far this year' }]} />
       <Card title={<>1099 contractors · {year} <Chip tone="info">Payment basis</Chip></>}>
-          <Table heads={['Contractor', 'TIN', 'Box 1 (check, ACH, wire, cash)', 'Card and networks (left out)', 'Method not recorded', 'Status']} figures={[2, 3, 4]} empty="No vendor is marked as a 1099 contractor yet.">
+          <Table heads={['Contractor', 'TIN', r.dimension?'Selected eligible-method payments':'Box 1 (check, ACH, wire, cash)', 'Card and networks (left out)', 'Method not recorded', r.dimension?'Whole-year status':'Status']} figures={[2, 3, 4]} empty="No vendor is marked as a 1099 contractor yet.">
             {r.contractors.map((c: D) => { const [label, tone] = status(c, r.threshold); return <tr key={c.id} tabIndex={0} className={selected === c.id ? 'selected' : ''} onClick={() => setSelected(c.id)} onKeyDown={k => { if (k.key === 'Enter') setSelected(c.id) }}>
               <td>{c.name}<AskAccountant subjectKind="report-line" subjectId={JSON.stringify({ report: 'contractors', line: c.id, from: `${year}-01-01`, to: `${year}-12-31`, basis: 'cash' })} label={`1099 contractor · ${c.name} · ${year}`} /></td><td className="nowrap">{c.tax?.tin ?? <Chip tone="warn">Missing</Chip>}</td><td className="fig">{open(c.id, 'box1', c.box1)}</td><td className="fig">{open(c.id, 'excluded', c.excluded)}</td><td className="fig">{open(c.id, 'unrecorded', c.unrecorded)}</td><td><Chip tone={tone}>{label}</Chip></td></tr> })}
           </Table>
@@ -78,7 +81,7 @@ export function Contractors({ year, onYear }: { year: number; onYear: (y: number
           <Table heads={['Recipient', 'TIN', 'Box 1 nonemployee compensation', 'Box 4 federal income tax withheld', 'Ready to file']} figures={[2, 3]} empty={`No contractor reached ${usd(r.threshold)} in ${year}.`}>
             {r.forms.map((f: D) => <tr key={f.id}><td>{f.name}</td><td className="nowrap">{f.tin ?? 'Missing'}</td><td className="fig">{open(f.id, 'box1', f.box1)}</td><td className="fig">{usd(f.box4)}</td><td>{f.ready ? <Chip tone="good">Ready</Chip> : <Chip tone="bad">Add TIN and address</Chip>}</td></tr>)}
           </Table>
-          {r.forms.length > 0 && (state.actor.can.post ? <p><a className="btn btn-primary" href={`/api/pantry/reports/contractors/${year}/1099-nec.csv`} download>Download the {year} 1099-NEC CSV</a> <small className="sub">It carries full TINs; every download is in the activity log.</small></p>
+          {r.forms.length > 0 && (state.actor.can.post ? <p><a className="btn btn-primary" href={`/api/pantry/reports/contractors/${year}/1099-nec.csv`} download>Download the {year} {r.dimension?'whole-year ':''}1099-NEC CSV</a> <small className="sub">It carries full TINs; every download is in the activity log.</small></p>
             : <p className="hint">The filing CSV carries full TINs, so the owner or someone with the posting grant downloads it.</p>)}
         </>}
       </Card>

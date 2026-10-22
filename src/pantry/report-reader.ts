@@ -21,7 +21,7 @@ export const FINANCIAL_REPORTS = [
 type Options = { from: string; to: string; basis: Basis; account?: string; payee?: string; columns?: string;dimension?:string;dimensionValue?:string }
 
 export async function readReport(db: D1Database, kind: string, { from, to, basis, account, payee, columns,dimension,dimensionValue }: Options) {
-  requireThat(!dimension||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
+  requireThat(!dimension||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances','deposits','check-detail','contractor-summary','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
   const scope=await dimensionScope(db,dimension,dimensionValue)
   if (isLibrary(kind)) return libraryReport(db, kind, from, to, basis, account, payee, scope)
   const e = await one(db, 'SELECT fiscal_year_start FROM pt_entity WHERE id = 1')

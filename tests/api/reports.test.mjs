@@ -930,3 +930,6 @@ test('DIM-001 cash-flow and sales-tax dimension filters keep dated contributions
 
 import {dimensionAgeing} from './dimension-extensions.mjs'
 test('DIM-001 ageing and open-item library dimensions retain mixed-line shares, unapplied credits, dated reversals and source exports',dimensionAgeing)
+
+import {dimensionPaymentReports} from './dimension-extensions.mjs'
+test('DIM-001 recorded and scoped payment coding preserves bank-side deposits, checks, contractor summaries and replay',dimensionPaymentReports)

@@ -244,7 +244,7 @@ view('reports/detail', async (ctx, c) => {
 })
 view('reports/record/:kind/:id', async (ctx, c) => recordView(ctx.db, c.req.param('kind')!, c.req.param('id')!))
 view('reports/adjusting-entries', async (ctx, c) => ({ ...await adjustingEntries(ctx.db, year(c)), basis: await reportBasis(ctx.db, c.req.query('basis')) }))
-view('reports/contractors', async (ctx, c) => contractors(ctx.db, year(c)))
+view('reports/contractors', async (ctx, c) => contractors(ctx.db, year(c),await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))))
 api.get('/api/pantry/reports/cash-flow/detail/export', async c => {
   const ctx = await reader(c)
   const detail = await cashFlowDetail(ctx.db, day(c, 'from'), day(c, 'to'), c.req.query('line') ?? '',await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue')))
@@ -263,7 +263,7 @@ api.get('/api/pantry/reports/:kind/export', async c => {
   const ctx = await reader(c), to = day(c, 'to'), from = day(c, 'from', to.slice(0, 8) + '01')
   const kind=c.req.param('kind')!,basis=await reportBasis(ctx.db,c.req.query('basis'))
   requireThat(!c.req.query('dimensionValue')||c.req.query('dimension'),'Choose a dimension before a value')
-  requireThat(!c.req.query('dimension')||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
+  requireThat(!c.req.query('dimension')||['general-ledger','trial-balance','profit-and-loss','balance-sheet','sales-by-customer','expenses-by-vendor','sales-by-item','cash-flow','sales-tax','receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances','deposits','check-detail','contractor-summary','transactions','journal'].includes(kind),'This report does not yet support a dimension filter',409)
   const response=isLibrary(kind)?await libraryExport(ctx.db,await libraryReport(ctx.db,kind,from,to,basis,c.req.query('account'),c.req.query('payee'),await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))),c.req.query('format')??'pdf')
     :await reportExport(ctx.db,kind,from,to,basis,c.req.query('format')??'pdf',c.req.query('columns'),c.req.query('account'),c.req.query('dimension'),c.req.query('dimensionValue'))
   await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:kind.replaceAll('-',' '),from,to,basis,report:kind,dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue'),account:c.req.query('account'),payee:c.req.query('payee'),columns:c.req.query('columns')})

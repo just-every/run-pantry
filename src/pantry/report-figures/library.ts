@@ -40,7 +40,7 @@ export async function libraryFigure(db: D1Database, kind: string, line: string, 
       return figureResult({ ...base, rows: (await all(db, 'SELECT * FROM pt_payments WHERE id IN (SELECT value FROM json_each(?)) ORDER BY payment_date, reference, id', JSON.stringify([...counted]))).map(payment) })
     }
     const wanted = total ? 'counted' : (['', '', 'counted', 'excluded', 'unknown'] as string[])[index]
-    return figureResult({ ...base, rows: (await contractorPayments(db, from, to)).filter(p => ids.has(p.group) && p.class === wanted).map(payment) })
+    return figureResult({ ...base, rows: (await contractorPayments(db, from, to, dimension)).filter(p => ids.has(p.group) && p.class === wanted).map(payment) })
   }
   const s = await openItemSources(db, RECEIVABLE.includes(kind) ? 'receivable' : 'payable', to, dimension)
   if (kind.endsWith('-balances')) {

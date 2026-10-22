@@ -4,6 +4,8 @@ import { books, harness } from './harness.mjs'
 export async function dimensionsJourney(t) {
  const h=await harness();t.after(()=>h.close())
  const {acct}=await books(h)
+ const legacy=await h.command('journal.save-draft',{date:'2026-01-20',memo:'Historical coding while dimensions were off',lines:[{accountId:acct['6300'],debit:'25',className:'Legacy studio'},{accountId:acct['1000'],credit:'25'}]})
+ await h.command('journal.post',{id:legacy.id,revision:legacy.revision})
  const before=await h.view('dimensions')
  const reader=await h.member('synthetic-pantry-dimension-reader@example.test','viewer')
  await h.command('dimensions.settings',{revision:before.settings.revision,class:true,location:true,project:true},reader,403)
@@ -11,6 +13,9 @@ export async function dimensionsJourney(t) {
  await h.command('dimensions.settings',{revision:before.settings.revision,class:false},h.owner,409)
  for(const [kind,names] of [['class',['Studio','Support']],['location',['New York','Remote']],['project',['Cedar website','Cypress care']]])for(const name of names)await h.command('dimension.save',{kind,name})
  await h.command('dimension.save',{kind:'class',name:'studio'},h.owner,409)
+ const legacyReport=await h.view('reports/general-ledger?from=2026-01-01&to=2026-01-31&dimension=class&dimensionValue=value:Legacy%20studio')
+ assert.equal(legacyReport.accounts.find(a=>a.id===acct['6300']).closing,2500)
+ await h.command('journal.save-draft',{date:'2026-01-21',memo:'Unknown new coding',lines:[{accountId:acct['6300'],debit:'1',className:'Legacy studio'},{accountId:acct['1000'],credit:'1'}]},h.owner,409)
  await h.command('dimension.require',{accountId:acct['6200'],kinds:['class']})
  const vendor=await h.command('contact.save',{kind:'vendor',name:'Design supplier',email:'synthetic-pantry-vendor@example.test'})
  const customer=await h.command('contact.save',{kind:'customer',name:'Cedar Workshop',email:'synthetic-pantry-customer@example.test'})

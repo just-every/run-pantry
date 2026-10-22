@@ -10,7 +10,9 @@ import { DIMENSIONS, dimensionsView, type DimensionKind } from './index'
 export async function dimensionColumns(db:D1Database,kind:DimensionKind,from:string,to:string,basis:Basis,report:'profit-and-loss'|'balance-sheet'='profit-and-loss',startMonth=1):Promise<StatementColumns> {
  const settings=(await dimensionsView(db)).settings!,flag={class:'classes_enabled',location:'locations_enabled',project:'projects_enabled'}[kind]
  requireThat(settings[flag],'Enable this dimension before running its columns',409)
- const names=(await all(db,'SELECT name FROM pt_dimensions WHERE kind=? ORDER BY name',kind)).map(v=>String(v.name))
+ const catalogue=await all(db,'SELECT name FROM pt_dimensions WHERE kind=? ORDER BY name',kind)
+ const historical=await all(db,`SELECT DISTINCT l.${kind}_name AS name FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id WHERE e.status='posted' AND e.entry_date<=? AND l.${kind}_name<>''`,to)
+ const names=[...new Set([...catalogue,...historical].map(v=>String(v.name)))].sort((a,b)=>a.localeCompare(b))
  // Include Unassigned even when empty; inactive catalogue values remain historical evidence.
  names.push('')
  const columns=[...names.map(name=>({id:name?'value:'+name:'unassigned',label:name||'Unassigned',from,to,unit:'money' as const})),{id:'total',label:'Total',from,to,unit:'money' as const}]

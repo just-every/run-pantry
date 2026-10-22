@@ -19,20 +19,20 @@ export async function ledgerActivity(db: D1Database, kind: string, from: string,
     totals: [{ label: 'Debits', amount: rows.reduce((n, l) => n + l.debit_cents, 0) }, { label: 'Credits', amount: rows.reduce((n, l) => n + l.credit_cents, 0) }] }
 }
 
-export async function paymentActivity(db: D1Database, kind: string, from: string, to: string): Promise<Partial<LibraryReport>> {
+export async function paymentActivity(db: D1Database, kind: string, from: string, to: string, dimension?: DimensionScope): Promise<Partial<LibraryReport>> {
   if (kind === 'deposits') {
-    const rows = await all(db, `SELECT l.id,l.debit_cents-l.credit_cents AS amount,e.entry_date,e.number,e.memo,e.id AS entry_id,e.source_kind,e.source_id,b.name AS bank,c.name AS contact
+    const rows = await all(db, `SELECT l.id,l.class_name,l.location_name,l.project_name,l.debit_cents-l.credit_cents AS amount,e.entry_date,e.number,e.memo,e.id AS entry_id,e.source_kind,e.source_id,b.name AS bank,c.name AS contact
       FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id JOIN pt_bank_accounts b ON b.account_id=l.account_id
       LEFT JOIN pt_payments p ON p.journal_id=e.id LEFT JOIN pt_contacts c ON c.id=p.contact_id
-      WHERE e.status='posted' AND e.entry_date BETWEEN ? AND ? AND l.debit_cents > l.credit_cents ORDER BY e.entry_date,e.number,l.id`, from, to)
+      WHERE e.status='posted' AND e.entry_date BETWEEN ? AND ? AND l.debit_cents > l.credit_cents ${dimension?`AND l.${dimension.kind}_name=?`:''} ORDER BY e.entry_date,e.number,l.id`, from, to,...(dimension?[dimension.value]:[]))
     return { basis: 'payment', basisLabel: 'Payment basis', note: 'Every positive posted bank movement in the inclusive range, including receipts, grouped deposits, transfers, interest and reversals. The total is gross bank debits, not net cash flow.',
       columns: ['Date', 'Entry', 'Bank', 'Contact', 'Description', 'Deposit'], moneyColumns: [5],
       rows: rows.map(r => ({ id: r.id, cells: [r.entry_date, r.number, r.bank, r.contact ?? '', r.memo, r.amount], record: `${r.source_kind === 'payment' ? 'payment:' + r.source_id : 'entry:' + r.entry_id}` })),
       totals: [{ label: 'Gross bank deposits', amount: rows.reduce((n,r) => n+r.amount,0) }] }
   }
   const rows = await all(db, `SELECT p.*, c.name AS contact, b.name AS bank, k.number AS check_number
-    FROM pt_payments p JOIN pt_contacts c ON c.id=p.contact_id JOIN pt_bank_accounts b ON b.id=p.bank_account_id LEFT JOIN pt_checks k ON k.payment_id=p.id
-    WHERE p.payment_date BETWEEN ? AND ? AND p.direction='paid' AND p.method='check' ORDER BY p.payment_date,p.reference,p.id`, from, to)
+    FROM pt_payments p JOIN pt_contacts c ON c.id=p.contact_id JOIN pt_bank_accounts b ON b.id=p.bank_account_id LEFT JOIN pt_checks k ON k.payment_id=p.id JOIN pt_journal_lines l ON l.entry_id=p.journal_id AND l.account_id=b.account_id
+    WHERE p.payment_date BETWEEN ? AND ? AND p.direction='paid' AND p.method='check' ${dimension?`AND l.${dimension.kind}_name=?`:''} ORDER BY p.payment_date,p.reference,p.id`, from, to,...(dimension?[dimension.value]:[]))
   const reversal = await all(db, 'SELECT id,entry_date FROM pt_journal_entries WHERE source_kind=\'reversal\'')
   const reversed = (r: any) => r.reversal_id && reversal.some(e => e.id === r.reversal_id && e.entry_date <= to)
   return { basis: 'payment', basisLabel: 'Payment basis', note: 'Payments dated within the inclusive range. Reversed payments remain visible; the total excludes reversals effective on or before the end date. Each payment opens its allocations, posted entry and matched bank lines.',

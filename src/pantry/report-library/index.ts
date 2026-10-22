@@ -10,19 +10,20 @@ import { LIBRARY, isLibrary, type LibraryReport } from './types'
 export { isLibrary, LIBRARY } from './types'
 
 /** Payments to marked 1099 vendors in the range, unreversed as of its end, with their summary group and method class. */
-export async function contractorPayments(db: D1Database, from: string, to: string): Promise<Data[]> {
+export async function contractorPayments(db: D1Database, from: string, to: string, dimension?: DimensionScope): Promise<Data[]> {
   return (await all(db, `SELECT p.*, c.name, substr(p.payment_date,1,4) AS year FROM pt_payments p JOIN pt_contacts c ON c.id=p.contact_id
-    LEFT JOIN pt_journal_entries r ON r.id=p.reversal_id WHERE p.direction='paid' AND c.is_1099=1 AND p.payment_date BETWEEN ? AND ? AND (p.reversal_id IS NULL OR r.entry_date > ?) ORDER BY year,c.name,p.payment_date,p.id`, from, to, to))
+    JOIN pt_bank_accounts bank ON bank.id=p.bank_account_id JOIN pt_journal_lines l ON l.entry_id=p.journal_id AND l.account_id=bank.account_id
+    LEFT JOIN pt_journal_entries r ON r.id=p.reversal_id WHERE p.direction='paid' AND c.is_1099=1 AND p.payment_date BETWEEN ? AND ? AND (p.reversal_id IS NULL OR r.entry_date > ?) ${dimension?`AND l.${dimension.kind}_name=?`:''} ORDER BY year,c.name,p.payment_date,p.id`, from, to, to,...(dimension?[dimension.value]:[])))
     .map(p => ({ ...p, group: `${p.contact_id}:${p.year}`, class: ['check', 'ach', 'wire', 'cash'].includes(p.method) ? 'counted' : ['card', 'payment-network'].includes(p.method) ? 'excluded' : 'unknown' }))
 }
 
 export async function libraryReport(db: D1Database, kind: string, from: string, to: string, basis: Basis, account?: string, payee?: string, dimension?: DimensionScope): Promise<LibraryReport> {
   requireThat(isLibrary(kind), 'Unknown library report', 404)
-  requireThat(!dimension || ['transactions','journal','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances'].includes(kind), 'This library report does not yet support a dimension filter', 409)
+  requireThat(!dimension || ['deposits','check-detail','contractor-summary','transactions','journal','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances'].includes(kind), 'This library report does not yet support a dimension filter', 409)
   requireThat(from <= to, 'The end date is on or after the start date')
   let data: Partial<LibraryReport>
   if (['transactions', 'journal'].includes(kind)) data = await ledgerActivity(db, kind, from, to, basis, account, payee, dimension)
-  else if (kind === 'deposits' || kind === 'check-detail') data = await paymentActivity(db, kind, from, to)
+  else if (kind === 'deposits' || kind === 'check-detail') data = await paymentActivity(db, kind, from, to, dimension)
   else if (kind === 'reconciliations') {
     const statements = await all(db, 'SELECT id FROM pt_statements WHERE end_date BETWEEN ? AND ? ORDER BY end_date,id', from, to)
     const states = await Promise.all(statements.map(s => reconciliationState(db, s.id)))
@@ -39,7 +40,7 @@ export async function libraryReport(db: D1Database, kind: string, from: string, 
       columns: ['When (UTC)', 'Actor', 'Action', 'Record kind', 'Record'], moneyColumns: [],
       rows: rows.map(r => ({ id: r.id, cells: [r.at, r.actor_email, r.action, r.subject_kind, r.subject_id], details: { ...r, detail: JSON.parse(r.detail) } })), totals: [] }
   } else if (kind === 'contractor-summary') {
-    const payments = await contractorPayments(db, from, to)
+    const payments = await contractorPayments(db, from, to, dimension)
     const grouped = new Map<string, { name: string; year: string; counted: number; excluded: number; unknown: number }>()
     for (const p of payments) {
       const key = p.group, r = grouped.get(key) ?? { name: p.name, year: p.year, counted: 0, excluded: 0, unknown: 0 }

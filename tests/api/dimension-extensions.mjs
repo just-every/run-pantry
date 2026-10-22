@@ -229,3 +229,50 @@ export async function dimensionAgeing(t) {
  const reopened=await h.view('reports/receivables?to=2026-10-31&dimension=class&dimensionValue=value:Studio')
  assert.equal(reopened.itemsTotal,5000,'the later payment reversal restores the same cumulative line share')
 }
+
+export async function dimensionPaymentReports(t) {
+ const {h,acct,bank,tags,other}=await seed(t)
+ const vendor=await h.command('contact.save',{kind:'vendor',name:'Dimension contractor'}),customer=await h.command('contact.save',{kind:'customer',name:'Dimension payer'})
+ await h.command('contractor.save',{contactId:vendor.id,is1099:true})
+ const pay=(direction,amount,method,coding={},reference='synthetic-pantry-38')=>h.command('payment.record',{direction,amount,method,reference,contactId:direction==='paid'?vendor.id:customer.id,date:'2026-10-05',bankAccountId:bank.id,...coding,allocations:[]})
+ await pay('paid','40','unrecorded')
+ for(const accountId of [acct['1000'],acct['1200'],acct['2000']])await h.command('dimension.require',{accountId,kinds:['class']})
+ const before=(await h.view('journal')).entries.length
+ await h.command('payment.record',{direction:'received',contactId:customer.id,date:'2026-10-05',amount:'100',bankAccountId:bank.id,allocations:[]},h.owner,409)
+ assert.equal((await h.view('journal')).entries.length,before,'missing required payment coding leaves no posting')
+ const received=await pay('received','100','ach',tags),cash=await pay('paid','10','cash',tags),check=await pay('paid','20','check',other),card=await pay('paid','30','card',tags)
+ const credential=await h.command('integration.create',{name:'synthetic-pantry-39',scopes:['payments:write','payments:read','reports:read','post']})
+ const body={direction:'received',contactId:customer.id,date:'2026-10-06',amount:'25',bankAccountId:bank.id,reference:'synthetic-pantry-40',...other,allocations:[]}
+ const requests=await Promise.all([1,2].map(()=>h.send('/api/pantry/integration/v1/payments',body,{headers:{authorization:`Bearer ${credential.token}`,'idempotency-key':'synthetic-pantry-40'}})))
+ assert.ok(requests.every(r=>r.status===200));assert.equal(requests[0].value.id,requests[1].value.id)
+ const entries=(await h.view('journal')).entries
+ for(const [payment,coding] of [[received,tags],[cash,tags],[check,other],[card,tags],[requests[0].value,other]])for(const l of entries.find(e=>e.id===payment.journal_id).lines)assert.deepEqual([l.class_name,l.location_name,l.project_name],Object.values(coding))
+ await h.command('journal.reverse',{id:check.journal_id,date:'2026-10-20',memo:'Cancelled dimension check'})
+ for(const to of ['2026-10-15','2026-10-31'])for(const report of ['deposits','check-detail','contractor-summary']) {
+  const whole=await h.view(`reports/${report}?from=2026-10-01&to=${to}`),pieces=[]
+  for(const name of ['Studio','Support','']) {
+   const q={from:'2026-10-01',to,dimension:'class',dimensionValue:name?'value:'+name:'unassigned'},r=await h.view(`reports/${report}?`+new URLSearchParams(q));pieces.push(r)
+   const figures=[...r.rows.flatMap(row=>r.moneyColumns.map(i=>[JSON.stringify([row.id,String(i)]),row.cells[i]])),...r.totals.map((t,i)=>[JSON.stringify(['total',String(i)]),t.amount])]
+   for(const [line,amount] of figures){const d=await h.view('reports/detail?'+new URLSearchParams({...q,report,line}));assert.equal(d.ties,true);assert.equal(d.figure,amount)}
+   for(const format of ['csv','pdf','xlsx'])assert.equal((await h.send(`/api/pantry/reports/${report}/export?`+new URLSearchParams({...q,format}),undefined,{cookie:h.owner})).status,200)
+   const scoped=await h.send(`/api/pantry/integration/v1/reports/${report}?`+new URLSearchParams(q),undefined,{headers:{authorization:`Bearer ${credential.token}`}})
+   assert.equal(scoped.status,200);assert.deepEqual(scoped.value,r)
+  }
+  for(const [i,total] of whole.totals.entries())assert.equal(pieces.reduce((n,r)=>n+r.totals[i].amount,0),total.amount)
+  if(report==='deposits')assert.equal(pieces[0].totals[0].amount,10000)
+  if(report==='check-detail')assert.equal(pieces[1].totals[0].amount,to==='2026-10-15'?2000:0)
+  if(report==='contractor-summary')assert.equal(pieces[0].totals[0].amount,1000,'card payments stay excluded from the operational eligible-method subtotal')
+ }
+ await pay('paid','2500','ach',other,'synthetic-pantry-41')
+ for(const [name,expected] of [['Studio',1000],['Support',250000],['',0]]) {
+  const q={year:'2026',dimension:'class',dimensionValue:name?'value:'+name:'unassigned'}
+  const r=await h.view('reports/contractors?'+new URLSearchParams(q)),v=r.contractors.find(c=>c.id===vendor.id)
+  assert.equal(v.box1,expected);assert.equal(v.overThreshold,true,'a subset never hides a whole-year filing threshold')
+  assert.equal(r.forms.find(f=>f.id===vendor.id).box1,251000,'filing figures retain the whole year')
+  for(const metric of ['box1','excluded','unrecorded','reversed']) {
+   const d=await h.view('reports/detail?'+new URLSearchParams({...q,report:'contractors',line:JSON.stringify([vendor.id,metric]),from:'2026-01-01',to:'2026-12-31',basis:'cash'}))
+   assert.equal(d.figure,v[metric]);assert.equal(d.ties,true)
+  }
+ }
+
+}

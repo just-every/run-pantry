@@ -132,15 +132,15 @@ export async function paymentStatements(db: D1Database, actor: AuditActor, b: Da
   // An allocation that first meets an invoice's early-payment offer posts its discount first and is capped (INVOICE-010).
   const early = received ? await takeEarlyDiscounts(db, actor, allocated.list, day, { sessionCounts: opts.sessionCounts, payments: id }) : { allocations: allocated.list.map(a => ({ ...a, counted: false })), before: [], after: [] }
   const lines: Line[] = received
-    ? [{ ...opts.bankCoding, accountId: bank.account_id, debit: amount, credit: 0, memo: `Received from ${who_.name}` }, { ...opts.controlCoding, accountId: control.id, debit: 0, credit: amount, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }]
-    : [{ ...opts.controlCoding, accountId: control.id, debit: amount, credit: 0, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }, { ...opts.bankCoding, accountId: bank.account_id, debit: 0, credit: amount, memo: `Paid to ${who_.name}` }]
+    ? [{ ...(opts.bankCoding??dimensionTags(b)), accountId: bank.account_id, debit: amount, credit: 0, memo: `Received from ${who_.name}` }, { ...(opts.controlCoding??dimensionTags(b)), accountId: control.id, debit: 0, credit: amount, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }]
+    : [{ ...(opts.controlCoding??dimensionTags(b)), accountId: control.id, debit: amount, credit: 0, memo: `Payment ${optionalText(b.reference, 'Reference', 80)}`, contactId: who_.id }, { ...(opts.bankCoding??dimensionTags(b)), accountId: bank.account_id, debit: 0, credit: amount, memo: `Paid to ${who_.name}` }]
   const statements: Sql[] = [
     ...nativeApprovalAuthority(actor, 'payment', amount), ...bankAuthority(actor, [bank.id]),
     ...entryStatements({ id: journalId, date: day, memo: `${received ? 'Payment from' : 'Payment to'} ${who_.name}`, sourceKind: 'payment', sourceId: id, preparedBy: actor.email, preparedKind: actor.kind === 'system' ? 'import' : 'person', lines }, actor.email),
     q('INSERT INTO pt_payments (id, direction, contact_id, payment_date, amount_cents, bank_account_id, reference, memo, method, card_last4, journal_id, recorded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       id, direction, who_.id, day, amount, bank.id, optionalText(b.reference, 'Reference', 80), optionalText(b.memo, 'Memo', 500), method, cardLast4, journalId, actor.email, now()),
     ...early.before, ...early.allocations.map(a => allocationInsert(actor, id, received ? 'invoice' : 'bill', a, day)), ...allocated.guards, ...early.after,
-    audit(who(actor), 'payment.record', 'payment', id, { direction, amount, method, cardLast4, allocations: early.allocations }),
+    audit(who(actor), 'payment.record', 'payment', id, { ...dimensionTags(b), direction, amount, method, cardLast4, allocations: early.allocations }),
   ]
   return { id, journalId, bankLedgerAccount: bank.account_id, statements, signed: received ? amount : -amount }
 }
