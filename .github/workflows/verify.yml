@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [source, api-1, api-2, api-3, app-1, app-2, app-3]
+        shard: [source, api-1, api-2, api-3, app-1, app-2, app-3, app-4, app-5, app-6]
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
