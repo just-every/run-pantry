@@ -77,4 +77,17 @@ export async function dimensionGenerated(t){
  await h.command('match.approve',{bankLineIds:[transferLine.id],create:[{type:'transfer',direction:'out',amount:'10',otherBankAccountId:reserveBank.id}]})
  const transfer=(await entries()).find(e=>e.source_kind==='bank'&&e.lines.some(l=>l.account_id===reserve.id));assert.ok(transfer);await coded(transfer.id)
 
+ const halves=[]
+ for(const [bankAccountId,last4,description,amount,opening,closing]of [[bank.id,'3131','TRANSFER TO RESERVE 4141','-5','290','285'],[reserveBank.id,'4141','TRANSFER FROM CHECKING 3131','5','0','5']]){
+  const imported=await h.command('statement.import',{bankAccountId,fileName:'synthetic-pantry-'+last4+'.csv',content:`Posting Date,Description,Amount\n01/02/2027,${description},${amount}`,opening,closing,start:'2027-01-01',end:'2027-01-31',confirmLast4:last4})
+  halves.push((await h.view('bank/lines')).lines.find(l=>l.statement_id===imported.statement.id))
+ }
+ for(const [i,line]of halves.entries())await h.command('bank-line.dimensions',{id:line.id,...(i?other:tags)})
+ const outgoing=(await h.view('bank/lines')).lines.find(l=>l.id===halves[0].id)
+ await h.command('transfer.expect',{bankLineId:outgoing.id,revision:outgoing.transfer.revision,otherBankAccountId:reserveBank.id})
+ const paired=(await h.view('bank/lines')).lines.find(l=>l.id===outgoing.id)
+ assert.equal(paired.transfer.pair_status,'paired')
+ const auto=(await entries()).find(e=>e.id===paired.transfer.journal_id)
+ assert.deepEqual(auto.lines.map(l=>[l.account_id,l.class_name]).sort(),[[acct['1000'],'Studio'],[reserve.id,'Support']].sort())
+
 }

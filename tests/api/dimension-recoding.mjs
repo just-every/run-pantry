@@ -56,5 +56,11 @@ export async function dimensionRecoding(t){
  assert.equal((await h.view('journal')).entries.length,current.length)
  await h.command('journal.reverse',{id:laterPayment.journal_id,date:'2026-10-20',memo:'Returned customer payment'})
  assert.equal((await h.view('reports/profit-and-loss?from=2026-10-01&to=2026-10-31&basis=cash&dimension=class&dimensionValue=value:Support')).totalIncome,0)
+ const reversible=await h.command('bill.save',{vendorId:vendor.id,billDate:'2026-08-25',reference:'synthetic-pantry-86',post:true,lines:[{description:'Reversed recoded bill',amount:'2',accountId:acct['6200'],...tags}]})
+ const billLine=(await h.view('journal')).entries.find(e=>e.id===reversible.journal_id).lines.find(l=>l.account_id===acct['6200'])
+ await h.command('journal.reclassify',{lineIds:[billLine.id],dimensionKind:'class',toDimensionName:'Support'})
+ const reversal=await h.command('journal.reverse',{id:reversible.journal_id,date:'2026-10-20',memo:'Cancel recoded purchase'})
+ assert.equal(reversal.lines.find(l=>l.account_id===acct['6200']).class_name,'Support','a bill reversal cancels its effective corrected coding')
 }
+
 

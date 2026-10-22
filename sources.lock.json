@@ -4864,7 +4864,7 @@
       "executable": false
     },
     "tests/api/dimension-generated.mjs": {
-      "sha256": "9372311e5dfca223066335fed90d4f576649ff66e6c6c4908a148aa424ad7541",
+      "sha256": "443d9d7e4ce8054e2688826672e5096f0ef11d554d597e2b8b0ceb4a0007315c",
       "executable": false
     },
     "tests/api/dimension-opening.mjs": {
@@ -4872,7 +4872,7 @@
       "executable": false
     },
     "tests/api/dimension-recoding.mjs": {
-      "sha256": "bb26b2e570dccd73e8ed5f0c1ca6ecfe8a935571238001fc846c8c8da5fe62d7",
+      "sha256": "d646964a0f2a21534a8438275a51f948b9ba0d9873156624201f459691e7c3e0",
       "executable": false
     },
     "tests/api/dimension-splits.mjs": {
