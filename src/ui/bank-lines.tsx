@@ -55,10 +55,12 @@ export function Suggestions({ items, onPick }: { items: D[]; onPick: (s: D) => v
 }
 
 export function Transactions({ data, onDone, feeds }: { data: D | undefined; onDone: () => Promise<void>; feeds: boolean }) {
-  const { state } = useShared(), [filter, setFilter] = useState<string>('All'), [account, setAccount] = useState(''), [picked, setPicked] = useState<string[]>([])
+  const { state } = useShared(), [filter, setFilter] = useState<string>('All'), [account, setAccount] = useState(''), [picked, setPicked] = useState<string[]>([]),[updating,setUpdating]=useState(false)
+  const finish=async()=>{setUpdating(true);try{await onDone();setPicked([])}finally{setUpdating(false)}}
   useEffect(()=>{setPicked([])},[filter,account])
   useEffect(()=>{
     const key=(event:KeyboardEvent)=>{
+      if(updating)return
       if(event.key==='Escape'){event.preventDefault();setPicked([]);return}
       if(!state.actor.can.record)return
       if(event.ctrlKey||event.metaKey||event.altKey||(event.target as HTMLElement)?.closest('input,select,textarea,[contenteditable=true]'))return
@@ -68,15 +70,16 @@ export function Transactions({ data, onDone, feeds }: { data: D | undefined; onD
       if(k==='x'&&index>=0){event.preventDefault();const id=lines[index].dataset.reviewLine!;setPicked(xs=>xs.includes(id)?xs.filter(x=>x!==id):[...xs,id])}
       if(k==='a'&&event.shiftKey){event.preventDefault();setPicked(lines.slice(0,50).map(row=>row.dataset.reviewLine!))}
     };document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key)
-  },[data,filter,account,state.actor.can.record])
+  },[data,filter,account,state.actor.can.record,updating])
   if (!data) return null
   const rows: D[] = [...data.pending.map((p: D) => ({ ...p, pending: true, filed_to: [] })), ...data.lines]
     .filter(l => !account || l.bank_account_id === account)
     .filter(l => filter === 'All' || (filter === 'Pending' ? l.pending : filter === 'Filed by rule' ? l.rule_id : filter === 'Excluded' ? l.excluded_at : !l.pending && !l.match_id && !l.removed_at && !l.excluded_at))
     .sort((a, b) => b.posted_date.localeCompare(a.posted_date))
   const chosen: D[] = data.lines.filter((l: D) => !l.match_id && !l.removed_at && !l.excluded_at && picked.includes(l.id))
-  const toggle = (id: string) => setPicked(xs => xs.includes(id) ? xs.filter(x => x !== id) : [...xs, id])
-  return <>
+  const toggle = (id: string) => !updating && setPicked(xs => xs.includes(id) ? xs.filter(x => x !== id) : [...xs, id])
+  return <fieldset disabled={updating} aria-label="Bank review queue" aria-busy={updating} style={{border:0,padding:0,margin:0,minWidth:0}}>
+    {updating&&<p role="status" className="hint">Updating the review queue…</p>}
     <MatchPanelScroll count={chosen.length} />
     {state.actor.can.record && <p className="hint">J/K move between review lines · X selects the focused line · Shift+A selects up to 50 visible lines · Escape clears the selection.</p>}
     <Card title="Transactions" actions={<div className="inline-fields">
@@ -93,12 +96,12 @@ export function Transactions({ data, onDone, feeds }: { data: D | undefined; onD
             <td data-label="Date">{day(l.posted_date)}</td><td data-label="Account">{l.bank_name}</td>
             <td data-label="Description">{l.description}{l.payee && !l.description.toLowerCase().includes(l.payee.toLowerCase()) && <small className="sub"> · {l.payee}</small>}{l.feed_txn_id && <small className="sub feed-tag">feed</small>}</td>
             <td data-label="Amount" className={`fig${l.amount_cents > 0 ? ' money-in' : ''}`}>{usd(l.amount_cents)}</td>
-            <td data-label="Filed"><LineSuggestion suggestion={data.suggestions?.[l.id]} /><Status l={l} onUndo={onDone} picked={picked.includes(l.id)} onFile={() => toggle(l.id)} /><RecordedPaymentProposal offers={l.excluded_at || ['pending', 'exception'].includes(l.transfer?.status) ? undefined : data.recordedPayments?.[l.id]} canRecord={state.actor.can.record} onDone={onDone} /><DepositProposal proposal={l.excluded_at || ['pending', 'exception'].includes(l.transfer?.status) ? undefined : data.depositProposals?.[l.id]} canRecord={state.actor.can.record} onDone={onDone} />{!l.pending && <AskAccountant subjectKind="bank-line" subjectId={l.id} label={`${l.posted_date} · ${l.description} · ${usd(l.amount_cents)}`} />}</td></tr> }) : <tr className="empty"><td colSpan={6}><Empty>{data.lines.length ? 'Nothing matches this view.' : <><strong className="empty-title">No transactions yet.</strong>{feeds ? 'Connect a bank or card, or import a statement.' : 'Import a statement and its lines appear here.'}</>}</Empty></td></tr>}</tbody></table></div>
+            <td data-label="Filed"><LineSuggestion suggestion={data.suggestions?.[l.id]} /><Status l={l} onUndo={finish} picked={picked.includes(l.id)} onFile={() => toggle(l.id)} /><RecordedPaymentProposal offers={l.excluded_at || ['pending', 'exception'].includes(l.transfer?.status) ? undefined : data.recordedPayments?.[l.id]} canRecord={state.actor.can.record} onDone={finish} /><DepositProposal proposal={l.excluded_at || ['pending', 'exception'].includes(l.transfer?.status) ? undefined : data.depositProposals?.[l.id]} canRecord={state.actor.can.record} onDone={finish} />{!l.pending && <AskAccountant subjectKind="bank-line" subjectId={l.id} label={`${l.posted_date} · ${l.description} · ${usd(l.amount_cents)}`} />}</td></tr> }) : <tr className="empty"><td colSpan={6}><Empty>{data.lines.length ? 'Nothing matches this view.' : <><strong className="empty-title">No transactions yet.</strong>{feeds ? 'Connect a bank or card, or import a statement.' : 'Import a statement and its lines appear here.'}</>}</Empty></td></tr>}</tbody></table></div>
     </Card>
     <SuggestionRates rates={data.suggestionRates} />
-    {chosen.length > 0 && <QueueSelection key={'queue:'+chosen.map(l=>l.id).join(':')} lines={chosen} onDone={async()=>{setPicked([]);await onDone()}} />}
-    {chosen.length > 0 && new Set(chosen.map(l=>l.bank_account_id)).size===1 && <MatchPanel key={'match:'+chosen.map((l: D) => l.id).join(':')} suggestedCategory={chosen.length === 1 ? data.suggestions?.[chosen[0].id] : undefined} lines={chosen} postings={[]} bankId={chosen[0].bank_account_id} clear={() => setPicked([])} onDone={onDone} />}
-  </>
+    {chosen.length > 0 && <QueueSelection key={'queue:'+chosen.map(l=>l.id).join(':')} lines={chosen} onDone={finish} />}
+    {chosen.length > 0 && new Set(chosen.map(l=>l.bank_account_id)).size===1 && <MatchPanel key={'match:'+chosen.map((l: D) => l.id).join(':')} suggestedCategory={chosen.length === 1 ? data.suggestions?.[chosen[0].id] : undefined} lines={chosen} postings={[]} bankId={chosen[0].bank_account_id} clear={() => setPicked([])} onDone={finish} />}
+  </fieldset>
 }
 
 /** Brings Match review into view when the first line is chosen, so filing a line never happens off screen. */

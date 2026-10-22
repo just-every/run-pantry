@@ -4324,7 +4324,7 @@
       "executable": false
     },
     "src/ui/bank-lines.tsx": {
-      "sha256": "d20ed6bb379d5230e03c698f5d84a3147d9e7ea3455136708b76204373a47308",
+      "sha256": "4dd6976b991ef7099ada27a175a63e477be04aa1ca908f5a0495f14447513f70",
       "executable": false
     },
     "src/ui/bank-rules.tsx": {
@@ -4960,7 +4960,7 @@
       "executable": false
     },
     "tests/app/queue-journey.mjs": {
-      "sha256": "8a43ec3d38b20c77425b559ef94380dab79a79d489ab25b1c50755b61d9f9989",
+      "sha256": "aac5bed0b64771640d83ccc7a46820d831e601826af181c906c5ff8a3f506897",
       "executable": false
     },
     "tests/app/recurring-journals.test.mjs": {

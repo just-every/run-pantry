@@ -58,7 +58,7 @@ export async function queueBrowser(t){
   let releaseSales;const salesGate=new Promise(resolve=>{releaseSales=resolve})
   await page.route('**/api/pantry/sales',async route=>{await salesGate;await route.continue()})
   await choose(descriptions[3]);await panel.getByRole('button',{name:'+ Customer payment',exact:true}).click();await panel.getByLabel('Customer',{exact:true}).selectOption(customer.id)
-  try{await expect(panel.getByRole('button',{name:'Approve match',exact:true})).toBeDisabled()}finally{releaseSales()}
+  try{await expect(panel.getByRole('button',{name:'Approve match',exact:true})).toBeDisabled();await panel.screenshot({path:`${evidence}/queue-payment-loading-${width}.png`})}finally{releaseSales()}
   await panel.getByRole('button',{name:'Approve match',exact:true}).click();await expect(panel).toHaveCount(0)
   await page.unroute('**/api/pantry/sales')
   assert.equal((await view('sales')).invoices.find(i=>i.id===invoice.id).open_cents,0)
@@ -69,7 +69,19 @@ export async function queueBrowser(t){
    const heading=page.getByRole('heading',{name:`Review ${count} selected lines`,exact:true});await expect(heading).toBeVisible()
    await page.getByLabel('I reviewed every displayed category and amount.',{exact:true}).check()
    await heading.locator('..').screenshot({path:`${evidence}/queue-bulk-${count}-${width}.png`})
-   await page.getByRole('button',{name:'Accept selected suggestions',exact:true}).click();await expect(heading).toHaveCount(0)
+   let releaseRefresh;const refreshGate=new Promise(resolve=>{releaseRefresh=resolve})
+   if(count===20)await page.route('**/api/pantry/state',async route=>{await refreshGate;await route.continue()})
+   await page.getByRole('button',{name:'Accept selected suggestions',exact:true}).click()
+   if(count===20){
+    try{
+     await expect(page.getByText('Updating the review queue…',{exact:true})).toBeVisible()
+     await expect(page.getByRole('checkbox',{name:new RegExp(`^Select ${vendor.name}`)}).first()).toBeDisabled()
+     await page.screenshot({path:`${evidence}/queue-refresh-loading-${width}.png`})
+    }finally{releaseRefresh()}
+   }
+   await expect(page.getByText('Updating the review queue…',{exact:true})).toHaveCount(0)
+   await expect(heading).toHaveCount(0)
+   if(count===20)await page.unroute('**/api/pantry/state')
   }
   await bulk(20);await bulk(26)
   const queued=(await view('bank/lines')).lines.filter(l=>l.bank_account_id===bank.id)
