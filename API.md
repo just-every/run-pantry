@@ -22,6 +22,10 @@ Writes: `POST /api/pantry/command/:action` with a JSON object.
 | `journal.post` | post | `id, revision` (the version you reviewed; not your own preparation unless owner) |
 | `journal.reverse` | post | `id, date, memo` |
 | `invoice.save-draft` | record | `customerId, issueDate, dueDate?, number?, kind? ('credit'), creditFor?, lines[{kind? ('item'|'delivery'), description, quantity, rate, accountId, taxCode ('exempt' or a code id)}], discounts?[{type ('percent'|'amount'), value, lines? (line numbers; default the subtotal), afterTax?}], deposit?{amount, method, date?, bankAccountId, reference?}, earlyPayment?{percent, days}` (INVOICE-010; invoices only) |
+| `estimate.save-draft`, `estimate.send` | record | Invoice draft economics and optional template/custom fields, with `id, revision` for edits; send uses the exact reviewed `id, revision`. Early-payment terms are text on the estimate and become offers only on converted invoices. |
+| `estimate.convert`, `estimate.refresh-invoice` | record | `id, revision, requestId, issueDate, mode ('full', 'percent', 'milestone', 'balance'), percent?, amount?, milestone?, depositId?, depositAmount?`; refresh uses `id, invoiceId, revision` and retains accepted pricing. |
+| `customer-deposit.record`, `customer-deposit.apply` | post | `customerId, date, amount, bankAccountId, liabilityAccountId, method, reference, memo?` / `depositId, invoiceId, amount, date, requestId`; advance money stays a liability until applied, with no second bank receipt. |
+| `estimate.sibling-preview`, `estimate.sibling-confirm` | owner | `id, revision, provider ('inkwell', 'platter'), origin, remoteId, token` / `id, revision, previewId, previewRevision`; one-use credentials are never stored, and confirmation attaches only exact reviewed source proof. |
 | `discount-settings.save` | post | `discountAccountId, earlyAccountId?, revision?` (active income or expense accounts) |
 | `tax-code.early-treatment` | post | `id, revision, treatment ('retain'|'reduce'), source?{url, section, date}, reason?` (source prefilled from the suggestion table; a reason when it has no row or the choice goes against it) |
 | `early-discount.reverse` | post | `id` (the discount credit), `date, reason` |
@@ -58,6 +62,9 @@ Writes: `POST /api/pantry/command/:action` with a JSON object.
 `node scripts/pantry-agent.mjs` wraps these as typed commands (`context`, `propose-match`, `propose-journal`, `propose-close-packet`, `propose-variance`, `status`) with `PANTRY_URL` and `PANTRY_AGENT_TOKEN`; it exits 3 on a 409 and 4 when the token is refused.
 
 ## Sibling integrations: `/api/pantry/integration/v1/`
+
+Owner-selected `estimates:read`, `customer-deposits:read`, `time:read`, `time-projects:read` and `estimate-sibling-links:read` scopes expose their projected business records. Estimate acceptance IPs, customer bearer links, source credentials, private source summaries and signed document bytes remain outside the integration API. Discover the exact resource doors and scopes in OpenAPI.
+
 
 The machine-readable OpenAPI 3.1 document is `GET /api/pantry/integration/v1/openapi.json`, using the same scoped bearer credential. It describes the currently implemented integration routes and their enforced 120-requests-per-credential fixed UTC-minute budget, response headers and `429`/`Retry-After` behavior. See the [request budget](docs/integrations.md#request-budget) for counting and retry semantics. Granular owner-selected read scopes cover native business records through explicit projections; see the [record-type readers](docs/integrations.md#record-type-readers). Scoped invoice creates preserve native INVOICE-010 discounts, delivery charges, deposits and early-payment offers, including counting the issue-time deposit toward early settlement, and retain destination/exemption evidence with the native guards. See [invoice writes](docs/integrations.md#write-records) for input and retry semantics.
 
