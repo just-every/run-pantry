@@ -1,3 +1,4 @@
+import { dimensionReconciliation } from '../dimensions/reconciliation'
 import type { DimensionScope } from '../dimensions/scope'
 // Everyday-library figures: each money cell and total opens to the ledger
 // lines, payments or open items its row or total was read from, under the
@@ -24,7 +25,7 @@ export async function libraryFigure(db: D1Database, kind: string, line: string, 
   const name = total ? report.totals[index].label : `${row!.cells.filter((_, i) => !report.moneyColumns.includes(i)).join(' · ')} · ${report.columns[index]}`
   const base = { report: kind, line, label: name, basis, basisLabel: report.basisLabel, from, to, figure, context: { ...(dimension ? { dimension: dimension.kind, dimensionValue: dimension.id } : {}), ...(account ? { account } : {}), ...(payee ? { payee } : {}) } }
   const ids = new Set(total ? report.rows.map(r => r.id) : [rowId])
-  if (kind === 'reconciliations') return figureResult({ ...base, ...await proofRows(db, rowId, index) })
+  if (kind === 'reconciliations') return figureResult({ ...base, ...await proofRows(db, rowId, index, dimension) })
   if (kind === 'transactions' || kind === 'journal') {
     const credit = total ? index === 1 : index === 6
     const rows = (await reportSourceRows(db, { accountId: account, types: TYPES, from, to, sign: 1 }, basis)).filter(r => ids.has(r.key)).map(r => ({ ...r, amount: credit ? r.credit : r.debit }))
@@ -61,13 +62,22 @@ export async function libraryFigure(db: D1Database, kind: string, line: string, 
 
 /** A reconciliation proof figure: statement balances open to the statement, book and cleared figures to the bank
  *  account's posted lines through the end date, outstanding to the postings no statement line has cleared. */
-async function proofRows(db: D1Database, statementId: string, index: number) {
+async function proofRows(db: D1Database, statementId: string, index: number, dimension?: DimensionScope) {
   const state = await reconciliationState(db, statementId), proof = state.completed ? JSON.parse(state.completed.proof) : state
   const docs = state.statement.document_id ? (await all(db, 'SELECT id, name, media_type FROM pt_documents WHERE id = ?', state.statement.document_id)).map(d => ({ id: d.id, name: d.name, mediaType: d.media_type })) : []
   const account = (await all(db, 'SELECT id, code, name FROM pt_accounts WHERE id = ?', state.bank.account_id))[0]
   const statement = (part: string, amount: number) => ({ key: `statement:${part}`, date: part === 'opening' ? state.statement.start_date : state.statement.end_date, account, amount, debit: Math.max(amount, 0), credit: Math.max(-amount, 0),
     description: `Statement ${state.statement.start_date} to ${state.statement.end_date} · ${part} balance`, lineMemo: '', entry: null, settlement: null, documents: docs, bank: [],
     record: { kind: 'statement', id: statementId, label: `Statement ending ${state.statement.end_date} · ${state.bank.name}`, href: `/app/bank?statement=${encodeURIComponent(statementId)}` } })
+  if(dimension) {
+    const selected=await dimensionReconciliation(db,state,dimension)
+    const scopeNote='External statement balances are Unassigned; book contributions retain their bank-posting dimensions as of completion. This is a contribution to the whole statement proof.'
+    if(index===2||index===3)return {rows:dimension.value===''?[statement(index===2?'opening':'closing',index===2?selected.opening:selected.closing)]:[],scopeNote}
+    if(index===4)return {rows:selected.bookRows,scopeNote}
+    if(index===5)return {rows:selected.outstandingRows,scopeNote}
+    if(index===6)return {rows:selected.clearedRows,scopeNote}
+    return {rows:[...(dimension.value===''?[statement('closing',selected.closing)]:[]),...less(selected.clearedRows,'cleared')],scopeNote}
+  }
   const book = await reportSourceRows(db, { accountId: state.bank.account_id, types: [], from: FIRST_DAY, to: state.statement.end_date, sign: 1 }, 'accrual')
   const outstanding = new Set((proof.outstanding as Data[]).map(o => o.id))
   const cleared = book.filter(r => !outstanding.has(r.key))

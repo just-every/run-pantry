@@ -1,3 +1,4 @@
+import { dimensionReconciliation } from '../dimensions/reconciliation'
 import type { DimensionScope } from '../dimensions/scope'
 // Everyday report variants share the seed's posted ledger and native evidence.
 import { addDays, requireThat, type Data } from '../core'
@@ -19,7 +20,7 @@ export async function contractorPayments(db: D1Database, from: string, to: strin
 
 export async function libraryReport(db: D1Database, kind: string, from: string, to: string, basis: Basis, account?: string, payee?: string, dimension?: DimensionScope): Promise<LibraryReport> {
   requireThat(isLibrary(kind), 'Unknown library report', 404)
-  requireThat(!dimension || ['deposits','check-detail','contractor-summary','transactions','journal','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances'].includes(kind), 'This library report does not yet support a dimension filter', 409)
+  requireThat(!dimension || ['reconciliations','deposits','check-detail','contractor-summary','transactions','journal','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances'].includes(kind), 'This library report does not yet support a dimension filter', 409)
   requireThat(from <= to, 'The end date is on or after the start date')
   let data: Partial<LibraryReport>
   if (['transactions', 'journal'].includes(kind)) data = await ledgerActivity(db, kind, from, to, basis, account, payee, dimension)
@@ -27,13 +28,14 @@ export async function libraryReport(db: D1Database, kind: string, from: string, 
   else if (kind === 'reconciliations') {
     const statements = await all(db, 'SELECT id FROM pt_statements WHERE end_date BETWEEN ? AND ? ORDER BY end_date,id', from, to)
     const states = await Promise.all(statements.map(s => reconciliationState(db, s.id)))
-    data = { basis: 'accrual', basisLabel: 'Statement reconciliation - accrual ledger', note: 'Statements ending within the inclusive range. Completed rows use their immutable saved proof; unfinished rows show the current PAN-09 proof and blockers. Closing balances are per statement, not added across successive statements.',
+    data = { basis: 'accrual', basisLabel: 'Statement reconciliation - accrual ledger', note: (dimension?'Dimension contributions: external statement opening and closing balances are Unassigned; book, cleared and outstanding figures use bank-posting coding retained at completion. Whole-statement completion status is not a separate dimension reconciliation. ':'')+'Statements ending within the inclusive range. Completed rows use their immutable saved proof; unfinished rows show the current PAN-09 proof and blockers. Closing balances are per statement, not added across successive statements.',
       columns: ['End date', 'Bank', 'Opening', 'Statement closing', 'Book', 'Outstanding', 'Cleared', 'Difference', 'Status'], moneyColumns: [2, 3, 4, 5, 6, 7],
-      rows: states.map(s => {
+      rows: await Promise.all(states.map(async s => {
         const proof = s.completed ? JSON.parse(s.completed.proof) : s
         const outstanding = s.completed ? s.completed.outstanding_cents : s.outstandingTotal
-        return { id: s.statement.id, cells: [s.statement.end_date, s.bank.name, proof.opening, proof.closing, proof.book, outstanding, proof.cleared, proof.closing - proof.cleared, s.completed ? 'Reconciled' : 'Unfinished'], href: `/app/bank?statement=${encodeURIComponent(s.statement.id)}`, details: { proof, blockers: s.completed ? [] : s.blockers, completedBy: s.completed?.completed_by ?? null } }
-      }), totals: [] }
+        const selected=dimension?await dimensionReconciliation(db,s,dimension):null
+        return { id: s.statement.id, cells: [s.statement.end_date, s.bank.name, selected?.opening??proof.opening, selected?.closing??proof.closing, selected?.book??proof.book, selected?.outstanding??outstanding, selected?.cleared??proof.cleared, selected?.difference??(proof.closing-proof.cleared), s.completed ? dimension?'Whole statement reconciled':'Reconciled' : 'Unfinished'], href: `/app/bank?statement=${encodeURIComponent(s.statement.id)}`, details: { proof, blockers: s.completed ? [] : s.blockers, completedBy: s.completed?.completed_by ?? null } }
+      })), totals: [] }
   } else if (kind === 'audit-log') {
     const rows = await all(db, 'SELECT * FROM pt_audit WHERE at >= ? AND at < ? ORDER BY at,id', `${from}T00:00:00`, `${addDays(to, 1)}T00:00:00`)
     data = { basis: 'history', basisLabel: 'Activity history', note: 'Audit events timestamped within the inclusive UTC date range. Event counts and history are independent of the financial-report basis.',

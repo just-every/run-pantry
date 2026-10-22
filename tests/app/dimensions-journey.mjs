@@ -18,6 +18,8 @@ export async function dimensionsBrowser(t){
  const state=await view('state'),acct=Object.fromEntries(state.accounts.map(a=>[a.code,a.id]))
  const vendor=await command('contact.save',{kind:'vendor',name:'Brightline Software'}),customer=await command('contact.save',{kind:'customer',name:'Cedar Workshop'})
  const bank=await command('bank-account.save',{name:'Operating checking',institution:'Juniper Bank',accountId:acct['1000'],numberLast4:'4821',openingDate:'2026-01-01',openingBalance:'0'})
+ acct['1010']=(await command('account.save',{code:'1010',name:'Project reserve',type:'asset',subtype:'bank'})).id
+ const reserve=await command('bank-account.save',{name:'Project reserve',institution:'Juniper Bank',accountId:acct['1010'],numberLast4:'4242',openingDate:'2026-01-01',openingBalance:'0'})
  for(const width of [1440,390]){
   const page=await owner.newPage();await page.setViewportSize({width,height:1000})
   const errors=[];page.on('pageerror',e=>errors.push(String(e)))
@@ -375,7 +377,9 @@ export async function dimensionsBrowser(t){
   await page.getByRole('heading',{name:'Write off small balances',exact:true}).locator('..').locator('..').screenshot({path:`${proof}/dimensions-write-off-card-${width}.png`})
   await page.getByRole('button',{name:'Write off 1 balance',exact:true}).click()
   await expect(page.getByText('Wrote off 1 balance to 6200 · Software and subscriptions.',{exact:true})).toBeVisible()
-  await page.goto(origin+'/app/sales?tab=payments')
+  await page.goto(origin+'/app/sales')
+  if(width===390)await page.getByLabel('Show',{exact:true}).selectOption('Payments')
+  else await page.getByRole('tab',{name:'Payments',exact:true}).click()
   const paymentForm=page.locator('form').filter({has:page.getByRole('button',{name:'Record payment',exact:true})})
   await paymentForm.getByLabel('Direction',{exact:true}).selectOption('received')
   await paymentForm.getByLabel('Customer',{exact:true}).selectOption(customer.id)
@@ -403,6 +407,20 @@ export async function dimensionsBrowser(t){
    await page.locator('.figure-link').first().click();await expect(page.getByText('Adds up to the report figure',{exact:true})).toBeVisible()
    await shot(report+'-filtered-sources')
   }
+
+  const month=width===1440?'10':'11',date=`2026-${month}-15`,end=width===1440?'31':'30'
+  const j=await command('journal.save-draft',{date,memo:'Project reserve receipt',lines:[{accountId:acct['1010'],debit:'50',className:`Studio ${width}`},{accountId:acct['4000'],credit:'50',className:`Studio ${width}`}]})
+  await command('journal.post',{id:j.id,revision:j.revision})
+  const statement=await command('statement.import',{bankAccountId:reserve.id,fileName:`synthetic-pantry-reserve-${width}.csv`,content:`Posting Date,Description,Amount\n${month}/15/2026,Project receipt,50`,opening:width===1440?'0':'50',closing:width===1440?'50':'100',start:`2026-${month}-01`,end:`2026-${month}-${end}`,confirmLast4:'4242'})
+  const recon=await view('reconciliation/'+statement.statement.id)
+  if(!recon.lines[0].match_id)await command('match.approve',{bankLineIds:[recon.lines[0].id],journalLineIds:[recon.postings.find(p=>p.entry_date===date).id]})
+  await command('reconciliation.complete',{statementId:statement.statement.id})
+  await page.goto(origin+'/app/reports?'+new URLSearchParams({report:'reconciliations',from:`2026-${month}-01`,to:`2026-${month}-${end}`,basis:'accrual',dimension:'class',dimensionValue:`value:Studio ${width}`}))
+  await expect(page.getByText('Whole statement reconciled',{exact:true})).toBeVisible()
+  await shot('reconciliation-filtered')
+  await page.locator('.figure-link').filter({hasText:'$50.00'}).first().click()
+  await expect(page.getByText('Adds up to the report figure',{exact:true})).toBeVisible()
+  await shot('reconciliation-filtered-sources')
 
   const written=(await view('sales')).vendorCredits.find(c=>c.write_off&&c.allocations.some(a=>a.target_id===generatedBill.id))
   assert.equal(written.class_name,`Studio ${width}`)

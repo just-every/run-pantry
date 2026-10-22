@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "39521f505e3d4da99c7d8bb2d137a81690b9e408eac9f76d8f0bf6e3b0457819",
+      "sha256": "5d7e42f68d978af04568efc866221d5b595cf264c016092d89e5071f60f62d00",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "1bd7cc358576fb4e4960b9b94a6b5764becbcd638ba0f1c934a1fd8a8fdca4f4",
+      "sha256": "85b7362c159150f6a69e81bb0aec1f6a46594089118a4ddace7ae69512337200",
       "executable": false
     },
     "DEMO.md": {
@@ -128,7 +128,7 @@
       "executable": false
     },
     "docs/dimensions.md": {
-      "sha256": "92aa56fb81f72e940d2138b460a4181d98945f4088abf55568b887dd5e0eda9d",
+      "sha256": "2f074edd6ead62b5da26a59489feb524bda8a9dd2ac0e23367355b5d2c848d31",
       "executable": false
     },
     "docs/first-month.md": {
@@ -2932,7 +2932,7 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "017887f1dc2ed0056029f20e667979c2eef83bf2b9d3774225bf658848077978",
+      "sha256": "3facff86a4131dab49a3158070fdcee54e0514ce9814d3aceab3bc80c29c58e1",
       "executable": false
     },
     "src/pantry/automatch.ts": {
@@ -3221,6 +3221,10 @@
     },
     "src/pantry/dimensions/processor.ts": {
       "sha256": "4ddff1aab981778897266e922d230bda9cf07e1a1effeb5a3d954f8224eab2dc",
+      "executable": false
+    },
+    "src/pantry/dimensions/reconciliation.ts": {
+      "sha256": "72da39a70343b7267eaec500b615c49d1d6d3b9f66301a46de3ca06d7470085d",
       "executable": false
     },
     "src/pantry/dimensions/report.ts": {
@@ -3872,11 +3876,11 @@
       "executable": false
     },
     "src/pantry/report-figures/index.ts": {
-      "sha256": "1c8ce0e7757e750b8ef3261a7f4f7fe6fa9fbeb3922f4d5c304e111056f73fba",
+      "sha256": "33dbfaf930fd78497cde68df4b9d543c63a887e304ce27154fc3a249545723cd",
       "executable": false
     },
     "src/pantry/report-figures/library.ts": {
-      "sha256": "a4b3c3b663587a2312b896ef9f62fccaa8e00a0b0d612c217b0564f2858e2930",
+      "sha256": "6c040142e356cfbb94785931f585410d2ee97cd57f362a401d77a3dc763eec38",
       "executable": false
     },
     "src/pantry/report-figures/open-items.ts": {
@@ -3900,7 +3904,7 @@
       "executable": false
     },
     "src/pantry/report-library/index.ts": {
-      "sha256": "a35b96b460845764c9c4386148d66b83ca21375c07e415da3617bbc7afe56328",
+      "sha256": "4cae23806378b2ff51d75654fab9818ebaba33de245fce0bdd591f19f2f7fd81",
       "executable": false
     },
     "src/pantry/report-library/open-items.ts": {
@@ -3916,7 +3920,7 @@
       "executable": false
     },
     "src/pantry/report-reader.ts": {
-      "sha256": "a1786ee3aa6a1d38e9847d45f7640ff4ecbbf3c558df7eda802601011f536a27",
+      "sha256": "e5512e6a7c9c1a71f84a3ea953ccd82ce37b82ef8a9ce32d3e38fb365818e40d",
       "executable": false
     },
     "src/pantry/report-sources.ts": {
@@ -4696,7 +4700,7 @@
       "executable": false
     },
     "src/ui/reports.tsx": {
-      "sha256": "0edb14339083cc8ab04442dd3fe4261adad4a32814c486d26af943c74d082763",
+      "sha256": "e4910c0d3c1a2b4f186a368986656f06773e7d56c59863282db2648d15cd8efa",
       "executable": false
     },
     "src/ui/review.tsx": {
@@ -4812,7 +4816,7 @@
       "executable": false
     },
     "tests/api/dimension-extensions.mjs": {
-      "sha256": "f9e541ff5f70158c145796e4cb90e6b8f66a3095ef7be62d56a37170076d4a75",
+      "sha256": "6f61fdb7e118c240cea04d90762b75b8c7421f91d8bef90981917695e06718ed",
       "executable": false
     },
     "tests/api/dimensions-journey.mjs": {
@@ -4880,7 +4884,7 @@
       "executable": false
     },
     "tests/api/reports.test.mjs": {
-      "sha256": "f8ff0181b44854dcf7383bcfb7ee2db323bf102161e17c32eb5cd4bcfff78ad6",
+      "sha256": "467044151a4d0c29e2ae866c42868c28853234ce3fa2af0a2b34529eded0eea1",
       "executable": false
     },
     "tests/api/resources-journey.mjs": {
@@ -4988,7 +4992,7 @@
       "executable": false
     },
     "tests/app/dimensions-journey.mjs": {
-      "sha256": "8561712a9fe033094453fcd5d730fdc7ad6c20d113050e9b3b383bef5710d826",
+      "sha256": "88c85c7b4c002d1d4ffa61a87e5af4c7cf51a71c847733cb8497806436623b2f",
       "executable": false
     },
     "tests/app/effects-journey.mjs": {

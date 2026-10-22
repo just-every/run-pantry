@@ -274,5 +274,39 @@ export async function dimensionPaymentReports(t) {
    assert.equal(d.figure,v[metric]);assert.equal(d.ties,true)
   }
  }
+}
+
+export async function dimensionReconciliationReports(t) {
+ const {h,acct,tags,other}=await seed(t)
+ // Reconciliations retain a saved whole-statement proof and expose coded book contributions.
+ acct['1010']=(await h.command('account.save',{code:'1010',name:'Project reserve',type:'asset',subtype:'bank'})).id
+ const reserve=await h.command('bank-account.save',{name:'Dimension reserve',institution:'Synthetic bank',accountId:acct['1010'],numberLast4:'4242',openingDate:'2026-01-01',openingBalance:'0'})
+ const post=async(amount,coding)=>{const j=await h.command('journal.save-draft',{date:'2026-10-15',memo:'Dimension reserve receipt',lines:[{accountId:acct['1010'],debit:amount,...coding},{accountId:acct['4000'],credit:amount,...coding}]});await h.command('journal.post',{id:j.id,revision:j.revision})}
+ await post('50',tags);await post('25',other);await post('10',{});await post('5',tags)
+ const imported=await h.command('statement.import',{bankAccountId:reserve.id,fileName:'synthetic-pantry-42.csv',content:'Posting Date,Description,Amount\n10/15/2026,Studio receipt,50\n10/15/2026,Support receipt,25\n10/15/2026,Unassigned receipt,10',opening:'0',closing:'85',start:'2026-10-01',end:'2026-10-31',confirmLast4:'4242'})
+ let state=await h.view('reconciliation/'+imported.statement.id)
+ for(const line of state.lines.filter(l=>!l.match_id)) {
+  state=await h.view('reconciliation/'+imported.statement.id)
+  const posting=state.postings.find(p=>!p.match_id&&Number(p.amount)===line.amount_cents)
+  assert.ok(posting,JSON.stringify(line))
+  await h.command('match.approve',{bankLineIds:[line.id],journalLineIds:[posting.id]})
+ }
+ await h.command('reconciliation.complete',{statementId:imported.statement.id})
+ const q={from:'2026-10-01',to:'2026-10-31'},whole=await h.view('reports/reconciliations?'+new URLSearchParams(q)),pieces=[]
+ for(const name of ['Studio','Support','']) {
+  const scope={...q,dimension:'class',dimensionValue:name?'value:'+name:'unassigned'},r=await h.view('reports/reconciliations?'+new URLSearchParams(scope));pieces.push(r)
+  const row=r.rows.find(row=>row.id===imported.statement.id)
+  assert.equal(row.cells[8],'Whole statement reconciled')
+  if(name==='Studio')assert.deepEqual(row.cells.slice(2,8),[0,0,5500,500,5000,-5000])
+  for(const index of r.moneyColumns) {
+   const detail=await h.view('reports/detail?'+new URLSearchParams({...scope,report:'reconciliations',line:JSON.stringify([row.id,String(index)])}))
+   assert.equal(detail.ties,true);assert.equal(detail.figure,row.cells[index]);assert.ok(detail.rows.every(source=>source.key.startsWith('statement:')||source.class_name===name))
+  }
+  for(const format of ['pdf','csv','xlsx'])assert.equal((await h.send('/api/pantry/reports/reconciliations/export?'+new URLSearchParams({...scope,format}),undefined,{cookie:h.owner})).status,200)
+ }
+ for(const index of whole.moneyColumns)assert.equal(pieces.reduce((n,r)=>n+r.rows[0].cells[index],0),whole.rows[0].cells[index])
+ await post('7',tags)
+ assert.deepEqual((await h.view('reports/reconciliations?'+new URLSearchParams({...q,dimension:'class',dimensionValue:'value:Studio'}))).rows[0].cells,pieces[0].rows[0].cells,'later backdated postings do not change the saved dimension contribution')
+
 
 }
