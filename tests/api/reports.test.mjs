@@ -948,3 +948,42 @@ test('REPORT-007 scheduled read authority stops when its creating owner identity
 
 import {reportExportParity} from './report-export-parity.mjs'
 test('REPORT-007 dedicated reports, close packages and audited filing data export tied PDF CSV and Excel values',reportExportParity)
+
+
+test('TAXFORM-001 native TIN reveal binds proof to the session and keeps withholding and MISC review visible', async t => {
+ const h=await harness();t.after(()=>h.close());const {acct}=await books(h)
+ let vendor=await h.command('contact.save',{kind:'vendor',name:'Synthetic tax vendor',vendorTaxBox:'MISC-1'})
+ const bank=await h.command('bank-account.save',{name:'Synthetic checking',institution:'Example',accountId:acct['1000'],numberLast4:'0123',openingDate:'2025-01-01',openingBalance:'0'})
+ await h.command('payment.record',{direction:'paid',contactId:vendor.id,date:'2025-03-01',amount:'650.00',bankAccountId:bank.id,method:'ach'})
+ const bookkeeper=await h.member('synthetic-bookkeeper@example.test','bookkeeper',{canPost:true})
+ const accountant=await h.member('synthetic-accountant@example.test','accountant')
+ await h.command('contractor.save',{contactId:vendor.id,is1099:true,legalName:'Synthetic tax vendor',tinKind:'ein',tin:'000000123',address:'1 Example Street',city:'Albany',state:'NY',zip:'12207',backupWithholding:true})
+ await h.command('contractor.reveal',{contactId:vendor.id},h.owner,403)
+ await h.command('contractor.step-up',{},bookkeeper,403)
+ await h.command('contractor.reveal',{contactId:vendor.id},bookkeeper,403)
+ await h.command('contractor.save',{contactId:vendor.id,is1099:true,backupWithholding:false},bookkeeper,403)
+ const proof=async(cookie,email)=>{
+  await h.command('contractor.step-up',{},cookie)
+  const mail=h.mail.findLast(m=>[m.to].flat().includes(email)),token=new URL(mail.text.match(/http:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get('token')
+  return token
+ }
+ const token=await proof(h.owner,'owner@example.test')
+ assert.notEqual((await h.send('/auth/confirm',{token},{cookie:accountant})).status,303,'another session cannot consume the proof')
+ assert.equal((await h.send('/auth/confirm',{token},{cookie:h.owner})).status,303)
+ assert.equal((await h.command('contractor.reveal',{contactId:vendor.id})).tin,'000000123')
+ const accountingToken=await proof(accountant,'synthetic-accountant@example.test')
+ assert.equal((await h.send('/auth/confirm',{token:accountingToken},{cookie:accountant})).status,303)
+ assert.equal((await h.command('contractor.reveal',{contactId:vendor.id},accountant)).tin,'000000123')
+ const report=await h.view('/reports/contractors?year=2025'.slice(1),bookkeeper)
+ assert.equal(report.contractors[0].backupWithholding,true);assert.equal(report.otherBoxes[0].taxBox,'MISC-1');assert.equal(report.forms.length,0)
+ assert.ok(!JSON.stringify(report).includes('000000123'))
+ const readiness=(await h.view('year-end/2025')).checks.find(c=>c.key==='year-end-1099')
+ assert.equal(readiness.ok,false);assert.ok(readiness.items.some(i=>i.label.includes('backup withholding')));assert.ok(readiness.items.some(i=>i.label.includes('MISC-1')))
+ vendor=(await h.view('state')).contacts.find(c=>c.id===vendor.id)
+ await h.command('contact.save',{id:vendor.id,revision:vendor.revision,kind:'vendor',vendorTaxBox:'NEC-1'})
+ assert.equal((await h.view('/reports/contractors?year=2025'.slice(1))).forms[0].ready,false,'withholding review blocks filing')
+ assert.equal((await h.send('/api/pantry/reports/contractors/2025/1099-nec.csv',undefined,{cookie:h.owner})).status,409)
+ const audit=await h.view('activity');assert.ok(audit.audit.some(a=>a.action==='contractor.tin-reveal'));assert.ok(!JSON.stringify(audit).includes('000000123'))
+ await h.db.prepare('UPDATE oa_step_up_challenges SET consumed_at=? WHERE consumed_at IS NOT NULL').bind(Date.now()-301000).run()
+ await h.command('contractor.reveal',{contactId:vendor.id},h.owner,403)
+})

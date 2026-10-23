@@ -8,9 +8,10 @@ import { inDimension, type DimensionScope } from './dimensions/scope'
 // - check, ACH, wire and cash payments count in box 1;
 // - a payment whose method was never recorded is shown apart until a person sets it.
 // The reporting threshold is kept per tax year (One Big Beautiful Bill Act, 2025).
-import { authority, who } from './access'
+import { authority, who, tinAuthority } from './access'
+import { operatorAuth, runtimeBindings } from '../auth.server'
 import { requireThat, text, uid, now, type Data } from './core'
-import { all, audit, changed, one, q, run, type Sql, type AuditActor } from './db'
+import { all, audit, changed, guard, one, q, run, type Sql, type AuditActor } from './db'
 import { contact } from './contacts'
 import { requireEntity } from './settings'
 import { STATES } from './states'
@@ -31,7 +32,7 @@ const masked = (tin: string, kind: string) => kind === 'ein' ? `••-•••
 /** Every vendor's payments in a calendar year with the 1099-NEC figures they make; the report and its drill-through share it. */
 export async function vendorYear(db: D1Database, year: number, dimension?: DimensionScope) {
   const from = `${year}-01-01`, to = `${year}-12-31`, limit = threshold(year)
-  const vendors = await all(db, `SELECT c.id, c.name, c.is_1099, c.revision, t.legal_name, t.tin_kind, t.tin, t.address, t.city, t.state, t.zip FROM pt_contacts c LEFT JOIN pt_contractor_tax t ON t.contact_id = c.id WHERE c.kind = 'vendor' ORDER BY c.name`)
+  const vendors = await all(db, `SELECT c.id, c.name, c.is_1099, c.revision, t.legal_name, t.tin_kind, t.tin, t.address, t.city, t.state, t.zip, t.backup_withholding, c.vendor_tax_box FROM pt_contacts c LEFT JOIN pt_contractor_tax t ON t.contact_id = c.id WHERE c.kind = 'vendor' ORDER BY c.name`)
   const payments = await all(db, "SELECT p.id,p.contact_id,p.payment_date,SUM(l.credit_cents-l.debit_cents) AS amount_cents,p.method,p.reference,p.reversal_id,l.class_name,l.location_name,l.project_name FROM pt_payments p JOIN pt_bank_accounts b ON b.id=p.bank_account_id JOIN pt_journal_lines l ON l.entry_id=p.journal_id AND l.account_id=b.account_id WHERE p.direction = 'paid' AND p.payment_date BETWEEN ? AND ? GROUP BY p.id,l.class_name,l.location_name,l.project_name ORDER BY p.payment_date,p.created_at,p.id", from, to)
   return vendors.map(v => {
     const whole = payments.filter(p => p.contact_id === v.id), selected=whole.filter(p=>inDimension(p,dimension)),grouped=new Map<string,Data>()
@@ -42,7 +43,7 @@ export async function vendorYear(db: D1Database, year: number, dimension?: Dimen
     const box1 = sum(p => COUNTED.has(p.method)), excluded = sum(p => EXCLUDED.has(p.method)), unrecorded = sum(p => p.method === 'unrecorded')
     const missing = [!v.tin && 'TIN', !v.address && 'address'].filter(Boolean)
     return { id: v.id, name: v.name, is1099: !!v.is_1099, revision: v.revision,
-      tax: v.tin ? { legalName: v.legal_name, tinKind: v.tin_kind, tin: masked(v.tin, v.tin_kind), address: v.address, city: v.city, state: v.state, zip: v.zip } : null,
+      taxBox: v.vendor_tax_box, backupWithholding: !!v.backup_withholding, tax: v.tin ? { legalName: v.legal_name, tinKind: v.tin_kind, tin: masked(v.tin, v.tin_kind), address: v.address, city: v.city, state: v.state, zip: v.zip } : null,
       box1, excluded, unrecorded, reversed: own.filter(p => p.reversal_id).reduce((s, p) => s + p.amount_cents, 0),
       ...(dimension?{wholeBox1,wholeUnknown}:{}), overThreshold: wholeBox1 >= limit.cents, mayReach: wholeBox1 < limit.cents && wholeBox1 + wholeUnknown >= limit.cents, missing,
       payments: own.map(p => ({ id: p.id, date: p.payment_date, amount: p.amount_cents, method: p.method, reference: p.reference, reversed: !!p.reversal_id, counts: !p.reversal_id && COUNTED.has(p.method), excluded: !p.reversal_id && EXCLUDED.has(p.method) })) }
@@ -54,7 +55,8 @@ export async function contractors(db: D1Database, year: number, dimension?: Dime
   const today = new Date().toISOString().slice(0, 10)
   const marked = list.filter(v => v.is1099)
   return { ...(dimension?{dimension}:{}),basis: 'payment', year, threshold: limit.cents, thresholdNote: limit.note, yearEnded: today > to, dueBy: `${year + 1}-01-31`,
-    contractors: marked, forms: marked.filter(v => v.overThreshold).map(v => ({ id: v.id, name: v.tax?.legalName ?? v.name, tin: v.tax?.tin ?? null, box1: dimension?v.wholeBox1!:v.box1, box4: 0, ready: !v.missing.length })),
+    contractors: marked, forms: marked.filter(v => v.overThreshold && v.taxBox === 'NEC-1').map(v => ({ id: v.id, name: v.tax?.legalName ?? v.name, tin: v.tax?.tin ?? null, box1: dimension?v.wholeBox1!:v.box1, box4: 0, ready: !v.missing.length && !v.backupWithholding })),
+    otherBoxes: marked.filter(v => v.taxBox !== 'NEC-1').map(v => ({ id: v.id, name: v.name, taxBox: v.taxBox, paid: v.box1 })),
     // Vendors not marked as contractors who were paid enough by check, ACH, wire or cash to be worth a look.
     unmarked: list.filter(v => !v.is1099 && v.overThreshold).map(v => ({ id: v.id, name: v.name, box1: v.box1 })),
     vendors: list.filter(v => !v.is1099).map(v => ({ id: v.id, name: v.name })) }
@@ -67,7 +69,7 @@ export async function necRows(db: D1Database, year: number) {
   const report = await contractors(db, year), entity = await requireEntity(db)
   requireThat(report.yearEnded, `The ${year} forms are ready after December 31, ${year}`, 409)
   const incomplete = report.forms.filter(f => !f.ready).map(f => f.name)
-  requireThat(!incomplete.length, `Add the TIN and address for ${incomplete.join(', ')} first`, 409)
+  requireThat(!incomplete.length, `Review filing details and backup withholding for ${incomplete.join(', ')} first`, 409)
   const tax = new Map((await all(db, 'SELECT * FROM pt_contractor_tax')).map(t => [t.contact_id, t]))
   const rows = [['Tax year', 'Form', 'Payer name', 'Payer state', 'Recipient account', 'Recipient name', 'Recipient TIN type', 'Recipient TIN', 'Address', 'City', 'State', 'ZIP', 'Box 1 nonemployee compensation', 'Box 4 federal income tax withheld', 'Basis']]
   for (const f of report.forms) {
@@ -108,8 +110,13 @@ const saveContractor: Command = { need: 'record', async run(c, b) {
       ON CONFLICT (contact_id) DO UPDATE SET legal_name = excluded.legal_name, tin_kind = excluded.tin_kind, tin = excluded.tin, address = excluded.address, city = excluded.city, state = excluded.state, zip = excluded.zip, revision = excluded.revision, updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
       vendor.id, text(b.legalName, 'Legal name (as on the W-9)', 200), tinKind, tin, text(b.address, 'Street address', 200), text(b.city, 'City', 100), state, zip, uid(), c.actor.email, now()))
   }
+  if (b.backupWithholding !== undefined) {
+    requireThat(c.actor.kind === 'person' && ['owner', 'accountant'].includes(c.actor.role), 'Only the owner or accountant records backup withholding', 403)
+    requireThat(details || current, 'Save the contractor tax details first')
+    statements.push(q('UPDATE pt_contractor_tax SET backup_withholding=? WHERE contact_id=?', b.backupWithholding === true || b.backupWithholding === 'on' ? 1 : 0, vendor.id), changed())
+  }
   // The audit trail names what changed, never the TIN itself.
-  statements.push(audit(who(c.actor), 'contractor.save', 'vendor', vendor.id, { is1099, details, tinLast4: details ? last4 : undefined }))
+  statements.push(audit(who(c.actor), 'contractor.save', 'vendor', vendor.id, { is1099, details, tinLast4: details ? last4 : undefined, ...(b.backupWithholding !== undefined ? { backupWithholding: b.backupWithholding === true || b.backupWithholding === 'on' } : {}) }))
   await run(c.db, statements)
   return { id: vendor.id, is1099 }
 } }
@@ -128,5 +135,18 @@ const setMethod: Command = { need: 'record', async run(c, b) {
 
 export const contractorCommands: Record<string, Command> = {
   'contractor.save': saveContractor,
+  'contractor.step-up': { need: 'read', async run(c) {
+    requireThat(c.actor.kind === 'person' && ['owner', 'accountant'].includes(c.actor.role) && !c.actor.policy?.maskTin, 'Only the owner or an unmasked accountant may reveal tax identity', 403)
+    await operatorAuth(runtimeBindings(c.env)).requestStepUp(c.request, { action: 'export', returnTo: '/app/reports?report=contractors' })
+    return { message: 'Check your sign-in email, confirm in this browser, then reveal the TIN within five minutes.' }
+  } },
+  'contractor.reveal': { need: 'read', async run(c,b) {
+    const checks = await tinAuthority(c)
+    const vendor = await contact(c.db, text(b.contactId, 'Vendor'), 'vendor')
+    const tax = await one(c.db, 'SELECT tin, revision FROM pt_contractor_tax WHERE contact_id=?', vendor.id)
+    requireThat(tax?.tin, 'No tax identity is on file', 404)
+    await run(c.db, [...checks, guard('EXISTS (SELECT 1 FROM pt_contractor_tax t JOIN pt_contacts c ON c.id=t.contact_id WHERE t.contact_id=? AND t.revision=? AND c.erased_at IS NULL)', vendor.id, tax.revision), audit(who(c.actor), 'contractor.tin-reveal', 'vendor', vendor.id, { revision: tax.revision })])
+    return { tin: tax.tin }
+  } },
   'payment.set-method': setMethod,
 }
