@@ -1,3 +1,4 @@
+import { runStanding } from '../standing'
 import { discoverLearning } from '../learning'
 // One pass of the books agent: find what doesn't add up, ask each new thing
 // once, let go of questions the books have since answered for themselves, and
@@ -63,6 +64,7 @@ export async function runAgent(env: Bindings, { scheduled = false } = {}): Promi
     const claimed = await db.prepare('UPDATE pt_books_agent SET last_run_at = ? WHERE id = 1 AND (last_run_at IS NULL OR last_run_at < ?)').bind(at, new Date(Date.now() - HOURLY).toISOString()).run()
     if (claimed.meta.changes !== 1) return null
   }
+  await runStanding(db)
   const issues = await findIssues(db, settings, at.slice(0, 10))
   const known = new Map((await all(db, 'SELECT * FROM pt_questions')).map(r => [r.fingerprint, parse(r)]))
   const accounts = await all(db, 'SELECT * FROM pt_accounts ORDER BY code'), budget = { left: 5 }

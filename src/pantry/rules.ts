@@ -17,7 +17,7 @@ import type { Command, Context } from './context'
 export type Split = { accountId: string; share?: number; amountCents?: number }
 export type Rule = Data & { id: string; name: string; splits: Split[] }
 /** Who files: the person who triggered it, or for a feed sync, the rule's author. */
-export type Filer = { actor: AuditActor; authority: Sql }
+export type Filer = { actor: AuditActor; authority: Sql; permission?: Data }
 
 const NOISE = new Set(['POS', 'DEBIT', 'CREDIT', 'CARD', 'CHECKCARD', 'PURCHASE', 'ACH', 'ONLINE', 'RECURRING', 'VISA', 'THE', 'WWW', 'COM', 'INC', 'LLC', 'CO', 'PAYMENT', 'TO', 'FROM'])
 const words = (s: string) => ' ' + String(s ?? '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim() + ' '
@@ -135,7 +135,7 @@ const notReconciled = (line: Data) => guard('NOT EXISTS (SELECT 1 FROM pt_reconc
 
 /** The batch that files one line by a rule: a posted bank entry and a match naming the rule. */
 export async function fileStatements(db: D1Database, rule: Rule, line: Data, filer: Filer): Promise<Sql[]> {
-  requireThat(rule.mode !== 'suggest', 'Suggest-only rules never post entries', 409)
+  requireThat(rule.mode !== 'suggest' || !!filer.permission, 'Suggest-only rules never post entries', 409)
   requireThat(!splitHold(rule, line), 'Split amounts must equal the statement line amount', 409)
   const bank = (await one(db, 'SELECT * FROM pt_bank_accounts WHERE id = ?', line.bank_account_id))!
   const abs = Math.abs(line.amount_cents), out = line.amount_cents < 0
@@ -152,15 +152,18 @@ export async function fileStatements(db: D1Database, rule: Rule, line: Data, fil
     { ...dimensionTags(line),accountId: bank.account_id, debit: out ? 0 : abs, credit: out ? abs : 0, memo },
   ]
   const entryId = uid(), matchId = uid()
-  return [filer.authority, standingFence(standingAuthority(filer.actor.email, 'bank', [bank.id])), periodOpen(line.posted_date), notReconciled(line),
-    guard('EXISTS(SELECT 1 FROM pt_bank_lines WHERE id=? AND excluded_at IS NULL AND class_name=? AND location_name=? AND project_name=?)',line.id,...dimensionValues(line)),
+  const permission=filer.permission
+  const grant=permission?guard("EXISTS(SELECT 1 FROM pt_agent_permissions p JOIN oa_operators o ON o.id=p.owner_id AND o.role='owner' AND o.status='active' WHERE p.id=? AND p.revision=? AND p.active=1 AND p.rule_id=? AND p.rule_revision=? AND p.bank_account_id=? AND p.payee=? AND p.max_cents>=?)",permission.id,permission.revision,rule.id,rule.revision,bank.id,permission.payee,abs):standingFence(standingAuthority(filer.actor.email, 'bank', [bank.id]))
+  return [filer.authority, grant, periodOpen(line.posted_date), notReconciled(line),
+    guard('EXISTS(SELECT 1 FROM pt_bank_lines WHERE id=? AND posted_date=? AND amount_cents=? AND description=? AND payee=? AND removed_at IS NULL AND rules_off=0 AND excluded_at IS NULL AND class_name=? AND location_name=? AND project_name=?)',line.id,line.posted_date,line.amount_cents,line.description,line.payee,...dimensionValues(line)),
     guard('NOT EXISTS (SELECT 1 FROM pt_match_bank_lines WHERE bank_line_id = ? AND active = 1)', line.id),
     guard("NOT EXISTS (SELECT 1 FROM pt_transfer_halves WHERE bank_line_id = ? AND status IN ('pending', 'exception'))", line.id),
     guard('EXISTS (SELECT 1 FROM pt_bank_rules WHERE id = ? AND revision = ? AND active = 1)', rule.id, rule.revision),
-    ...entryStatements({ id: entryId, date: line.posted_date, memo: `${memo} · by rule ${rule.name}`, sourceKind: 'bank', sourceId: line.id, preparedBy: filer.actor.email, preparedKind: 'person', lines }, filer.actor.email),
-    q("INSERT INTO pt_matches (id, bank_account_id, status, proposal_id, note, approved_by, approved_at, revision, rule_id, rule_revision, rule_snapshot) VALUES (?, ?, 'approved', NULL, ?, ?, ?, ?, ?, ?, ?)", matchId, bank.id, `Filed by rule "${rule.name}"`, filer.actor.email, now(), uid(), rule.id, rule.revision, JSON.stringify(rule)),
+    ...entryStatements({ id: entryId, date: line.posted_date, memo: permission?`${memo} · by books agent · ${permission.name}`:`${memo} · by rule ${rule.name}`, sourceKind: 'bank', sourceId: line.id, preparedBy: filer.actor.email, preparedKind: permission?'agent':'person', lines }, filer.actor.email),
+    q("INSERT INTO pt_matches (id, bank_account_id, status, proposal_id, note, approved_by, approved_at, revision, rule_id, rule_revision, rule_snapshot) VALUES (?, ?, 'approved', NULL, ?, ?, ?, ?, ?, ?, ?)", matchId, bank.id, permission?`Filed by books agent under ${permission.name}`:`Filed by rule "${rule.name}"`, filer.actor.email, now(), uid(), rule.id, rule.revision, JSON.stringify(rule)),
     q('INSERT INTO pt_match_bank_lines (match_id, bank_line_id, active) VALUES (?, ?, 1)', matchId, line.id),
     q('INSERT INTO pt_match_postings (match_id, journal_line_id, active) SELECT ?, id, 1 FROM pt_journal_lines WHERE entry_id = ? AND account_id = ?', matchId, entryId, bank.account_id),
+    ...(permission?[q('INSERT INTO pt_agent_actions(id,permission_id,permission_revision,permission_snapshot,bank_line_id,match_id,at)VALUES(?,?,?,?,?,?,?)',uid(),permission.id,permission.revision,JSON.stringify(permission),line.id,matchId,now()),audit(filer.actor,'books-agent.file','match',matchId,{permissionId:permission.id,permissionRevision:permission.revision,owner:permission.owner_email,line:line.id})]:[]),
     audit(filer.actor, 'bank-rule.file', 'match', matchId, { rule: rule.name, ruleId: rule.id, line: line.id, amount: line.amount_cents, description: line.description }),
   ]
 }

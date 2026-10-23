@@ -1,3 +1,4 @@
+import { runStanding } from '../standing'
 import { matchWaitingReceipts } from '../receipts/review'
 // Feed sync. Each connection (Plaid Item) is synced by one claim at a time:
 // /transactions/sync pages from the stored cursor, applied idempotently on
@@ -119,6 +120,7 @@ export async function syncItem(env: Bindings, itemId: string, trigger: Trigger):
     await matchDeposits(db, available)
     await matchRecorded(db, available)
     const filed = await applyRules(db, arrived.map(l => l.id), authorFiler)
+    await runStanding(db,arrived.map(l=>l.id))
     await matchWaitingReceipts(db)
     const waiting = Number((await one(db, 'SELECT COUNT(*) AS n FROM pt_feed_pending p JOIN pt_feed_accounts f ON f.id = p.feed_account_id WHERE f.item_id = ?', itemId))?.n ?? 0)
     await run(db, [q('UPDATE pt_feed_syncs SET finished_at = ?, added = ?, updated = ?, removed = ?, pending = ?, filed = ? WHERE id = ?', now(), arrived.length, counts.updated, counts.removed, waiting, filed.filed, syncId)])

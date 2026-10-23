@@ -1,3 +1,4 @@
+import { runStanding } from './standing'
 import { matchWaitingReceipts } from './receipts/review'
 // Bank accounts and statement imports. A statement is evidence of what the bank
 // recorded; importing it never posts to the ledger.
@@ -94,6 +95,7 @@ const importStatement: Command = { need: 'record', async run(c, b) {
   const available = await transferAvailableLines(c.db, added.map(l => l.id))
   const automatic = await matchDeposits(c.db, available), recorded = await matchRecorded(c.db, available)
   const filed = await applyRulesAs(c, added.map(l => l.id))
+  await runStanding(c.db,added.map(l=>l.id))
   await matchWaitingReceipts(c.db)
   return { statement: await one(c.db, 'SELECT * FROM pt_statements WHERE id = ?', id), duplicate: false, added: added.length, automatic, recorded, duplicates: keyed.length - fresh.length, fromFeed, filedByRule: filed.filed, fileBalances: { opening, closing, lineTotal: total, agrees: closing - opening === total } }
 } }

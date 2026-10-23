@@ -176,3 +176,23 @@ test('AGENT-006 repeated resolutions yield a prior-year back-test and vendor-lim
  await h.command('learned.revoke',{id:p.id,revision:current.revision})
  await h.command('learned.prepare',{id:p.id,revision:current.revision,sourceJournalId:current.sources[1].id},undefined,409)
 })
+
+test('AGENT-001 100 lines obey exact standing scope, retain labels and undo, sample real actions and stop after revocation',async t=>{
+ const h=await harness();t.after(()=>h.close());const {standingScenario}=await import('./standing-journey.mjs'),{bank,rule,permission}=await standingScenario(h)
+ const lines=(await h.view('bank/lines')).lines
+ assert.equal(lines.length,100);assert.equal(lines.filter(l=>l.match_id).length,50);assert.equal(lines.filter(l=>l.agent_permission_name==='Reviewed recurring charges').length,50)
+ assert.ok(lines.filter(l=>!l.match_id).every(l=>l.description==='Synthetic held'))
+ const ruleView=await h.view('bank/rules');assert.equal(ruleView.suggestedLines.filter(l=>l.ruleId===rule.id).length,50)
+ let report=await h.view('agent-permissions'),p=report.permissions.find(p=>p.id===permission.id)
+ assert.equal(p.metrics.actions,50);assert.equal(p.sample.length,5);assert.equal(p.metrics.accuracy,null)
+ await h.command('agent-action.review',{id:p.sample[0].id,review:'correct'})
+ await h.command('agent-action.review',{id:p.sample[1].id,review:'changed'})
+ await h.command('bank-rule.undo',{matchId:p.sample[0].match_id,reason:'Owner inspected weekly sample'})
+ p=(await h.view('agent-permissions')).permissions.find(p=>p.id===permission.id)
+ assert.equal(p.metrics.undone,1);assert.equal(p.metrics.reviewed,2);assert.equal(p.metrics.accuracy,0.5)
+ await h.command('agent-permission.revoke',{id:p.id,revision:p.revision})
+ await h.command('statement.import',{bankAccountId:bank.id,fileName:'synthetic-pantry-5.csv',content:'Date,Description,Amount\n2026-05-01,Synthetic permitted,-10.00\n',opening:'9000',closing:'8990',start:'2026-05-01',end:'2026-05-01',confirmLast4:'4821'})
+ const next=(await h.view('bank/lines')).lines.find(l=>l.posted_date==='2026-05-01');assert.equal(next.match_id,null)
+ const viewer=await h.member('synthetic-pantry-6@example.test','viewer');await h.view('agent-permissions',viewer,403)
+ await h.command('agent-permission.grant',{name:'synthetic-pantry-7',ruleId:rule.id,ruleRevision:rule.revision,bankAccountId:bank.id,payee:'Synthetic permitted',maxAmount:'15',confirm:true},viewer,403)
+})
