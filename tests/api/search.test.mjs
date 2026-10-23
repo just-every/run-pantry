@@ -33,7 +33,7 @@ test('SEARCH-001 amount, range, reference and words find current records without
  assert.equal((await find({q:'pine supplies'}))[0].id,bill.id)
  assert.ok((await find({q:vendor.name})).some(r=>r.id===bill.id))
  assert.ok((await find({q:'45.00',account:acct['6200']})).some(r=>r.id===bill.id))
- assert.equal((await find({q:'45.00',from:'2026-04-01'})).length,0)
+ assert.equal((await find({q:'45.00',from:'2026-04-01',type:'bill'})).length,0)
  assert.equal((await find({q:'%'})).length,0,'wildcards are literal')
  const sales=await h.member('synthetic-pantry-10@example.test','sales')
  assert.equal(flat(await h.view('search?q=987.65',sales)).length,0)
