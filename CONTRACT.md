@@ -676,8 +676,8 @@ The 21 October CLOSE-004 round moves Continuous checks to done from `tests/api/c
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 51 | 41 | 29 | 121 |
-| All | 70 | 41 | 29 | 140 |
+| Target and push further | 51 | 43 | 27 | 121 |
+| All | 70 | 43 | 27 | 140 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |

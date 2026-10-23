@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "eb910c1f6d59dc85f36bb0bc19536e64d39c1a553b64a85b8f32d83d7e682d2c",
+      "sha256": "847c11f3d813dde82c632d7bed2cdb15541125711492dd58e35f4bcd3d070887",
       "executable": false
     },
     "DEMO.md": {
@@ -2955,6 +2955,10 @@
       "sha256": "5b298d2fbe9614e704e737ba468d446b05bb22d429584e3c1f4d695e7b052450",
       "executable": false
     },
+    "src/pantry/ask/index.ts": {
+      "sha256": "f50c405ba7b236385159492e09282007b86e678f13501f4167dae45b9b949df4",
+      "executable": false
+    },
     "src/pantry/automatch.ts": {
       "sha256": "b55b7ec3f92f7eccd9524af1c87a8cf685d57b626769c0db61a81c492ed911fd",
       "executable": false
@@ -3539,6 +3543,10 @@
       "sha256": "b52a0d6708a1123aae98b00d11041130a88866ae23b41f872bccfee9be9aecfc",
       "executable": false
     },
+    "src/pantry/integrations/health.ts": {
+      "sha256": "6210f8cce0ae0d01ff0f755b23a630db24485b54fc41afe3a3a6d15ff0341ecd",
+      "executable": false
+    },
     "src/pantry/integrations/idempotency.ts": {
       "sha256": "cfb8c0c46af87c3310724de24a94ea958c517227fde7d1712cd8a85f7d5240fb",
       "executable": false
@@ -3553,6 +3561,10 @@
     },
     "src/pantry/integrations/postings.ts": {
       "sha256": "bec39507ef97b342ee41209867bc5e1d74efbdcf2f75acd2b399124080f9b4bd",
+      "executable": false
+    },
+    "src/pantry/integrations/qbo.ts": {
+      "sha256": "424ccd5cef6116a1f4dd022ba637f1e0770be9e3923769e6752366a8df2d14b3",
       "executable": false
     },
     "src/pantry/integrations/rate-limit.ts": {
@@ -4455,6 +4467,10 @@
       "sha256": "4fd8c04175a3a152c09074a1ebcde2b25504be5491f228f69d290828db058d9c",
       "executable": false
     },
+    "src/ui/ask-books.tsx": {
+      "sha256": "cdaad003e7702530028b3bdd57c41d4ebb9cb60d13e5fa906b4cbae33d0f32d9",
+      "executable": false
+    },
     "src/ui/bank-connect.tsx": {
       "sha256": "f29d0472629ed9971fc27dc2114ba7c8caa912d44ff45d4f12cfbf52171785b4",
       "executable": false
@@ -5089,6 +5105,10 @@
     },
     "tests/app/checks.test.mjs": {
       "sha256": "bbe5eba559b3e6f699a0b944fdb774db64e6453a42594aadad11c30927289464",
+      "executable": false
+    },
+    "tests/app/connections-ask-journey.mjs": {
+      "sha256": "1dc6a607d2ac11c531455d3e42e51904e471a899079483d05a44f76f8adef57d",
       "executable": false
     },
     "tests/app/custom-reports.test.mjs": {
