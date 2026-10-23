@@ -1,5 +1,6 @@
 import { DimensionFormFields } from './dimensions'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouterState } from '@tanstack/react-router'
 import { Action, Card, Chip, Field, Form, Loading, Table, accountOptions, amountText, command, day, usd, useShared, useView, useWho, type D } from './kit'
 
 type Kind = 'prepaid' | 'accrual' | 'deferred'
@@ -86,7 +87,9 @@ function ScheduleDetail({ schedule: s, asOf, businessToday, edit, refresh }: { s
 
 export function RecognitionSchedules({ to, onChange }: { to: string; onChange?: () => Promise<void> }) {
   const { data, error, reload } = useView<D>(`recognition?to=${to}`), { state, reload: reloadShared } = useShared()
-  const [selected, setSelected] = useState<string | null>(null), [editing, setEditing] = useState<{ schedule?: D } | null>(null)
+  const search=useRouterState({select:s=>s.location.searchStr})
+  const [selected, setSelected] = useState<string | null>(()=>new URLSearchParams(search).get('recognition')), [editing, setEditing] = useState<{ schedule?: D } | null>(null)
+  useEffect(()=>{setSelected(new URLSearchParams(search).get('recognition'))},[search])
   const refresh = async () => { await Promise.all([reload(), reloadShared()]); await onChange?.() }
   if (!data) return <Card title="Recognition schedules"><Loading error={error} what="recognition schedules" /></Card>
   const current = data.schedules.find((s: D) => s.id === selected)

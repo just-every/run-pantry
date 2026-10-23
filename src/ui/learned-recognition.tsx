@@ -27,7 +27,7 @@ function LearnedProposal({p,can,onDone}:{p:D;can:boolean;onDone:()=>Promise<void
  <Field label="Reviewed funding source" name="sourceJournalId" options={p.sources.filter((s:D)=>!p.applications.some((a:D)=>a.source_journal_id===s.id)).map((s:D)=>({value:s.id,label:`${s.date} · ${usd(s.amount)}`}))} required/>
  </Form><Form label="Revoke this recommendation" submit={()=>command('learned.revoke',{id:p.id,revision:p.revision})} onDone={onDone} children={null}/></>}
  {p.applications.length>0&&<Table heads={['Prepared plan','Status','Posting approval']}>
- {p.applications.map((a:D)=><tr key={a.schedule_id}><td><a href="/app/close#recognition">Review source-funded plan</a></td><td>{a.status}</td><td>{a.approved_revision===a.revision?'Approved exact revision':'Human posting approval required'}</td></tr>)}
+ {p.applications.map((a:D)=><tr key={a.schedule_id}><td><a href={'/app/close?recognition='+a.schedule_id+'#recognition'}>Review source-funded plan</a></td><td>{a.status}</td><td>{a.approved_revision===a.revision?'Approved exact revision':'Human posting approval required'}</td></tr>)}
  </Table>}
  </section>
 }
