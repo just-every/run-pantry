@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "ce16797abccb42edb30d7dcef0dc0e3c33d54e3af0eab7c20492a8862dcda123",
+      "sha256": "249810b803df851a760a85a80af3de5fa28dc45988bbac69c6e8f730219f0c98",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "8c76863c6e630d411dea238840f3fba27673750c6b91b4d5d0678a77b0235f55",
+      "sha256": "b7839cccdb86c1b2dec62485ca616ab8c7ea2768e5b335fbd7778089e64fa655",
       "executable": false
     },
     "DEMO.md": {
@@ -769,6 +769,10 @@
     },
     "migrations/core/0100_reminder_business_day_recipients.sql": {
       "sha256": "6c5306eaab0dd11eed583500839f46bd7738c81425f052bf38783fc31b236898",
+      "executable": false
+    },
+    "migrations/core/0101_asset_disposal_approval.sql": {
+      "sha256": "721f77e1e7747aba9ac5235674bddcc709fb76eb0f661a00b888c32431978eb3",
       "executable": false
     },
     "migrations/rewrites.json": {
@@ -2988,7 +2992,7 @@
       "executable": false
     },
     "src/pantry/assets/index.ts": {
-      "sha256": "dbfb9bf06bbeb9e6d023a7ae02315708fd8bf2952e6af991c049b4897dc660be",
+      "sha256": "87582b98cd5386a3e371044efe58e9a1ccb66c5531d28334a72706bff2bdaece",
       "executable": false
     },
     "src/pantry/automatch.ts": {
@@ -3272,7 +3276,7 @@
       "executable": false
     },
     "src/pantry/db.ts": {
-      "sha256": "2ae977930b910c20dea9e7eda2248e38609c02a4634ed13278b88977cc4982ab",
+      "sha256": "30a890ee200c0e372e9d91d93b2e162dcfc153837d721c70b17b1fc514ff70de",
       "executable": false
     },
     "src/pantry/dedicated-report-export.ts": {
@@ -4548,7 +4552,7 @@
       "executable": false
     },
     "src/ui/assets.tsx": {
-      "sha256": "be665e9de635efcf9ce3d5132d6ba3a2b7431e8a71d953a43e07cd5144593d51",
+      "sha256": "f19c5dc0600237f0fb471e56ce4bd3a568a1529cc33c258dc72e02af4b88df1f",
       "executable": false
     },
     "src/ui/bank-connect.tsx": {
@@ -4984,7 +4988,7 @@
       "executable": false
     },
     "tests/api/assets.test.mjs": {
-      "sha256": "50fed0ab07c0ed47f3e20a59125993543668544608767a07b4b58ba5137311be",
+      "sha256": "7873486d832d6eb5042c83031960911774adf0440aa49b2f5a7baf600bc7175f",
       "executable": false
     },
     "tests/api/bank.test.mjs": {
@@ -5224,7 +5228,7 @@
       "executable": false
     },
     "tests/app/assets-journey.mjs": {
-      "sha256": "ca7ad5f8441d908d1a35289b7c0fef9f64726350e7884c80e1889022468c7c02",
+      "sha256": "b87c985d1886716a0b12abf3cd3e02655975ea667b37b3f142cca0956e4baa86",
       "executable": false
     },
     "tests/app/bank-rules.test.mjs": {

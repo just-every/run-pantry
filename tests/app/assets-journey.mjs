@@ -22,10 +22,15 @@ export async function assetsJourney(t){
   const asset=page.locator('section.card').filter({has:page.getByRole('heading',{name:'Vehicle '+width,exact:true})})
   await asset.waitFor();await asset.getByRole('button',{name:'Prepare next monthly journals',exact:true}).click()
   for(let month=1;month<=12;month++){const day=new Date(Date.UTC(2025,month,0)).toISOString().slice(0,10);await asset.getByRole('button',{name:'Approve '+day,exact:true}).click();await asset.getByRole('button',{name:'Approve '+day,exact:true}).waitFor({state:'detached'})}
-  await asset.getByRole('button',{name:'Run approved depreciation due now',exact:true}).click()
+  await asset.getByRole('button',{name:'Run approved journals due now',exact:true}).click()
   await asset.getByText('$7,200.00 accumulated book depreciation · $0.00 remaining book value.',{exact:true}).waitFor()
+  const booked=asset.locator('details').filter({has:page.locator('summary',{hasText:'Posted book entries'})});await booked.locator('summary').click();assert.equal(await booked.getByRole('link').count(),12)
   await asset.locator('summary',{hasText:'Accountant tax schedule'}).click();await asset.getByLabel('Section 179 amount',{exact:true}).fill('7200.00');await asset.getByLabel('Accountant election note',{exact:true}).fill('Accountant selected Section 179 for the tax package only');await asset.getByRole('button',{name:'Record tax election',exact:true}).click()
-  await asset.locator('summary',{hasText:'Dispose of this asset'}).click();await asset.getByLabel('Disposal date',{exact:true}).fill('2026-01-01');await asset.getByLabel('Disposal proceeds',{exact:true}).fill('4000.00');await asset.getByLabel('Proceeds bank ledger account',{exact:true}).selectOption(acct['1000']);await asset.getByLabel('Gain income account',{exact:true}).selectOption(acct['4000']);await asset.getByLabel('Loss expense account',{exact:true}).selectOption(expense.id);await asset.getByRole('button',{name:'Approve and record disposal',exact:true}).click()
+  await asset.locator('summary',{hasText:'Dispose of this asset'}).click();await asset.getByLabel('Disposal date',{exact:true}).fill('2026-01-01');await asset.getByLabel('Disposal proceeds',{exact:true}).fill('4000.00');await asset.getByLabel('Proceeds bank ledger account',{exact:true}).selectOption(acct['1000']);await asset.getByLabel('Gain income account',{exact:true}).selectOption(acct['4000']);await asset.getByLabel('Loss expense account',{exact:true}).selectOption(expense.id);await asset.getByRole('button',{name:'Prepare disposal for approval',exact:true}).click()
+  await asset.getByText('It posts only after approval of this exact revision.',{exact:false}).waitFor();assert.equal(await asset.getByText(/Disposed 2026-01-01/).count(),0)
+  if(process.env.PANTRY_PROOF_DIR){await mkdir(process.env.PANTRY_PROOF_DIR,{recursive:true});await asset.screenshot({path:`${process.env.PANTRY_PROOF_DIR}/assets-disposal-pending-${width}.png`})}
+  await asset.getByRole('button',{name:'Approve disposal 2026-01-01',exact:true}).click();await asset.getByRole('button',{name:'Approve disposal 2026-01-01',exact:true}).waitFor({state:'detached'})
+  await asset.getByRole('button',{name:'Run approved journals due now',exact:true}).click()
   await asset.getByText(/Disposed 2026-01-01/).waitFor()
   await asset.scrollIntoViewIfNeeded()
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal(await page.locator('button').evaluateAll(buttons=>buttons.filter(b=>!b.textContent.trim()).length),0);assert.deepEqual(errors,[])

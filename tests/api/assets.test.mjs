@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { books,harness } from './harness.mjs'
 
-test('ASSET-001 reviewed source cost depreciates through approved recurring journals, disposal ties and tax elections do not post',async t=>{
+test('ASSET-001 reviewed source cost depreciates through approved recurring journals, disposal posts only through approval and tax elections do not post',async t=>{
  const h=await harness();t.after(()=>h.close());const {acct,state}=await books(h)
  await h.command('entity.save',{revision:state.settings.entity.revision,legalName:'synthetic-pantry-11',entityType:'single-member-llc',state:'NY',fiscalYearStart:1,taxMethod:'cash',booksStart:'2025-01-01'})
  const contra=await h.command('account.save',{code:'1590',name:'synthetic-pantry-1',type:'asset',subtype:'other'})
@@ -27,13 +27,39 @@ test('ASSET-001 reviewed source cost depreciates through approved recurring jour
  const templates=await h.view('recurring-journals');assert.ok(templates.templates.filter(t=>a.plan.some(p=>p.recurring_id===t.id)).every(t=>t.name.includes('straight-line')&&t.memo.includes('straight-line')))
  await h.command('recurring-journal.approve',{id:first.recurring_id,revision:'stale'},undefined,409)
  for(const p of a.plan)await h.command('recurring-journal.approve',{id:p.recurring_id,revision:p.revision})
+ const pair=await h.command('bill.save',{vendorId:vendor.id,reference:'synthetic-pantry-12',billDate:'2025-01-01',post:true,evidenceWaived:'synthetic-pantry-5',lines:['synthetic-pantry-13','synthetic-pantry-14'].map(description=>({description,accountId:acct['6200'],amount:'2600.00'}))})
+ const line=description=>view.proposals.find(p=>p.bill_id===pair.id&&p.description===description);view=await h.view('assets')
+ const laptop=await h.command('asset.capitalize',{...input,name:'synthetic-pantry-13',billLineId:line('synthetic-pantry-13').id,billRevision:line('synthetic-pantry-13').bill_revision,cost:'2600.00',months:7})
+ const press=await h.command('asset.capitalize',{...input,name:'synthetic-pantry-14',billLineId:line('synthetic-pantry-14').id,billRevision:line('synthetic-pantry-14').bill_revision,cost:'2600.00',months:5,method:'declining-balance',residual:'100.00'})
+ const pressPlan=(await h.command('asset.prepare-depreciation',{id:press.id,revision:press.revision})).assets.find(x=>x.id===press.id).plan
+ assert.deepEqual(pressPlan.map(p=>p.amount_cents),[104000,62400,37440,22464,23696],'double declining balance; the final period carries what is left above residual')
+ assert.ok((await h.view('recurring-journals')).templates.filter(t=>pressPlan.some(p=>p.recurring_id===t.id)).every(t=>t.name.includes('declining-balance')&&t.memo.includes('declining-balance')))
+ const loss={id:laptop.id,revision:laptop.revision,accumulatedCents:0,date:'2025-03-01',proceeds:'2000.00',bankAccountId:acct['1000'],gainAccountId:acct['4000'],lossAccountId:expense.id,confirm:true}
+ const stale=(await h.command('asset.dispose',loss)).assets.find(x=>x.id===laptop.id).disposal;assert.equal(stale.gain_cents,-60000)
+ await h.command('recurring-journal.approve',{id:stale.recurring_id,revision:stale.revision})
+ const laptopPlan=(await h.command('asset.prepare-depreciation',{id:laptop.id,revision:laptop.revision})).assets.find(x=>x.id===laptop.id).plan
+ assert.deepEqual(laptopPlan.map(p=>p.amount_cents),[...Array(6).fill(37142),37148],'straight-line rounding remainder lands in the final period')
+ await h.command('recurring-journal.approve',{id:laptopPlan[0].recurring_id,revision:laptopPlan[0].revision})
  await h.cron(Date.parse('2027-01-01T12:00:00Z'))
+ const blocked=(await h.view('assets')).assets.find(x=>x.id===laptop.id)
+ assert.deepEqual([blocked.disposed_date,blocked.depreciation.accumulated,blocked.disposal.run_status],[null,37142,'blocked'],'depreciation posted after review blocks the approved disposal snapshot');assert.match(blocked.disposal.run_detail,/prepare the disposal again/)
  view=await h.view('assets');a=view.assets.find(a=>a.id===asset.id)
  assert.equal(a.depreciation.accumulated,720000);assert.equal(a.bookValue,0);assert.equal(a.depreciation.rows.length,12)
  const entries=await h.view('journal');assert.equal(entries.entries.filter(e=>a.plan.some(p=>p.recurring_id===e.source_id)&&e.status==='posted').length,12)
- await h.command('asset.dispose',{id:a.id,revision:a.revision,accumulatedCents:0,date:'2027-01-02',proceeds:'4000.00',bankAccountId:acct['1000'],gainAccountId:acct['4000'],lossAccountId:expense.id,confirm:true},undefined,409)
- const disposed=await h.command('asset.dispose',{id:a.id,revision:a.revision,accumulatedCents:720000,date:'2027-01-02',proceeds:'4000.00',bankAccountId:acct['1000'],gainAccountId:acct['4000'],lossAccountId:expense.id,confirm:true})
- const disposal=(await h.view('journal')).entries.find(e=>e.id===disposed.disposal_journal_id)
+ const dispose={id:a.id,revision:a.revision,accumulatedCents:720000,date:'2026-01-02',proceeds:'4000.00',bankAccountId:acct['1000'],gainAccountId:acct['4000'],lossAccountId:expense.id,confirm:true}
+ await h.command('asset.dispose',{...dispose,accumulatedCents:0},undefined,409)
+ await h.command('asset.dispose',dispose,reviewingAccountant,403)
+ const trialBalance=()=>h.view('/reports/trial-balance?to=2027-12-31&basis=accrual'.slice(1)),unposted=await trialBalance()
+ const pending=(await h.command('asset.dispose',dispose)).assets.find(x=>x.id===asset.id).disposal
+ assert.deepEqual([pending.status,pending.gain_cents,pending.accumulated_cents],['awaiting-approval',400000,720000])
+ await h.cron(Date.parse('2027-01-03T12:00:00Z'))
+ assert.deepEqual(await trialBalance(),unposted,'a prepared disposal posts nothing before CLOSE-001 approval')
+ await h.command('recurring-journal.approve',{id:pending.recurring_id,revision:'stale'},undefined,409)
+ await h.command('recurring-journal.approve',{id:pending.recurring_id,revision:pending.revision})
+ await h.cron(Date.parse('2027-01-03T12:00:00Z'))
+ a=(await h.view('assets')).assets.find(x=>x.id===asset.id);assert.equal(a.disposed_date,'2026-01-02')
+ const disposal=(await h.view('journal')).entries.find(e=>e.id===a.disposal_journal_id)
+ assert.deepEqual([disposal.status,disposal.source_id],['posted',pending.recurring_id])
  assert.equal(disposal.lines.find(l=>l.account_id===acct['4000']).credit_cents,400000)
  assert.equal(disposal.lines.find(l=>l.account_id===acct['1500']).credit_cents,720000)
  assert.equal(disposal.lines.find(l=>l.account_id===contra.id).debit_cents,720000)
