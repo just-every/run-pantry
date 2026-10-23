@@ -3,6 +3,7 @@ import { authority, type Integration, who } from '../access'
 import type { Command, Context } from '../context'
 import { list, now, requireThat, sha256, text, uid } from '../core'
 import { all, audit, changed, one, q, run } from '../db'
+import { connectionHealth } from './health'
 import { READ_SCOPES } from './resources'
 
 export const SCOPES = [
@@ -45,7 +46,7 @@ export async function integrationSettings(c: Context, cursor?: string) {
   const calls = await all(c.db, `SELECT c.*,i.name FROM pt_integration_calls c JOIN pt_integrations i ON i.id = c.credential_id ${before ? 'WHERE (c.at,c.id) < (?,?)' : ''} ORDER BY c.at DESC,c.id DESC LIMIT 101`, ...(before ? [before.at, before.id] : []))
   const more = calls.length > 100
   if (more) calls.pop()
-  return { credentials: credentials.map(r => ({ ...r, scopes: JSON.parse(r.scopes) })), scopes: SCOPES,
+  return { connections: await connectionHealth(c), credentials: credentials.map(r => ({ ...r, scopes: JSON.parse(r.scopes) })), scopes: SCOPES,
     calls, nextCursor: more ? calls.at(-1)!.id : null }
 }
 

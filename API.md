@@ -109,3 +109,29 @@ The signed-in native owner can use `dimensions.settings` with the current settin
 Native read projections expose `/api/pantry/dimensions` and `/api/pantry/dimensions/project?name=NAME&from=YYYY-MM-DD&to=YYYY-MM-DD&basis=cash|accrual` to the existing authorized financial reader. Invoice, bill and journal line inputs accept `className`, `locationName`, `projectName`. The scoped invoice posting door uses the same validation and retained coding. P&L and balance sheet accept `columns=class|location|project`. General ledger, trial balance, P&L, balance sheet, grouped customer/vendor/item totals, cash-flow, sales-tax, ageing/open-item library, deposits/check/operational contractor summaries, reconciliation contributions and transaction/journal reports accept `dimension=class|location|project&dimensionValue=unassigned|value:NAME`, including comparisons and downloads where supported. Choose dimension columns or a dimension filter. Saved custom definitions retain dimension/dimensionValue in `filters` and class/location/project statement comparison modes; formula operands and management-package reports preserve the selection. Class/location budget selectors retain ordinary basis, source-figure and export semantics. See [dimensions](docs/dimensions.md) for current supported surfaces and remaining limitations.
 
 The ordinary state projection includes historical posted dimension names only for the existing full financial-report reader. They remain report filters rather than catalogue entries for new coding. Reconciliation contributions keep external statement balances Unassigned and retain the completed proof boundary; they are not separate dimension reconciliations.
+
+
+## QuickBooks compatibility subset (API-002, partial)
+
+The installation accepts the root `/qbo/v3/company/pantry` with the same native integration bearer token. The realm ID is the literal `pantry`. This compatibility route uses the same granular native scopes, durable rate limit, idempotency records, posting rules and period guards. Send a unique `requestid` query value or `Idempotency-Key` header on every write. A replay returns the current native record. Changed payloads with an old key are refused.
+
+Implemented operations:
+
+| Entity | Operations | Native consent |
+| --- | --- | --- |
+| Customer and Vendor | Create, exact lookup, query | Contact read or write scopes; creates need write |
+| Invoice | Create, exact lookup, query | Invoice read or write scopes; creates need write |
+| Payment | Record an external receipt, exact lookup, query | Payment read or write scopes; recording needs write and `post` |
+| Account and Item | Exact lookup and query | The respective record read scope |
+| Bill and JournalEntry | Exact lookup and query of native records | The respective read or write scope |
+| Attachable | Upload, metadata lookup and query | Document read or write scopes; uploads need write |
+
+Invoice creation accepts USD tax-exempt `SalesItemLineDetail` lines referencing existing native Items. Set `TaxCodeRef.value` to `NON`; `Qty` and `UnitPrice` must agree with each supplied `Amount`. A token with `post` issues the invoice; without it, the invoice remains a native draft. Nonzero tax, unsupported fields, updates, deletes and unsupported entity writes are refused. Payment creation records money already received; it never charges a customer. `DepositToAccountRef.value` may name the native bank ledger account or its bank mapping ID. Allocation and amount checks are native. Upload uses multipart fields `file_metadata_01` and `file_content_01`, with optional Invoice or Bill `AttachableRef` linkage, and an 8 MB request limit. Download requires the scoped document door, not a public URL.
+
+Queries accept `SELECT * FROM Entity`, optional exact `Id`, `DisplayName`, `DocNumber` or `CustomerRef` filters where that entity supports them, `STARTPOSITION 1` and `MAXRESULTS` from 1 through 100. Unsupported query syntax is refused rather than ignored. Responses use named QuickBooks entity envelopes, `QueryResponse`, `AttachableResponse`, and a `Fault` with `Error`, `Message`, `Detail`, `code` and `type`. Estimate requests return an explicit unsupported-entity fault.
+
+No unmodified SDK version is certified yet. The required Java setting is `Config.BASE_URL_QBO`; the .NET setting is `IppConfiguration.BaseUrl.Qbo`. Their complete customer, invoice, query, payment and attachment journeys, a Make HTTP execution, change data capture, BillPayment, Class, Department and TaxCode remain unproved. The intended configurable root is the installation origin plus `/qbo/`; actual SDK settings and versions will be published only after running those clients. Jobber, Housecall Pro and ServiceTitan require the named INTEG-003 connectors; they are not compatible tools under API-002.
+
+## Calculated book questions
+
+Signed-in people with full financial-report authority can read `/api/pantry/ask` with `question` and optional `basis`. The current interpreter understands contractor spending and net income with a named calendar month or quarter, an optional year, and comparisons to the previous period or last year. It runs native posted-data reports, returns their explicit ranges and basis, account movements, posted source lines and working report links. Contractor spending means expense accounts whose names contain `contract`, including the starter chart's Contractors account; it is not a 1099 payment report. Ambiguous or unsupported questions are refused; an empty current period says `no records`. Generated answers can be saved through the existing custom-report command and its native authority checks. No model memory, model call, posting or outbound action supplies an answer.

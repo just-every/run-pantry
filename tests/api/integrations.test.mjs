@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { books, harness } from './harness.mjs'
+import { books, fixture, harness } from './harness.mjs'
 
 const financialReports = ['trial-balance', 'general-ledger', 'profit-and-loss', 'balance-sheet', 'sales-by-customer', 'expenses-by-vendor', 'sales-by-item', 'cash-flow', 'sales-tax', 'receivables', 'payables', 'receivables-summary', 'payables-summary', 'open-invoices', 'unpaid-bills', 'customer-balances', 'vendor-balances', 'transactions', 'journal', 'deposits', 'check-detail', 'reconciliations', 'contractor-summary']
 
@@ -665,4 +665,88 @@ test('API-001 record-type readers expose bounded native records with granular co
 
 test('API-001 webhook transport times out a slow receiver without reading its response',async t=>{
  const {webhookTimeout}=await import('./webhook-journey.mjs');await webhookTimeout(t)
+})
+
+
+test('INTEG-002 owner sees failed Stripe and Gusto connections, retries a provider and gets current counts and ledger tie-outs',async t=>{
+  const {clearingProvider}=await import('../providers/stripe-clearing.mjs')
+  const edge=clearingProvider({missingRefund:false});let broken=false
+  const payrolls=JSON.parse(await fixture('gusto/payrolls.json'))
+  const h=await harness({bindings:{GUSTO_CLIENT_ID:'synthetic-pantry-1',GUSTO_CLIENT_SECRET:'synthetic-pantry-2',GUSTO_ENV:'demo'},outbound:async request=>{
+    const u=new URL(request.url)
+    if(broken)return Response.json({error:'synthetic-pantry-3'},{status:503})
+    if(u.hostname==='api.stripe.com')return edge.outbound(request)
+    if(u.pathname==='/oauth/token')return Response.json({access_token:'synthetic-pantry-4',refresh_token:'synthetic-pantry-5',expires_in:7200})
+    if(u.pathname==='/v1/token_info')return Response.json({resource:{type:'Company',uuid:'synthetic-pantry-6'}})
+    if(u.pathname==='/v1/companies/synthetic-pantry-6')return Response.json({uuid:'synthetic-pantry-6',name:'Synthetic payroll'})
+    if(u.pathname==='/v1/companies/synthetic-pantry-6/payrolls')return Response.json(u.searchParams.get('page')==='1'?payrolls:[])
+    throw new Error('Unexpected provider request '+u.pathname)
+  }});t.after(h.close)
+  const {acct}=await books(h)
+  const bank=await h.command('bank-account.save',{name:'Checking',institution:'Synthetic bank',accountId:acct['1000'],numberLast4:'4821',openingDate:'2026-01-01',openingBalance:'0'})
+  await h.command('stripe.connect',{secretKey:'synthetic-pantry-7'})
+  await h.command('stripe.payouts',{bankAccountId:bank.id,salesAccountId:acct['4000'],from:'2026-01-01'})
+  const connect=await h.command('gusto.connect',{}),state=new URL(connect.url).searchParams.get('state')
+  assert.equal((await h.send('/api/pantry/gusto/callback?'+new URLSearchParams({state,code:'synthetic-pantry-8'}),undefined,{cookie:h.owner})).status,303)
+  let v=await h.view('integrations')
+  const gusto=v.connections.find(c=>c.id==='gusto'),stripe=v.connections.find(c=>c.id==='stripe')
+  assert.ok(gusto.objects>0);assert.ok(stripe.objects>0)
+  assert.equal(gusto.tieOut.differenceCents,-105000);assert.equal(stripe.tieOut.differenceCents,0)
+  assert.equal(gusto.status,'Needs attention');assert.match(gusto.reason,/5a9d3e71/)
+  assert.ok(gusto.lastSync);assert.ok(stripe.lastSync)
+  assert.equal(gusto.retry,'gusto.sync');assert.equal(stripe.retry,'stripe.payouts-sync')
+  const expected=gusto.tieOut.providerCents
+  assert.ok(expected>0)
+  broken=true
+  await h.command('gusto.sync',{});await h.command('stripe.payouts-sync',{})
+  v=await h.view('integrations')
+  for(const id of ['stripe','gusto']){const row=v.connections.find(c=>c.id===id);assert.equal(row.status,'Needs attention');assert.match(row.reason,/503/);assert.equal(row.tieOut.complete,false)}
+  broken=false
+  payrolls[2].totals.company_debit='1076.50';payrolls[2].totals.tax_debit='326.50'
+  await h.command(v.connections.find(c=>c.id==='gusto').retry,{})
+  v=await h.view('integrations')
+  assert.equal(v.connections.find(c=>c.id==='gusto').status,'Connected')
+  assert.equal(v.connections.find(c=>c.id==='gusto').tieOut.providerCents,expected+2650)
+  assert.equal(v.connections.find(c=>c.id==='gusto').tieOut.differenceCents,0)
+  assert.equal(v.connections.find(c=>c.id==='stripe').status,'Needs attention')
+  for(const secret of ['synthetic-pantry-2','synthetic-pantry-4','synthetic-pantry-5','synthetic-pantry-7'])assert.ok(!JSON.stringify(v).includes(secret))
+  assert.ok(v.connections.some(c=>c.status==='Unavailable'))
+  const viewer=await h.member('synthetic-pantry-9@example.test','viewer')
+  await h.view('integrations',viewer,403)
+})
+
+test('API-002 compatibility calls create, query, pay and attach through native scope, idempotency and period guards',async t=>{
+  const h=await harness();t.after(h.close);const {acct}=await books(h)
+  const bank=await h.command('bank-account.save',{name:'Checking',institution:'Synthetic bank',accountId:acct['1000'],numberLast4:'4821',openingDate:'2026-01-01',openingBalance:'0'})
+  const item=await h.command('item.save',{name:'synthetic-pantry-1',kind:'service',rate:'125.00',accountId:acct['4000'],taxCategory:'non-taxable'})
+  const token=await h.command('integration.create',{name:'synthetic-pantry-2',scopes:['contacts:write','invoices:write','payments:write','documents:write','items:read','post']})
+  const call=async(path,body,key,status=200,credential=token.token)=>{const r=await h.send('/qbo/v3/company/pantry/'+path,body,{headers:{authorization:'Bearer '+credential,...(key?{'idempotency-key':key}:{})}});assert.equal(r.status,status,JSON.stringify(r.value));return r.value}
+  const customerBody={DisplayName:'synthetic-pantry-3',PrimaryEmailAddr:{Address:'synthetic-pantry-3@example.test'}}
+  const {Customer}=await call('customer',customerBody,'synthetic-pantry-4')
+  assert.equal((await call('customer',customerBody,'synthetic-pantry-4')).Customer.Id,Customer.Id)
+  assert.equal((await call('customer/'+Customer.Id)).Customer.DisplayName,customerBody.DisplayName)
+  const body={CustomerRef:{value:Customer.Id},TxnDate:'2026-10-17',DocNumber:'synthetic-pantry-5',Line:[{Amount:250,Description:'synthetic-pantry-6',DetailType:'SalesItemLineDetail',SalesItemLineDetail:{ItemRef:{value:item.id},Qty:2,UnitPrice:125,TaxCodeRef:{value:'NON'}}}]}
+  const {Invoice}=await call('invoice',body,'synthetic-pantry-7')
+  assert.equal(Invoice.TotalAmt,250);assert.equal(Invoice.Balance,250)
+  assert.equal((await call('invoice',body,'synthetic-pantry-7')).Invoice.Id,Invoice.Id)
+  const query=await call('query?'+new URLSearchParams({query:"SELECT * FROM Invoice WHERE DocNumber = 'synthetic-pantry-5' MAXRESULTS 10"}))
+  assert.deepEqual(query.QueryResponse.Invoice.map(i=>i.Id),[Invoice.Id])
+  const pay={CustomerRef:{value:Customer.Id},DepositToAccountRef:{value:bank.id},TxnDate:'2026-10-18',TotalAmt:250,PaymentRefNum:'synthetic-pantry-8',Line:[{Amount:250,LinkedTxn:[{TxnId:Invoice.Id,TxnType:'Invoice'}]}]}
+  const {Payment}=await call('payment',pay,'synthetic-pantry-9')
+  assert.equal((await call('payment',pay,'synthetic-pantry-9')).Payment.Id,Payment.Id)
+  assert.equal((await call('invoice/'+Invoice.Id)).Invoice.Balance,0)
+  const form=new FormData();form.set('file_metadata_01',JSON.stringify({FileName:'synthetic-pantry-10.txt',ContentType:'text/plain',AttachableRef:[{EntityRef:{type:'Invoice',value:Invoice.Id}}]}));form.set('file_content_01',new Blob(['synthetic-pantry-11'],{type:'text/plain'}),'synthetic-pantry-10.txt')
+  const raw=new Request('https://example.test',{method:'POST',body:form})
+  const uploaded=await h.send('/qbo/v3/company/pantry/upload?requestid=synthetic-pantry-12',undefined,{method:'POST',raw:new Uint8Array(await raw.arrayBuffer()),headers:{authorization:'Bearer '+token.token,'content-type':raw.headers.get('content-type')}})
+  assert.equal(uploaded.status,200,JSON.stringify(uploaded.value))
+  assert.equal(uploaded.value.AttachableResponse[0].Attachable.FileName,'synthetic-pantry-10.txt')
+  assert.equal((await call('estimate',{CustomerRef:{value:Customer.Id}},'synthetic-pantry-13',400)).Fault.type,'ValidationFault')
+  assert.match((await call('query?query=SELECT+*+FROM+Estimate',undefined,undefined,400)).Fault.Error[0].Message,/Unsupported/)
+  const read=await h.command('integration.create',{name:'synthetic-pantry-14',scopes:['invoices:read']})
+  await call('invoice',body,'synthetic-pantry-15',403,read.token)
+  await call('query?query=SELECT+*+FROM+Invoice+STARTPOSITION+2',undefined,undefined,400)
+  await call('query?query=SELECT+*+FROM+Invoice+WHERE+DocNumber+LIKE+%27synthetic%25%27',undefined,undefined,400)
+  await call('invoice',{...body,Line:[{...body.Line[0],Amount:251}]},'synthetic-pantry-16',400)
+  await h.command('integration.revoke',{id:token.id})
+  await call('invoice/'+Invoice.Id,undefined,undefined,401)
 })

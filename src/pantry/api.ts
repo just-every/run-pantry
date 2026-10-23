@@ -1,3 +1,5 @@
+import { qbo } from './integrations/qbo'
+import { askBooks } from './ask'
 import { contractorFormExport } from './contractor-export'
 import { reportDeliveryCommands, deliverySettings, deliveryAttachment } from './report-delivery'
 import { nativeReportExport } from './report-export-reader'
@@ -130,6 +132,7 @@ api.use('*', async (c, next) => {
   c.executionCtx.waitUntil(runDueWork(c.env).catch(error => console.error('Pantry due work failed:', error)))
 })
 api.get('/health', c => c.json({ status: 'ok', ...deploymentHealth(c.env) }))
+api.route('/qbo/v3/company', qbo)
 api.route('/', customer)
 api.use('/api/pantry/*', async (c, next) => { await next(); c.header('cache-control', 'no-store'); c.header('x-content-type-options', 'nosniff') })
 // Feed syncs that have come due run after an ordinary read answers, as well as on the Cron trigger.
@@ -160,6 +163,7 @@ api.route('/api/pantry/integration/v1', integrations)
 view('webhooks', async ctx => webhookSettings(ctx))
 view('data-flows', async ctx => dataFlows(ctx))
 view('erasure', async ctx => { await ownerSession(ctx); return erasureSettings(ctx.db) })
+view('ask', async (ctx,c) => askBooks(ctx,c.req.query('question'),c.req.query('basis')))
 view('integrations', async (ctx, c) => { must(ctx.actor, 'owner'); return integrationSettings(ctx, c.req.query('cursor')) })
 const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10)) => date(c.req.query(name) ?? fallback, name)
 

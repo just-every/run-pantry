@@ -313,3 +313,36 @@ Owner/member/auth/session/passkey/agent/integration/provider credentials, erasur
 ## Webhook receivers
 
 The native owner manages webhooks in Settings, independently of integration credentials. [API.md](https://github.com/just-every/run-pantry/blob/main/API.md) documents exact payload bytes, HMAC verification, the five-minute timestamp limit, 24-hour rotation overlap, retry schedule, consent cancellation and safe restore behavior. The settings data declaration lists only destination hosts, selected event types and the thin payload fields. Record details require their own granular read grant.
+
+
+## Connection health
+
+The owner's Integration credentials card now includes a unified Connections table. It lists configured services, sibling credentials and unavailable connection families without offering unimplemented providers. Stripe shows its retained clearing-item count, last read attempt, safe failure reason, retry and provider clearing balance against today's ledger. Gusto shows retained payroll counts, last read attempt, safe failure reasons and retry; its tie-out compares retained payroll-debit observations with the bank credits in their associated posted entries, including named held payrolls. It does not claim a current company-wide provider balance. An incomplete read stays labeled incomplete. The retry buttons call the ordinary native sync commands, preserving their claims, locks and idempotency. Measurements that a connection does not provide say **Not measured**. No credential is returned in health data.
+
+## Automation HTTP recipes
+
+Crank HTTP workflows, Zapier Webhooks steps and Make HTTP modules use the same scoped API and signed webhooks. No certified native platform package is claimed yet.
+
+| Trigger | Owner subscription | Receiver condition |
+| --- | --- | --- |
+| Invoice created | `created` | `record.kind` is `invoice` |
+| Invoice approved | `approved` | `record.kind` is `invoice` |
+| Invoice paid | `paid` | `record.kind` is `invoice`; this reports the transition to fully settled |
+| Bill posted | `posted` | `record.kind` is `bill` |
+| Statement matched | `matched` | Read the referenced match with its record scope |
+| Period locked | `locked` | Read close status with its record scope |
+
+Create a native owner webhook subscription to the workflow's HTTPS receiver, explicitly selecting its events. Verify the exact signed bytes and five-minute timestamp window as described in API.md. Durably insert `Pantry-Event-Id` into a unique receiver store before starting workflow side effects; a duplicate event returns success without repeating the workflow. Delivery is at least once, so a receiver without durable deduplication cannot promise once-only workflow execution. Read the event's record through a separate token holding only its required read scope. The thin webhook never carries amounts or personal fields.
+
+| Action | Native path | Scope and control |
+| --- | --- | --- |
+| Create customer or vendor | `/api/pantry/integration/v1/contacts` | `contacts:write`; stable external ID and idempotency key |
+| Create invoice draft | `/api/pantry/integration/v1/invoices` | `invoices:write`; omit `post` |
+| Issue approved source invoice | `/api/pantry/integration/v1/invoices` | `invoices:write` plus `post`; explicit `post: true` |
+| Create bill draft | `/api/pantry/integration/v1/bills` | `bills:write`; omit `post` |
+| Record external payment | `/api/pantry/integration/v1/payments` | `payments:write` plus `post`; money already moved |
+| Attach document | `/api/pantry/integration/v1/documents` | `documents:write`; native retention and period checks |
+
+Use a separate idempotency key for each source operation; retry the same bytes with the same key after an uncertain response. Native reads, request limits, approvals, revocation and locks still apply. A real installed Crank workflow receiving one invoice-paid event and deduplicating its delivery remains acceptance work; an HTTP-edge test alone is not that installation journey.
+
+API-002's implemented compatibility subset and its outstanding SDK certification are documented in API.md. Make can use ordinary HTTP calls today; no completed Make scenario or unmodified Java or .NET SDK journey is claimed.

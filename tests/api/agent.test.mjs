@@ -157,3 +157,48 @@ test('AGENT-003 a locked September correction names issued copies, changes its p
   const income = await h.view('reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=accrual')
   assert.equal(income.netIncome, -300000, 'September remains locked and unchanged')
 })
+
+
+test('AGENT-007 book questions equal posted reports on both bases, explain comparisons and save as custom reports', async t => {
+  const h=await harness();t.after(h.close)
+  const {acct}=await books(h)
+  const post=async(date,debit,credit,amount)=>{const e=await h.command('journal.save-draft',{date,memo:'synthetic-pantry-1',lines:[{accountId:debit,debit:amount},{accountId:credit,credit:amount}]});return h.command('journal.post',{id:e.id,revision:e.revision})}
+  await post('2025-08-15',acct['6000'],acct['1000'],'100.00')
+  await post('2026-08-15',acct['6000'],acct['1000'],'250.00')
+  await post('2026-09-15',acct['1000'],acct['4000'],'1000.00')
+  await post('2026-10-15',acct['1000'],acct['4000'],'600.00')
+  // A draft must never contribute to an answer.
+  await h.command('journal.save-draft',{date:'2026-10-20',memo:'synthetic-pantry-2',lines:[{accountId:acct['1000'],debit:'9999.00'},{accountId:acct['4000'],credit:'9999.00'}]})
+  for(const basis of ['cash','accrual'])for(const question of ['what did we spend on contractors in Q3 2026 compared with last year?','why is net income down in October 2026?']) {
+    const a=await h.view('ask?'+new URLSearchParams({question,basis}))
+    assert.equal(a.generated,true);assert.equal(a.status,'answered');assert.equal(a.basis,basis)
+    assert.equal(a.changeCents,question.includes('contractors')?15000:-40000)
+    assert.equal(a.movements.reduce((s,m)=>s+m.changeCents,0),a.changeCents)
+    for(const [i,f]of a.figures.entries()) {
+      const query=a.citations[i].query, report=await h.view('reports/profit-and-loss?'+new URLSearchParams(query))
+      const expected=question.includes('contractors')?report.expenses.filter(e=>/contract/i.test(e.name)).reduce((s,e)=>s+e.amount,0):report.netIncome
+      assert.equal(f.amountCents,expected)
+      assert.equal(f.lines.reduce((s,l)=>s+l.amountCents,0),expected)
+      assert.ok(a.citations[i].href.startsWith('/app/reports?'))
+      for(const line of f.lines)assert.equal((await h.view('reports/record/entry/'+line.entryId)).id,line.entryId)
+    }
+    const saved=await h.command('custom-report.save',{definition:a.definition})
+    const result=await h.view('custom-reports/'+saved.id)
+    assert.ok(result)
+  }
+})
+
+test('AGENT-007 no-data and unsupported questions produce no invented figures and financial authority is enforced',async t=>{
+  const h=await harness();t.after(h.close);await books(h)
+  const a=await h.view('ask?'+new URLSearchParams({question:'why is net income down in October 2040?',basis:'cash'}))
+  assert.equal(a.status,'no records');assert.ok(a.figures.every(f=>f.records===0&&f.amountCents===0&&f.lines.length===0))
+  await h.view('ask?question='+encodeURIComponent('What will revenue be next year?'),h.owner,400)
+  await h.view('ask?question=net+income',h.owner,400)
+  const sales=await h.member('synthetic-pantry-3@example.test','sales')
+  await h.view('ask?question='+encodeURIComponent('What are our bank balances in October 2026?'),sales,403)
+  await h.view('ask?question='+encodeURIComponent('net income in October 2026'),sales,403)
+  const viewer=await h.member('synthetic-pantry-4@example.test','viewer')
+  assert.equal((await h.view('ask?question='+encodeURIComponent('net income in October 2026'),viewer)).status,'no records')
+  const agent=await h.agent('synthetic-pantry-5')
+  assert.equal((await h.send('/api/pantry/ask?question=net+income+October+2026',undefined,{headers:{authorization:'Bearer '+agent.token}})).status,401)
+})

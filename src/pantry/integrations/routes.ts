@@ -23,6 +23,7 @@ import { prepareBill, prepareContact, prepareDocument, prepareInvoice, prepareJo
 type Env = { Bindings: Bindings; Variables: { integration: Integration & { scopes: string[] } } }
 type C = HonoContext<Env>
 export const integrations = new Hono<Env>()
+integrations.onError((error,c)=>{const status=error instanceof Fault?error.status:500;return c.json({error:error instanceof Fault?error.message:'Unexpected integration error'},status as 400)})
 
 integrations.use('*', async (c, next) => {
   const credential = await identify(c.req.raw, c.env)

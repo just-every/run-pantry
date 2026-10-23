@@ -1,3 +1,4 @@
+import { askJourney, connectionJourney } from './connections-ask-journey.mjs'
 import { estimatesJourney } from './estimates-journey.mjs'
 import { access001Browser } from './access001-journey.mjs'
 import { effectsJourney } from './effects-journey.mjs'
@@ -466,3 +467,6 @@ test('DIM-001 dimension splits, document recoding and generated coding through t
 
 import {reportDeliveryBrowser} from './report-delivery.mjs'
 test('REPORT-007 dedicated exports and owner-consented lender delivery on month lock at 1440 and 390',reportDeliveryBrowser)
+
+test('AGENT-007 calculated answers, citations and saved reports at 1440 and 390', askJourney)
+test('INTEG-002 connection inventory and honest unmeasured states at 1440 and 390', connectionJourney)

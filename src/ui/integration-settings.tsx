@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Action, Card, Chip, command, day, Field, Form, Loading, Table, useShared, useView } from './kit'
+import { Action, Card, Chip, command, day, Field, Form, Loading, Table, useShared, useView, usd, type D } from './kit'
 
 type Scope = { id: string; label: string; help: string }
 type Credential = { id: string; name: string; scopes: string[]; created_at: string; created_by: string; revoked_at: string | null }
 type CreatedCredential = { id: string; name: string; token: string; scopes: string[] }
 type IntegrationCall = { id: string; credential_id: string; name: string; at: string; method: string; path: string; status: number }
-type Integrations = { credentials: Credential[]; calls: IntegrationCall[]; scopes: Scope[]; nextCursor: string | null }
+type Integrations = { connections: D[]; credentials: Credential[]; calls: IntegrationCall[]; scopes: Scope[]; nextCursor: string | null }
 
 function NewCredential({ scopes, onCreated }: { scopes: Scope[]; onCreated: (credential: CreatedCredential) => Promise<void> }) {
   const [selected, setSelected] = useState<string[]>([])
@@ -99,6 +99,15 @@ export function IntegrationSettings() {
     {!data ? <Loading error={error} what="integration credentials" /> : <>
       {error && <p className="error" role="alert">{error}</p>}
       {visibleToken && <CredentialToken key={visibleToken.id} credential={visibleToken} onDismiss={() => setToken(null)} />}
+      <h3>Connections</h3>
+      <Table heads={['Connection', 'Status and reason', 'Last sync', 'Objects synced', 'Provider and ledger', '']} caption="Connection health">
+        {data.connections.map(c => <tr key={c.id}>
+          <td>{c.name}</td><td><Chip tone={c.status === 'Needs attention' ? 'bad' : 'info'}>{c.status}</Chip><small className="sub block">{c.reason}</small></td>
+          <td>{c.lastSync ? new Date(c.lastSync).toLocaleString() : 'Not measured'}</td><td>{c.objects ?? 'Not measured'}</td>
+          <td>{c.tieOut ? <>{c.tieOut.label}<small className="sub block">{c.tieOut.complete ? 'Complete read' : 'Incomplete read'}</small><small className="sub block">Provider: {c.tieOut.providerCents === null ? 'Not measured' : usd(c.tieOut.providerCents)} · Ledger: {usd(c.tieOut.ledgerCents)} · Difference: {c.tieOut.differenceCents === null ? 'Not measured' : usd(c.tieOut.differenceCents)}</small></> : 'Not measured'}</td>
+          <td>{c.retry && <Action run={async () => { await command(c.retry, {}); await refreshLatest() }}>Retry {c.name}</Action>}</td>
+        </tr>)}
+      </Table>
       <Credentials credentials={data.credentials} scopes={data.scopes} revoke={revoke} />
       {!visibleToken && <NewCredential scopes={data.scopes} onCreated={async credential => { setToken(credential); await refreshLatest() }} />}
       <RecentCalls calls={data.calls} nextCursor={data.nextCursor} paged={cursor !== null} older={() => setCursor(data.nextCursor)} latest={() => setCursor(null)} />
