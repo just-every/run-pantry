@@ -191,7 +191,7 @@ test('AGENT-007 book questions equal posted reports on both bases, explain compa
 test('AGENT-007 no-data and unsupported questions produce no invented figures and financial authority is enforced',async t=>{
   const h=await harness();t.after(h.close);await books(h)
   const a=await h.view('ask?'+new URLSearchParams({question:'why is net income down in October 2040?',basis:'cash'}))
-  assert.equal(a.status,'no records');assert.ok(a.figures.every(f=>f.records===0&&f.amountCents===0&&f.lines.length===0))
+  assert.equal(a.status,'no records');assert.equal(a.changeCents,null);assert.ok(a.figures.every(f=>f.records===0&&f.amountCents===0&&f.lines.length===0))
   await h.view('ask?question='+encodeURIComponent('What will revenue be next year?'),h.owner,400)
   await h.view('ask?question=net+income',h.owner,400)
   const sales=await h.member('synthetic-pantry-3@example.test','sales')

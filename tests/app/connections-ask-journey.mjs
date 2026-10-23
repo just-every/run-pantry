@@ -62,9 +62,10 @@ export async function connectionJourney(t) {
     const context=await browser.newContext({storageState:await owner.storageState(),viewport:{width,height:1000}}),page=await context.newPage()
     await page.goto(app.origin+'/app/settings')
     const table=page.getByRole('table',{name:'Connection health',exact:true});await table.waitFor();await table.scrollIntoViewIfNeeded()
-    for(const name of ['Stripe','Gusto','Synthetic automation'])assert.equal(await table.getByRole('row').filter({has:page.getByRole('cell',{name,exact:true})}).count(),1)
-    await table.getByRole('cell',{name:'Not measured',exact:true}).first().waitFor()
-    const row=table.getByRole('row').filter({has:page.getByRole('cell',{name:'Synthetic automation',exact:true})});await row.getByText('Active',{exact:true}).waitFor()
+    const names=await table.locator('tbody tr > td:first-child').allTextContents()
+    for(const name of ['Stripe','Gusto','Synthetic automation'])assert.equal(names.filter(n=>n===name).length,1)
+    await table.locator('td').filter({hasText:/^Not measured$/}).first().waitFor()
+    const row=table.locator('tbody tr').filter({has:page.locator('td:first-child').filter({hasText:/^Synthetic automation$/})});await row.getByText('Active',{exact:true}).waitFor()
     await page.screenshot({path:join(evidence,'connections-'+width+'.png'),fullPage:true})
     await iconAudit(page);await context.close()
   }

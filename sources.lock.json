@@ -2956,7 +2956,7 @@
       "executable": false
     },
     "src/pantry/ask/index.ts": {
-      "sha256": "f50c405ba7b236385159492e09282007b86e678f13501f4167dae45b9b949df4",
+      "sha256": "9e2d24837e9f4952b951d2c93e8b78d592839afd9b5cf3efa43af618f0f5472b",
       "executable": false
     },
     "src/pantry/automatch.ts": {
@@ -4468,7 +4468,7 @@
       "executable": false
     },
     "src/ui/ask-books.tsx": {
-      "sha256": "cdaad003e7702530028b3bdd57c41d4ebb9cb60d13e5fa906b4cbae33d0f32d9",
+      "sha256": "16bb65b789968220f5a0fe3854288d21be3a6bae9ae6bc3263e2e443e41334a9",
       "executable": false
     },
     "src/ui/bank-connect.tsx": {
@@ -4872,7 +4872,7 @@
       "executable": false
     },
     "tests/api/agent.test.mjs": {
-      "sha256": "9a68c0119f1f02aa9f81bd197cae77d90e1115c220a2a8a3dbd4b2c4b63a53f7",
+      "sha256": "3e23aa806f37a2a69e81e71fded9f3ee08f7d347059c774425d8c99f5571571b",
       "executable": false
     },
     "tests/api/bank.test.mjs": {
@@ -5108,7 +5108,7 @@
       "executable": false
     },
     "tests/app/connections-ask-journey.mjs": {
-      "sha256": "2aa9eef40d859a6e9c902e61c796ac461dcdd78f9d2f1e08a8fbb026f27d3eeb",
+      "sha256": "f15b964974d1032336fe7350338393e5c14704b53f820fa3aabc4a910da4cd43",
       "executable": false
     },
     "tests/app/custom-reports.test.mjs": {

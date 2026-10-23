@@ -11,9 +11,13 @@ const bounds = (year:number,month:number,count=1) => ({from:`${year}-${String(mo
 export async function askBooks(c:Context, raw:unknown, selectedBasis?:unknown) {
   requireThat(financialSourceAllowed(c.actor,'profit-and-loss'), 'Book questions require access to full financial reports',403)
   const question=text(raw,'Question',1000), input=question.toLowerCase(), basis=await reportBasis(c.db,selectedBasis)
-  const year=Number(input.match(/\b(20\d{2})\b/)?.[1]??new Date().getUTCFullYear())
-  const quarter=input.match(/\bq([1-4])\b/), month=months.findIndex(m=>input.includes(m))
+  const years=[...input.matchAll(/\b([12]\d{3})\b/g)].map(m=>Number(m[1]))
+  requireThat(years.length<=1,'Use one year and say last year for an annual comparison')
+  const year=years[0]??new Date().getUTCFullYear()
+  requireThat(year>=2000&&year<=2099,'Choose a year from 2000 through 2099')
+  const quarter=input.match(/\bq([1-4])\b/), month=months.findIndex(m=>new RegExp('\\b'+m+'\\b').test(input))
   const contractors=/contractor/.test(input), net=/net income|profit/.test(input)
+  requireThat(!(contractors&&net),'Ask about one metric at a time')
   requireThat(contractors||net,'Ask about contractor spending or net income, with a month or quarter and optional year. Other questions are not supported yet.')
   requireThat(!!quarter||month>=0,'Name a month or quarter so the report range is explicit')
   const range=bounds(year,quarter?(Number(quarter[1])-1)*3+1:month+1,quarter?3:1)
@@ -32,6 +36,7 @@ export async function askBooks(c:Context, raw:unknown, selectedBasis?:unknown) {
     citations.push({label:`Profit and loss · ${r.from} to ${r.to} · ${basis} basis`,href:'/app/reports?'+query,query:{report:'profit-and-loss',...r,basis}})
   }
   const movements = [...new Set(figures.flatMap(f=>f.lines.map((l:Data)=>l.accountId)))].map(id=>{ const current=figures[0].lines.filter((l:Data)=>l.accountId===id).reduce((s:number,l:Data)=>s+l.amountCents,0), previous=figures[1].lines.filter((l:Data)=>l.accountId===id).reduce((s:number,l:Data)=>s+l.amountCents,0); return {accountId:id,accountName:figures.flatMap(f=>f.lines).find((l:Data)=>l.accountId===id)?.accountName,currentCents:current,previousCents:previous,changeCents:current-previous} }).sort((a,b)=>Math.abs(b.changeCents)-Math.abs(a.changeCents))
+  const comparisonAvailable=figures.every(f=>f.records>0)
   const definition={name:question,source:'profit-and-loss',...range,basis,comparison:/last year|prior year/.test(input)?'prior-year':'prior-period',...(contractors?{filters:{accountIds}}:{})}
-  return {generated:true,question,basis,metric:contractors?'Contractor expense accounts':'Net income',scope:contractors?`Expense accounts containing "contract": ${accounts.map(a=>a.name).join(', ')||'none'}`:'Posted income less expenses; the change is explained by account movements, not an inferred cause.',status:figures[0].records?'answered':'no records',figures,citations,movements,changeCents:figures[0].amountCents-figures[1].amountCents,definition}
+  return {generated:true,question,basis,metric:contractors?'Contractor expense accounts':'Net income',scope:contractors?`Expense accounts containing "contract": ${accounts.map(a=>a.name).join(', ')||'none'}`:'Posted income less expenses; the change is explained by account movements, not an inferred cause.',status:figures[0].records?'answered':'no records',figures,citations,movements:comparisonAvailable?movements:[],changeCents:comparisonAvailable?figures[0].amountCents-figures[1].amountCents:null,definition}
 }
