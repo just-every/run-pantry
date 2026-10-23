@@ -18,6 +18,7 @@ const MORE = [
   { to: '/app/search', label: 'Find a transaction' },
   { to: '/app/cash-planner', label: 'Cash planner' },
   { to: '/app/assets', label: 'Fixed assets' },
+  { to: '/app/currency', label: 'Foreign amount worksheets' },
   { to: '/app/collections', label: 'Collection drafts' },
   { to: '/app/time', label: 'Time' },
   { to: '/app', label: 'Overview' },

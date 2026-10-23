@@ -1,3 +1,4 @@
+import { currencyJourney } from './currency-journey.mjs'
 import { archiveJourney } from './archive-journey.mjs'
 import { collectionsJourney } from './collections-journey.mjs'
 import { standingJourney } from './standing-journey.mjs'
@@ -20,6 +21,8 @@ import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
 import { vendorCreditJourney } from './vendor-credit-journey.mjs'
+
+test('CURRENCY-001 foreign amount worksheets at 1440 and 390',currencyJourney)
 
 test('MIGRATE-005 reviewed archive upload, placement and journal at 1440 and 390',archiveJourney)
 

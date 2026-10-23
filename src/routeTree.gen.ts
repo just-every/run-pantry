@@ -19,6 +19,7 @@ import { Route as AppBooksRouteImport } from './routes/app.books'
 import { Route as AppCashPlannerRouteImport } from './routes/app.cash-planner'
 import { Route as AppCloseRouteImport } from './routes/app.close'
 import { Route as AppCollectionsRouteImport } from './routes/app.collections'
+import { Route as AppCurrencyRouteImport } from './routes/app.currency'
 import { Route as AppDocumentsRouteImport } from './routes/app.documents'
 import { Route as AppMoveInRouteImport } from './routes/app.move-in'
 import { Route as AppQuestionsRouteImport } from './routes/app.questions'
@@ -79,6 +80,11 @@ const AppCloseRoute = AppCloseRouteImport.update({
 const AppCollectionsRoute = AppCollectionsRouteImport.update({
   id: '/collections',
   path: '/collections',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCurrencyRoute = AppCurrencyRouteImport.update({
+  id: '/currency',
+  path: '/currency',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDocumentsRoute = AppDocumentsRouteImport.update({
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/app/cash-planner': typeof AppCashPlannerRoute
   '/app/close': typeof AppCloseRoute
   '/app/collections': typeof AppCollectionsRoute
+  '/app/currency': typeof AppCurrencyRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/move-in': typeof AppMoveInRoute
   '/app/questions': typeof AppQuestionsRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/app/cash-planner': typeof AppCashPlannerRoute
   '/app/close': typeof AppCloseRoute
   '/app/collections': typeof AppCollectionsRoute
+  '/app/currency': typeof AppCurrencyRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/move-in': typeof AppMoveInRoute
   '/app/questions': typeof AppQuestionsRoute
@@ -193,6 +201,7 @@ export interface FileRoutesById {
   '/app/cash-planner': typeof AppCashPlannerRoute
   '/app/close': typeof AppCloseRoute
   '/app/collections': typeof AppCollectionsRoute
+  '/app/currency': typeof AppCurrencyRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/move-in': typeof AppMoveInRoute
   '/app/questions': typeof AppQuestionsRoute
@@ -218,6 +227,7 @@ export interface FileRouteTypes {
     | '/app/cash-planner'
     | '/app/close'
     | '/app/collections'
+    | '/app/currency'
     | '/app/documents'
     | '/app/move-in'
     | '/app/questions'
@@ -240,6 +250,7 @@ export interface FileRouteTypes {
     | '/app/cash-planner'
     | '/app/close'
     | '/app/collections'
+    | '/app/currency'
     | '/app/documents'
     | '/app/move-in'
     | '/app/questions'
@@ -263,6 +274,7 @@ export interface FileRouteTypes {
     | '/app/cash-planner'
     | '/app/close'
     | '/app/collections'
+    | '/app/currency'
     | '/app/documents'
     | '/app/move-in'
     | '/app/questions'
@@ -351,6 +363,13 @@ declare module '@tanstack/react-router' {
       path: '/collections'
       fullPath: '/app/collections'
       preLoaderRoute: typeof AppCollectionsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/currency': {
+      id: '/app/currency'
+      path: '/currency'
+      fullPath: '/app/currency'
+      preLoaderRoute: typeof AppCurrencyRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/documents': {
@@ -442,6 +461,7 @@ interface AppRouteChildren {
   AppCashPlannerRoute: typeof AppCashPlannerRoute
   AppCloseRoute: typeof AppCloseRoute
   AppCollectionsRoute: typeof AppCollectionsRoute
+  AppCurrencyRoute: typeof AppCurrencyRoute
   AppDocumentsRoute: typeof AppDocumentsRoute
   AppMoveInRoute: typeof AppMoveInRoute
   AppQuestionsRoute: typeof AppQuestionsRoute
@@ -465,6 +485,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCashPlannerRoute: AppCashPlannerRoute,
   AppCloseRoute: AppCloseRoute,
   AppCollectionsRoute: AppCollectionsRoute,
+  AppCurrencyRoute: AppCurrencyRoute,
   AppDocumentsRoute: AppDocumentsRoute,
   AppMoveInRoute: AppMoveInRoute,
   AppQuestionsRoute: AppQuestionsRoute,
