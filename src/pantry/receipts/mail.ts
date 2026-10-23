@@ -10,13 +10,14 @@ import type { Bindings } from '../../auth.server'
 import { parseMime as parseBaseMime } from '../../modules/mail/src/inbound/mime.mjs'
 import { authority, who } from '../access'
 import { now, requireThat, text, uid, type Data } from '../core'
-import { audit, one, q, run } from '../db'
+import { audit, changed, one, q, run } from '../db'
 import type { Command, Context } from '../context'
 import { seal, unseal } from '../seal'
 import { MAX_IMAGE_TO_READ, receive } from './intake'
 import type { ReceiptInput } from './reader'
 import { applyRules } from './review'
 import { managed } from './settings'
+import { pdfDocument, pdfLiteral, pdfWrap } from '../pdf-document'
 import { receiveReply } from '../questions/mail'
 
 const PURPOSE = 'receipt-address-tag'
@@ -82,7 +83,16 @@ const removeAddress: Command = { need: 'owner', async run(c) {
   return inboxView(c)
 } }
 
+const reviewMail: Command = { need: 'owner', async run(c, b) {
+  const r = await one(c.db, 'SELECT * FROM pt_receipts WHERE id = ?', text(b.id, 'Receipt'))
+  requireThat(r && r.mail_state === 'quarantined', 'Quarantined receipt not found', 404)
+  requireThat(b.accept === true || b.accept === false, 'Choose accept or refuse')
+  await run(c.db, [authority(c.actor, 'owner'), q("UPDATE pt_receipts SET mail_state = ?, status = ?, revision = ? WHERE id = ? AND revision = ? AND mail_state = 'quarantined'", b.accept ? 'accepted' : 'refused', b.accept ? 'review' : 'dismissed', uid(), r.id, b.revision), changed(), audit(who(c.actor), b.accept ? 'receipt-mail.accept' : 'receipt-mail.refuse', 'receipt', r.id, { sender: r.sender })])
+  return { id: r.id, accepted: b.accept }
+} }
+
 export const mailCommands: Record<string, Command> = {
+  'receipt-mail.review': reviewMail,
   'receipt-address.create': createAddress,
   'receipt-address.remove': removeAddress,
 }
@@ -132,7 +142,22 @@ function forwardingConfirmation(m: Parsed) {
 
 const fileName = (subject: string) => `${(subject || 'email').replace(/[^\w .-]+/g, '').trim().slice(0, 80) || 'email'}.eml`
 
-export type MailOutcome = { result: 'refused'; reason: string } | { result: 'confirmation' } | { result: 'reply'; question: string; outcome: string } | { result: 'received'; receiptId: string; read: string; rule: string | null }
+/** Retained transport headers are evidence, never an authentication decision by Pantry. */
+function authenticationResults(raw: Uint8Array) {
+  const headers = new TextDecoder().decode(raw.subarray(0, 64_000)).split(/\r?\n\r?\n/, 1)[0].replace(/\r?\n[ \t]+/g, ' ')
+  const values = [...headers.matchAll(/^Authentication-Results:\s*(.*)$/gim)].map(match => match[1].slice(0, 5000))
+  const result = (name: string) => new RegExp(`(?:^|[;\\s])${name}=([a-z]+)`, 'i').exec(values.join('; '))?.[1]?.toLowerCase() ?? null
+  return { source: 'received message headers', verifiedByPantry: false, spf: result('spf'), dkim: result('dkim'), dmarc: result('dmarc') }
+}
+
+/** Safe text rendition: no scripts, network requests or active HTML enter the PDF. */
+function htmlReceiptPdf(value: string) {
+  const lines = pdfWrap(value, 500, 11), pages: string[][] = []
+  for (let offset = 0; offset < lines.length; offset += 48) pages.push(lines.slice(offset, offset + 48).map((line, row) => `BT /F1 11 Tf 50 ${740 - row * 14} Td ${pdfLiteral(line)} Tj ET`))
+  return pdfDocument(pages.length ? pages : [[]])
+}
+
+export type MailOutcome = { result: 'refused'; reason: string } | { result: 'confirmation' } | { result: 'reply'; question: string; outcome: string } | { result: 'received'; receiptId: string; receiptIds?: string[]; read: string; rule: string | null }
 
 /** The Pantry address, where replies to Pantry's questions also come back; null until the owner creates it. */
 export async function pantryAddress(db: D1Database, env: Bindings) {
@@ -157,17 +182,24 @@ export async function receiveMail(env: Bindings, recipients: string[], raw: Uint
     return { result: 'confirmation' }
   }
   const sender = parsed?.from ?? envelopeFrom ?? '', subject = parsed?.subject ?? ''
-  const attachment = parsed ? receiptAttachment(parsed) : null
+  const known = !!await one(db, `SELECT 1 FROM pt_contacts WHERE lower(email) = ? AND email <> '' UNION ALL SELECT 1 FROM oa_operators WHERE lower(email) = ? AND status = 'active' LIMIT 1`, sender.toLowerCase(), sender.toLowerCase())
+  const mailAuth = authenticationResults(raw)
+  const quarantine = !known || [mailAuth.spf, mailAuth.dkim, mailAuth.dmarc].some(result => ['fail', 'softfail', 'permerror'].includes(result ?? ''))
   const by = { email: `mail:${sender || 'unknown sender'}`.slice(0, 254), kind: 'person' as const }
-  const { id, outcome } = await receive(db, env, {
-    by, source: 'email', sender, subject,
-    original: { name: fileName(subject), mediaType: 'message/rfc822', bytes: raw, note: `Emailed to the Pantry address by ${sender || 'an unknown sender'}` },
-    file: attachment ? { name: attachment.filename || (attachment.contentType === 'application/pdf' ? 'receipt.pdf' : 'receipt-photo'), mediaType: attachment.contentType, bytes: attachment.content, note: `Attachment of ${fileName(subject)}` } : null,
-    read: parsed ? readFrom(parsed, fileName(subject)) : UNREADABLE,
-  })
-  const rule = await applyRules(db, id)
+  const attachments = parsed?.attachments.length ? parsed.attachments : parsed?.html ? [{ filename: 'html-receipt.pdf', contentType: 'application/pdf', content: htmlReceiptPdf(emailText(parsed)) }] : [null]
+  const received = []
+  for (const attachment of attachments) {
+    const item = await receive(db, env, {
+      by, source: 'email', sender, subject, mailState: quarantine ? 'quarantined' : 'accepted', mailAuth: JSON.stringify(mailAuth),
+      original: { name: fileName(subject), mediaType: 'message/rfc822', bytes: raw, note: `Emailed to the Pantry address by ${sender || 'an unknown sender'}` },
+      file: attachment ? { name: attachment.filename || 'receipt', mediaType: attachment.contentType, bytes: attachment.content, note: `Attachment of ${fileName(subject)}` } : null,
+      read: attachment ? (/^image\//.test(attachment.contentType) ? { kind: 'image', mediaType: attachment.contentType, bytes: attachment.content, name: attachment.filename } : attachment.contentType === 'application/pdf' ? { kind: 'pdf', mediaType: attachment.contentType, bytes: attachment.content, name: attachment.filename } : 'This attachment is kept for manual review.') : parsed ? readFrom(parsed, fileName(subject)) : UNREADABLE,
+    }, quarantine ? { status: 'failed', note: 'Quarantined sender: the owner must accept this message before reading or using it.', model: null, reading: null } : undefined)
+    received.push({ ...item, rule: quarantine ? null : await applyRules(db, item.id) })
+  }
+  const { id, outcome, rule } = received[0]
   await run(db, [q('UPDATE pt_receipt_inbox SET last_received_at = ?, last_note = ? WHERE id = 1', now(), `${subject || 'A message'} from ${sender || 'an unknown sender'}`.slice(0, 300))])
-  return { result: 'received', receiptId: id, read: outcome.status, rule }
+  return { result: 'received', receiptId: id, receiptIds: received.map(item => item.id), read: outcome.status, rule }
 }
 
 /** Cloudflare Email Routing: the Worker's email handler. Anything not for the Pantry address is refused unread. */

@@ -30,6 +30,17 @@ function ReadLine({ r, reader }: { r: D; reader: D }) {
   return <p className="read-line"><Chip tone="warn">Not read</Chip> <span>{r.read_note}</span></p>
 }
 
+function ReadingEvidence({ r }: { r: D }) {
+  const meta = r.read_match_fields ? JSON.parse(r.read_match_fields) : {}
+  if (!meta.fieldEvidence) return null
+  const labels: Record<string, string> = { vendor: 'Vendor', date: 'Date', total: 'Total', tax: 'Tax', tip: 'Tip', currency: 'Currency', invoiceNumber: 'Invoice number', dueDate: 'Due date', termsDays: 'Payment terms', lines: 'Line items', cardLast4: 'Card last four' }
+  return <details className="details"><summary>Reading confidence and page regions</summary>
+    {meta.instructionLikeText && <p role="status" className="hint">Instruction-like text detected. Review the true document fields; automatic receipt rules are paused for this document.</p>}
+    {!!meta.lineDifference && <p role="status" className="hint">Line items differ from the total by {usd(meta.lineDifference)}. Confirm the lines, tax and tip.</p>}
+    {Object.entries(meta.fieldEvidence as Record<string, D>).map(([field, e]) => <p key={field}><strong>{labels[field] ?? field}</strong>: <Chip tone={e.confidence === 'high' ? 'good' : 'warn'}>{e.confidence === 'high' ? 'High confidence' : 'Low confidence · confirm'}</Chip> <small>{e.region ? `Page ${e.region.page}; left ${Math.round(e.region.left * 100)}%, top ${Math.round(e.region.top * 100)}%, width ${Math.round(e.region.width * 100)}%, height ${Math.round(e.region.height * 100)}%` : 'No source region supplied'}</small></p>)}
+  </details>
+}
+
 type Typed = { vendor: string; invoiceNumber: string; date: string; total: string; currency: string; tip: string; chargedUsd: string; cardLast4: string }
 const NONE: D[] = []
 
@@ -70,7 +81,7 @@ function ReceiptCard({ r, data, onChange }: { r: D; data: D; onChange: () => Pro
       <Preview r={r} />
       <div className="receipt-fields">
         {m.duplicate && <p className="hint" role="status">Duplicate receipt · {m.basis === 'file' ? 'same file' : m.basis === 'vendor-invoice' ? 'same vendor and invoice number' : 'same vendor, date and total'}. Original: <FileLink id={m.duplicate.document_id} name={m.duplicate.file_name} mediaType={m.duplicate.media_type} />{m.duplicate.status === 'attached' ? <> · already attached {day(m.duplicate.decided_at)}</> : ' · waiting for review'}. Choose Keep both with a reason, or Skip.</p>}
-        <ReadLine r={r} reader={{ ...data.reader, canSet: state.actor.can.owner }} />
+        <ReadLine r={r} reader={{ ...data.reader, canSet: state.actor.can.owner }} /><ReadingEvidence r={r} />{r.mail_auth && <p className="hint">Transport results (received headers): SPF {JSON.parse(r.mail_auth).spf ?? 'absent'}, DKIM {JSON.parse(r.mail_auth).dkim ?? 'absent'}, DMARC {JSON.parse(r.mail_auth).dmarc ?? 'absent'}.</p>}
         {r.read_status !== 'read' && state.actor.can.record && <p className="hint">Type the vendor, date and total from the receipt: the transactions with that total are listed under <strong>Attach to</strong>.</p>}
         {state.actor.can.record&&['classes_enabled','locations_enabled','projects_enabled'].some(flag=>state.dimensions?.settings[flag])&&<Form label="Save document coding" submit={()=>command('receipt.dimensions',{id:r.id,revision:r.revision,...coding})} onDone={onChange} className="grid-form">{[['class','classes_enabled'],['location','locations_enabled'],['project','projects_enabled']].filter(([,flag])=>state.dimensions?.settings[flag]).map(([kind])=><Field key={kind} label={`Document ${kind}`} name={`document-${kind}`} value={coding[`${kind}Name`]??''} onChange={(e:any)=>setCoding(d=>({...d,[`${kind}Name`]:e.target.value}))} empty="Unassigned" options={state.dimensions.values.filter((v:D)=>v.kind===kind&&v.active).map((v:D)=>({value:v.name,label:v.name}))} />)}</Form>}
         {state.actor.can.record && <ReceiptVendor r={r} accounts={data.accounts} vendors={state.contacts.filter((v: D) => v.kind === 'vendor')} onChange={onChange} />}
@@ -134,6 +145,7 @@ export function Receipts() {
         {data.reader.unavailable ? <p className="hint">{data.reader.unavailable}</p> : data.reader.missing ? <p className="hint">{data.reader.missing} {state.actor.can.owner && <Link to="/app/settings" hash="ai-reading">Add a key</Link>}</p> : <p className="hint">Read with this install’s own AI model ({data.reader.model}). The original is kept exactly as received.</p>}
         <Forwarding inbox={data.inbox} owner={state.actor.can.owner} />
       </Card>
+      {data.quarantine?.length > 0 && <Card title="Quarantined email"><p>Unknown senders wait here. Accepting a message permits reading; it does not post or attach it.</p>{data.quarantine.map((r: D) => <div key={r.id}><p><strong>{r.subject || r.file_name}</strong> · {r.sender || 'Unknown sender'} · <FileLink id={r.document_id} name="Source message" mediaType="message/rfc822" /></p>{r.mail_auth && <p className="hint">Transport results (received headers): SPF {JSON.parse(r.mail_auth).spf ?? 'absent'}, DKIM {JSON.parse(r.mail_auth).dkim ?? 'absent'}, DMARC {JSON.parse(r.mail_auth).dmarc ?? 'absent'}.</p>}{state.actor.can.owner && <div className="row-actions">{[true, false].map(accept => <Action key={String(accept)} run={async () => { await command('receipt-mail.review', { id: r.id, revision: r.revision, accept }); await refresh() }}>{accept ? 'Accept message' : 'Refuse message'}</Action>)}</div>}</div>)}</Card>}
       <CaptureApprovalRules rules={data.approvalRules} accounts={data.accounts} onChange={refresh} />
       {data.review.length ? data.review.map((r: D) => <div id={`receipt-${r.id}`} key={r.id + r.revision}><ReceiptCard r={r} data={data} onChange={refresh} /></div>)
         : <Card title="To review" className="empty-card"><span className="empty-lines" aria-hidden="true" /><p>Nothing waiting. New receipts appear here with what was read and the transaction they belong to.</p></Card>}

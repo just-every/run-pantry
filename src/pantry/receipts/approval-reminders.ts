@@ -1,5 +1,6 @@
 // A captured draft revision gets one owner reminder after it has been pending
 // for a day. The durable claim makes cron and ordinary-request replays safe.
+import { sendReceiptRequests } from './chase'
 import { runtimeBindings, type Bindings } from '../../auth.server'
 import { operatorMail } from '../../mail.server.mjs'
 import { ownerEmail, pantry } from '../access'
@@ -12,6 +13,7 @@ const escape = (value: string) => value.replace(/[&<>"']/g, c => ({ '&': '&amp;'
 
 /** Send each still-pending captured revision once, after 24 hours. */
 export async function sendDueApprovalReminders(env: Bindings, db: D1Database, stamp = now()) {
+  await sendReceiptRequests(env, db, stamp)
   const captured = await all<{ id: string; receipt_id: string; revision: string; kind: string; payload: string }>(db, `
     SELECT d.id, d.receipt_id, d.revision, d.kind, d.payload FROM pt_capture_drafts d
     JOIN pt_receipts r ON r.id = d.receipt_id

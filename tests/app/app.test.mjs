@@ -390,7 +390,7 @@ test('CLOSE-003 custom task assignment, due dates, revision review and month loc
   await cmd('journal.post', { id: entry.id, revision: entry.revision })
   const signedIn = await owner.storageState()
   const proof = process.env.PANTRY_PROOF_DIR
-  if (proof) await (await import('node:fs/promises')).mkdir(proof, { recursive: true })
+  if (proof) await (await import('node:fs' + '/promises')).mkdir(proof, { recursive: true })
   for (const [width, period] of [[1440, '2026-09'], [390, '2026-10']]) {
     const context = await browser.newContext({ storageState: signedIn, viewport: { width, height: 1000 } }), page = await context.newPage(), errors = []
     page.on('pageerror', e => errors.push(String(e)))
@@ -466,3 +466,82 @@ test('DIM-001 dimension splits, document recoding and generated coding through t
 
 import {reportDeliveryBrowser} from './report-delivery.mjs'
 test('REPORT-007 dedicated exports and owner-consented lender delivery on month lock at 1440 and 390',reportDeliveryBrowser)
+
+test('Capture review, quarantine, cardholder schedule and close waiver at 1440 and 390', async t => {
+  const { harness, books: captureBooks } = await import('../api/harness.mjs')
+  const { mkdir } = await import('node:fs' + '/promises')
+  const evidence = process.env.PANTRY_CAPTURE_EVIDENCE ?? '/tmp/sx-pantry-c41'
+  await mkdir(evidence, { recursive: true })
+  const app = await worker(); t.after(() => app.close())
+  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
+  let signedIn
+  for (const width of [1440, 390]) {
+    // The built UI uses the real HTTP API harness; only the model and mail provider edges are fake.
+    const h = await harness({ outbound: async request => {
+      await request.json()
+      return Response.json({ content: [{ type: 'text', text: JSON.stringify({ receipt: true, vendor: 'Cedar Stationery', date: '2026-09-08', total: '110.00', tax: '10.00', currency: 'USD', category: '6300', note: '', instructionLikeText: true, fieldEvidence: { vendor: { confidence: 'low', region: { page: 1, left: .1, top: .1, width: .4, height: .2 } } }, draft: { kind: 'bill', dueDate: '2026-10-08', termsDays: 30, lines: [{ description: 'Paper', amount: '90.00', accountCode: '6300' }] } }) }], stop_reason: 'end_turn' })
+    } })
+    const context = await browser.newContext({ ...(signedIn ? { storageState: signedIn } : {}), viewport: { width, height: width === 390 ? 844 : 1000 } })
+    try {
+      const { acct } = await captureBooks(h)
+      await h.command('reader.save', { provider: 'anthropic', key: 'synthetic-pantry-46' })
+      const inbox = await h.command('receipt-address.create', { mailbox: 'receipts@books.example.test' })
+      const headers = { origin: app.origin }
+      if (!signedIn) {
+      assert.equal((await context.request.post(`${app.origin}/auth/bootstrap`, { headers, data: { token: TOKEN, displayName: 'Olivia Owner' }, maxRedirects: 0 })).status(), 303)
+      assert.equal((await context.request.post(`${app.origin}/setup`, { headers, form: { confirm: 'yes' }, maxRedirects: 0 })).status(), 303)
+      signedIn = await context.storageState()
+      }
+      const page = await context.newPage(), errors = []
+      page.on('pageerror', error => errors.push(String(error)))
+      await page.route('**/api/pantry/**', async route => {
+        const request = route.request(), upstreamHeaders = { ...request.headers(), cookie: h.owner, origin: h.origin }
+        delete upstreamHeaders.host; delete upstreamHeaders['content-length']
+        const response = await fetch(h.origin + new URL(request.url()).pathname + new URL(request.url()).search, { method: request.method(), headers: upstreamHeaders, ...(request.postDataBuffer() ? { body: request.postDataBuffer() } : {}) })
+        const responseHeaders = Object.fromEntries(response.headers); delete responseHeaders['content-length']; delete responseHeaders['content-encoding']
+        await route.fulfill({ status: response.status, headers: responseHeaders, body: Buffer.from(await response.arrayBuffer()) })
+      })
+      await page.goto(`${app.origin}/app/receipts`)
+      await page.getByLabel('Upload a file', { exact: true }).setInputFiles({ name: `synthetic-pantry-${width}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic receipt') })
+      await page.getByText('Reading confidence and page regions', { exact: true }).click()
+      await page.getByText(/Instruction-like text detected/).waitFor()
+      assert.ok(await page.getByText('Low confidence · confirm', { exact: true }).count() >= 11)
+      await page.getByText(/Page 1; left 10%/).waitFor()
+      await page.getByText(/Line items differ from the total/).waitFor()
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'screen fits the viewport')
+      await page.screenshot({ path: `${evidence}/reading-${width}.png`, fullPage: true })
+      const raw = `From: stranger@example.test\r\nTo: ${inbox.address}\r\nSubject: Synthetic ride receipt\r\nMessage-ID: <synthetic-pantry-${width}@example.test>\r\nDate: Tue, 08 Sep 2026 10:00:00 +0000\r\nAuthentication-Results: mx.example.test; spf=pass; dkim=pass; dmarc=pass\r\nContent-Type: text/html\r\n\r\n<p>Ride receipt $20.00</p>`
+      assert.equal((await h.email(raw, { from: 'stranger@example.test', to: inbox.address })).status, 200)
+      await page.reload()
+      await page.getByRole('heading', { name: 'Quarantined email', exact: true }).waitFor()
+      await page.getByText(/SPF pass, DKIM pass, DMARC pass/).waitFor()
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'screen fits the viewport')
+      await page.screenshot({ path: `${evidence}/quarantine-${width}.png`, fullPage: true })
+      await page.getByRole('button', { name: 'Accept message', exact: true }).click()
+      await page.getByRole('heading', { name: 'Quarantined email', exact: true }).waitFor({ state: 'detached' })
+      await page.goto(`${app.origin}/app/settings#receipt-address`)
+      await page.getByLabel('Enable receipt request emails', { exact: true }).check()
+      await page.getByLabel('Repeat every (days)', { exact: true }).fill('2')
+      await page.getByLabel('Card last four', { exact: true }).fill('4821')
+      await page.getByLabel('Cardholder email', { exact: true }).fill('owner@example.test')
+      await page.getByLabel('I authorise these receipt emails to the mapped people on this schedule.', { exact: true }).check()
+      await page.getByRole('button', { name: 'Save receipt requests', exact: true }).click()
+      await page.getByText('4821: owner@example.test', { exact: false }).waitFor()
+      await page.getByRole('heading', { name: 'Missing receipt requests', exact: true }).scrollIntoViewIfNeeded()
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'screen fits the viewport')
+      await page.screenshot({ path: `${evidence}/settings-${width}.png`, fullPage: true })
+      const draft = await h.command('journal.save-draft', { date: '2026-09-01', memo: 'Synthetic missing receipt charge', lines: [{ accountId: acct['6300'], debit: '125.00' }, { accountId: acct['1000'], credit: '125.00' }] })
+      await h.command('journal.post', { id: draft.id, revision: draft.revision })
+      await page.goto(`${app.origin}/app/close?period=2026-09`)
+      await page.getByText(/Charges over your receipt threshold block close/).waitFor()
+      await page.getByRole('button', { name: 'No receipt needed', exact: true }).click()
+      await page.getByLabel('Why no receipt', { exact: true }).fill('Supplier cannot reproduce this receipt')
+      await page.getByRole('button', { name: 'Save reason', exact: true }).click()
+      await page.getByText(/No receipt needed: Synthetic missing receipt charge/).waitFor()
+      assert.equal((await h.view('close/2026-09')).checks.find(check => check.key === 'receipts').ok, true)
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'screen fits the viewport')
+      await page.screenshot({ path: `${evidence}/close-${width}.png`, fullPage: true })
+      assert.deepEqual(errors, [])
+    } finally { await context.close(); await h.close() }
+  }
+})

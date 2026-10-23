@@ -17,6 +17,7 @@ function ReceiptsCard({ s, onChange }: { s: D; onChange: () => Promise<void> }) 
   const bills = s.checks.find((c: D) => c.key === 'evidence')?.items ?? []
   const count = s.receipts.missing.length + bills.length
   return <Card title={<><Icon name="receipt" /> Receipts</>} actions={count ? <Chip tone="warn">{count} without a receipt</Chip> : <Chip tone="good">Every entry has its receipt</Chip>}>
+    <p className="hint">Charges over your receipt threshold block close until a receipt is supplied or a person with the posting grant records a reason below.</p>
     <Table heads={['Date', 'Entry', 'Amount', '']} figures={[2]} empty={s.receipts.waived.length ? `Every entry in ${monthName(s.id)} has its receipt or a recorded reason.` : `Every entry in ${monthName(s.id)} has its receipt.`}>
       {s.receipts.missing.map((m: D) => <tr key={m.id}><td>{day(m.entry_date)}</td><td>{m.memo}{m.number ? <small className="sub"> · entry {m.number}</small> : null}</td><td className="fig">{usd(m.amount_cents)}</td>
         <td>{open && can.record && <div className="row-actions"><span className="hint">Add receipt</span><CaptureButtons compact target={{ kind: 'journal', id: m.id }} onDone={onChange} />
@@ -29,7 +30,7 @@ function ReceiptsCard({ s, onChange }: { s: D; onChange: () => Promise<void> }) 
   </Card>
 }
 
-const LINK: Record<string, string> = { 'stripe-clearing': '/app/settings', bank: '/app/bank', feeds: '/app/bank', drafts: '/app/books', evidence: '/app/sales', subledgers: '/app/reports', 'trial-balance': '/app/reports', proposals: '/app/agents', 'year-end-1099': '/app/reports?report=contractors', 'year-end-payroll': '/app/settings', questions: '/app/questions' }
+const LINK: Record<string, string> = { 'stripe-clearing': '/app/settings', bank: '/app/bank', feeds: '/app/bank', drafts: '/app/books', evidence: '/app/sales', subledgers: '/app/reports', 'trial-balance': '/app/reports', proposals: '/app/agents', 'year-end-1099': '/app/reports?report=contractors', 'year-end-payroll': '/app/settings', questions: '/app/questions', receipts: '/app/receipts' }
 
 export function Close() {
   const shared = useShared(), who = useWho(), [period, setPeriod] = useState(() => new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('period') ?? shared.state.overview.closing ?? thisMonth())

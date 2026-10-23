@@ -2,10 +2,12 @@
 // explains, money out still unfiled or a cost without its receipt past a set
 // age, the same payment made twice, and a bank balance the books cannot reach.
 // Each finding becomes one question with the answers that would settle it,
-// every answer naming exactly what it changes. Nothing here writes.
+// every answer naming exactly what it changes. Receipt routing may prepare
+// an owner-consented question; financial entries are never written here.
 import { addDays, daysBetween, longDay, monthBounds, usd, type Data } from '../core'
 import { all, one } from '../db'
 import { payeeKey } from '../rules'
+import { prepareReceiptRequests } from '../receipts/chase'
 import { missingReceipts } from '../receipts/attachments'
 
 export type Action =
@@ -176,6 +178,7 @@ async function unfiled(c: Ctx, lines: Data[]): Promise<Issue[]> {
 }
 
 async function receipts(c: Ctx): Promise<Issue[]> {
+  await prepareReceiptRequests(c.db, c.today)
   const before = addDays(c.today, -c.settings.file_days), out: Issue[] = []
   const bills = await all(c.db, `SELECT b.id, b.reference, b.bill_date, b.total_cents, v.name AS vendor FROM pt_bills b JOIN pt_contacts v ON v.id = b.vendor_id
     WHERE b.status = 'posted' AND b.evidence_waived IS NULL AND b.bill_date <= ? AND b.total_cents >= ?

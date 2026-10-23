@@ -21,9 +21,10 @@ import { documentDraftProposal } from './draft-proposal'
 import { receiptVendorCommands } from './vendor-confirm'
 import { receiptVendorProposal } from './vendor-match'
 import { bytesOf, MEDIA } from './upload'
+import { chaseCommands, chaseView } from './chase'
 import { captureRoutes, captureProvenance } from './captures'
 
-export const receiptCommands: Record<string, Command> = { ...cashReceiptCommands, ...readerCommands, ...mailCommands, ...reviewCommands, ...receiptVendorCommands, ...captureDraftCommands }
+export const receiptCommands: Record<string, Command> = { ...chaseCommands, ...cashReceiptCommands, ...readerCommands, ...mailCommands, ...reviewCommands, ...receiptVendorCommands, ...captureDraftCommands }
 
 const TARGETS = ['bankline', 'bill', 'payment', 'journal']
 
@@ -38,7 +39,7 @@ function offerOriginal(list: Data[], original: Data | null, facts: { date: strin
 
 export async function receiptsView(c: Context): Promise<Data> {
   const review = await all(c.db, `SELECT r.*, d.name AS file_name, d.media_type, d.size, d.sha256, f.name AS read_file_name, f.media_type AS read_media_type
-    FROM pt_receipts r JOIN pt_documents d ON d.id = r.document_id LEFT JOIN pt_documents f ON f.id = r.file_document_id WHERE r.status = 'review' ORDER BY r.received_at DESC LIMIT 100`)
+    FROM pt_receipts r JOIN pt_documents d ON d.id = r.document_id LEFT JOIN pt_documents f ON f.id = r.file_document_id WHERE r.status = 'review' AND r.mail_state = 'accepted' ORDER BY r.received_at DESC LIMIT 100`)
   for (const r of review) {
     const duplicate = await duplicateOf(c.db, r.id, readFingerprint(r))
     r.duplicate_of = duplicate?.receipt_id ?? null
@@ -77,7 +78,8 @@ export async function receiptsView(c: Context): Promise<Data> {
   await captureProvenance(c.db, [...review, ...attached, ...skipped])
   const rules = await all(c.db, 'SELECT r.*, a.code, a.name AS account_name FROM pt_receipt_rules r JOIN pt_accounts a ON a.id = r.account_id WHERE r.active = 1 ORDER BY r.created_at')
   const reader = await readerView(c)
-  return { approvalRules: await all(c.db, 'SELECT * FROM pt_capture_approval_rules ORDER BY minimum_cents'), review, attached, skipped, duplicateDocuments: await documentDuplicates(c.db), rules, accounts: await categories(c.db), reader: { unavailable: reader.unavailable, missing: reader.missing, model: reader.saved?.model ?? null }, inbox: await inboxView(c) }
+  const quarantine = await all(c.db, `SELECT r.id, r.sender, r.subject, r.revision, r.document_id, r.file_document_id, r.mail_auth, d.name AS file_name FROM pt_receipts r JOIN pt_documents d ON d.id = r.document_id WHERE r.mail_state = 'quarantined' ORDER BY r.received_at DESC LIMIT 100`)
+  return { quarantine, approvalRules: await all(c.db, 'SELECT * FROM pt_capture_approval_rules ORDER BY minimum_cents'), review, attached, skipped, duplicateDocuments: await documentDuplicates(c.db), rules, accounts: await categories(c.db), reader: { unavailable: reader.unavailable, missing: reader.missing, model: reader.saved?.model ?? null }, inbox: await inboxView(c) }
 }
 
 export function receiptRoutes(api: Hono<{ Bindings: Bindings }>) {
@@ -129,7 +131,7 @@ export function receiptRoutes(api: Hono<{ Bindings: Bindings }>) {
     const actor = await person(c.req.raw, c.env)
     must(actor, 'owner')
     const ctx = { db: c.env.DB, env: c.env, request: c.req.raw, actor }
-    return c.json({ reader: await readerView(ctx), inbox: await inboxView(ctx) })
+    return c.json({ reader: await readerView(ctx), inbox: await inboxView(ctx), chase: await chaseView(c.env.DB) })
   })
 
   api.post('/api/pantry/receipts/try-email', async c => {

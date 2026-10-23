@@ -132,6 +132,7 @@ const notNeeded: Command = { need: 'post', async run(c, b) {
   requireThat(entry, 'Posted entry not found', 404)
   const reason = text(b.reason, 'Reason', 300)
   await run(c.db, [authority(c.actor, 'post'), q('INSERT INTO pt_receipt_waivers (entry_id, reason, waived_by, waived_at) VALUES (?, ?, ?, ?)', entry.id, reason, c.actor.email, now()),
+    q("UPDATE pt_questions SET status = 'resolved', pending = NULL, revision = ? WHERE kind = 'missing-receipt' AND subject_kind = 'journal' AND subject_id = ? AND status IN ('open', 'confirm')", uid(), entry.id),
     audit(who(c.actor), 'receipt.not-needed', 'journal', entry.id, { reason })])
   return { entryId: entry.id }
 } }
@@ -182,6 +183,7 @@ export async function attachChosen(c: Context, receiptId: string, target: Target
  */
 export async function applyRules(db: D1Database, receiptId: string) {
   const r = await receipt(db, receiptId)
+  if (r && (r.read_match_fields && JSON.parse(r.read_match_fields).instructionLikeText)) return null
   if (!r || r.status !== 'review' || r.read_status !== 'read' || !r.read_vendor || !r.read_total_cents || !r.read_date) return null
   if (await flagDuplicate(db, r, readFingerprint(r))) return null
   const rules = await all(db, 'SELECT * FROM pt_receipt_rules WHERE active = 1 ORDER BY created_at')
@@ -210,7 +212,7 @@ export async function applyRules(db: D1Database, receiptId: string) {
 /** New feed/file lines revisit waiting receipts under their existing owner rule.
  * Receipts without a rule remain suggestions, recomputed by the review door. */
 export async function matchWaitingReceipts(db: D1Database) {
-  for (const r of await all(db, "SELECT id FROM pt_receipts WHERE status = 'review' AND read_status = 'read' ORDER BY received_at, id")) {
+  for (const r of await all(db, "SELECT id FROM pt_receipts WHERE status = 'review' AND mail_state = 'accepted' AND read_status = 'read' ORDER BY received_at, id")) {
     try { await applyRules(db, r.id) } catch (error) {
       // A lock/reconciliation or a concurrent decision leaves the receipt for review.
       if (!(error instanceof Fault) || error.status !== 409) throw error

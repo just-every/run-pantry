@@ -3,7 +3,7 @@
 // reads it if it can, and it waits for a person, unless a rule the business
 // set attaches it.
 import type { Bindings } from '../../auth.server'
-import { now, uid, type Data } from '../core'
+import { now, requireThat, uid, type Data } from '../core'
 import { all, audit, one, q, run, type AuditActor, type Sql } from '../db'
 import { documentStatements, type NewDocument } from '../documents'
 import { readReceipt, ReaderError, type Category, type Reading, type ReceiptInput } from './reader'
@@ -45,12 +45,13 @@ export async function readWith(db: D1Database, env: Bindings, input: ReceiptInpu
 /** The receipt columns a reading fills. */
 export async function readingColumns(db: D1Database, r: ReadOutcome) {
   const account = r.reading?.category ? await one<{ id: string }>(db, 'SELECT id FROM pt_accounts WHERE code = ?', r.reading.category) : null
-  return { read_match_fields: JSON.stringify({ tip: r.reading?.tip ?? null, chargedUsd: r.reading?.chargedUsd ?? null, cardLast4: r.reading?.cardLast4 ?? null }), ...await vendorReadingColumns(r.reading?.vendorDetails), read_draft_fields: r.reading?.draft ? JSON.stringify(r.reading.draft) : null, read_status: r.status, read_note: r.note, read_model: r.model, read_at: now(), read_vendor: r.reading?.vendor ?? null, read_invoice_number: r.reading?.invoiceNumber ?? null, read_date: r.reading?.date ?? null, read_total_cents: r.reading?.total ?? null, read_tax_cents: r.reading?.tax ?? null, read_currency: r.reading?.currency ?? null, read_account_id: account?.id ?? null }
+  return { read_match_fields: JSON.stringify({ tip: r.reading?.tip ?? null, chargedUsd: r.reading?.chargedUsd ?? null, cardLast4: r.reading?.cardLast4 ?? null, fieldEvidence: r.reading?.fieldEvidence ?? null, instructionLikeText: r.reading?.instructionLikeText ?? false, lineDifference: r.reading?.lineDifference ?? null }), ...await vendorReadingColumns(r.reading?.vendorDetails), read_draft_fields: r.reading?.draft ? JSON.stringify(r.reading.draft) : null, read_status: r.status, read_note: r.note, read_model: r.model, read_at: now(), read_vendor: r.reading?.vendor ?? null, read_invoice_number: r.reading?.invoiceNumber ?? null, read_date: r.reading?.date ?? null, read_total_cents: r.reading?.total ?? null, read_tax_cents: r.reading?.tax ?? null, read_currency: r.reading?.currency ?? null, read_account_id: account?.id ?? null }
 }
 
 export type Arrival = {
   by: AuditActor; source: 'upload' | 'camera' | 'email'; sender?: string; subject?: string
   original: NewDocument; file?: NewDocument | null; read: ReceiptInput | string; guards?: Sql[]
+  mailState?: 'accepted' | 'quarantined'; mailAuth?: string
   publication?: (receiptId: string, documentId: string) => Sql[]
 }
 
@@ -61,16 +62,18 @@ export async function receive(db: D1Database, env: Bindings, a: Arrival, read?: 
   const file = a.file ? await documentStatements(a.by.email, a.file) : null
   const id = uid(), cols = await readingColumns(db, outcome)
   await run(db, [...(a.guards ?? []), ...original.statements, ...(file?.statements ?? []),
-    q(`INSERT INTO pt_receipts (id, document_id, file_document_id, source, sender, subject, read_status, read_note, read_model, read_at, read_vendor, read_date, read_total_cents, read_tax_cents, read_currency, read_account_id, status, received_by, received_at, revision, vendor_key, read_invoice_number, read_vendor_details, read_draft_fields, read_match_fields)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'review', ?, ?, ?, ?, ?, ?, ?, ?)`,
+    q(`INSERT INTO pt_receipts (id, document_id, file_document_id, source, sender, subject, read_status, read_note, read_model, read_at, read_vendor, read_date, read_total_cents, read_tax_cents, read_currency, read_account_id, status, received_by, received_at, revision, vendor_key, read_invoice_number, read_vendor_details, read_draft_fields, read_match_fields, mail_state, mail_auth)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'review', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       id, original.id, file?.id ?? null, a.source, (a.sender ?? '').slice(0, 254), (a.subject ?? '').slice(0, 300), cols.read_status, cols.read_note, cols.read_model, cols.read_at,
-      cols.read_vendor, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, a.by.email, now(), uid(), vendorKey(cols.read_vendor), cols.read_invoice_number, cols.read_vendor_details, cols.read_draft_fields, cols.read_match_fields),
+      cols.read_vendor, cols.read_date, cols.read_total_cents, cols.read_tax_cents, cols.read_currency, cols.read_account_id, a.by.email, now(), uid(), vendorKey(cols.read_vendor), cols.read_invoice_number, cols.read_vendor_details, cols.read_draft_fields, cols.read_match_fields, a.mailState ?? 'accepted', a.mailAuth ?? null),
     ...(a.publication?.(id, original.id) ?? []),
     audit(a.by, 'receipt.receive', 'receipt', id, { source: a.source, file: a.original.name, sha256: original.sha256, read: outcome.status })])
-  await flagDuplicate(db, (await receipt(db, id))!)
+  if (a.mailState !== 'quarantined') await flagDuplicate(db, (await receipt(db, id))!)
   return { id, outcome }
 }
 
 export async function receipt(db: D1Database, id: string): Promise<Data | null> {
-  return one(db, 'SELECT * FROM pt_receipts WHERE id = ?', id)
+  const r = await one(db, 'SELECT * FROM pt_receipts WHERE id = ?', id)
+  requireThat(!r || r.mail_state === 'accepted', 'Review this quarantined message before using its receipt', 409)
+  return r
 }

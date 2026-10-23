@@ -12,7 +12,7 @@ import { longDay, monthBounds, monthName, now, optionalText, requireThat, text, 
 import { all, approval, audit, changed, guard, one, q, run, type Sql } from './db'
 import { ageing, trialBalance } from './reports'
 import { requireEntity } from './settings'
-import { missingReceipts } from './receipts/attachments'
+import { hasDocument, missingReceipts } from './receipts/attachments'
 import { openSummary, periodThread } from './questions/close'
 import type { Command } from './context'
 
@@ -45,6 +45,11 @@ export async function closeState(db: D1Database, id: string): Promise<Data> {
   const waived = Number((await one(db, "SELECT COUNT(*) AS n FROM pt_bills WHERE status = 'posted' AND bill_date BETWEEN ? AND ? AND evidence_waived IS NOT NULL", start, end))?.n ?? 0)
   checks.push({ key: 'evidence', title: 'Bills have source documents', ok: missing.length === 0, items: missing.map(m => ({ kind: 'bill', id: m.id, label: `${m.vendor} ${m.reference}`, date: m.bill_date, amount_cents: m.total_cents })),
     detail: missing.length ? `${missing.length} bill${missing.length === 1 ? '' : 's'} without a document or recorded reason` : waived ? `Every bill has a receipt or a recorded reason (${waived} waived)` : 'Every bill has a receipt' })
+
+  const receiptLimit = Number((await one(db, 'SELECT receipt_cents FROM pt_books_agent WHERE id = 1'))?.receipt_cents ?? 7500)
+  const expenseEntries = new Set((await all(db, "SELECT DISTINCT l.entry_id FROM pt_journal_lines l JOIN pt_accounts a ON a.id = l.account_id WHERE a.type = 'expense'")).map(row => row.entry_id))
+  const receiptExceptions = (await missingReceipts(db, start, end)).filter(entry => entry.amount_cents > receiptLimit && expenseEntries.has(entry.id))
+  checks.push({ key: 'receipts', title: 'Expense receipts supplied or waived', ok: receiptExceptions.length === 0, items: receiptExceptions.map(entry => ({ kind: 'journal', id: entry.id, label: entry.memo })), detail: receiptExceptions.length ? `${receiptExceptions.length} charges over ${usd(receiptLimit)} need a receipt or a posting-authority waiver with a reason.` : 'Required expense receipts supplied or waived.' })
 
   const ar = await ageing(db, 'receivable', end), ap = await ageing(db, 'payable', end)
   checks.push({ key: 'subledgers', title: 'Receivables and payables agree to control accounts', ok: ar.agrees && ap.agrees,
@@ -139,6 +144,7 @@ export async function lockPlan(db: D1Database, actor: Actor, id: string, note: s
   requireThat(state.tasks.length && state.tasks.every((t: Data) => t.status === 'done'), 'Complete every review task before locking', 409)
   const revision = uid()
   return [
+    guard(`NOT EXISTS (SELECT 1 FROM pt_journal_entries e WHERE e.status = 'posted' AND e.reversed_by_id IS NULL AND e.reverses_id IS NULL AND e.entry_date BETWEEN ? AND ? AND NOT ${hasDocument('e')} AND NOT EXISTS (SELECT 1 FROM pt_receipt_waivers w WHERE w.entry_id = e.id) AND EXISTS (SELECT 1 FROM pt_journal_lines l JOIN pt_accounts a ON a.id = l.account_id WHERE l.entry_id = e.id AND a.type = 'expense') AND (SELECT COALESCE(SUM(l.credit_cents), 0) FROM pt_journal_lines l JOIN pt_accounts a ON a.id = l.account_id WHERE l.entry_id = e.id AND a.subtype = 'bank') > (SELECT receipt_cents FROM pt_books_agent WHERE id = 1) AND NOT EXISTS (SELECT 1 FROM pt_payments p JOIN pt_allocations x ON x.source_kind = 'payment' AND x.source_id = p.id AND x.target_kind = 'bill' WHERE p.journal_id = e.id))`, state.start, state.end),
     ...await recognitionCloseGuards(db, state.end),
     ...await clearingCloseGuards(db),
     // The checked state must still hold: no task reopened, no draft or posting added in the period meanwhile.

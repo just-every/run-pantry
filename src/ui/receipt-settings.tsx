@@ -90,8 +90,23 @@ function AddressCard({ inbox, onChange }: { inbox: D; onChange: () => Promise<vo
   </Card></section>
 }
 
+function ChaseSettings({ data, onChange }: { data: D; onChange: () => Promise<void> }) {
+  const saved = data.settings, [enabled, setEnabled] = useState(!!saved.enabled)
+  return <Card title="Missing receipt requests"><p>Map a card's last four to its charge owner. Email requests use the existing signed-in question and attachment reply. The recipient must already be the owner or an accountant with full unmasked access to these books.</p>
+    <p className="hint">{data.cardholders.map((c: D) => `${c.last_four}: ${c.email || 'Choose a cardholder again'}`).join('; ') || 'No cardholders mapped.'} Requests stop after a receipt or an authorised waiver, and sending stops when disabled or access is removed. A restored installation needs fresh owner consent and cardholder mapping.</p>
+    <Form key={saved.revision} label="Save receipt requests" className="grid-form" submit={b => command('receipt-chase.save', { ...b, enabled, consent: b.consent === 'on', revision: saved.revision })} onDone={onChange}>
+      <label><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} /> Enable receipt request emails</label>
+      <Field label="Repeat every (days)" name="repeatDays" type="number" min="1" max="90" defaultValue={saved.repeat_days} required />
+      <Field label="Card last four" name="lastFour" pattern="[0-9]{4}" maxLength={4} />
+      <Field label="Cardholder email" name="email" type="email" />
+      <label><input type="checkbox" name="consent" required={enabled} /> I authorise these receipt emails to the mapped people on this schedule.</label>
+    </Form>
+    {saved.enabled === 1 && <Action run={async () => { await command('receipt-chase.run', {}); await onChange() }}>Send due receipt requests</Action>}
+  </Card>
+}
+
 export function ReceiptSettings() {
   const { data, error, reload } = useView<D>('receipts/settings')
   if (!data) return <Card title="Receipts"><Loading error={error} what="receipt settings" /></Card>
-  return <><ReadingCard reader={data.reader} onChange={reload} /><AddressCard inbox={data.inbox} onChange={reload} /></>
+  return <><ReadingCard reader={data.reader} onChange={reload} /><AddressCard inbox={data.inbox} onChange={reload} /><ChaseSettings data={data.chase} onChange={reload} /></>
 }
