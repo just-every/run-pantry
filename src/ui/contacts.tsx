@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Card, Chip, command, Field, Form, Table, useShared, type D } from './kit'
+import { VendorHistory } from './vendor-history'
 import { CustomerHistory } from './customer-history'
 import { ExemptionCertificates } from './exemption-certificates'
 
@@ -15,13 +16,22 @@ function ContactEditor({ editing, onDone, onCancel }: { editing: D | null; onDon
   const patch = (index: number, values: D) => setPeople(p => p.map((v, i) => i === index ? { ...v, ...values } : v))
   return <Card title={editing ? `Edit ${editing.name}` : 'Add a customer or vendor'}>
     <Form label={editing ? 'Save' : 'Add'} submit={b => command('contact.save', { ...b, id: editing?.id, revision: editing?.revision, kind,
-      active: b.active !== 'no', ...(kind === 'customer' ? { contacts: people, payMethods: methods } : {}) })} onDone={onDone}
+      active: b.active !== 'no', contacts: people, ...(kind === 'customer' ? { payMethods: methods } : {}) })} onDone={onDone}
       secondary={editing && <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>}>
       {!editing && !fixedKind && <Field label="Kind" name="kind" value={kind} onChange={(e: any) => setKind(e.target.value)} required options={[{ value: 'customer', label: 'Customer' }, { value: 'vendor', label: 'Vendor' }]} />}
       <Field label="Name" name="name" defaultValue={editing?.name} required />
       <Field label="Email" name="email" type="email" defaultValue={editing?.email} />
       <Field label="Payment terms (days)" name="termsDays" type="number" defaultValue={editing?.terms_days ?? 30} min={0} max={365} />
       {kind === 'vendor' && ['class','location','project'].filter(kind=>state.dimensions?.settings[kind==='class'?'classes_enabled':kind==='location'?'locations_enabled':'projects_enabled']).map(kind=><Field key={kind} label={`Default ${kind}`} name={`default${kind[0].toUpperCase()+kind.slice(1)}`} defaultValue={editing?.[`default_${kind}`]??''} empty="Unassigned" options={state.dimensions.values.filter((v:D)=>v.kind===kind&&(v.active||v.name===editing?.[`default_${kind}`])).map((v:D)=>({value:v.name,label:v.name+(v.active?'':' (inactive)')}))} />)}
+      {kind === 'vendor' && <>
+        <Field label="Vendor phone" name="phone" defaultValue={editing?.phone} />
+        <Field label="Default account" name="defaultAccountId" defaultValue={editing?.default_account_id ?? ''} empty="Not set" options={state.accounts.filter((a:D)=>a.active&&!['bank','receivable','payable'].includes(a.subtype)).map((a:D)=>({value:a.id,label:`${a.code} · ${a.name}`}))} />
+        <Field label="1099 box" name="vendorTaxBox" defaultValue={editing?.vendor_tax_box ?? 'NEC-1'} options={['NEC-1','MISC-1','MISC-2','MISC-3','MISC-5','MISC-6','MISC-7','MISC-8','MISC-9','MISC-10','MISC-11','MISC-12','MISC-14','MISC-15'].map(value=>({value,label:value}))} hint="MISC classifications require separate filing review; they are excluded from NEC filing data." />
+        <Field label="Payment provider" name="paymentProvider" defaultValue={editing?.payment_provider} />
+        <Field label="Preferred provider payment method" name="providerPaymentMethod" defaultValue={editing?.provider_payment_method ?? ''} empty="Not recorded" options={['ach','check','wire','card','cash','payment-network'].map(value=>({value,label:value.toUpperCase()}))} hint="Records the preference only; no provider change or payment is sent." />
+        {people.map((p,i)=><div key={i}><Field label={`Vendor contact ${i+1} name`} name={`vendor-contact-${i}-name`} value={p.name} onChange={(e:any)=>patch(i,{name:e.target.value})} /><Field label={`Vendor contact ${i+1} email`} name={`vendor-contact-${i}-email`} type="email" value={p.email} onChange={(e:any)=>patch(i,{email:e.target.value})} /><Field label={`Vendor contact ${i+1} phone`} name={`vendor-contact-${i}-phone`} value={p.phone} onChange={(e:any)=>patch(i,{phone:e.target.value})} /><button type="button" className="btn btn-link" onClick={()=>setPeople(ps=>ps.filter((_,n)=>n!==i))}>Remove vendor contact {i+1}</button></div>)}
+        <button type="button" className="btn btn-secondary" onClick={()=>setPeople(p=>[...p,{name:'',email:'',phone:'',roles:['primary']}])}>Add vendor contact</button>
+      </>}
       {kind === 'customer' && <>
         <Field label="Phone" name="phone" defaultValue={editing?.phone} />
         <Field label="Billing address" name="billingAddress" type="textarea" defaultValue={editing?.billing_address} />
@@ -71,6 +81,6 @@ export function Contacts() {
       </Card>
       {state.actor.can.record && (editing && !editingOpen ? <Card title={editing.name}><p>{editing.kind === 'customer' ? 'Customer history, balances and preferences are below.' : 'Vendor contact details are saved in your books.'}</p><button type="button" className="btn btn-secondary" onClick={() => setEditingOpen(true)}>Edit contact details</button></Card> : <ContactEditor key={`${editing?.id ?? 'new'}-${editing?.revision ?? added}`} editing={editing} onCancel={clear} onDone={async c => { await reload(); setAdded(n => n + 1); choose(c) }} />)}
     </div>
-    {editing?.kind === 'customer' ? <CustomerHistory key={editing.id + editing.revision} customerId={editing.id} /> : !['sales', 'payables-clerk'].includes(state.actor.role) && <ExemptionCertificates />}
+    {editing?.kind === 'customer' ? <CustomerHistory key={editing.id + editing.revision} customerId={editing.id} /> : editing?.kind === 'vendor' ? <VendorHistory key={editing.id + editing.revision} vendorId={editing.id} /> : !['sales', 'payables-clerk'].includes(state.actor.role) && <ExemptionCertificates />}
   </>
 }

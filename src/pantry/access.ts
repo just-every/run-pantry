@@ -96,3 +96,15 @@ export async function ownerEmail(db: D1Database, env: Bindings) {
   const row = await one<{ email: string }>(db, "SELECT lower(email) AS email FROM oa_operators WHERE role = 'owner' AND status = 'active' ORDER BY created_at LIMIT 1")
   return (row?.email ?? String(runtimeBindings(env).OWNER_EMAIL ?? '')).trim().toLowerCase()
 }
+
+/** Tax identity is a deliberate, fresh native-session disclosure. */
+export async function tinAuthority(c: { actor: Actor; request: Request; env: Bindings }) {
+  const actor = c.actor
+  requireThat(actor.kind === 'person' && ['owner', 'accountant'].includes(actor.role) && !actor.policy?.maskTin, 'Only the owner or an unmasked accountant may reveal tax identity', 403)
+  try { await operatorAuth(runtimeBindings(c.env)).requireStepUp(c.request, 'export') }
+  catch { throw new Fault(403, 'Confirm your sign-in before revealing tax identity') }
+  const fresh = await one(c.env.DB, "SELECT 1 FROM oa_step_up_challenges WHERE session_id=? AND operator_id=? AND action='export' AND consumed_at>=? AND expires_at>?", actor.session, actor.id, Date.now()-300000, Date.now())
+  requireThat(fresh, 'Confirm your sign-in before revealing tax identity', 403)
+  return [authority(actor, 'read'), guard(`EXISTS (SELECT 1 FROM oa_step_up_challenges c JOIN oa_sessions s ON s.id=c.session_id JOIN oa_operators o ON o.id=s.operator_id
+    WHERE c.session_id=? AND c.operator_id=? AND c.operator_version=o.version AND c.action='export' AND c.consumed_at IS NOT NULL AND c.consumed_at>=? AND c.expires_at>?)`, actor.session, actor.id, Date.now()-300000, Date.now())]
+}

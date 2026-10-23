@@ -5,7 +5,7 @@ on:
   push:
     tags: ['v*']
   schedule:
-    - cron: '41 15 * * *'
+    - cron: '41 18 * * *'
   workflow_dispatch:
     inputs:
       from:

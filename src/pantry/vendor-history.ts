@@ -1,6 +1,7 @@
 // Complete vendor read model. Do not reuse the capped sales lists for balances.
-import { requireThat, text, type Data } from './core'
+import { date, requireThat, text, type Data } from './core'
 import { all, one } from './db'
+import { contactTotals } from './contact-totals'
 
 const scope = `WITH vendor_bills AS (SELECT * FROM pt_bills WHERE vendor_id = ?),
   vendor_payments AS (SELECT * FROM pt_payments WHERE contact_id = ? AND direction = 'paid'),
@@ -15,10 +16,14 @@ const scope = `WITH vendor_bills AS (SELECT * FROM pt_bills WHERE vendor_id = ?)
   ) `
 
 /** Call behind the native-session read capability, like the other screen views. */
-export async function vendorHistory(db: D1Database, rawId: string) {
+export async function vendorHistory(db: D1Database, rawId: string, from?: string, to?: string) {
   const id = text(rawId, 'Vendor')
-  const vendor = await one(db, "SELECT id, name, active, terms_days, default_class FROM pt_contacts WHERE id = ? AND kind = 'vendor'", id)
+  const vendor = await one(db, "SELECT c.id, c.name, c.active, c.terms_days, c.default_class, c.default_account_id, c.is_1099, c.vendor_tax_box, c.provider_payment_method, c.payment_provider, c.email, c.phone, c.contacts_json, a.code AS account_code, a.name AS account_name FROM pt_contacts c LEFT JOIN pt_accounts a ON a.id=c.default_account_id WHERE c.id = ? AND c.kind = 'vendor'", id)
   requireThat(vendor, 'Vendor not found', 404)
+  const start = date(from ?? `${new Date().getUTCFullYear()}-01-01`, 'From'), end = date(to ?? `${new Date().getUTCFullYear()}-12-31`, 'To')
+  requireThat(start <= end, 'From must be on or before To')
+  const expenses = await contactTotals(db, 'vendor', start, end, 'accrual')
+  const tax = await one(db, 'SELECT tin, tin_kind, backup_withholding FROM pt_contractor_tax WHERE contact_id=?', id)
   const read = (sql: string) => all(db, scope + sql, id, id, id, id)
   const [bills, payments, credits, drafts, billLines, journalLines, documents, allocations, activity] = await Promise.all([
     read(`SELECT b.*, e.status AS entry_status, e.reversed_by_id, e.document_id AS entry_document_id FROM vendor_bills b LEFT JOIN pt_journal_entries e ON e.id = b.journal_id`),
@@ -123,7 +128,12 @@ export async function vendorHistory(db: D1Database, rawId: string) {
   const currentPayments = rows.filter(r => r.kind === 'payment' && r.included_in_balance)
   const currentCredits = rows.filter(r => r.kind === 'vendor-credit' && r.included_in_balance)
   const open = amount(currentBills, 'balance_cents'), unappliedPayments = amount(currentPayments, 'balance_cents'), unappliedCredits = amount(currentCredits, 'balance_cents')
-  return { vendor, rows, summary: {
+  const inPeriod = (r: Data) => r.date >= start && r.date <= end
+  const periodBills = currentBills.filter(inPeriod), periodCredits = currentCredits.filter(inPeriod), periodPayments = currentPayments.filter(inPeriod)
+  const captured = rows.filter(r => r.posted_expense && inPeriod(r))
+  return { vendor: { ...vendor, contacts: JSON.parse(vendor.contacts_json), tin: tax?.tin ? `•••••${tax.tin.slice(-4)}` : null, backup_withholding: !!tax?.backup_withholding } as Data, rows,
+    spend: { from: start, to: end, expense_cents: expenses.rows.find(r => r.id === id)?.amount ?? 0, billed_cents: amount(periodBills, 'total_cents'), credited_cents: amount(periodCredits, 'total_cents'), paid_cents: amount(periodPayments, 'total_cents'), captured_expense_cents: amount(captured, 'total_cents'),
+      net_purchases_cents: amount(periodBills, 'total_cents') - amount(periodCredits, 'total_cents') + amount(captured, 'total_cents') }, summary: {
     billed_cents: amount(currentBills, 'total_cents'), paid_cents: amount(currentPayments, 'total_cents'), credited_cents: amount(currentCredits, 'total_cents'),
     open_bill_cents: open, unallocated_payment_cents: unappliedPayments, unallocated_credit_cents: unappliedCredits,
     net_payable_cents: open - unappliedPayments - unappliedCredits,
