@@ -5,6 +5,7 @@
 // without Subaddressing) is kept; anything else is refused unread. Each kept message is
 // kept whole, byte for byte, and read from its PDF or photo attachment, or from
 // its text when it has none.
+import { upgradeTins } from '../contractor-tin'
 import type { Bindings } from '../../auth.server'
 // @ts-expect-error Base's inbound MIME parser ships without type declarations.
 import { parseMime as parseBaseMime } from '../../modules/mail/src/inbound/mime.mjs'
@@ -172,6 +173,7 @@ export async function receiveMail(env: Bindings, recipients: string[], raw: Uint
 
 /** Cloudflare Email Routing: the Worker's email handler. Anything not for the Pantry address is refused unread. */
 export async function emailHandler(message: ForwardableEmailMessage, env: Bindings) {
+  await upgradeTins(env)
   if (message.rawSize > MAX_EMAIL_BYTES) { message.setReject('Message too large for Pantry (12 MB)'); return }
   const raw = new Uint8Array(await new Response(message.raw).arrayBuffer())
   const outcome = await receiveMail(env, [message.to], raw, message.from)

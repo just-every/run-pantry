@@ -1,6 +1,8 @@
+import type { Bindings } from '../../auth.server'
+import { matchesTin } from '../contractor-tin'
 // Identity evidence proposes contacts; only a person's confirmation retains an alias.
 import { all } from '../db'
-import { sha256, type Data } from '../core'
+import { type Data } from '../core'
 import { storedVendorDetails } from './vendor-details'
 
 export const vendorNameKey = (value: string | null | undefined) => (value ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -16,10 +18,10 @@ export function vendorDefaults(v: Data) {
 function publicVendor(v: Data) { return { id: v.id, name: v.name, email: v.email, address: v.address, phone: v.phone, revision: v.revision, defaults: vendorDefaults(v) } }
 
 /** Conflicting identities remain choices, even if one has a stronger signal. */
-export async function receiptVendorProposal(db: D1Database, r: Data) {
+export async function receiptVendorProposal(db: D1Database, r: Data, env: Bindings) {
   const details = storedVendorDetails(r), name = r.vendor ?? r.read_vendor ?? ''
   const [vendors, aliases] = await Promise.all([
-    all(db, `SELECT c.*, t.tin, t.tin_kind, t.address AS tax_address, t.city AS tax_city, t.state AS tax_state, t.zip AS tax_zip
+    all(db, `SELECT c.*, t.tin_hash, t.tin_kind, t.address AS tax_address, t.city AS tax_city, t.state AS tax_state, t.zip AS tax_zip
       FROM pt_contacts c LEFT JOIN pt_contractor_tax t ON t.contact_id = c.id WHERE c.kind = 'vendor' AND c.active = 1 ORDER BY c.name, c.id`),
     all(db, 'SELECT vendor_id, alias_key FROM pt_vendor_aliases'),
   ])
@@ -35,7 +37,7 @@ export async function receiptVendorProposal(db: D1Database, r: Data) {
     const taxAddress = [v.tax_address, v.tax_city, v.tax_state, v.tax_zip].filter(Boolean).join(' ')
     if (address.length >= 10 && [addressKey(v.address), addressKey(taxAddress)].includes(address)) reasons.push('address')
     if (phoneKey(details.phone) && phoneKey(details.phone) === phoneKey(v.phone)) reasons.push('phone')
-    if (details.einHash && (details.einHash === v.vendor_ein_hash || (v.tin_kind === 'ein' && v.tin && details.einHash === await sha256(v.tin)))) reasons.push('EIN on W-9')
+    if (details.einHash && (details.einHash === v.vendor_ein_hash || (v.tin_kind === 'ein' && v.tin_hash && await matchesTin(env, v.id, v.tin_hash, details.einHash)))) reasons.push('EIN on W-9')
     if (reasons.length) candidates.push({ ...publicVendor(v), reasons })
   }
   const confirmed = r.vendor_id ? vendors.find(v => v.id === r.vendor_id) : null

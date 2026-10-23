@@ -24,6 +24,25 @@ function TinReveal({ id }: { id: string }) {
   return <div className="row-actions"><Action run={async()=>{const r=await command('contractor.step-up',{});setNotice(r.message)}}>Confirm sign-in</Action><Action run={async()=>{const r=await command('contractor.reveal',{contactId:id});setTin(r.tin);setTimeout(()=>setTin(''),30000)}}>Reveal TIN</Action>{tin && <><output aria-label="Full TIN">{tin}</output><button className="btn btn-link" type="button" onClick={()=>setTin('')}>Hide TIN</button></>}{notice&&<p role="status">{notice}</p>}</div>
 }
 
+function FilingDownloads({ year, wholeYear }: { year: number; wholeYear: boolean }) {
+  const { state } = useShared(), [notice, setNotice] = useState('')
+  const canFullTin = ['owner', 'accountant'].includes(state.actor.role) && !state.actor.policy?.maskTin
+  const path = `/api/pantry/reports/contractors/${year}/1099-nec`
+  return <>
+    {state.actor.can.post ? <>
+      <p className="row-actions"><a className="btn btn-primary" href={`${path}.csv`} download>Download the {year} {wholeYear ? 'whole-year ' : ''}1099-NEC CSV</a>{['pdf', 'xlsx'].map(format => <a key={format} className="btn btn-secondary" download href={`${path}.${format}`}>Filing data {format === 'xlsx' ? 'Excel' : 'PDF'}</a>)}</p>
+      <p className="hint">Default downloads mask TINs. Use a confirmed full-TIN download when your filing service needs tax identities. Every download is in the activity log.</p>
+    </> : <p className="hint">The owner or someone with the posting grant can download filing data with masked TINs.</p>}
+    {canFullTin && <details>
+      <summary>Downloads with full TINs</summary>
+      <p>Confirm your sign-in through your email in this browser, then download within five minutes. These files contain full tax identities.</p>
+      <Action run={async () => { const r = await command('contractor.step-up', {}); setNotice(r.message) }}>Confirm sign-in</Action>
+      {notice && <p role="status">{notice}</p>}
+      <p className="row-actions">{['csv', 'pdf', 'xlsx'].map(format => <a key={format} className="btn btn-secondary" download href={`${path}.${format}?fullTin=true`}>Full TIN {format === 'xlsx' ? 'Excel' : format.toUpperCase()}</a>)}</p>
+    </details>}
+  </>
+}
+
 function Details({ c, onDone }: { c: D; onDone: () => Promise<void> }) {
   const { state } = useShared(), t = c.tax
   return <Form key={c.id + (t?.tin ?? '')} label="Save 1099 details" submit={b => command('contractor.save', { ...b, contactId: c.id, is1099: b.is1099 === 'on', ...(['owner','accountant'].includes(state.actor.role) ? {backupWithholding:b.backupWithholding === 'on'} : {}) })} onDone={onDone} className="grid-form">
@@ -93,8 +112,7 @@ export function Contractors({ year, onYear }: { year: number; onYear: (y: number
           <Table heads={['Recipient', 'TIN', 'Box 1 nonemployee compensation', 'Box 4 federal income tax withheld', 'Ready to file']} figures={[2, 3]} empty={`No contractor reached ${usd(r.threshold)} in ${year}.`}>
             {r.forms.map((f: D) => <tr key={f.id}><td>{f.name}</td><td className="nowrap">{f.tin ?? 'Missing'}</td><td className="fig">{open(f.id, 'box1', f.box1)}</td><td className="fig">{usd(f.box4)}</td><td>{f.ready ? <Chip tone="good">Ready</Chip> : <Chip tone="bad">Review details and withholding</Chip>}</td></tr>)}
           </Table>
-          {r.forms.length > 0 && (state.actor.can.post ? <p><a className="btn btn-primary" href={`/api/pantry/reports/contractors/${year}/1099-nec.csv`} download>Download the {year} {r.dimension?'whole-year ':''}1099-NEC CSV</a> {['pdf','xlsx'].map(format=><a key={format} className="btn btn-secondary" download href={`/api/pantry/reports/contractors/${year}/1099-nec.${format}`}>Filing data {format==='xlsx'?'Excel':'PDF'}</a>)} <small className="sub">It carries full TINs; every download is in the activity log.</small></p>
-            : <p className="hint">The filing CSV carries full TINs, so the owner or someone with the posting grant downloads it.</p>)}
+          {r.forms.length > 0 && <FilingDownloads year={year} wholeYear={!!r.dimension} />}
         </>}
       </Card>
     </>}

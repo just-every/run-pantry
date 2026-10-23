@@ -6,6 +6,7 @@ import { learningCommands,learningView } from './learning'
 import { assetCommands,assetView } from './assets'
 import { cashPlanner } from './cash-planner'
 import { search } from './search'
+import { upgradeTins } from './contractor-tin'
 import { contractorFormExport } from './contractor-export'
 import { reportDeliveryCommands, deliverySettings, deliveryAttachment } from './report-delivery'
 import { nativeReportExport } from './report-export-reader'
@@ -59,7 +60,7 @@ import { reportExport } from './report-export'
 import { isLibrary, libraryReport } from './report-library'
 import { libraryExport } from './report-library/export'
 import { recordView } from './records'
-import { contractorCommands, contractors, necCsv } from './contractors'
+import { contractorCommands, contractors } from './contractors'
 import { accountantPackage, ledgerCsv } from './package'
 import { packageZip } from './package-files'
 import { dashboard } from './dashboard'
@@ -133,6 +134,7 @@ export const api = new Hono<{ Bindings: Bindings }>()
 
 // Ordinary requests also run due work (reminders, recurring invoices, Stripe follow-up) after they answer.
 api.use('*', async (c, next) => {
+  await upgradeTins(c.env)
   await next()
   if(c.req.method!=='GET')c.executionCtx.waitUntil(runWebhooks(c.env).catch(()=>console.error('Webhook dispatch failed')))
   c.executionCtx.waitUntil(runDueWork(c.env).catch(error => console.error('Pantry due work failed:', error)))
@@ -314,17 +316,9 @@ view('reports/:kind', async (ctx, c) => {
   return readReport(ctx.db, c.req.param('kind')!, { from, to, basis: await reportBasis(ctx.db, c.req.query('basis')), account: c.req.query('account'), payee: c.req.query('payee'), columns: c.req.query('columns'),dimension:c.req.query('dimension'),dimensionValue:c.req.query('dimensionValue') })
 })
 
-// The 1099-NEC filing file carries full TINs: the owner or someone with the posting grant, audited.
-for(const format of ['pdf','xlsx'])api.get(`/api/pantry/reports/contractors/:year/1099-nec.${format}`,async c=>contractorFormExport(await reader(c),Number(c.req.param('year')),format))
-api.get('/api/pantry/reports/contractors/:year/1099-nec.csv', async c => {
-  const ctx = await reader(c)
-  must(ctx.actor, 'post')
-  const y = Number(c.req.param('year'))
-  requireThat(Number.isInteger(y) && y >= 2000 && y <= 2100, 'Choose a tax year')
-  const csv=await necCsv(ctx.db,who(ctx.actor),y)
-  await recordReportIssue(ctx.db,who(ctx.actor),{kind:'report',name:`1099-NEC · ${y}`,from:`${y}-01-01`,to:`${y}-12-31`,basis:'cash',report:'contractors'})
-  return new Response(csv, { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="pantry-1099-nec-${y}.csv"`, 'cache-control': 'no-store' } })
-})
+// Masked filing downloads use posting authority; full identity requires step-up.
+for (const format of ['csv', 'pdf', 'xlsx']) api.get(`/api/pantry/reports/contractors/:year/1099-nec.${format}`, async c =>
+  contractorFormExport(await reader(c), Number(c.req.param('year')), format, c.req.query('fullTin') === 'true'))
 
 api.get('/api/pantry/documents/:id', async c => {
   const ctx = await reader(c)

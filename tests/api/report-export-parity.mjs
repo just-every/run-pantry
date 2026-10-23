@@ -47,6 +47,6 @@ export async function reportExportParity(t){
   const file=await h.send(`/api/pantry/reports/contractors/2025/1099-nec.${format}`,undefined,{cookie:h.owner});assert.equal(file.status,200)
  }
  const filing=await downloadSpreadsheet(h.origin,'reports/contractors/2025/1099-nec.xlsx',h.owner)
- assert.equal(filing[1][12],700);assert.equal(filing[1][7],'00-0000001')
+ assert.equal(filing[1][12],700);assert.equal(filing[1][7],'••-•••0001')
  const activity=await h.view('activity');assert.ok(activity.audit.some(a=>a.action==='contractor.1099-export'))
 }

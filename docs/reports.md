@@ -47,7 +47,7 @@ Each tax code belongs to a state, set when you add it under **Books › Sales ta
 
 ## 1099 contractors
 
-Mark a vendor you pay for services as a **1099 contractor** and keep its W-9 details: legal name, TIN and address. The TIN is shown only as its last four digits everywhere in Pantry.
+Mark a vendor you pay for services as a **1099 contractor** and keep its W-9 details: legal name, TIN and address. Ordinary views show only the last four TIN digits. TINs are encrypted with a vendor-specific purpose under the installation session secret; existing stored digits are upgraded before Pantry serves data. The owner or an unmasked accountant can confirm sign-in by email in the same browser and reveal the TIN within five minutes; the display hides after thirty seconds.
 
 For each calendar year Pantry totals what you paid each contractor:
 
@@ -58,7 +58,7 @@ For each calendar year Pantry totals what you paid each contractor:
 
 A contractor at or over the year's threshold is flagged as the year goes on. The threshold is $600 for payments made in 2025 and earlier, and $2,000 for payments made in 2026 (raised by the One Big Beautiful Bill Act); the IRS adjusts it for inflation from 2027. Vendors not marked as contractors who were paid that much by check, ACH, wire or cash are listed so you can decide.
 
-After December 31, **1099-NEC forms** lists each form's recipient, box 1 and box 4 ($0.00: Pantry records no backup withholding), and the owner or someone with the posting grant downloads a filing CSV with the full TINs. Every download is in the activity log. **Pantry does not file with the IRS**: file the CSV through the IRS or a filing service by January 31. Whether a vendor needs a 1099 at all is your and your accountant's call.
+After December 31, **1099-NEC forms** lists each form's recipient, box 1 and box 4 ($0.00: Pantry records no backup withholding). The owner or someone with the posting grant downloads CSV, PDF and Excel copies with masked TINs. Under **Downloads with full TINs**, only the owner or an unmasked accountant, after confirming sign-in by email in the same browser within five minutes, downloads full tax identities. Every download is in the activity log without its TINs. A backup-withholding flag holds the vendor's forms for review and appears in fiscal year-end readiness. **Pantry does not file with the IRS**: file a confirmed full-TIN CSV through the IRS or a filing service by January 31. Whether a vendor needs a 1099 at all is your and your accountant's call.
 
 ## Statement of cash flows
 

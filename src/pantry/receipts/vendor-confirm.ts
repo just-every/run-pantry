@@ -14,7 +14,7 @@ const confirm: Command = { need: 'record', async run(c, b) {
   const r = await one(c.db, "SELECT * FROM pt_receipts WHERE id = ? AND status = 'review'", text(b.id, 'Receipt'))
   requireThat(r, 'Receipt not found or already decided', 404)
   requireThat(r.revision === b.revision, 'This receipt changed; reload', 409)
-  const proposal = await receiptVendorProposal(c.db, r), details = storedVendorDetails(r)
+  const proposal = await receiptVendorProposal(c.db, r, c.env), details = storedVendorDetails(r)
   const statements: Sql[] = [authority(c.actor, 'record'), guard("EXISTS (SELECT 1 FROM pt_receipts WHERE id = ? AND revision = ? AND status = 'review')", r.id, r.revision)]
   let vendor
   if (b.vendorId) {
@@ -47,7 +47,7 @@ const confirm: Command = { need: 'record', async run(c, b) {
   audit(who(c.actor), 'receipt.vendor-confirm', 'receipt', r.id, { vendorId: vendor.id, created: !b.vendorId, alias: alias || undefined, einLast4: details.einLast4 ?? undefined }))
   await run(c.db, statements)
   const saved = (await one(c.db, 'SELECT * FROM pt_receipts WHERE id = ?', r.id))!
-  return { id: r.id, revision: saved.revision, vendorId: vendor.id, vendorProposal: await receiptVendorProposal(c.db, saved) }
+  return { id: r.id, revision: saved.revision, vendorId: vendor.id, vendorProposal: await receiptVendorProposal(c.db, saved, c.env) }
 } }
 
 export const receiptVendorCommands: Record<string, Command> = { 'receipt.vendor-confirm': confirm }

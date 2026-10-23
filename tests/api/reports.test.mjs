@@ -311,13 +311,13 @@ test('CLOSE-005 / TAXFORM-002 1099 contractors: cash payments per calendar year 
   assert.deepEqual(y25.contractors.map(x => [x.name, x.box1, x.excluded, x.overThreshold, x.tax.tin]), [['Ada Okafor', 65000, 30000, true, '•••-••-6789'], ['Ben Ruiz Design', 50000, 70000, false, '••-•••4321']])
   assert.deepEqual(y25.forms, [{ id: v['Ada Okafor'].id, name: 'Adaeze Okafor', tin: '•••-••-6789', box1: 65000, box4: 0, ready: true }])
   assert.ok(!JSON.stringify(y25).includes('123456789') && !JSON.stringify(await h.view('state', bea)).includes('123456789'), 'views never carry the full TIN')
-  // The filing CSV carries the full TIN: owner or the posting grant only, and audited.
+  // The default filing CSV is masked; posting authority and audit still apply.
   assert.equal((await h.send('/api/pantry/reports/contractors/2025/1099-nec.csv', undefined, { cookie: bea })).status, 403)
   const csv = await h.send('/api/pantry/reports/contractors/2025/1099-nec.csv', undefined, { cookie: h.owner })
   assert.equal(csv.status, 200)
   const lines = csv.value.trim().split('\r\n')
   assert.equal(lines.length, 2)
-  assert.equal(lines[1], `2025,1099-NEC,Juniper Lane Design LLC,NY,${v['Ada Okafor'].id},Adaeze Okafor,SSN,123-45-6789,22 Elm St Apt 4,Brooklyn,NY,11201,650.00,0.00,Payment basis`)
+  assert.equal(lines[1], `2025,1099-NEC,Juniper Lane Design LLC,NY,${v['Ada Okafor'].id},Adaeze Okafor,SSN,•••-••-6789,22 Elm St Apt 4,Brooklyn,NY,11201,650.00,0.00,Payment basis`)
   const activity = await h.view('activity')
   assert.ok(activity.audit.some(a => a.action === 'contractor.1099-csv'))
   assert.ok(!JSON.stringify(activity).includes('123456789') && !JSON.stringify(activity).includes('123-45-6789'), 'the audit trail never carries the full TIN')
@@ -951,13 +951,26 @@ test('REPORT-007 dedicated reports, close packages and audited filing data expor
 
 
 test('TAXFORM-001 native TIN reveal binds proof to the session and keeps withholding and MISC review visible', async t => {
- const h=await harness();t.after(()=>h.close());const {acct}=await books(h)
+ const h=await harness({beforeMigration:async(db,file)=>{
+  if(file!=='0102_contractor_tin_vault.sql')return
+  await db.prepare("INSERT INTO pt_contacts(id,kind,name,revision) VALUES ('synthetic-pantry-201','vendor','Legacy contractor','synthetic-pantry-202')").run()
+  await db.prepare("INSERT INTO pt_contractor_tax(contact_id,legal_name,tin_kind,tin,address,city,state,zip,revision,updated_by,updated_at) VALUES ('synthetic-pantry-201','Legacy contractor','ssn','000000987','1 Synthetic Lane','Albany','NY','12207','synthetic-pantry-203','owner@example.test','2025-01-01')").run()
+ }});t.after(()=>h.close());const {acct}=await books(h)
+ const legacy=await h.db.prepare("SELECT * FROM pt_contractor_tax WHERE contact_id='synthetic-pantry-201'").first()
+ assert.notEqual(legacy.tin,'000000987','the first public command upgrades existing stored digits')
+ assert.equal(legacy.tin_last4,'0987');assert.equal(legacy.revision,'synthetic-pantry-203','migration preserves revision and custody')
+ assert.ok(!JSON.stringify(legacy).includes('000000987'))
  let vendor=await h.command('contact.save',{kind:'vendor',name:'Synthetic tax vendor',vendorTaxBox:'MISC-1'})
  const bank=await h.command('bank-account.save',{name:'Synthetic checking',institution:'Example',accountId:acct['1000'],numberLast4:'0123',openingDate:'2025-01-01',openingBalance:'0'})
  await h.command('payment.record',{direction:'paid',contactId:vendor.id,date:'2025-03-01',amount:'650.00',bankAccountId:bank.id,method:'ach'})
  const bookkeeper=await h.member('synthetic-bookkeeper@example.test','bookkeeper',{canPost:true})
  const accountant=await h.member('synthetic-accountant@example.test','accountant')
  await h.command('contractor.save',{contactId:vendor.id,is1099:true,legalName:'Synthetic tax vendor',tinKind:'ein',tin:'000000123',address:'1 Example Street',city:'Albany',state:'NY',zip:'12207',backupWithholding:true})
+ const stored=await h.db.prepare('SELECT * FROM pt_contractor_tax WHERE contact_id=?').bind(vendor.id).first()
+ assert.notEqual(stored.tin,'000000123');assert.equal(stored.tin_last4,'0123');assert.ok(!JSON.stringify(stored).includes('000000123'))
+ const details={contactId:vendor.id,is1099:true,legalName:'Synthetic tax vendor',tinKind:'ein',tin:'',address:'2 Example Street',city:'Albany',state:'NY',zip:'12207'}
+ await h.command('contractor.save',details)
+ assert.equal((await h.db.prepare('SELECT tin FROM pt_contractor_tax WHERE contact_id=?').bind(vendor.id).first()).tin,stored.tin,'blank input keeps the sealed identity')
  await h.command('contractor.reveal',{contactId:vendor.id},h.owner,403)
  await h.command('contractor.step-up',{},bookkeeper,403)
  await h.command('contractor.reveal',{contactId:vendor.id},bookkeeper,403)
@@ -967,10 +980,15 @@ test('TAXFORM-001 native TIN reveal binds proof to the session and keeps withhol
   const mail=h.mail.findLast(m=>[m.to].flat().includes(email)),token=new URL(mail.text.match(/http:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get('token')
   return token
  }
+ for(const format of ['csv','pdf','xlsx'])for(const cookie of [h.owner,bookkeeper,accountant]){
+  assert.equal((await h.send(`/api/pantry/reports/contractors/2025/1099-nec.${format}?fullTin=true`,undefined,{cookie})).status,403,'full filing files require native step-up and an eligible role')
+ }
  const token=await proof(h.owner,'owner@example.test')
  assert.notEqual((await h.send('/auth/confirm',{token},{cookie:accountant})).status,303,'another session cannot consume the proof')
  assert.equal((await h.send('/auth/confirm',{token},{cookie:h.owner})).status,303)
  assert.equal((await h.command('contractor.reveal',{contactId:vendor.id})).tin,'000000123')
+ assert.equal((await h.command('contractor.reveal',{contactId:'synthetic-pantry-201'})).tin,'000000987','migrated tax identity is usable after public-door confirmation')
+ for(const format of ['csv','pdf','xlsx'])assert.equal((await h.send(`/api/pantry/reports/contractors/2025/1099-nec.${format}?fullTin=true`,undefined,{cookie:accountant})).status,403,'owner confirmation does not authorize another session')
  const accountingToken=await proof(accountant,'synthetic-accountant@example.test')
  assert.equal((await h.send('/auth/confirm',{token:accountingToken},{cookie:accountant})).status,303)
  assert.equal((await h.command('contractor.reveal',{contactId:vendor.id},accountant)).tin,'000000123')
@@ -982,8 +1000,29 @@ test('TAXFORM-001 native TIN reveal binds proof to the session and keeps withhol
  vendor=(await h.view('state')).contacts.find(c=>c.id===vendor.id)
  await h.command('contact.save',{id:vendor.id,revision:vendor.revision,kind:'vendor',vendorTaxBox:'NEC-1'})
  assert.equal((await h.view('/reports/contractors?year=2025'.slice(1))).forms[0].ready,false,'withholding review blocks filing')
- assert.equal((await h.send('/api/pantry/reports/contractors/2025/1099-nec.csv',undefined,{cookie:h.owner})).status,409)
- const audit=await h.view('activity');assert.ok(audit.audit.some(a=>a.action==='contractor.tin-reveal'));assert.ok(!JSON.stringify(audit).includes('000000123'))
+ for(const format of ['csv','pdf','xlsx'])for(const full of ['', '?fullTin=true'])assert.equal((await h.send(`/api/pantry/reports/contractors/2025/1099-nec.${format}${full}`,undefined,{cookie:h.owner})).status,409,'withholding holds every filing format')
+ await h.command('contractor.save',{contactId:vendor.id,is1099:true,backupWithholding:false})
+ for(const format of ['csv','pdf','xlsx']){
+  for(const cookie of [h.owner,bookkeeper]){
+   const file=await h.send(`/api/pantry/reports/contractors/2025/1099-nec.${format}`,undefined,{cookie})
+   assert.equal(file.status,200);assert.equal(file.headers.get('x-pantry-tin'),'masked');assert.doesNotMatch(file.value,/000000123|00-0000123/)
+  }
+  for(const cookie of [h.owner,accountant]){
+   const file=await h.send(`/api/pantry/reports/contractors/2025/1099-nec.${format}?fullTin=true`,undefined,{cookie})
+   assert.equal(file.status,200,JSON.stringify(file.value));assert.equal(file.headers.get('x-pantry-tin'),'full')
+   if(format!=='xlsx')assert.ok(file.value.includes('00-0000123'),'confirmed filing bytes contain the exact TIN')
+  }
+ }
+ for(const cookie of [h.owner,bookkeeper])assert.equal((await downloadSpreadsheet(h.origin,'reports/contractors/2025/1099-nec.xlsx',cookie))[1][7],'••-•••0123')
+ for(const cookie of [h.owner,accountant])assert.equal((await downloadSpreadsheet(h.origin,'reports/contractors/2025/1099-nec.xlsx?fullTin=true',cookie))[1][7],'00-0000123')
+ const privacy=(await h.view('state')).settings.rolePrivacy.find(r=>r.role==='accountant')
+ await h.command('role-privacy.save',{role:'accountant',revision:privacy.revision,maskTin:true,maskBank:false})
+ for(const format of ['csv','pdf','xlsx'])assert.equal((await h.send(`/api/pantry/reports/contractors/2025/1099-nec.${format}?fullTin=true`,undefined,{cookie:accountant})).status,403,'a current privacy restriction overrides earlier confirmation')
+ await h.db.prepare('UPDATE pt_contractor_tax SET tin=? WHERE contact_id=?').bind(legacy.tin,vendor.id).run()
+ await h.command('contractor.reveal',{contactId:vendor.id},h.owner,409)
+ await h.db.prepare('UPDATE pt_contractor_tax SET tin=? WHERE contact_id=?').bind(stored.tin,vendor.id).run()
+ const audit=await h.view('activity');assert.ok(audit.audit.some(a=>a.action==='contractor.tin-reveal'));assert.ok(!JSON.stringify(audit).includes('000000123'));assert.ok(!JSON.stringify(audit).includes('00-0000123'))
  await h.db.prepare('UPDATE oa_step_up_challenges SET consumed_at=? WHERE consumed_at IS NOT NULL').bind(Date.now()-301000).run()
  await h.command('contractor.reveal',{contactId:vendor.id},h.owner,403)
+ for(const format of ['csv','pdf','xlsx'])assert.equal((await h.send(`/api/pantry/reports/contractors/2025/1099-nec.${format}?fullTin=true`,undefined,{cookie:h.owner})).status,403,'expired proof refuses every full-TIN format')
 })

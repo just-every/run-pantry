@@ -23,7 +23,7 @@ export async function vendorHistory(db: D1Database, rawId: string, from?: string
   const start = date(from ?? `${new Date().getUTCFullYear()}-01-01`, 'From'), end = date(to ?? `${new Date().getUTCFullYear()}-12-31`, 'To')
   requireThat(start <= end, 'From must be on or before To')
   const expenses = await contactTotals(db, 'vendor', start, end, 'accrual')
-  const tax = await one(db, 'SELECT tin, tin_kind, backup_withholding FROM pt_contractor_tax WHERE contact_id=?', id)
+  const tax = await one(db, 'SELECT tin_last4, tin_kind, backup_withholding FROM pt_contractor_tax WHERE contact_id=?', id)
   const read = (sql: string) => all(db, scope + sql, id, id, id, id)
   const [bills, payments, credits, drafts, billLines, journalLines, documents, allocations, activity] = await Promise.all([
     read(`SELECT b.*, e.status AS entry_status, e.reversed_by_id, e.document_id AS entry_document_id FROM vendor_bills b LEFT JOIN pt_journal_entries e ON e.id = b.journal_id`),
@@ -131,7 +131,7 @@ export async function vendorHistory(db: D1Database, rawId: string, from?: string
   const inPeriod = (r: Data) => r.date >= start && r.date <= end
   const periodBills = currentBills.filter(inPeriod), periodCredits = currentCredits.filter(inPeriod), periodPayments = currentPayments.filter(inPeriod)
   const captured = rows.filter(r => r.posted_expense && inPeriod(r))
-  return { vendor: { ...vendor, contacts: JSON.parse(vendor.contacts_json), tin: tax?.tin ? `•••••${tax.tin.slice(-4)}` : null, backup_withholding: !!tax?.backup_withholding } as Data, rows,
+  return { vendor: { ...vendor, contacts: JSON.parse(vendor.contacts_json), tin: tax?.tin_last4 ? `•••••${tax.tin_last4}` : null, backup_withholding: !!tax?.backup_withholding } as Data, rows,
     spend: { from: start, to: end, expense_cents: expenses.rows.find(r => r.id === id)?.amount ?? 0, billed_cents: amount(periodBills, 'total_cents'), credited_cents: amount(periodCredits, 'total_cents'), paid_cents: amount(periodPayments, 'total_cents'), captured_expense_cents: amount(captured, 'total_cents'),
       net_purchases_cents: amount(periodBills, 'total_cents') - amount(periodCredits, 'total_cents') + amount(captured, 'total_cents') }, summary: {
     billed_cents: amount(currentBills, 'total_cents'), paid_cents: amount(currentPayments, 'total_cents'), credited_cents: amount(currentCredits, 'total_cents'),

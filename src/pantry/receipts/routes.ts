@@ -56,7 +56,7 @@ export async function receiptsView(c: Context): Promise<Data> {
       r.currency ??= r.read_currency ?? r.duplicate.currency
       r.account_id ??= r.read_account_id ?? r.duplicate.account_id
     }
-    r.vendorProposal = await receiptVendorProposal(c.db, r)
+    r.vendorProposal = await receiptVendorProposal(c.db, r, c.env)
     r.account_id ??= r.vendorProposal.defaults?.accountId
     r.draftProposal = await documentDraftProposal(c.db, r)
     if (r.draftProposal.saved) r.draftProposal.saved.ownerRequired = await requiresOwner(c.db, r.draftProposal.saved.payload)

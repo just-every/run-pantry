@@ -1,3 +1,4 @@
+import { sealTin } from './pantry/contractor-tin'
 import type { Bindings } from './auth.server'
 import type { Person } from './pantry/access'
 import { SERVICE_CHART } from './pantry/accounts'
@@ -43,8 +44,9 @@ export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail:
   for (const [key, kind, name] of contacts) r.add('pt_contacts', { id: id(key), kind, name, email: `accounts@${name.toLowerCase().replace(/[^a-z]+/g, '')}.example`, revision: id(key) })
   // Dana Ruiz is a 1099 contractor with her W-9 on file; this year's ACH payments pass the threshold.
   r.sql('UPDATE pt_contacts SET is_1099 = 1 WHERE id = ?', id('dana'))
-  r.sql('INSERT INTO pt_contractor_tax (contact_id, legal_name, tin_kind, tin, address, city, state, zip, revision, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
-    id('dana'), 'Dana Ruiz', 'ssn', '900701234', '88 Dean Street, Apt 3', 'Brooklyn', 'NY', '11201', id('dana-tax'), ownerEmail, at)
+  const demoTin = await sealTin(env, id('dana'), '900701234')
+  r.sql('INSERT INTO pt_contractor_tax (contact_id, legal_name, tin_kind, tin, tin_last4, tin_hash, address, city, state, zip, revision, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
+    id('dana'), 'Dana Ruiz', 'ssn', demoTin.tin, demoTin.last4, demoTin.hash, '88 Dean Street, Apt 3', 'Brooklyn', 'NY', '11201', id('dana-tax'), ownerEmail, at)
   r.add('pt_tax_codes', { id: id('nyc'), name: 'New York City', rate_milli_percent: 8875, account_id: id('2200'), revision: id('nyc') })
   for (const [key, name, code, last4, amount] of [['checking', 'Operating checking', '1000', '4821', OPENING], ['savings', 'Savings', '1010', '7730', SAVINGS]] as const)
     r.add('pt_bank_accounts', { id: id(key), name, account_id: id(code), institution: 'Chase', number_last4: last4, opening_date: openingDay, opening_cents: amount, revision: id(key) })

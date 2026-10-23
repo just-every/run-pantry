@@ -18,7 +18,7 @@ const BOOTSTRAP = 'local-test-bootstrap-token-0123456789'
 export const fixture = (path) => readFile(new URL(`../../fixtures/${path}`, import.meta.url), 'utf8')
 
 /** `bindings` extend the Worker's; `outbound` answers any request not bound for the mail provider; `entry` swaps the Worker entry. */
-export async function harness({ bindings = {}, outbound, log, entry = 'tests/api/worker.ts' } = {}) {
+export async function harness({ bindings = {}, outbound, log, entry = 'tests/api/worker.ts', beforeMigration } = {}) {
   let mf,origin
   const dir = await mkdtemp(join(tmpdir(), 'pantry-test-'))
   const mail = []
@@ -37,8 +37,10 @@ export async function harness({ bindings = {}, outbound, log, entry = 'tests/api
   try {
     ({mf,origin}=await startWorker(optionsFor))
     const db = await mf.getD1Database('DB')
-    for (const file of (await readdir('migrations/core')).filter(f => f.endsWith('.sql')).sort())
+    for (const file of (await readdir('migrations/core')).filter(f => f.endsWith('.sql')).sort()) {
+      await beforeMigration?.(db, file)
       await db.batch(unstable_splitSqlQuery(await readFile('migrations/core/' + file, 'utf8')).map(sql => db.prepare(sql)))
+    }
 
     /** A request through the public door; `raw` sends a body as given (a form post) instead of JSON. */
     async function send(path, body, { cookie = '', method, headers = {}, raw } = {}) {

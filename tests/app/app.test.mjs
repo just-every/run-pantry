@@ -21,6 +21,7 @@ import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
 import { vendorCreditJourney } from './vendor-credit-journey.mjs'
+import { taxformJourney } from './taxform-journey.mjs'
 
 test('CURRENCY-001 foreign amount worksheets at 1440 and 390',currencyJourney)
 
@@ -266,16 +267,7 @@ test('BILL-002 owner reviews coding, original documents and vendor history, appr
     assert.equal(await page.getByLabel('Spend to',{exact:true}).inputValue(),'2026-09-30')
     await page.evaluate(()=>window.scrollTo(0,0))
     await page.screenshot({ path: `/tmp/sx-pantry-c43-vendor-${width}.png`, fullPage: true })
-    await command('contractor.save',{contactId:vendor.id,is1099:true,legalName:'Brightline Software',tinKind:'ein',tin:'000000123',address:'1 Example Street',city:'Albany',state:'NY',zip:'12207',backupWithholding:true})
-    await page.goto(`${app.origin}/app/reports?report=contractors&year=2026`)
-    await page.getByRole('row').filter({hasText:'Brightline Software'}).first().click()
-    await page.getByRole('button',{name:'Reveal TIN',exact:true}).click()
-    await page.getByText('Confirm your sign-in before revealing tax identity',{exact:true}).waitFor()
-    await page.getByLabel('Backup withholding requires review',{exact:true}).waitFor()
-    assert.equal(await page.getByLabel('Full TIN',{exact:true}).count(),0)
-    await page.evaluate(()=>window.scrollTo(0,0))
-    await page.screenshot({path:`/tmp/sx-pantry-c43-contractor-${width}.png`,fullPage:true})
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    await taxformJourney({ page, context, app, command, vendor, width })
     await page.goto(`${app.origin}/app/sales/bill/${bill.id}`)
     await page.getByRole('heading', { name: `Brightline Software BL-${width}`, exact: true }).waitFor()
     await page.getByRole('heading', { name: 'Brightline Software · vendor history' }).waitFor()
