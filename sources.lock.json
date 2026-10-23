@@ -4640,7 +4640,7 @@
       "executable": false
     },
     "src/ui/currency.tsx": {
-      "sha256": "6a3925130f3278b2a5102e49016e653a7c62b946f6c08cec50577009b0ee1fff",
+      "sha256": "6ddd043e665e0c01652439a7c3cf0e789edcb4244a6d46b043dd3343eee53084",
       "executable": false
     },
     "src/ui/custom-report-drill.tsx": {
@@ -5256,7 +5256,7 @@
       "executable": false
     },
     "tests/app/currency-journey.mjs": {
-      "sha256": "4d15155d59a3de27112d1a52deac2ee7b055bc13a3bbf26ef2a0d54ac1d80ccb",
+      "sha256": "fab9cc630fba86241e06992d925220d9bb4f22512a0fd93dd084c90b2bd0b145",
       "executable": false
     },
     "tests/app/custom-reports.test.mjs": {
