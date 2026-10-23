@@ -15,6 +15,7 @@ const quote = (s: string) => `"${s.replaceAll('"', '""')}"`
 const FIELDS: Record<string, string[]> = {
   pt_assets:['name'],pt_asset_tax:['note'],pt_asset_settings:['safe_harbor'],
   pt_learned_recognition:['evidence','backtest'],pt_agent_permissions:['name','payee','owner_email'],pt_agent_actions:['permission_snapshot'],
+  pt_collection_sends:['snapshot'],
   pt_collection_cases:['subject','body','recipient','evidence','reply_note'],
   pt_deliveries: ['recipient', 'subject', 'detail'],
   pt_estimate_deliveries: ['recipient','detail'],
