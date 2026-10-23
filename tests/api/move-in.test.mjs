@@ -255,3 +255,18 @@ test('MIGRATE-007 spreadsheet import of lists and open items', async t => {
 
 import {dimensionOpening} from './dimension-opening.mjs'
 test('DIM-001 staged spreadsheet opening dimensions validate, sign off and split without losing account tie-outs',dimensionOpening)
+
+test('MIGRATE-005 reviewed archive originals retain exact bytes, source-ID mappings, unlinked placement and journal hashes',async t=>{
+ const h=await harness();t.after(()=>h.close());const {archiveScenario,hash}=await import('./archive-journey.mjs'),{invoice,bill,batch,file}=await archiveScenario(h)
+ const preview=await h.command('archive.preview',batch);assert.equal(preview.files[0].linkedId,invoice.id);assert.equal(preview.files[1].linkedId,null)
+ await h.command('archive.import',{...batch,fingerprint:'stale'},undefined,409)
+ let result=await h.command('archive.import',{...batch,fingerprint:preview.fingerprint});assert.equal(result.archives[0].file_count,2);assert.equal(result.unlinked.length,1);assert.equal(result.files[0].sha256,hash(batch.files[0]))
+ for(const f of result.files){const response=await h.send('/api/pantry/documents/'+f.document_id,undefined,{cookie:h.owner});assert.equal(response.status,200);assert.deepEqual(Buffer.from(response.value),Buffer.from(batch.files.find(x=>x.sourceId===f.source_id).base64,'base64'))}
+ assert.equal((await h.command('archive.import',{...batch,fingerprint:preview.fingerprint})).replayed,true)
+ const unlinked=result.unlinked[0];await h.command('archive.place',{id:unlinked.id,revision:unlinked.revision,kind:'bill',targetId:bill.id});await h.command('archive.place',{id:unlinked.id,revision:unlinked.revision,kind:'invoice',targetId:invoice.id},undefined,409)
+ assert.equal((await h.view('document-archives')).unlinked.length,0)
+ for(const provider of ['quickbooks-online','freshbooks','dext','xero']){const p={provider,archiveKey:'synthetic-pantry-40',files:[file(41,{sourceSystem:'xero',transactionSourceId:'synthetic-pantry-30',kind:'invoice'})]},v=await h.command('archive.preview',p);assert.equal(v.files[0].linkedId,invoice.id);await h.command('archive.import',{...p,fingerprint:v.fingerprint})}
+ const bad={...batch,archiveKey:'synthetic-pantry-50',files:[file(51,{sha256:'bad'})]};await h.command('archive.preview',bad,undefined,400)
+ const viewer=await h.member('synthetic-pantry-52@example.test','viewer');await h.view('document-archives',viewer,403);await h.command('archive.preview',batch,viewer,403)
+ const event=await h.db.prepare("SELECT detail FROM pt_audit WHERE action='move-in.archive' AND subject_id=?").bind(result.id).first(),detail=JSON.parse(event.detail);assert.equal(detail.count,2);assert.deepEqual(detail.files.map(f=>f.sha256).sort(),batch.files.map(hash).sort())
+})

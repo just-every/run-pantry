@@ -1,3 +1,4 @@
+import { DocumentArchives } from './document-archives'
 // Move in from QuickBooks Online or Xero: upload the exports, preview counts,
 // refusals, tie-outs and what will not come in, import as staged records, then
 // the accountant signs off (posting the opening balances) or the import is
@@ -102,6 +103,7 @@ export function MoveIn() {
       </div>
       {error && <p role="alert" className="error">{error}</p>}
     </>}
+    {shared.state.actor.role === 'owner' && <DocumentArchives />}
     {status.data && status.data.jobs.length > 0 && <Card title="Import journal">
       <Table heads={['Import', 'From', 'State', 'Records', 'Error']} figures={[3]}>{status.data.jobs.map((j: D) => <tr key={j.id}><td><code>{j.id.slice(0, 8)}</code></td><td>{moveInName(j.source)}</td><td>{j.state === 'completed' ? <Chip tone="good">Imported</Chip> : j.state === 'undone' ? <Chip>Undone</Chip> : <Chip tone="warn">{j.state}</Chip>}</td><td className="fig">{j.checkpoint} of {j.total}</td><td>{j.error ?? '—'}</td></tr>)}</Table>
     </Card>}

@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "542ae1f7d57159a95fb85536374c714adb29da80169744f40e3a4cc154e8846b",
+      "sha256": "efe3c49ccd262593ea139c78495b1e3a475483dadde44e6f71fc0b5128d7e7a0",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "2af989c4109615c541843bc2a8d2c045524ac84be843c042d84743e38ca5c6c8",
+      "sha256": "9cc07a1c36d5a2a4f4398584d6274eb924b23a1557a9a97541c2d6be20b81303",
       "executable": false
     },
     "DEMO.md": {
@@ -760,7 +760,7 @@
       "executable": false
     },
     "MOVE-IN.md": {
-      "sha256": "b347ecd94a3e3516c05d3b7129fe6adb0be76bb8bebd6577eb6d0c750c79dbe8",
+      "sha256": "743e7dd620125beb14038f80dd3b24e25e3155c29a8de6b88c4b33d6d531b2a0",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -2968,7 +2968,7 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "c73879d80be0fa9289b66af3a2c018a746dede320592848aca5717280bd75257",
+      "sha256": "ea5d0cbd1165449f7081c895c80e59acfcff00856fcec2b1b8e1030b41d12be0",
       "executable": false
     },
     "src/pantry/assets/index.ts": {
@@ -4768,7 +4768,7 @@
       "executable": false
     },
     "src/ui/move-in.tsx": {
-      "sha256": "61d0448ae2870672298047cb21d8b21429be8c71d73d2be5b29a52bd95580fcb",
+      "sha256": "21a0a5beff7a502261ff5f5f5a9d459f4bff08fe562c9b5f09ce0bda72bc521e",
       "executable": false
     },
     "src/ui/nexus.tsx": {
@@ -5064,7 +5064,7 @@
       "executable": false
     },
     "tests/api/move-in.test.mjs": {
-      "sha256": "938850a9905b8a882c5d70b58c69eb6e63aff5db1dec1f77a03eb07871692b13",
+      "sha256": "483e5b9734bd67b9be0dae055a65a1993152bd15928a55c89613e6f03dd674be",
       "executable": false
     },
     "tests/api/oauth-return.test.mjs": {
@@ -5160,7 +5160,7 @@
       "executable": false
     },
     "tests/app/app.test.mjs": {
-      "sha256": "6d6eaca74e91676beab9d2c9f972d9bbe8e95448efe720fedab856c40b1e4c5d",
+      "sha256": "0d626e79446f4156514e047d94184ddf318854badfad070bf4ae6e102d5ab374",
       "executable": false
     },
     "tests/app/assets-journey.mjs": {
@@ -5208,7 +5208,7 @@
       "executable": false
     },
     "tests/app/collections-journey.mjs": {
-      "sha256": "d83d4561f6ba54477877d87866d42b328427b6a6d53180083b4388aeb4402fff",
+      "sha256": "6c0203c1a2b24f028554343dd41676df4a920e192c58ae106bd669b6c9c05501",
       "executable": false
     },
     "tests/app/custom-reports.test.mjs": {

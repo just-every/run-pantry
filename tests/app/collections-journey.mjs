@@ -15,7 +15,7 @@ export async function collectionsJourney(t){
    for(let n=0;n<2;n++){
     const card=page.locator('section.card').filter({has:page.getByRole('heading',{name:`${invoices[n].number} · Synthetic customer ${n}`,exact:true})})
     await card.getByLabel('Collection message',{exact:true}).fill('A friendly follow-up on our invoice. Please confirm your payment date. Thank you.')
-    await card.getByRole('button',{name:'Save collection draft',exact:true}).click();await card.getByRole('button',{name:'Approve this exact draft',exact:true}).click();await card.getByRole('button',{name:'Send approved draft',exact:true}).click();await card.getByText('suppressed',{exact:true}).waitFor()
+    await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/pantry/collections')&&r.request().method()==='GET'),card.getByRole('button',{name:'Save collection draft',exact:true}).click()]);await card.getByRole('button',{name:'Save collection draft',exact:true}).waitFor();const approval=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/command/collections.approve')),card.getByRole('button',{name:'Approve this exact draft',exact:true}).click()]);assert.equal(approval[0].status(),200,await approval[0].text());await card.getByRole('button',{name:'Send approved draft',exact:true}).click();await card.getByText('suppressed',{exact:true}).waitFor()
    }
    const promised=page.locator('section.card').filter({has:page.getByRole('heading',{name:`${invoices[2].number} · Synthetic customer 2`,exact:true})})
    await promised.locator('summary',{hasText:'Record a reply or stop chasing'}).click();await promised.getByLabel('Collection decision',{exact:true}).selectOption('promise')
