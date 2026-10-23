@@ -58,6 +58,7 @@ export function gusto(env: Bindings) {
     refresh: (refreshToken: string) => grant({ refresh_token: refreshToken, grant_type: 'refresh_token' }),
     tokenInfo: (token: string) => call<{ scope?: string; resource?: { type: string; uuid: string } | null }>('GET', '/v1/token_info', { token }),
     company: (token: string, uuid: string) => call<{ uuid: string; name?: string; trade_name?: string | null }>('GET', `/v1/companies/${encodeURIComponent(uuid)}`, { token }),
+    upcomingPayrolls: (token:string,uuid:string,startDate:string,endDate:string,page:number) => call<Payroll[]>('GET', `/v1/companies/${encodeURIComponent(uuid)}/payrolls`, {token,query:{processing_statuses:'unprocessed',payroll_types:'regular,off_cycle',include:'totals',start_date:startDate,end_date:endDate,page:String(page),per:'100'}}),
     /** Processed regular and off-cycle payrolls with their totals, one page of up to 100. */
     payrolls: (token: string, uuid: string, startDate: string, endDate: string, page: number) => call<Payroll[]>('GET', `/v1/companies/${encodeURIComponent(uuid)}/payrolls`, { token, query: { processing_statuses: 'processed', payroll_types: 'regular,off_cycle', include: 'totals', start_date: startDate, end_date: endDate, page: String(page), per: '100' } }),
   }

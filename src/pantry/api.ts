@@ -1,3 +1,4 @@
+import { cashPlanner } from './cash-planner'
 import { search } from './search'
 import { contractorFormExport } from './contractor-export'
 import { reportDeliveryCommands, deliverySettings, deliveryAttachment } from './report-delivery'
@@ -154,6 +155,7 @@ async function reader(c: C): Promise<Context> {
 }
 
 const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => { const ctx = await reader(c); return c.json(await projectAccess(ctx, await build(ctx, c))) })
+view('cash-planner', async (ctx,c) => cashPlanner(ctx,new URL(c.req.url).searchParams))
 view('search', async (ctx,c) => search(ctx.db,ctx.actor,new URL(c.req.url).searchParams))
 view('time', async ctx => timeView(ctx))
 view('report-delivery', async ctx => deliverySettings(ctx))

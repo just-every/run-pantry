@@ -22,7 +22,7 @@ export async function gustoSettings(db: D1Database):Promise<Data|null> {
 }
 
 /** A working access token: the stored one, or a refreshed pair saved before it is used. */
-async function accessToken(env: Bindings, db: D1Database, g: Data) {
+export async function accessToken(env: Bindings, db: D1Database, g: Data) {
   if (Date.parse(g.access_expires_at) > Date.now() + 60_000) {
     const token = await open(env.SESSION_SECRET, g.access_sealed)
     if (token) return token

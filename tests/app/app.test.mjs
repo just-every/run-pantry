@@ -1,3 +1,4 @@
+import { cashJourney } from './cash-journey.mjs'
 import { searchJourney } from './search-journey.mjs'
 import { estimatesJourney } from './estimates-journey.mjs'
 import { access001Browser } from './access001-journey.mjs'
@@ -14,6 +15,8 @@ import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
 import { vendorCreditJourney } from './vendor-credit-journey.mjs'
+
+test('CASH-001 cash projection, source records and what-if alert at 1440 and 390', cashJourney)
 
 test('SEARCH-001 current transaction search and exact records at 1440 and 390', searchJourney)
 
