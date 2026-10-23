@@ -57,7 +57,9 @@ export async function askJourney(t) {
 }
 export async function connectionJourney(t) {
   const {app,browser,owner,evidence,command}=await start(t)
-  await command('integration.create',{name:'Synthetic automation',scopes:['invoices:read']})
+  const credential=await command('integration.create',{name:'Synthetic automation',scopes:['invoices:read','accounts:read']})
+  const response=await owner.request.get(app.origin+'/qbo/v3/company/pantry/query?query=SELECT+*+FROM+Account',{headers:{authorization:'Bearer '+credential.token}})
+  assert.equal(response.status(),200,await response.text());assert.ok((await response.json()).QueryResponse.Account.length>0)
   for(const width of [1440,390]) {
     const context=await browser.newContext({storageState:await owner.storageState(),viewport:{width,height:1000}}),page=await context.newPage()
     await page.goto(app.origin+'/app/settings')
@@ -66,7 +68,8 @@ export async function connectionJourney(t) {
     for(const name of ['Stripe','Gusto','Synthetic automation'])assert.equal(names.filter(n=>n===name).length,1)
     await table.locator('td').filter({hasText:/^Not measured$/}).first().waitFor()
     const row=table.locator('tbody tr').filter({has:page.locator('td:first-child').filter({hasText:/^Synthetic automation$/})});await row.getByText('Active',{exact:true}).waitFor()
-    await page.screenshot({path:join(evidence,'connections-'+width+'.png'),fullPage:true})
+    const stripeIndex=names.indexOf('Stripe');await table.locator('tbody tr').nth(stripeIndex).scrollIntoViewIfNeeded()
+    await page.screenshot({path:join(evidence,'connections-'+width+'.png')})
     await iconAudit(page);await context.close()
   }
 }

@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "77edf52d55e1b84509c5e09aa9902058bbbb10062b5b529272cf4e4fd47511d6",
+      "sha256": "4548eeb94e6a4715ccc1aa5623cd7ebeb6d5c5b7e6b390ede26d1b7da08b8a52",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -68,7 +68,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "a7c96dd380c8cce43cf64dbcd359989a6a8d3a809305386d5c35700c4ffa910e",
+      "sha256": "d10a462e6c399ef7d05d194aa9c1db58e080744e8b047437629ba7fe38aab9ea",
       "executable": false
     },
     "base-copies.json": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "847c11f3d813dde82c632d7bed2cdb15541125711492dd58e35f4bcd3d070887",
+      "sha256": "c0ec1c98e3992c8a4e8b7e7af9e2b8d2611db59e96f32f6f7a50089fd35f7786",
       "executable": false
     },
     "DEMO.md": {
@@ -2956,7 +2956,7 @@
       "executable": false
     },
     "src/pantry/ask/index.ts": {
-      "sha256": "9e2d24837e9f4952b951d2c93e8b78d592839afd9b5cf3efa43af618f0f5472b",
+      "sha256": "f166ad55c3a001a298cb5567d40ccb6b8ea0a85f05d3d4315301d00be255e895",
       "executable": false
     },
     "src/pantry/automatch.ts": {
@@ -4872,7 +4872,7 @@
       "executable": false
     },
     "tests/api/agent.test.mjs": {
-      "sha256": "3e23aa806f37a2a69e81e71fded9f3ee08f7d347059c774425d8c99f5571571b",
+      "sha256": "79525bbc2a198c0659e39da64a7d6f73c231fc4289bd6b741ff9e752043300ad",
       "executable": false
     },
     "tests/api/bank.test.mjs": {
@@ -5108,7 +5108,7 @@
       "executable": false
     },
     "tests/app/connections-ask-journey.mjs": {
-      "sha256": "f15b964974d1032336fe7350338393e5c14704b53f820fa3aabc4a910da4cd43",
+      "sha256": "4863f41320cc582a80dfdc05dad580a84890a05a105e172f81449e4d40a90bd0",
       "executable": false
     },
     "tests/app/custom-reports.test.mjs": {

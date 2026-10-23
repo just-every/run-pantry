@@ -1,7 +1,7 @@
 import type { Context } from '../context'
 import { financialSourceAllowed } from '../access-policy/doors'
 import { reportBasis } from '../basis'
-import { requireThat, text, type Data } from '../core'
+import { addDays, daysBetween, requireThat, text, type Data } from '../core'
 import { all } from '../db'
 import { profitAndLoss, generalLedger } from '../reports'
 
@@ -21,7 +21,7 @@ export async function askBooks(c:Context, raw:unknown, selectedBasis?:unknown) {
   requireThat(contractors||net,'Ask about contractor spending or net income, with a month or quarter and optional year. Other questions are not supported yet.')
   requireThat(!!quarter||month>=0,'Name a month or quarter so the report range is explicit')
   const range=bounds(year,quarter?(Number(quarter[1])-1)*3+1:month+1,quarter?3:1)
-  const prior=/last year|prior year/.test(input)?bounds(year-1,quarter?(Number(quarter[1])-1)*3+1:month+1,quarter?3:1):bounds(quarter ? (Number(quarter[1])===1?year-1:year) : month===0?year-1:year,quarter ? (Number(quarter[1])===1?10:(Number(quarter[1])-2)*3+1) : month===0?12:month,quarter?3:1)
+  const prior=/last year|prior year/.test(input)?bounds(year-1,quarter?(Number(quarter[1])-1)*3+1:month+1,quarter?3:1):{from:addDays(range.from,-daysBetween(range.from,range.to)-1),to:addDays(range.from,-1)}
   const ranges=[range,prior], figures:Data[]=[], citations:Data[]=[]
   const accounts=contractors?await all(c.db,"SELECT id,name FROM pt_accounts WHERE type='expense' AND lower(name) LIKE '%contract%'"):[]
   const accountIds=accounts.map(a=>a.id)
@@ -38,5 +38,5 @@ export async function askBooks(c:Context, raw:unknown, selectedBasis?:unknown) {
   const movements = [...new Set(figures.flatMap(f=>f.lines.map((l:Data)=>l.accountId)))].map(id=>{ const current=figures[0].lines.filter((l:Data)=>l.accountId===id).reduce((s:number,l:Data)=>s+l.amountCents,0), previous=figures[1].lines.filter((l:Data)=>l.accountId===id).reduce((s:number,l:Data)=>s+l.amountCents,0); return {accountId:id,accountName:figures.flatMap(f=>f.lines).find((l:Data)=>l.accountId===id)?.accountName,currentCents:current,previousCents:previous,changeCents:current-previous} }).sort((a,b)=>Math.abs(b.changeCents)-Math.abs(a.changeCents))
   const comparisonAvailable=figures.every(f=>f.records>0)
   const definition={name:question,source:'profit-and-loss',...range,basis,comparison:/last year|prior year/.test(input)?'prior-year':'prior-period',...(contractors?{filters:{accountIds}}:{})}
-  return {generated:true,question,basis,metric:contractors?'Contractor expense accounts':'Net income',scope:contractors?`Expense accounts containing "contract": ${accounts.map(a=>a.name).join(', ')||'none'}`:'Posted income less expenses; the change is explained by account movements, not an inferred cause.',status:figures[0].records?'answered':'no records',figures,citations,movements:comparisonAvailable?movements:[],changeCents:comparisonAvailable?figures[0].amountCents-figures[1].amountCents:null,definition}
+  return {generated:true,question,basis,metric:contractors?'Contractor expense accounts':'Net income',scope:contractors?`Expense accounts containing "contract": ${accounts.map(a=>a.name).join(', ')||'none'}`:'Posted income less expenses; account movements explain the change.',status:figures[0].records?'answered':'no records',figures,citations,movements:comparisonAvailable?movements:[],changeCents:comparisonAvailable?figures[0].amountCents-figures[1].amountCents:null,definition}
 }

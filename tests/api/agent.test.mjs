@@ -184,7 +184,12 @@ test('AGENT-007 book questions equal posted reports on both bases, explain compa
     }
     const saved=await h.command('custom-report.save',{definition:a.definition})
     const result=await h.view('custom-reports/'+saved.id)
-    assert.ok(result)
+    assert.deepEqual(result.definition,a.definition)
+    const rendered=(await h.view('custom-reports/'+saved.id+'/render')).report
+    for(const [i,column]of ['current','prior'].entries()) {
+      const actual=rendered.rows.filter(r=>r.kind==='account').reduce((sum,r)=>sum+Number(r.values[column]??0)*(question.includes('contractors')||r.code!=='6000'?1:-1),0)
+      assert.equal(actual,a.figures[i].amountCents,'saved report preserves the answer range and figure')
+    }
   }
 })
 
