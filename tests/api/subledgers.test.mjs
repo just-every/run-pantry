@@ -333,7 +333,7 @@ test('ACCESS-003 owner limits, exact atomic self-issue, second-person correction
 test('VENDOR-001 preferences and period purchases preserve whole-history payable balances', async t => {
   const h=await harness();t.after(()=>h.close())
   const {acct,vendor,bank}=await setup(h)
-  const edited=await h.command('contact.save',{id:vendor.id,revision:vendor.revision,kind:'vendor',defaultAccountId:acct['6200'],vendorTaxBox:'MISC-1',paymentProvider:'Recorded bill provider',providerPaymentMethod:'ach',contacts:[{name:'Accounts team',email:'accounts@example.test',phone:'555-0100',roles:['primary']}]})
+  const edited=await h.command('contact.save',{id:vendor.id,revision:vendor.revision,kind:'vendor',defaultAccountId:acct['6200'],defaultClass:'Studio',vendorTaxBox:'MISC-1',paymentProvider:'Recorded bill provider',providerPaymentMethod:'ach',contacts:[{name:'Accounts team',email:'accounts@example.test',phone:'555-0100',roles:['primary']}]})
   assert.equal(edited.name,vendor.name);assert.equal(edited.terms_days,15)
   await h.command('contact.save',{id:vendor.id,revision:vendor.revision,kind:'vendor',name:vendor.name},h.owner,409)
   await h.command('contact.save',{id:vendor.id,revision:edited.revision,kind:'vendor',vendorTaxBox:'MISC-99'},h.owner,400)
@@ -351,6 +351,10 @@ test('VENDOR-001 preferences and period purchases preserve whole-history payable
   assert.equal(month.spend.expense_cents,29000);assert.equal(whole.spend.expense_cents,49000)
   for(const row of whole.rows){const [kind,id]=new URL(row.href,h.origin).searchParams.get('record').split(':');await h.view(`/reports/record/${kind}/${id}`.slice(1))}
   const ap=await h.view('/reports/payables?to=2026-12-31'.slice(1));assert.equal(ap.itemsTotal,month.summary.net_payable_cents)
+  await h.command('contractor.save',{contactId:vendor.id,is1099:true,legalName:'Brightline Software',tinKind:'ein',tin:'000000123',address:'1 Example Street',city:'Albany',state:'NY',zip:'12207'})
+  const bookkeeper=await h.member('synthetic-pantry-1@example.test','bookkeeper'),record=await h.view(`vendors/${vendor.id}/history?from=2026-09-01&to=2026-09-30`,bookkeeper)
+  assert.equal(record.vendor.tin,'•••••0123');assert.equal(record.vendor.is_1099,1);assert.equal(record.vendor.vendor_tax_box,'MISC-1');assert.equal(record.vendor.terms_days,15);assert.equal(record.vendor.default_class,'Studio')
+  assert.deepEqual(record.summary,month.summary);assert.ok(!JSON.stringify(record).includes('000000123'),'the bookkeeper reads the vendor record with the TIN masked, never in full')
   await h.view(`vendors/${vendor.id}/history?from=2026-10-01&to=2026-09-01`,h.owner,400)
   assert.equal((await h.send(`/api/pantry/vendors/${vendor.id}/history`)).status,401)
 })

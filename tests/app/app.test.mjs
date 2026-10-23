@@ -279,6 +279,8 @@ test('BILL-002 owner reviews coding, original documents and vendor history, appr
     await page.goto(`${app.origin}/app/sales/bill/${bill.id}`)
     await page.getByRole('heading', { name: `Brightline Software BL-${width}`, exact: true }).waitFor()
     await page.getByRole('heading', { name: 'Brightline Software · vendor history' }).waitFor()
+    await page.getByText('TIN: •••••0123', { exact: false }).first().waitFor()
+    assert.equal((await page.content()).includes('000000123'), false, `the vendor record never shows the full TIN at ${width}`)
     await page.screenshot({ path: `/tmp/sx-pantry-r4-bill-before-${width}.png`, fullPage: true })
     assert.ok(await page.getByRole('link', { name: `Brightline-${width}.pdf`, exact: true }).count() > 0, `source document visible at ${width}: ${JSON.stringify((await (await owner.request.get(`${app.origin}/api/pantry/sales`)).json()).bills.find(b => b.id === bill.id)?.documents)}`)
     await page.getByRole('button', { name: 'Approve bill revision', exact: true }).click()

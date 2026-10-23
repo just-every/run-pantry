@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "1d643bb517ebbbfad6ba99e19d76c0af7e293e8322ef202c90228299516bd196",
+      "sha256": "ce16797abccb42edb30d7dcef0dc0e3c33d54e3af0eab7c20492a8862dcda123",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "3d1664477daca7fe2c2e42508a52bcee35a30d41953642b4611b6c1edbd1f57c",
+      "sha256": "8c76863c6e630d411dea238840f3fba27673750c6b91b4d5d0678a77b0235f55",
       "executable": false
     },
     "DEMO.md": {
@@ -5192,7 +5192,7 @@
       "executable": false
     },
     "tests/api/subledgers.test.mjs": {
-      "sha256": "6fce63d87085f1828aab5c1a937d8e62c88bb4dc11e997b4a7376e239020ee06",
+      "sha256": "23dbb2c8df0f8c3a0287289717955c81877a18c6a3cd1c35e85f8743582a70b1",
       "executable": false
     },
     "tests/api/webhook-journey.mjs": {
@@ -5216,7 +5216,7 @@
       "executable": false
     },
     "tests/app/app.test.mjs": {
-      "sha256": "05a9b30fce77aac67b999a40775622c25457af178a19a8a56c88686967f8694e",
+      "sha256": "043e373132d4c9e91c486c6d32acc92fb536099e9d198670a7ccd8c12ea9bb9f",
       "executable": false
     },
     "tests/app/archive-journey.mjs": {
