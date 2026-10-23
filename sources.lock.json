@@ -72,7 +72,7 @@
       "executable": false
     },
     "base-copies.json": {
-      "sha256": "9cab4dccda7323e97ac0aafccf40cab9443f29a4905b7b7b6add5229dc75f2b7",
+      "sha256": "836ba32066bd0b49c792421f7afb0afebef2ed2e4d70ff7e8fe8e467d16f0147",
       "executable": false
     },
     "CHANGELOG.md": {
@@ -760,7 +760,7 @@
       "executable": false
     },
     "package.json": {
-      "sha256": "7e67caa7eee85c3ba191338485f472fb9ef9aab03b153c699075d7cc4e6650fc",
+      "sha256": "2ea6c5926bdb0a099530ad62bf942da20ed30460842a6869448c4e0c81af9051",
       "executable": false
     },
     "pnpm-lock.yaml": {
@@ -1104,7 +1104,7 @@
       "executable": false
     },
     "scripts/verify.mjs": {
-      "sha256": "c9f7856d91fd1b5cdbed25db3bad8b7456d8fa4cd514f0944c008a262067ca20",
+      "sha256": "5b569cd7f254201dac477675b6491018eaeffb3b879b2a03191e9af728de1f3b",
       "executable": false
     },
     "SEED-COMMAND-CONTRACT.md": {
@@ -4899,14 +4899,6 @@
       "sha256": "46ea0e6f6532c6d813e874eb8a3d9b5fd04129e05bffdb6691bb37871f59ae29",
       "executable": false
     },
-    "tests/api/demo-worker.ts": {
-      "sha256": "cc2ed472b1e6d44a75f730ed925831c6de75c691bfb19c9a55abeda3c3e7aa64",
-      "executable": false
-    },
-    "tests/api/demo.test.mjs": {
-      "sha256": "5b3b962d2f98687f4418b6207caa8aee03057e03770d47b976ae3d60a3882cfd",
-      "executable": false
-    },
     "tests/api/dev-worker.ts": {
       "sha256": "1f5867ff4ebc87ed745e90b8500726e2b96e588f444111f96f8180a9ac251c61",
       "executable": false
@@ -5215,10 +5207,6 @@
       "sha256": "980f541e0b588eb592131646357f9624ec56731ea062779aaf310b8a25cd9736",
       "executable": false
     },
-    "tests/incremental-typecheck.test.mjs": {
-      "sha256": "a11d6b89e7219137540c7052683c5f4d9ba7ddf16f66d34c1f56ae34029c0a95",
-      "executable": false
-    },
     "tests/providers/stripe-clearing.mjs": {
       "sha256": "02228acac6cd32183062b048117064d43624f6da26b25d8181f203e7c2e50d55",
       "executable": false
@@ -5267,16 +5255,8 @@
       "sha256": "7a320b094ddf47873cd7206a3178c658b1a468f25bff2e5abe1c6a97de6b751a",
       "executable": false
     },
-    "tests/site/site.test.mjs": {
-      "sha256": "1a044bfd3e6815e73cc2e05368f86df0dbeff4b13cf43b3be132113f1e6d6c62",
-      "executable": false
-    },
     "tests/start-worker.mjs": {
       "sha256": "d4c046d6425efd742737eda2c9fc8f40c5d45c746f7d0fe72a31631fc5a5ea9c",
-      "executable": false
-    },
-    "tests/typecheck-checks.mjs": {
-      "sha256": "8bb5355750d1743fd97860ebe6a2b0f47a2b9f695bc6fb122289a09d28b17ba1",
       "executable": false
     },
     "tests/xlsx.mjs": {
