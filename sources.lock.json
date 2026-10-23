@@ -3564,7 +3564,7 @@
       "executable": false
     },
     "src/pantry/integrations/qbo.ts": {
-      "sha256": "424ccd5cef6116a1f4dd022ba637f1e0770be9e3923769e6752366a8df2d14b3",
+      "sha256": "e818d54843adb8315488b35fd915d488703bd0b39d9dd30094ecfeaa8bcd13d0",
       "executable": false
     },
     "src/pantry/integrations/rate-limit.ts": {
@@ -4968,7 +4968,7 @@
       "executable": false
     },
     "tests/api/integrations.test.mjs": {
-      "sha256": "7a946dea0d1096ed3f1283a28eab9f58888cfffb725732b98a7738b3c2304f98",
+      "sha256": "295e3503f4824139b714d1d23c126b816b6186b29a7319044ceef6b6c45e2c22",
       "executable": false
     },
     "tests/api/invoices-out.test.mjs": {
@@ -5108,7 +5108,7 @@
       "executable": false
     },
     "tests/app/connections-ask-journey.mjs": {
-      "sha256": "1dc6a607d2ac11c531455d3e42e51904e471a899079483d05a44f76f8adef57d",
+      "sha256": "2aa9eef40d859a6e9c902e61c796ac461dcdd78f9d2f1e08a8fbb026f27d3eeb",
       "executable": false
     },
     "tests/app/custom-reports.test.mjs": {

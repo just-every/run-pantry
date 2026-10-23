@@ -43,7 +43,7 @@ export async function askJourney(t) {
     await page.screenshot({path:join(evidence,'ask-'+width+'.png'),fullPage:true})
     await card.getByText('Posted lines used (1)',{exact:true}).first().click()
     await card.getByRole('link',{name:/Synthetic posted work/}).first().click()
-    await page.getByRole('heading',{name:/Journal entry/}).waitFor()
+    await page.getByRole('heading',{name:/Journal entry/}).first().waitFor()
     await page.goto(app.origin+'/app/reports')
     await card.getByLabel('Book question').fill('why is net income down in October 2040?');await card.getByLabel('Answer basis').selectOption('cash')
     await card.getByRole('button',{name:'Ask the books',exact:true}).click();await card.getByRole('heading',{name:'Generated answer · no records'}).waitFor()

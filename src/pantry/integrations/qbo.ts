@@ -57,7 +57,9 @@ qbo.post('/:realmId/upload',async c=>{
   const form=await new Request(c.req.url,{method:'POST',headers:c.req.raw.headers,body:bytes}).formData()
   const metadata=form.get('file_metadata_01'),file=form.get('file_content_01')
   requireThat(typeof metadata==='string'&&file instanceof File,'Send file_metadata_01 and file_content_01 multipart fields')
-  const info=JSON.parse(metadata) as Data,ref=info.AttachableRef?.[0]?.EntityRef
+  let info:Data;try{info=JSON.parse(metadata)}catch{throw new Fault(400,'Attachment metadata must be JSON')}
+  requireThat(info&&typeof info==='object'&&!Array.isArray(info),'Attachment metadata must be an object')
+  const ref=info.AttachableRef?.[0]?.EntityRef
   requireThat(!ref||ref.type==='Invoice'||ref.type==='Bill','Only Invoice and Bill attachment links are supported')
   const content=new Uint8Array(await file.arrayBuffer());let binary='';for(let i=0;i<content.length;i+=8192)binary+=String.fromCharCode(...content.subarray(i,i+8192))
   const result=await native(c,'documents',{name:info.FileName??file.name,mediaType:info.ContentType??file.type,base64:btoa(binary),...(ref?{linkedKind:ref.type.toLowerCase(),linkedId:ref.value}:{})})
