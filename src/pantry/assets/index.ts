@@ -72,7 +72,7 @@ const dispose:Command={need:'post',async run(c,b){accountant(c);requireThat(c.ac
 }}
 const tax:Command={need:'record',async run(c,b){accountant(c);const a=await get(c.db,text(b.id,'Asset')),year=Number(b.year),section=cents(b.section179??'0','Section 179',{zero:true}),bonus=cents(b.bonus??'0','Bonus depreciation',{zero:true}),method=text(b.method,'Tax method'),note=text(b.note,'Accountant election note',2000)
  requireThat(Number.isInteger(year)&&year>=Number(a.placed_date.slice(0,4))&&year<=9999,'Choose a tax year on or after placed in service');requireThat(['none','MACRS','accountant-entered'].includes(method),'Choose the accountant-selected tax method')
- const schedule=list<Data>(b.schedule??[],'Tax schedule',100).map(r=>({year:Number(r.year),amount:cents(r.amount,'Annual tax depreciation',{zero:true})}))
+ const rawSchedule=b.schedule??[];requireThat(Array.isArray(rawSchedule)&&rawSchedule.length<=100,'Use at most 100 annual tax amounts');const schedule=(rawSchedule as Data[]).map(r=>({year:Number(r.year),amount:cents(r.amount,'Annual tax depreciation',{zero:true})}))
  requireThat(schedule.every(r=>Number.isInteger(r.year)&&r.year>=year&&r.year<=9999)&&new Set(schedule.map(r=>r.year)).size===schedule.length,'Each schedule year must be unique and on or after the election year')
  requireThat(section+bonus+schedule.reduce((n,r)=>n+r.amount,0)<=a.cost_cents,'Tax deductions cannot exceed the recorded cost')
  const old=await one(c.db,'SELECT * FROM pt_asset_tax WHERE asset_id=?',a.id);requireThat(!old||old.revision===b.taxRevision,'Tax election changed; reload',409)

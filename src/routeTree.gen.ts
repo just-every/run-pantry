@@ -13,6 +13,7 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppActivityRouteImport } from './routes/app.activity'
 import { Route as AppAgentsRouteImport } from './routes/app.agents'
+import { Route as AppAssetsRouteImport } from './routes/app.assets'
 import { Route as AppBankRouteImport } from './routes/app.bank'
 import { Route as AppBooksRouteImport } from './routes/app.books'
 import { Route as AppCashPlannerRouteImport } from './routes/app.cash-planner'
@@ -47,6 +48,11 @@ const AppActivityRoute = AppActivityRouteImport.update({
 const AppAgentsRoute = AppAgentsRouteImport.update({
   id: '/agents',
   path: '/agents',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAssetsRoute = AppAssetsRouteImport.update({
+  id: '/assets',
+  path: '/assets',
   getParentRoute: () => AppRoute,
 } as any)
 const AppBankRoute = AppBankRouteImport.update({
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
   '/app/activity': typeof AppActivityRoute
   '/app/agents': typeof AppAgentsRoute
+  '/app/assets': typeof AppAssetsRoute
   '/app/bank': typeof AppBankRoute
   '/app/books': typeof AppBooksRoute
   '/app/cash-planner': typeof AppCashPlannerRoute
@@ -149,6 +156,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/app/activity': typeof AppActivityRoute
   '/app/agents': typeof AppAgentsRoute
+  '/app/assets': typeof AppAssetsRoute
   '/app/bank': typeof AppBankRoute
   '/app/books': typeof AppBooksRoute
   '/app/cash-planner': typeof AppCashPlannerRoute
@@ -171,6 +179,7 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/app/activity': typeof AppActivityRoute
   '/app/agents': typeof AppAgentsRoute
+  '/app/assets': typeof AppAssetsRoute
   '/app/bank': typeof AppBankRoute
   '/app/books': typeof AppBooksRoute
   '/app/cash-planner': typeof AppCashPlannerRoute
@@ -194,6 +203,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/app/activity'
     | '/app/agents'
+    | '/app/assets'
     | '/app/bank'
     | '/app/books'
     | '/app/cash-planner'
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
   to:
     | '/app/activity'
     | '/app/agents'
+    | '/app/assets'
     | '/app/bank'
     | '/app/books'
     | '/app/cash-planner'
@@ -235,6 +246,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/app/activity'
     | '/app/agents'
+    | '/app/assets'
     | '/app/bank'
     | '/app/books'
     | '/app/cash-planner'
@@ -285,6 +297,13 @@ declare module '@tanstack/react-router' {
       path: '/agents'
       fullPath: '/app/agents'
       preLoaderRoute: typeof AppAgentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/assets': {
+      id: '/app/assets'
+      path: '/assets'
+      fullPath: '/app/assets'
+      preLoaderRoute: typeof AppAssetsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/bank': {
@@ -398,6 +417,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppActivityRoute: typeof AppActivityRoute
   AppAgentsRoute: typeof AppAgentsRoute
+  AppAssetsRoute: typeof AppAssetsRoute
   AppBankRoute: typeof AppBankRoute
   AppBooksRoute: typeof AppBooksRoute
   AppCashPlannerRoute: typeof AppCashPlannerRoute
@@ -419,6 +439,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppActivityRoute: AppActivityRoute,
   AppAgentsRoute: AppAgentsRoute,
+  AppAssetsRoute: AppAssetsRoute,
   AppBankRoute: AppBankRoute,
   AppBooksRoute: AppBooksRoute,
   AppCashPlannerRoute: AppCashPlannerRoute,
