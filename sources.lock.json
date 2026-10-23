@@ -763,6 +763,10 @@
       "sha256": "9cfa2e4b5eaddbb81641efd5a53c5829ccbfb0f2a8303ae3019c06b4ab2daa7a",
       "executable": false
     },
+    "migrations/core/0100_reminder_business_day_recipients.sql": {
+      "sha256": "6c5306eaab0dd11eed583500839f46bd7738c81425f052bf38783fc31b236898",
+      "executable": false
+    },
     "migrations/rewrites.json": {
       "sha256": "85daa9b69cfde96f1e5a82f736e59b0a98d544eea2ec518c01808b21408e2826",
       "executable": false
