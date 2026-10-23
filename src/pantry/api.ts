@@ -1,3 +1,4 @@
+import { search } from './search'
 import { contractorFormExport } from './contractor-export'
 import { reportDeliveryCommands, deliverySettings, deliveryAttachment } from './report-delivery'
 import { nativeReportExport } from './report-export-reader'
@@ -153,6 +154,7 @@ async function reader(c: C): Promise<Context> {
 }
 
 const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => { const ctx = await reader(c); return c.json(await projectAccess(ctx, await build(ctx, c))) })
+view('search', async (ctx,c) => search(ctx.db,ctx.actor,new URL(c.req.url).searchParams))
 view('time', async ctx => timeView(ctx))
 view('report-delivery', async ctx => deliverySettings(ctx))
 api.get('/api/pantry/report-delivery/:id/attachment', async c => { const file=await deliveryAttachment(await reader(c),c.req.param('id')); return new Response(file.bytes as Uint8Array<ArrayBuffer>,{headers:{'content-type':file.contentType,'content-disposition':`attachment; filename="${file.filename}"`,'cache-control':'no-store'}}) })

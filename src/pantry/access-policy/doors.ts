@@ -34,7 +34,7 @@ export async function assertDoor(c: Context, path: string, body?: Data) {
       if (op === 'contact.save') requireThat(body?.kind === (actor.role === 'sales' ? 'customer' : 'vendor'), 'This contact is not part of your role', 403)
       if (actor.role === 'sales') requireThat(!body?.deposit && !body?.depositId && !body?.depositAmount, 'Banking is not part of the sales role', 403)
     } else {
-      const shared = ['state', 'time', 'sales'].includes(door)
+      const shared = ['state', 'time', 'sales', 'search'].includes(door)
       const custom = /^(custom-reports|management-packages)(\/|$)/.test(door)
       const sale = actor.role === 'sales' && (/^(customers|estimates)\//.test(door) || door === 'estimates' || door === 'invoice-documents' || door === 'exemptions' || /^invoice-documents\/[^/]+\/(pdf|preview)$/.test(door))
       const payable = actor.role === 'payables-clerk' && (/^vendors\/[^/]+\/history$/.test(door) || /^documents\/[^/]+$/.test(door) && !!await one(c.db, "SELECT id FROM pt_documents WHERE id = ? AND linked_kind = 'bill'", door.slice(10)))
@@ -44,7 +44,7 @@ export async function assertDoor(c: Context, path: string, body?: Data) {
   if (limitedBanks(actor) && !narrow(actor)) {
     if (!op) {
       // Bank views are filtered below; reconcile is checked against its account.
-      const safe = ['state', 'time', 'sales', 'bank', 'bank/lines', 'invoice-documents', 'customer-deposits', 'estimates'].includes(door) || /^estimates\//.test(door) || /^reconciliation\//.test(door) || /^(custom-reports|management-packages)(\/|$)/.test(door)
+      const safe = ['state', 'time', 'sales', 'search', 'bank', 'bank/lines', 'invoice-documents', 'customer-deposits', 'estimates'].includes(door) || /^estimates\//.test(door) || /^reconciliation\//.test(door) || /^(custom-reports|management-packages)(\/|$)/.test(door)
       requireThat(safe, 'This screen requires access to all bank accounts', 403)
       if (door.startsWith('reconciliation/')) {
         const statement = await one(c.db, 'SELECT bank_account_id FROM pt_statements WHERE id = ?', door.slice(15))

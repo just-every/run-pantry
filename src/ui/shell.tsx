@@ -15,6 +15,7 @@ const MAIN = [
   { to: '/app/reports', label: 'Reports', short: 'Reports', icon: 'chart' },
 ] as const
 const MORE = [
+  { to: '/app/search', label: 'Find a transaction' },
   { to: '/app/time', label: 'Time' },
   { to: '/app', label: 'Overview' },
   { to: '/app/questions', label: 'Questions from Pantry' },
@@ -60,6 +61,7 @@ export function Shell() {
       {state && <div className="profile"><span className="profile-name">{state.actor.name}</span>{state.actor.name !== ROLE_LABEL[state.actor.role] && <small>{ROLE_LABEL[state.actor.role]}</small>}</div>}
     </header></HydrationUnit>
     <main className="workspace">
+      {state && state.actor.role !== 'time-only' && <form action="/app/search" className="transaction-search" role="search"><label htmlFor="transaction-search">Find a transaction</label><input id="transaction-search" name="q" type="search" placeholder="Amount, reference or words" maxLength={200} /><button className="btn btn-sm">Search</button></form>}
       {state ? <SharedState.Provider value={{ state, reload }}><>{allowed(path) ? <Outlet /> : <><h1>Access restricted</h1><p>This screen is not part of your role. Choose an available destination above.</p>{state.actor.role === 'time-only' && <Link to="/app/time">Record time</Link>}</>}</></SharedState.Provider> : <><Loading error={error} what="your books" />{error && <p><a href="/signout">Sign out or switch person</a></p>}</>}
     </main>
   </div>

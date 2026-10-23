@@ -109,3 +109,20 @@ The signed-in native owner can use `dimensions.settings` with the current settin
 Native read projections expose `/api/pantry/dimensions` and `/api/pantry/dimensions/project?name=NAME&from=YYYY-MM-DD&to=YYYY-MM-DD&basis=cash|accrual` to the existing authorized financial reader. Invoice, bill and journal line inputs accept `className`, `locationName`, `projectName`. The scoped invoice posting door uses the same validation and retained coding. P&L and balance sheet accept `columns=class|location|project`. General ledger, trial balance, P&L, balance sheet, grouped customer/vendor/item totals, cash-flow, sales-tax, ageing/open-item library, deposits/check/operational contractor summaries, reconciliation contributions and transaction/journal reports accept `dimension=class|location|project&dimensionValue=unassigned|value:NAME`, including comparisons and downloads where supported. Choose dimension columns or a dimension filter. Saved custom definitions retain dimension/dimensionValue in `filters` and class/location/project statement comparison modes; formula operands and management-package reports preserve the selection. Class/location budget selectors retain ordinary basis, source-figure and export semantics. See [dimensions](docs/dimensions.md) for current supported surfaces and remaining limitations.
 
 The ordinary state projection includes historical posted dimension names only for the existing full financial-report reader. They remain report filters rather than catalogue entries for new coding. Reconciliation contributions keep external statement balances Unassigned and retain the completed proof boundary; they are not separate dimension reconciliations.
+
+### Transaction search
+
+Native sessions use `GET /api/pantry/search`; scoped integrations use
+`GET /api/pantry/integration/v1/search`. Parameters: `q` (amount, reference or
+space-separated words), `min`, `max` (absolute USD amounts), `from`, `to`,
+`type`, `account` (ledger account id), `status`, `record` (exact record id),
+`limit` (1–100, default 100), and opaque `cursor`. Results are grouped by type
+with date, number, contact, signed amount, status, description and an exact
+record link. Follow `nextCursor` with the same filters. No global hidden-record
+count is returned. Literal percent and underscore characters are not wildcards.
+
+Search uses current native roles and bank visibility, or only the credential's
+selected record-family readback scopes. `post` and `reports:read` alone do not
+grant discovery. Revocation applies to the next request. Masked original files
+and journals/documents spanning restricted bank accounts are not discoverable.
+The native mobile application and production scale proof remain unverified.

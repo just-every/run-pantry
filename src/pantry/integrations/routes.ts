@@ -1,3 +1,4 @@
+import { search, searchScopes } from '../search'
 import { Hono, type Context as HonoContext } from 'hono'
 import type { Bindings } from '../../auth.server'
 import { authority, type Integration } from '../access'
@@ -59,6 +60,13 @@ integrations.use('*', async (c, next) => {
 // Keep schema discovery behind the transport's existing credential and audit middleware.
 integrations.get('/openapi.json', c => c.json(integrationOpenApi))
 registerRecordReads(integrations)
+integrations.get('/search',async c=>{
+ const credential=c.get('integration'), scope=credential.scopes.find(s=>searchScopes().includes(s)||['invoices:write','bills:write','journals:write','documents:write'].includes(s))
+ requireThat(scope,'A searchable record scope is required',403)
+ const actor={...credential,scope}
+ await run(c.env.DB,[authority(actor,'read')])
+ return c.json(await search(c.env.DB,actor,new URL(c.req.url).searchParams,credential.scopes))
+})
 
 function readScope(c: C, family: string) {
   return c.get('integration').scopes.includes(family + ':read') ? family + ':read' : family + ':write'
