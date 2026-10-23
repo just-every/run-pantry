@@ -22,7 +22,7 @@ const saveContact: Command = { need: 'record', async run(c, b) {
   requireThat(kind === 'customer' || kind === 'vendor', 'Kind is customer or vendor')
   const id = b.id ? text(b.id, 'Contact') : uid(), statements: Sql[] = [authority(c.actor, 'record')]
   const current = b.id ? await contact(c.db, id) : null
-  const preserve = kind === 'customer' ? current : null
+  const preserve = current
   const name = text(b.name === undefined ? preserve?.name : b.name, 'Name', 200), email = optionalText(b.email === undefined ? preserve?.email : b.email, 'Email', 254).toLowerCase()
   requireThat(!email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email), 'Enter a valid email')
   const invoiceTemplate = kind === 'customer' ? await selectedTemplate(c.db, preserve ?? {}, b.invoiceTemplateId) : null
@@ -40,6 +40,15 @@ const saveContact: Command = { need: 'record', async run(c, b) {
     statements.push(q('UPDATE pt_contacts SET name = ?, email = ?, terms_days = ?, bank_reference = ?, active = ?, revision = ? WHERE id = ? AND revision = ?', name, email, terms, bankReference, active, uid(), id, b.revision), changed())
   } else statements.push(q('INSERT INTO pt_contacts (id, kind, name, email, terms_days, external_ref, bank_reference, active, revision) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)', id, kind, name, email, terms, '', bankReference, uid()))
   if (profile) statements.push(q('UPDATE pt_contacts SET address = ?, phone = ?, default_account_id = ?, default_class = ?,default_location=?,default_project=?, is_1099 = ?, vendor_ein_hash = ? WHERE id = ?', profile.address, profile.phone, profile.accountId, profile.className,profile.locationName,profile.projectName, profile.is1099, profile.einHash, id), changed())
+  if (profile) {
+    const box = b.vendorTaxBox === undefined ? current?.vendor_tax_box ?? 'NEC-1' : text(b.vendorTaxBox, '1099 box')
+    requireThat(['NEC-1', 'MISC-1', 'MISC-2', 'MISC-3', 'MISC-5', 'MISC-6', 'MISC-7', 'MISC-8', 'MISC-9', 'MISC-10', 'MISC-11', 'MISC-12', 'MISC-14', 'MISC-15'].includes(box), 'Choose a supported 1099 box')
+    const method = b.providerPaymentMethod === undefined ? current?.provider_payment_method ?? '' : optionalText(b.providerPaymentMethod, 'Preferred payment method', 30)
+    requireThat(['', 'ach', 'check', 'wire', 'card', 'cash', 'payment-network'].includes(method), 'Choose a payment method')
+    const provider = b.paymentProvider === undefined ? current?.payment_provider ?? '' : optionalText(b.paymentProvider, 'Payment provider', 100)
+    const contacts = customerProfile({ contacts: b.contacts }, current).contacts
+    statements.push(q('UPDATE pt_contacts SET vendor_tax_box=?, provider_payment_method=?, payment_provider=?, contacts_json=? WHERE id=?', box, method, provider, contacts, id), changed())
+  }
   if (customer) statements.push(q('UPDATE pt_contacts SET contacts_json = ?, billing_address = ?, service_address = ?, phone = ?, internal_notes = ?, pay_methods = ?, invoice_template_id = ?, invoice_terms_override = ? WHERE id = ?', customer.contacts, customer.billingAddress, customer.serviceAddress, customer.phone, customer.internalNotes, customer.payMethods, customer.invoiceTemplateId, b.termsDays === undefined ? current?.invoice_terms_override ?? 0 : b.termsDays === '' ? 0 : 1, id), changed())
   statements.push(audit(who(c.actor), b.id ? 'contact.update' : 'contact.create', kind, id, { name }))
   await run(c.db, statements)

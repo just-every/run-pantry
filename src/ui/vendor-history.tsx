@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { VendorHistoryData } from '../pantry/vendor-history'
 import { Action, Card, Chip, FileLink, Loading, Metrics, Table, day, usd, useShared, useView, useWho, type D } from './kit'
 
@@ -38,12 +39,23 @@ function HistoryDetails({ row }: { row: D }) {
 
 /** The same full vendor context can sit beside a manual bill or captured draft. */
 export function VendorHistory({ vendorId }: { vendorId: string }) {
-  const { data, error, reload } = useView<VendorHistoryData>(vendorId ? `vendors/${encodeURIComponent(vendorId)}/history` : null)
+  const year = new Date().getUTCFullYear(), [from, setFrom] = useState(`${year}-01-01`), [to, setTo] = useState(`${year}-12-31`)
+  const { data, error, reload } = useView<VendorHistoryData>(vendorId ? `vendors/${encodeURIComponent(vendorId)}/history?${new URLSearchParams({from,to})}` : null)
+  const picker = <div className="inline-fields"><label>Spend from <input aria-label="Spend from" type="date" value={from} onChange={e=>{if(e.target.value)setFrom(e.target.value)}} /></label><label>Spend to <input aria-label="Spend to" type="date" value={to} onChange={e=>{if(e.target.value)setTo(e.target.value)}} /></label></div>
   if (!vendorId) return null
-  if (!data) return <Card title="Vendor history"><Loading error={error} what="vendor history" /></Card>
+  if (!data) return <Card title="Vendor history">{picker}<Loading error={error} what="vendor history" /></Card>
   const s = data.summary
   return <Card title={`${data.vendor.name} · vendor history`} actions={<Action run={reload}>Refresh</Action>}>
     {error && <p role="alert" className="error">{error}</p>}
+    <p>{data.vendor.terms_days} day terms · Default account: {data.vendor.account_code ? `${data.vendor.account_code} · ${data.vendor.account_name}` : 'Not set'} · Class: {data.vendor.default_class || 'Unassigned'}</p>
+    <p>1099 eligible: {data.vendor.is_1099 ? 'Yes' : 'No'} · Box: {data.vendor.vendor_tax_box} · TIN: {data.vendor.tin || 'Not on file'} · Backup withholding: {data.vendor.backup_withholding ? 'Flagged for review' : 'Not flagged'}</p>
+    <p>Preferred payment: {METHOD[data.vendor.provider_payment_method] || 'Not recorded'}{data.vendor.payment_provider ? ` at ${data.vendor.payment_provider}` : ''}. This records a preference; it does not change the provider.</p>
+    <p>{data.vendor.email} {data.vendor.phone}</p>
+    {data.vendor.contacts.map((c: D, i: number) => <p key={i}>{c.name} · {c.email} · {c.phone}</p>)}
+    {picker}
+    <p>Expenses in period (accrual): {usd(data.spend.expense_cents)}. Includes all posted expense lines attributed to this vendor, including journals and dated reversals.</p>
+    <p>Purchases in period: {usd(data.spend.net_purchases_cents)}. Bills {usd(data.spend.billed_cents)} less credits {usd(data.spend.credited_cents)}, plus captured expenses {usd(data.spend.captured_expense_cents)}. Payments in period: {usd(data.spend.paid_cents)}.</p>
+    <p className="hint">Uses each record's date and current posted state; excludes drafts, voids and reversals. Payments are shown separately from purchases. Current payable below covers all dates.</p>
     <Metrics items={[
       { label: 'Bills recorded', value: usd(s.billed_cents) },
       { label: 'Payments recorded', value: usd(s.paid_cents) },
