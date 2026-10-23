@@ -105,6 +105,7 @@ async function snapshot(context, origin, docName) {
       invoiceTemplates: await get('invoice-documents'),
       invoiceDocuments: await Promise.all(sales.invoices.filter(i => i.status === 'issued').map(i => get(`invoice-documents/${i.id}/preview`))),
       recurringBills: sales.recurringBills,
+      assets: await get('assets'),
       trialBalance: (await get('reports/trial-balance?to=2026-09-30')).rows.map(r => [r.code, r.net]),
       pl: (await get('reports/profit-and-loss?from=2026-09-01&to=2026-09-30&basis=cash')).netIncome,
       lines: (await get('bank/lines')).lines.map(l => [l.posted_date, l.description, l.amount_cents]).sort(),
@@ -152,6 +153,14 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   await command('recurring-bill.generate', { through: '2026-09-30' })
   const siblingInstallations = process.env.PANTRY_PROVE_SIBLINGS === '1' ? await (await import('../siblings/harness.mjs')).realSiblings(t) : undefined
   const estimates = await estimatesForRestore(context, server.origin, siblingInstallations)
+  const assetContra=await command('account.save',{code:'1590',name:'Restored accumulated depreciation',type:'asset',subtype:'other'}),assetExpense=await command('account.save',{code:'6900',name:'Restored book depreciation',type:'expense',subtype:'other'})
+  const assetSettings=await(await context.request.get(`${server.origin}/api/pantry/assets`)).json()
+  await command('asset.settings',{revision:assetSettings.settings.revision,threshold:'2500',taxYear:2026,safeHarbor:'Not elected'})
+  const assetBill=await command('bill.save',{vendorId:vendor.id,reference:'synthetic-pantry-9401',billDate:'2026-09-01',post:true,evidenceWaived:'Accountant-reviewed asset source',lines:[{description:'Restored vehicle',accountId:rent,amount:'7200.00'}]})
+  const sourceAsset=(await(await context.request.get(`${server.origin}/api/pantry/assets`)).json()).proposals.find(p=>p.bill_id===assetBill.id)
+  const asset=await command('asset.capitalize',{name:'Restored vehicle',billLineId:sourceAsset.id,billRevision:sourceAsset.bill_revision,cost:'7200',placedDate:'2026-09-01',months:12,method:'straight-line',residual:'0',assetAccountId:invoiceState.accounts.find(a=>a.code==='1500').id,accumulatedAccountId:assetContra.id,expenseAccountId:assetExpense.id,confirm:true})
+  await command('asset.prepare-depreciation',{id:asset.id,revision:asset.revision})
+  await command('asset.tax-election',{id:asset.id,year:2026,section179:'7200',bonus:'0',method:'none',schedule:[],note:'Retained accountant-selected election; no tax posting'})
   const captured = await captureForRestore(context, server.origin)
   // Configure real installation-local credentials through the same public
   // settings doors. No model call is made. A held Stripe key, when injected

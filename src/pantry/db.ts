@@ -16,6 +16,7 @@ export const changed = (n = 1) => q(`INSERT INTO pt_guard SELECT CASE WHEN chang
 
 export function faultFrom(error: unknown): Fault | null {
   const message = String((error as Error)?.message ?? error)
+  if (message.includes('Asset depreciation plan is retained') || message.includes('Asset source reversed or disposed')) return new Fault(409, 'The retained asset plan or source changed; review the asset before posting')
   if (message.includes('PANTRY_DIMENSION_REQUIRED_OR_UNKNOWN')) return new Fault(409, 'A required dimension is missing or a dimension value is inactive or unknown; review the line coding')
   if (message.includes('PANTRY_PERIOD_LOCKED')) return new Fault(409, 'That date is in a locked period; ask for the period to be reopened first')
   if (message.includes('PANTRY_ADJUSTING_YEAR_END')) return new Fault(409, 'Adjusting entries must be dated at fiscal year end; review the business fiscal year setting')

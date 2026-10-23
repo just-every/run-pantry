@@ -17,6 +17,7 @@ const MAIN = [
 const MORE = [
   { to: '/app/search', label: 'Find a transaction' },
   { to: '/app/cash-planner', label: 'Cash planner' },
+  { to: '/app/assets', label: 'Fixed assets' },
   { to: '/app/time', label: 'Time' },
   { to: '/app', label: 'Overview' },
   { to: '/app/questions', label: 'Questions from Pantry' },

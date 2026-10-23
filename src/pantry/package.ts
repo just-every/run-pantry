@@ -1,3 +1,4 @@
+import { taxDepreciation } from './assets'
 import type { DimensionScope } from './dimensions/scope'
 // The accountant package: one period's close evidence as a JSON document, and
 // its general ledger as CSV. Every figure is recalculated from the ledger.
@@ -17,6 +18,7 @@ export async function accountantPackage(db: D1Database, period: string, basis: B
   const { start, end } = monthBounds(period)
   return {
     format: 'pantry-accountant-package/1',
+    taxDepreciation: await taxDepreciation(db,Number(end.slice(0,4))),
     ...(dimension?{dimension,scopeNote:'Financial reports use the selected line dimension. Close checks, provider balances, reconciliations, audit, approvals and document inventory remain explicitly whole-business evidence.'}:{}),
     generatedAt: new Date().toISOString(),
     // Ledger reports read on this basis; ageing lists open items, which only the accrual books carry.

@@ -1,0 +1,41 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { books,harness } from './harness.mjs'
+
+test('ASSET-001 reviewed source cost depreciates through approved recurring journals, disposal ties and tax elections do not post',async t=>{
+ const h=await harness();t.after(()=>h.close());const {acct,state}=await books(h)
+ await h.command('entity.save',{revision:state.settings.entity.revision,legalName:'synthetic-pantry-11',entityType:'single-member-llc',state:'NY',fiscalYearStart:1,taxMethod:'cash',booksStart:'2025-01-01'})
+ const contra=await h.command('account.save',{code:'1590',name:'synthetic-pantry-1',type:'asset',subtype:'other'})
+ const expense=await h.command('account.save',{code:'6900',name:'synthetic-pantry-2',type:'expense',subtype:'other'})
+ const vendor=await h.command('contact.save',{kind:'vendor',name:'synthetic-pantry-3'})
+ let view=await h.view('assets')
+ await h.command('asset.settings',{revision:view.settings.revision,threshold:'2500.00',taxYear:2025,safeHarbor:'Not elected; accountant reviewed'})
+ const bill=await h.command('bill.save',{vendorId:vendor.id,reference:'synthetic-pantry-4',billDate:'2025-01-01',post:true,evidenceWaived:'synthetic-pantry-5',lines:[{description:'synthetic-pantry-6',accountId:acct['6200'],amount:'7200.00'}]})
+ view=await h.view('assets');const source=view.proposals.find(p=>p.bill_id===bill.id);assert.ok(source)
+ const input={name:'synthetic-pantry-7',billLineId:source.id,billRevision:source.bill_revision,cost:'7200.00',placedDate:'2025-01-01',months:12,method:'straight-line',residual:'0.00',assetAccountId:acct['1500'],accumulatedAccountId:contra.id,expenseAccountId:expense.id,confirm:true}
+ await h.command('asset.capitalize',{...input,billRevision:'stale'},undefined,409)
+ const asset=await h.command('asset.capitalize',input)
+ await h.command('asset.capitalize',input,undefined,409)
+ view=await h.command('asset.prepare-depreciation',{id:asset.id,revision:asset.revision});let a=view.assets.find(a=>a.id===asset.id)
+ assert.equal(a.plan.length,12);assert.ok(a.plan.every(p=>p.amount_cents===60000&&p.status==='awaiting-approval'))
+ const first=a.plan[0]
+ await h.command('recurring-journal.approve',{id:first.recurring_id,revision:'stale'},undefined,409)
+ for(const p of a.plan)await h.command('recurring-journal.approve',{id:p.recurring_id,revision:p.revision})
+ await h.cron(Date.parse('2027-01-01T12:00:00Z'))
+ view=await h.view('assets');a=view.assets.find(a=>a.id===asset.id)
+ assert.equal(a.depreciation.accumulated,720000);assert.equal(a.bookValue,0);assert.equal(a.depreciation.rows.length,12)
+ const entries=await h.view('journal');assert.equal(entries.entries.filter(e=>a.plan.some(p=>p.recurring_id===e.source_id)&&e.status==='posted').length,12)
+ await h.command('asset.dispose',{id:a.id,revision:a.revision,accumulatedCents:0,date:'2027-01-02',proceeds:'4000.00',bankAccountId:acct['1000'],gainAccountId:acct['4000'],lossAccountId:expense.id,confirm:true},undefined,409)
+ const disposed=await h.command('asset.dispose',{id:a.id,revision:a.revision,accumulatedCents:720000,date:'2027-01-02',proceeds:'4000.00',bankAccountId:acct['1000'],gainAccountId:acct['4000'],lossAccountId:expense.id,confirm:true})
+ const disposal=(await h.view('journal')).entries.find(e=>e.id===disposed.disposal_journal_id)
+ assert.equal(disposal.lines.find(l=>l.account_id===acct['4000']).credit_cents,400000)
+ assert.equal(disposal.lines.find(l=>l.account_id===acct['1500']).credit_cents,720000)
+ assert.equal(disposal.lines.find(l=>l.account_id===contra.id).debit_cents,720000)
+ const before=await h.view('reports/trial-balance?to=2027-12-31&basis=accrual')
+ await h.command('asset.tax-election',{id:asset.id,year:2025,section179:'7200.00',bonus:'0',method:'none',schedule:[],note:'Accountant selected Section 179; tax schedule only'})
+ assert.deepEqual(await h.view('reports/trial-balance?to=2027-12-31&basis=accrual'),before)
+ const tax=(await h.view('package/2025-12?basis=accrual')).taxDepreciation.find(t=>t.asset_id===asset.id)
+ assert.equal(tax.annualAmount,720000);assert.match(tax.basis,/never posted/)
+ const clerk=await h.member('synthetic-pantry-8@example.test','payables-clerk');await h.view('assets',clerk,403)
+ const bookkeeper=await h.member('synthetic-pantry-9@example.test','bookkeeper');await h.command('asset.tax-election',{id:asset.id,year:2025,section179:'7200',method:'none',note:'synthetic-pantry-10'},bookkeeper,403)
+})

@@ -1,3 +1,4 @@
+import { assetsJourney } from './assets-journey.mjs'
 import { cashJourney } from './cash-journey.mjs'
 import { searchJourney } from './search-journey.mjs'
 import { estimatesJourney } from './estimates-journey.mjs'
@@ -15,6 +16,8 @@ import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
 import { vendorCreditJourney } from './vendor-credit-journey.mjs'
+
+test('ASSET-001 reviewed capitalization, depreciation, disposal and tax schedule at 1440 and 390', assetsJourney)
 
 test('CASH-001 cash projection, source records and what-if alert at 1440 and 390', cashJourney)
 
