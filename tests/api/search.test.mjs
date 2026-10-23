@@ -25,7 +25,7 @@ test('SEARCH-001 amount, range, reference and words find current records without
   const results=await find({q});assert.ok(results.some(r=>r.id===inv.id));assert.ok(results.some(r=>r.id===payment.id));assert.ok(results.some(r=>r.type==='bank-line'))
  }
  assert.ok((await find({min:'1200',max:'1300'})).some(r=>r.id===inv.id))
- assert.equal((await find({q:'1047',type:'bill'}))[0].id,bill.id)
+ assert.deepEqual((await find({q:'1047',type:'bill'})).map(r=>r.id).sort(),[bill.id,check.checks[0].expense_bill_id].sort())
  assert.equal((await find({q:'1047',type:'check'}))[0].number,'1047')
  assert.ok((await find({q:'synthetic-pantry-4 alias'})).some(r=>r.id===bill.id))
  assert.ok((await find({q:'synthetic-pantry-20.pdf'})).some(r=>r.type==='document'))
