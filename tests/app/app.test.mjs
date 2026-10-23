@@ -1,3 +1,4 @@
+import { collectionsJourney } from './collections-journey.mjs'
 import { standingJourney } from './standing-journey.mjs'
 import { learningJourney } from './learning-journey.mjs'
 import { assetsJourney } from './assets-journey.mjs'
@@ -18,6 +19,8 @@ import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
 import { vendorCreditJourney } from './vendor-credit-journey.mjs'
+
+test('AGENT-008 collection approval, suppressed local sends, promises and paid stop at 1440 and 390', collectionsJourney)
 
 test('AGENT-001 owner permission, weekly sample, undo, revocation and bank labels at 1440 and 390', standingJourney)
 

@@ -1,6 +1,7 @@
 // Navigation follows the same role boundaries as the native HTTP doors.
 export function roleScreen(role: string, path: string, banksLimited = false) {
   if (role === 'owner') return true
+  if (path === '/app/collections') return false
   if (role === 'time-only') return path === '/app/time'
   if (path === '/app/search') return true
   if (role === 'sales' || role === 'payables-clerk') return ['/app/sales', '/app/time', '/app/reports'].some(p => path === p || path.startsWith(p + '/'))

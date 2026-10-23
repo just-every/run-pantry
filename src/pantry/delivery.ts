@@ -7,7 +7,7 @@ import { runtimeBindings, type Bindings } from '../auth.server'
 import { operatorMail } from '../mail.server.mjs'
 import { authority, ownerEmail, pantry, who } from './access'
 import { addDays, daysBetween, longDay, now, optionalText, requireThat, sha256, text, uid, usd, type Data } from './core'
-import { all, audit, changed, one, q, run, type AuditActor } from './db'
+import { all, audit, changed, one, q, run, type AuditActor, type Sql } from './db'
 import { invoice } from './invoices'
 import { customerRecipients } from './customer-profile'
 import { ensureLink, invoiceLinkCommands } from './invoice-links'
@@ -49,7 +49,7 @@ const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<
  * Returns the delivery row. A reminder whose step (or day) is already claimed
  * returns null without sending.
  */
-export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, invoiceId: string, recipient: string, kind: 'invoice' | 'reminder', step: number | null = null): Promise<Data | null> {
+export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, invoiceId: string, recipient: string, kind: 'invoice' | 'reminder', step: number | null = null, approved?:{subject:string;body:string;claim:Sql[];onClaim:(id:string)=>Sql[]}): Promise<Data | null> {
   recipient = recipient.trim().toLowerCase()
   const mailer = operatorMail(runtimeBindings(env)) as unknown as InvoiceMailer | undefined
   requireThat(mailer, 'No mail provider is set up for this installation, so Pantry cannot send email. Set MAIL_PROVIDER and MAIL_API_KEY when you deploy.', 409)
@@ -57,16 +57,17 @@ export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, 
   requireThat(inv.kind === 'invoice' && inv.status === 'issued', 'Issue the invoice before sending it', 409)
   const token = await ensureLink(db, inv.id), link = customerLink(env, token)
   const retained = await issuedDocument(db, inv.id), doc = retained.document, pdf = retained.pdf, settings = await sendingSettings(db)
-  const subject = kind === 'invoice' ? `Invoice ${inv.number} from ${doc.business}: ${usd(inv.open_cents)} due ${longDay(inv.due_date)}` : reminderSubject(inv.number, step!, doc.business)
+  const subject = approved?.subject ?? (kind === 'invoice' ? `Invoice ${inv.number} from ${doc.business}: ${usd(inv.open_cents)} due ${longDay(inv.due_date)}` : reminderSubject(inv.number, step!, doc.business))
   const id = uid()
   try {
-    await db.prepare("INSERT INTO pt_deliveries (id, invoice_id, kind, step, recipient, subject, status, attachment_sha256, sent_by, at) VALUES (?, ?, ?, ?, ?, ?, 'sending', ?, ?, ?)")
-      .bind(id, inv.id, kind, step, recipient, subject, retained.sha256, actor.email, now()).run()
+    const claim=q("INSERT INTO pt_deliveries (id, invoice_id, kind, step, recipient, subject, status, attachment_sha256, sent_by, at,reminder_day) VALUES (?, ?, ?, ?, ?, ?, 'sending', ?, ?, ?,?)",id,inv.id,kind,step,recipient,subject,retained.sha256,actor.email,now(),kind==='reminder'?businessDay(settings.time_zone):null)
+    if(approved)await run(db,[...approved.claim,claim,...approved.onClaim(id)])
+    else await db.prepare(claim.sql).bind(...claim.params).run()
   } catch (error) {
-    if (kind === 'reminder' && String((error as Error).message).includes('UNIQUE')) return null
+    if (kind === 'reminder' && (/UNIQUE/i.test(String((error as Error).message)) || String((error as Error).message).startsWith('That record already exists: pt_deliveries'))) return null
     throw error
   }
-  const lead = kind === 'invoice' ? `${doc.business} has sent you invoice ${inv.number} for ${usd(inv.total_cents)}, due ${longDay(inv.due_date)}.` : `This is a reminder that invoice ${inv.number} from ${doc.business} ${step! < 0 ? `is due on ${longDay(inv.due_date)}` : step === 0 ? 'is due today' : `was due on ${longDay(inv.due_date)}`}. ${usd(inv.open_cents)} is still open.`
+  const lead = approved?.body ?? (kind === 'invoice' ? `${doc.business} has sent you invoice ${inv.number} for ${usd(inv.total_cents)}, due ${longDay(inv.due_date)}.` : `This is a reminder that invoice ${inv.number} from ${doc.business} ${step! < 0 ? `is due on ${longDay(inv.due_date)}` : step === 0 ? 'is due today' : `was due on ${longDay(inv.due_date)}`}. ${usd(inv.open_cents)} is still open.`)
   const textBody = `${lead}\n\nView the invoice and pay: ${link}\n\nThe invoice is attached as a PDF. Reply to this email to reach ${doc.business}.\n`
   const html = `<p>${escapeHtml(lead)}</p><p><a href="${escapeHtml(link)}">View invoice ${escapeHtml(inv.number)}</a></p><p>The invoice is attached as a PDF. Reply to this email to reach ${escapeHtml(doc.business)}.</p>`
   const fromName = doc.business.replace(/[<>"\\,;:@()[\]]/g, '').trim()
@@ -171,7 +172,7 @@ export function dueStep(dueDate: string, today: string, steps: number[], sent: n
 export async function reminderPlans(db: D1Database) {
   const settings = await sendingSettings(db), today = businessDay(settings.time_zone), plans: Record<string, string | null> = {}
   if (!settings.reminders_on) return { today, on: false, days: settings.reminder_days, plans }
-  const sent = await all<{ invoice_id: string; step: number; recipient: string }>(db, "SELECT invoice_id, step, recipient FROM pt_deliveries WHERE kind = 'reminder'")
+  const sent = await all<{ invoice_id: string; step: number; recipient: string }>(db, "SELECT invoice_id, step, recipient FROM pt_deliveries WHERE kind = 'reminder' AND step IS NOT NULL")
   for (const inv of await all(db, "SELECT id, customer_id, due_date FROM pt_invoices WHERE kind = 'invoice' AND status = 'issued' AND sent_at IS NOT NULL AND reminders_paused = 0")) {
     const customer = (await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', inv.customer_id))!
     const dates = customerRecipients(customer).flatMap(recipient => {
@@ -196,7 +197,7 @@ export async function sendDueReminders(env: Bindings, db: D1Database, today: str
     const inv = await invoice(db, row.id)
     if (inv.open_cents <= 0) continue
     const customer = (await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', row.customer_id))!
-    const prior = await all<{ step: number; recipient: string }>(db, "SELECT step, recipient FROM pt_deliveries WHERE invoice_id = ? AND kind = 'reminder'", inv.id)
+    const prior = await all<{ step: number; recipient: string }>(db, "SELECT step, recipient FROM pt_deliveries WHERE invoice_id = ? AND kind = 'reminder' AND step IS NOT NULL", inv.id)
     for (const recipient of customerRecipients(customer)) {
       const steps = prior.filter(r => r.recipient.toLowerCase() === recipient.toLowerCase()).map(r => r.step)
       const step = dueStep(inv.due_date, today, settings.reminder_days, steps)

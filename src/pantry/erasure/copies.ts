@@ -13,6 +13,9 @@ type Input = { id: string; member: boolean; memberEmail?: string; posted: boolea
 type Column = { name: string; pk: number }
 const quote = (s: string) => `"${s.replaceAll('"', '""')}"`
 const FIELDS: Record<string, string[]> = {
+  pt_assets:['name'],pt_asset_tax:['note'],pt_asset_settings:['safe_harbor'],
+  pt_learned_recognition:['evidence','backtest'],pt_agent_permissions:['name','payee','owner_email'],pt_agent_actions:['permission_snapshot'],
+  pt_collection_cases:['subject','body','recipient','evidence','reply_note'],
   pt_deliveries: ['recipient', 'subject', 'detail'],
   pt_estimate_deliveries: ['recipient','detail'],
   pt_customer_deposits: ['reference','memo'],
@@ -52,7 +55,7 @@ const FIELDS: Record<string, string[]> = {
   pt_check_flags: ['title', 'detail', 'setting', 'lines', 'dismissed_reason'],
   pt_contractor_tax: ['address', 'city', 'state', 'zip'],
 }
-const JSON_FIELDS = new Set(['facts', 'choices', 'pending', 'read_vendor_details', 'read_draft_fields', 'read_match_fields', 'payload', 'refs', 'evidence', 'document_template', 'document_values', 'self_approval', 'lines', 'splits', 'feed_snapshot', 'details', 'candidates', 'snapshot', 'left_out', 'definition', 'settings', 'recipients', 'setting'])
+const JSON_FIELDS = new Set(['backtest','permission_snapshot','facts', 'choices', 'pending', 'read_vendor_details', 'read_draft_fields', 'read_match_fields', 'payload', 'refs', 'evidence', 'document_template', 'document_values', 'self_approval', 'lines', 'splits', 'feed_snapshot', 'details', 'candidates', 'snapshot', 'left_out', 'definition', 'settings', 'recipients', 'setting'])
 // Their scoped trigger exceptions and metadata are owned by the caller. Never
 // attempt a generic update through an immutable accounting/history door.
 const CALLER_OWNED = new Set(['pt_contacts', 'pt_members', 'pt_audit', 'pt_approvals', 'pt_journal_entries', 'pt_journal_lines', 'pt_invoice_documents', 'pt_documents', 'pt_document_parts', 'pt_voided_reconciliations', 'pt_reconciliation_undos', 'pt_line_suggestion_decisions', 'pt_time_entries', 'pt_time_projects','pt_estimates','pt_estimate_documents','pt_estimate_sibling_previews','pt_estimate_sibling_links','pt_estimate_sibling_attempts'])
@@ -110,6 +113,7 @@ export async function eraseCopies(db: D1Database, input: Input) {
       if (table === 'pt_deliveries' && set.recipient !== row.recipient) set.recipient = `${input.marker}:${row.id}`
       if(table==='pt_customer_deposits'&&set.reference!==row.reference)set.reference=`${set.reference}:${row.id}`
       if (table === 'pt_bank_rules' && set.name !== row.name) set.name = `${set.name}:${row.id}`
+      if(table==='pt_agent_permissions'&&Object.keys(set).some(k=>set[k]!==row[k]))set.active=0
       if (Object.keys(set).some(k => set[k] !== row[k]) && names.has('revision')) set.revision = crypto.randomUUID()
       if (table === 'pt_receipts' && (Object.keys(set).some(k => set[k] !== row[k]) || (!input.member && row.vendor_id === input.id))) {
         for (const id of [row.document_id, row.file_document_id]) if (id) receiptDocuments.add(id)

@@ -196,3 +196,28 @@ test('AGENT-001 100 lines obey exact standing scope, retain labels and undo, sam
  const viewer=await h.member('synthetic-pantry-6@example.test','viewer');await h.view('agent-permissions',viewer,403)
  await h.command('agent-permission.grant',{name:'synthetic-pantry-7',ruleId:rule.id,ruleRevision:rule.revision,bankAccountId:bank.id,payee:'Synthetic permitted',maxAmount:'15',confirm:true},viewer,403)
 })
+
+test('AGENT-008 five collection drafts require exact owner approval, stop at promises/payment/dispute and share the reminder-day fence',async t=>{
+ const h=await harness();t.after(()=>h.close());const {collectionsScenario}=await import('./collections-journey.mjs'),{bank,invoices,customers}=await collectionsScenario(h)
+ const rows=()=>h.view('collections'),before=await h.view('reports/trial-balance?to=2026-12-31&basis=accrual'),mailCount=h.mail.length
+ let cases=(await rows()).cases;const firstSentId=cases[0].invoice_id;assert.equal(cases.length,5);assert.ok(cases.every(c=>c.status==='draft'&&c.evidence.invoiceId===c.invoice_id&&Array.isArray(c.evidence.paymentHistory)&&Array.isArray(c.evidence.correspondence)))
+ await h.command('collections.send',{id:cases[0].invoice_id,revision:cases[0].revision},undefined,409)
+ for(const c of cases.slice(0,2)){await h.command('collections.approve',{id:c.invoice_id,revision:c.revision});const sent=await h.command('collections.send',{id:c.invoice_id,revision:c.revision});assert.equal(sent.delivery.status,'accepted')}
+ assert.equal(h.mail.length,mailCount+2);assert.ok(h.mail.at(-1).text.includes('Could you confirm the expected payment date?'))
+ assert.deepEqual(await h.view('reports/trial-balance?to=2026-12-31&basis=accrual'),before)
+ const today=(await rows()).today,promise=new Date(today+'T12:00:00Z');promise.setUTCDate(promise.getUTCDate()+(5-promise.getUTCDay()+7)%7)
+ const paused=cases[2];await h.command('collections.hold',{id:paused.invoice_id,revision:paused.revision,status:'promise',promiseDate:promise.toISOString().slice(0,10),note:'Customer replied: I will pay Friday'})
+ await h.command('collections.prepare',{});let promised=(await rows()).cases.find(c=>c.invoice_id===paused.invoice_id);assert.equal(promised.status,'promise');assert.match(promised.reply_note,/Friday/)
+ await h.command('collections.approve',{id:promised.invoice_id,revision:promised.revision},undefined,409)
+ assert.equal((await h.view('sales')).invoices.find(i=>i.id===paused.invoice_id).reminders_paused,1)
+ const paid=cases[3],paidInvoice=invoices.find(i=>i.id===paid.invoice_id)
+ await h.command('collections.approve',{id:paid.invoice_id,revision:paid.revision})
+ await h.command('payment.record',{direction:'received',contactId:paidInvoice.customer_id,date:today,amount:'100.00',bankAccountId:bank.id,allocations:[{targetId:paidInvoice.id,amount:'100.00'}]})
+ await h.command('collections.send',{id:paid.invoice_id,revision:paid.revision},undefined,409);assert.equal((await rows()).cases.find(c=>c.invoice_id===paid.invoice_id).currentStatus,'paid')
+ const dispute=cases[4];await h.command('collections.hold',{id:dispute.invoice_id,revision:dispute.revision,status:'disputed',note:'Customer disputes the service line'})
+ await h.command('collections.prepare',{});cases=(await rows()).cases
+ const again=cases.find(c=>c.invoice_id===firstSentId)
+ await h.command('collections.approve',{id:again.invoice_id,revision:again.revision});await h.command('collections.send',{id:again.invoice_id,revision:again.revision},undefined,409)
+ assert.equal(h.mail.length,mailCount+2)
+ const viewer=await h.member('synthetic-pantry-20@example.test','viewer');await h.view('collections',viewer,403)
+})

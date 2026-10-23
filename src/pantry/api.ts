@@ -1,3 +1,4 @@
+import { collectionCommands,collectionsView } from './collections'
 import { standingCommands,standingView } from './standing'
 import { learningCommands,learningView } from './learning'
 import { assetCommands,assetView } from './assets'
@@ -118,7 +119,7 @@ import { estimateCommands, estimatesView, estimate, registerEstimateRoutes } fro
 import { customerDepositCommands, customerDepositsView } from './customer-deposits'
 
 const commands: Record<string, Command> = {
-  ...standingCommands, ...learningCommands, ...assetCommands, ...dimensionCommands, ...siblingCommands,
+  ...collectionCommands, ...standingCommands, ...learningCommands, ...assetCommands, ...dimensionCommands, ...siblingCommands,
   ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...reportDeliveryCommands, ...ruleCommands, ...feedCommands,
@@ -158,6 +159,7 @@ async function reader(c: C): Promise<Context> {
 }
 
 const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => { const ctx = await reader(c); return c.json(await projectAccess(ctx, await build(ctx, c))) })
+view('collections',async ctx=>collectionsView(ctx))
 view('agent-permissions',async ctx=>standingView(ctx))
 view('learned-recognition',async ctx=>learningView(ctx.db))
 view('assets', async ctx=>assetView(ctx.db))
