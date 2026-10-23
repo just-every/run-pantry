@@ -126,3 +126,11 @@ selected record-family readback scopes. `post` and `reports:read` alone do not
 grant discovery. Revocation applies to the next request. Masked original files
 and journals/documents spanning restricted bank accounts are not discoverable.
 The native mobile application and production scale proof remain unverified.
+
+Search scale acceptance runs outside push Verify on a clean committed checkout:
+
+```sh
+node tests/api/search-scale.mjs --receipt /outside/repository/search-scale.json
+```
+
+The journey loads at least 250,000 synthetic posted lines and 20,000 documents into D1, then uses the authenticated native HTTP search door for each usual amount spelling, range, check number, memo, confirmed alias and document name. It asserts the real scenario records and a response below one second for each query, and records the exact unchanged commit SHA. Evidence stays outside the checkout. A local VM receipt does not claim hosted Cloudflare OPS-001 deployment acceptance.
