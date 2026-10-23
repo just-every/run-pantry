@@ -15,7 +15,7 @@ export async function learningJourney(t){
    const panel=page.locator('section.card').filter({has:page.getByRole('heading',{name:'Repeated resolutions',exact:true})})
    await panel.getByRole('heading',{name:'Synthetic Insurance · 3-month prepaid proposal',exact:true}).waitFor()
    await panel.getByLabel('Recognition expense account',{exact:true}).selectOption(expense.id);await panel.getByLabel('Back-test through',{exact:true}).fill('2026-10-01');await panel.getByRole('button',{name:'Back-test prior year',exact:true}).click()
-   await panel.getByText('2026-01',{exact:true}).waitFor();assert.equal(await panel.getByRole('cell',{name:'$400.00',exact:true}).count(),18)
+   await panel.getByText('2026-01',{exact:true}).waitFor();assert.equal(await panel.getByText('$400.00',{exact:true}).count(),18)
    await panel.getByLabel('Maximum funding amount',{exact:true}).fill('1200.00');await panel.getByRole('button',{name:'Approve this vendor and materiality',exact:true}).click()
    await panel.getByLabel('Reviewed funding source',{exact:true}).selectOption(proposal.sources[0].id);await panel.getByRole('button',{name:'Prepare source-funded plan',exact:true}).click();await panel.getByText('Human posting approval required',{exact:true}).waitFor()
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal(await page.locator('button').evaluateAll(buttons=>buttons.filter(b=>!b.textContent.trim()).length),0)
