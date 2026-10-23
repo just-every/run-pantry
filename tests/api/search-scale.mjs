@@ -39,7 +39,7 @@ try{
  {query:'q=synthetic-pantry-scale-19999.pdf',verify:rows=>assert.ok(rows.some(r=>r.type==='document'))}]
  for(const item of cases){const start=performance.now(),r=await h.view('search?'+item.query),elapsed=performance.now()-start,rows=r.groups.flatMap(g=>g.records);item.verify(rows);measurements.push({query:item.query,milliseconds:Math.round(elapsed),returned:rows.length});console.log(JSON.stringify(measurements.at(-1)));assert.ok(elapsed<1000,`Search took ${elapsed.toFixed(1)} ms; must answer within one second`)}
  assert.equal(execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),head,'Candidate changed during the run')
- const result={runId:'sx-pantry-c37-search-scale-01',head,postedLines:posted,documents,fixture:'Synthetic D1 history; shared native invoice/payment/feed/check/alias scenario; every measured query through authenticated HTTP; dedicated local VM, not a hosted Cloudflare measurement',measurements}
+ const result={runId:'sx-pantry-c38-search-scale-01',head,postedLines:posted,documents,fixture:'Synthetic D1 history; shared native invoice/payment/feed/check/alias scenario; every measured query through authenticated HTTP; dedicated local VM, not a hosted Cloudflare measurement',measurements}
  if(receipt)await writeFile(receipt,JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify({runId:result.runId,head,postedLines:posted,documents,status:'passed'}))
 
 }finally{await h.close()}

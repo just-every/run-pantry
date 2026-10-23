@@ -28,7 +28,7 @@
   ],
   "files": {
     ".github/workflows/release.yml": {
-      "sha256": "bfc2dbb80be0457768407cae9dbb4472b5a59a4fd4ea339bd8f2a815eba18a65",
+      "sha256": "ad67ca101605501b4fcf689d1f71d1f379963c54fb754043e4ffc9a783d49855",
       "executable": false
     },
     ".github/workflows/run-demo.yml": {
@@ -56,7 +56,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "a92ce53850709e19d92148b8b8153c85b12a9a70f0309d7d8f2c48cf575f126d",
+      "sha256": "14626443b4687eb64ed79427db18f20b1b89ec8b71a8fa383af6bdc075c92095",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -84,7 +84,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "e4cd03f65065c9edb11b4d44e9269b1e022e99b47f0cd1a137871090b3bb9909",
+      "sha256": "39258b917cecb8df6556636a4b101d7a405d0814acf609f01f9fe2d097521a3f",
       "executable": false
     },
     "DEMO.md": {
@@ -2980,7 +2980,7 @@
       "executable": false
     },
     "src/pantry/assets/index.ts": {
-      "sha256": "2d7e35638daddcc89e5b69786c91a7cac69e2cd8bcb6ae367c63ab2275bbea23",
+      "sha256": "dbfb9bf06bbeb9e6d023a7ae02315708fd8bf2952e6af991c049b4897dc660be",
       "executable": false
     },
     "src/pantry/automatch.ts": {
@@ -3024,7 +3024,7 @@
       "executable": false
     },
     "src/pantry/cash-planner/index.ts": {
-      "sha256": "502b18a727fc191c9684aefa6d21388b4adbec355dce16f28dc641592116219e",
+      "sha256": "b6331ec6085be8181235005d65190a1650020a9ec66b178711d2d0b1e0d7ede6",
       "executable": false
     },
     "src/pantry/checks/commands.ts": {
@@ -4540,7 +4540,7 @@
       "executable": false
     },
     "src/ui/assets.tsx": {
-      "sha256": "a9531fe044babfb547847db6b146b3050787b56d9b46c8ed8908aa5b483b46af",
+      "sha256": "be665e9de635efcf9ce3d5132d6ba3a2b7431e8a71d953a43e07cd5144593d51",
       "executable": false
     },
     "src/ui/bank-connect.tsx": {
@@ -4604,7 +4604,7 @@
       "executable": false
     },
     "src/ui/cash-planner.tsx": {
-      "sha256": "7b86e72bbdeed56dbbdcd81f19b502d3813fa415f56fe83ed58d19c76ad32669",
+      "sha256": "efc77f479f93e237458dcbfb40a5b98acc93af1fa486a408afdf4ddaadfc34a5",
       "executable": false
     },
     "src/ui/checks.tsx": {
@@ -4976,7 +4976,7 @@
       "executable": false
     },
     "tests/api/assets.test.mjs": {
-      "sha256": "18a7f500dd31585b7a32345f344dc65fa096dceada8e79c992d44fff24e9543c",
+      "sha256": "50fed0ab07c0ed47f3e20a59125993543668544608767a07b4b58ba5137311be",
       "executable": false
     },
     "tests/api/bank.test.mjs": {
@@ -5160,7 +5160,7 @@
       "executable": false
     },
     "tests/api/search-scale.mjs": {
-      "sha256": "47bec36680d52be9f18b9df7283b70b9f2148371642f1f1c75e82b04fd7a0caa",
+      "sha256": "4d1a8666c088a4a7303480b93904794f628d8f481d64e9d6669d8abadd3964a3",
       "executable": false
     },
     "tests/api/search-scenario.mjs": {

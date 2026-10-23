@@ -12,6 +12,11 @@ test('ASSET-001 reviewed source cost depreciates through approved recurring jour
  await h.command('asset.settings',{revision:view.settings.revision,threshold:'2500.00',taxYear:2025,safeHarbor:'Not elected; accountant reviewed'})
  const bill=await h.command('bill.save',{vendorId:vendor.id,reference:'synthetic-pantry-4',billDate:'2025-01-01',post:true,evidenceWaived:'synthetic-pantry-5',lines:[{description:'synthetic-pantry-6',accountId:acct['6200'],amount:'7200.00'}]})
  view=await h.view('assets');const source=view.proposals.find(p=>p.bill_id===bill.id);assert.ok(source)
+ const policy=(await h.view('assets')).settings
+ const reviewingAccountant=await h.member('synthetic-pantry-30@example.test','accountant')
+ await h.command('asset.settings',{revision:policy.revision,threshold:'5000.00',taxYear:2025,safeHarbor:'Not elected'},reviewingAccountant,403)
+ await h.command('asset.settings',{revision:'stale',threshold:'5000.00',taxYear:2025,safeHarbor:'Not elected'},undefined,409)
+ assert.deepEqual((await h.view('assets')).settings,policy)
  const input={name:'synthetic-pantry-7',billLineId:source.id,billRevision:source.bill_revision,cost:'7200.00',placedDate:'2025-01-01',months:12,method:'straight-line',residual:'0.00',assetAccountId:acct['1500'],accumulatedAccountId:contra.id,expenseAccountId:expense.id,confirm:true}
  await h.command('asset.capitalize',{...input,billRevision:'stale'},undefined,409)
  const asset=await h.command('asset.capitalize',input)
@@ -19,6 +24,7 @@ test('ASSET-001 reviewed source cost depreciates through approved recurring jour
  view=await h.command('asset.prepare-depreciation',{id:asset.id,revision:asset.revision});let a=view.assets.find(a=>a.id===asset.id)
  assert.equal(a.plan.length,12);assert.ok(a.plan.every(p=>p.amount_cents===60000&&p.status==='awaiting-approval'))
  const first=a.plan[0]
+ const templates=await h.view('recurring-journals');assert.ok(templates.templates.filter(t=>a.plan.some(p=>p.recurring_id===t.id)).every(t=>t.name.includes('straight-line')&&t.memo.includes('straight-line')))
  await h.command('recurring-journal.approve',{id:first.recurring_id,revision:'stale'},undefined,409)
  for(const p of a.plan)await h.command('recurring-journal.approve',{id:p.recurring_id,revision:p.revision})
  await h.cron(Date.parse('2027-01-01T12:00:00Z'))

@@ -5,7 +5,7 @@ export function Assets(){
  const {data,error,reload}=useView<D>('assets'),{state}=useShared(),owner=state.actor.role==='owner',accountant=owner||state.actor.role==='accountant',options=(type:string)=>state.accounts.filter((a:D)=>a.active&&a.type===type).map((a:D)=>({value:a.id,label:`${a.code} · ${a.name}`}))
  if(!data)return <Loading error={error} what="fixed assets"/>
  return <><PageHead title="Fixed assets" lead="Review capital purchases, approve book depreciation and keep tax elections separate."/>
- {accountant&&<Card title="Accountant policy"><Form label="Save capitalization policy" submit={b=>command('asset.settings',{...b,revision:data.settings.revision})} onDone={reload}>
+ {owner&&<Card title="Capitalization policy"><Form label="Save capitalization policy" submit={b=>command('asset.settings',{...b,revision:data.settings.revision})} onDone={reload}>
  <Field label="Capitalize bill lines over" name="threshold" defaultValue={data.settings.threshold_cents==null?'':money(data.settings.threshold_cents)} required inputMode="decimal"/>
  <Field label="Election tax year" name="taxYear" type="number" defaultValue={data.settings.tax_year??new Date().getFullYear()} required/>
  <Field label="De minimis safe-harbor election record" name="safeHarbor" defaultValue={data.settings.safe_harbor} required hint="Record the accountant’s election or leave ‘Not elected’. Pantry makes no tax election for you."/>

@@ -3,13 +3,13 @@ import { Card, Field, Form, PageHead, Table, day, usd, useView, Loading, type D 
 export function CashPlanner(){
  const search=useRouterState({select:s=>s.location.searchStr}),query=new URLSearchParams(search),{data,error}=useView<D>('cash-planner?'+query)
  const whatIf=(()=>{try{return JSON.parse(query.get('whatIf')??'[]')}catch{return []}})()
- return <><PageHead title="Cash planner" lead="Thirteen weeks, with the records and assumptions behind each balance." />
+ return <><PageHead title="Cash planner" lead="Estimates for thirteen weeks, with the records and assumptions behind each balance." />
  <Card title="Projection dates"><form className="form" action="/app/cash-planner"><Field label="Projection starts" name="asOf" type="date" defaultValue={query.get('asOf')??new Date().toISOString().slice(0,10)} /><Field label="Alert below" name="threshold" defaultValue={query.get('threshold')??'0.00'} inputMode="decimal" /><button className="btn btn-primary">Update projection</button></form></Card>
  {!data?<Loading error={error} what="cash projection" />:<>
  {data.lowWeeks.length>0&&<div className="notice notice-warn" role="alert"><strong>Projected cash below {usd(data.threshold)}</strong><p>Weeks starting {data.lowWeeks.join(', ')}. Review the items and timing below before making a decision.</p></div>}
  {data.payrollWarnings.map((warning:string)=><p key={warning} className="notice">{warning}</p>)}
  <Card title={`Opening cash · ${usd(data.opening)}`}><Table heads={['Bank account','Source','Balance']} figures={[2]}>{data.banks.map((b:D)=><tr key={b.id}><td><a href={b.href}>{b.name}</a></td><td>{b.basis}</td><td>{usd(b.balance)}</td></tr>)}</Table></Card>
- <Card title="What if?"><p>Try a purchase or an extra receipt. Negative amounts reduce cash. These items never change the books.</p><Form label="Add what-if item" submit={async b=>{const q=new URLSearchParams(query);q.set('whatIf',JSON.stringify([...whatIf,b]));window.location.assign('/app/cash-planner?'+q);return {}}}>
+ <Card title="What if?"><p>Try a purchase or an extra receipt. Negative amounts reduce cash. These items stay in this URL and never change the books. Alerts appear only in this app.</p><Form label="Add what-if item" submit={async b=>{const q=new URLSearchParams(query);q.set('whatIf',JSON.stringify([...whatIf,b]));window.location.assign('/app/cash-planner?'+q);return {}}}>
  <Field label="Scenario item" name="label" required maxLength={100}/><Field label="Scenario date" name="date" type="date" required min={data.asOf} max={data.end} defaultValue={data.asOf}/><Field label="Scenario amount" name="amount" required inputMode="decimal" placeholder="-15000.00" />
  </Form>{whatIf.length>0&&<p><a href={'/app/cash-planner?'+new URLSearchParams({asOf:data.asOf,threshold:(data.threshold/100).toFixed(2)})}>Remove what-if items</a></p>}</Card>
  <Card title="13-week projection"><p>{data.method}</p><a download="cash-projection.json" href={'/api/pantry/cash-planner?'+query}>Export projection JSON</a>
