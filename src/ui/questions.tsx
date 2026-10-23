@@ -1,3 +1,4 @@
+import { LearnedRecognition } from './learned-recognition'
 // Questions from Pantry: what doesn't add up in the books, asked one plain
 // question at a time (by email first), each beside the exact record. A chosen
 // answer shows what it changes before it files anything; words the owner
@@ -132,6 +133,7 @@ export function Questions({ focus }: { focus?: string }) {
   return <>
     <PageHead title="Questions from Pantry" chip={data.open.length ? <Chip tone="warn">{data.open.length} open</Chip> : <Chip tone="good">All answered</Chip>}
       lead="Pantry checks your books for what doesn’t add up and asks you, by email first. Your answer files it." />
+    <LearnedRecognition/>
     <div className="split split-wide-left">
       <div className="stack">
         {current && <QuestionCard key={current.id} q={current} onDone={refresh} focused={current === focused} accountants={data.accountants} />}

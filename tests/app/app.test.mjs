@@ -1,3 +1,4 @@
+import { learningJourney } from './learning-journey.mjs'
 import { assetsJourney } from './assets-journey.mjs'
 import { cashJourney } from './cash-journey.mjs'
 import { searchJourney } from './search-journey.mjs'
@@ -16,6 +17,8 @@ import { chromium } from '@playwright/test'
 import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
 import { vendorCreditJourney } from './vendor-credit-journey.mjs'
+
+test('AGENT-006 learned back-test, vendor scope and human schedule approval at 1440 and 390', learningJourney)
 
 test('ASSET-001 reviewed capitalization, depreciation, disposal and tax schedule at 1440 and 390', assetsJourney)
 

@@ -1,3 +1,4 @@
+import { discoverLearning } from '../learning'
 // One pass of the books agent: find what doesn't add up, ask each new thing
 // once, let go of questions the books have since answered for themselves, and
 // email the owner the new ones, a few a day. Cron runs it about hourly; a
@@ -107,6 +108,7 @@ export async function runAgent(env: Bindings, { scheduled = false } = {}): Promi
   const result: RunResult = { at, found: issues.length, asked, reopened, resolved, emailed, open, model: 'config' in model ? 'on' : 'unavailable' in model ? 'unavailable' : 'missing', mail }
   await run(db, [q('UPDATE pt_books_agent SET last_run_at = ?, last_run = ? WHERE id = 1', at, JSON.stringify(result)),
     ...(asked || resolved || reopened ? [q('INSERT INTO pt_audit (id, at, actor_email, actor_kind, action, subject_kind, subject_id, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', uid(), at, AGENT.email, AGENT.kind, 'books-agent.run', 'books-agent', '1', JSON.stringify({ asked, resolved, reopened, emailed }))] : [])])
+  await discoverLearning(db)
   return result
 }
 

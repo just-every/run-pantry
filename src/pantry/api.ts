@@ -1,3 +1,4 @@
+import { learningCommands,learningView } from './learning'
 import { assetCommands,assetView } from './assets'
 import { cashPlanner } from './cash-planner'
 import { search } from './search'
@@ -116,7 +117,7 @@ import { estimateCommands, estimatesView, estimate, registerEstimateRoutes } fro
 import { customerDepositCommands, customerDepositsView } from './customer-deposits'
 
 const commands: Record<string, Command> = {
-  ...assetCommands, ...dimensionCommands, ...siblingCommands,
+  ...learningCommands, ...assetCommands, ...dimensionCommands, ...siblingCommands,
   ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...reportDeliveryCommands, ...ruleCommands, ...feedCommands,
@@ -156,6 +157,7 @@ async function reader(c: C): Promise<Context> {
 }
 
 const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => { const ctx = await reader(c); return c.json(await projectAccess(ctx, await build(ctx, c))) })
+view('learned-recognition',async ctx=>learningView(ctx.db))
 view('assets', async ctx=>assetView(ctx.db))
 view('cash-planner', async (ctx,c) => cashPlanner(ctx,new URL(c.req.url).searchParams))
 view('search', async (ctx,c) => search(ctx.db,ctx.actor,new URL(c.req.url).searchParams))

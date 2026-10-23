@@ -3,15 +3,15 @@ import { nativeApprovalAuthority } from '../access-policy/approvals'
 import { ledgerBankAuthority } from '../access-policy/banks'
 import { authority, who } from '../access'
 import { businessDay, sendingSettings } from '../delivery'
-import { date, now, optionalText, requireThat, text, uid } from '../core'
-import { approval, audit, changed, guard, one, q, run } from '../db'
-import type { Command } from '../context'
+import { date, now, optionalText, requireThat, text, uid, type Data } from '../core'
+import { approval, audit, changed, guard, one, q, run, type Sql } from '../db'
+import type { Command, Context } from '../context'
 import { accountFences, parsePlan, schedule, snapshot, sourceFence, validateAccounts, type Schedule } from './plan'
 import { approvalFences, generateRecognition } from './runs'
 
 const today = async (db: D1Database) => businessDay((await sendingSettings(db)).time_zone)
 
-const save: Command = { need: 'record', async run(c, b) {
+export async function saveRecognition(c:Context,b:Data,extra:Sql[]|((s:Schedule)=>Sql[]) = []) {
   const p = await parsePlan(c.db, b), before = b.id ? await schedule(c.db, text(b.id, 'Schedule')) : null
   if (before) {
     requireThat(before.revision === b.revision, 'Schedule changed; reload', 409)
@@ -23,9 +23,11 @@ const save: Command = { need: 'record', async run(c, b) {
     ...(before ? [guard("NOT EXISTS (SELECT 1 FROM pt_recognition_runs WHERE schedule_id = ? AND status = 'posted')", s.id),
       q("UPDATE pt_recognition_schedules SET kind = ?, name = ?, balance_account_id = ?, recognition_account_id = ?, amount_cents = ?, start_date = ?, months = ?, plan = ?, source_journal_id = ?, source_line_id = ?, source_date = ?, class_name=?,location_name=?,project_name=?,prepared_by = ?, revision = ?, updated_at = ?, status = 'awaiting-approval', approved_by = NULL, approved_revision = NULL, approved_snapshot = NULL WHERE id = ? AND revision = ?", ...fields, s.id, b.revision), changed()]
       : [q("INSERT INTO pt_recognition_schedules (kind, name, balance_account_id, recognition_account_id, amount_cents, start_date, months, plan, source_journal_id, source_line_id, source_date, class_name,location_name,project_name,prepared_by, revision, updated_at, id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'awaiting-approval', ?)", ...fields, s.id, now())]),
+    ...(typeof extra==='function'?extra(s):extra),
     audit(who(c.actor), before ? 'recognition.edit' : 'recognition.create', 'recognition', s.id, { revision: s.revision, before, after: s })])
   return schedule(c.db, s.id)
-} }
+}
+const save:Command={need:'record',run:saveRecognition}
 
 const approve: Command = { need: 'post', async run(c, b) {
   const s = await schedule(c.db, text(b.id, 'Schedule'))
