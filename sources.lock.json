@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "parent": null,
   "edition": "just-every/run-pantry",
-  "manifest": "ae53be30c49da4ec5e9ca3d1e862e5d75a49ce90da56359cf83656d0324ba1bb",
+  "manifest": "81199e8f47ca4cfce7da0f40a4420be4c58cb5c9548312323cdc1c29ebf70b50",
   "toolchain": {
     "id": "runeditrun/edition-authoring",
     "version": "1.1.0",
@@ -21,9 +21,32 @@
           "fixtures",
           "public",
           "docs"
+        ],
+        "origin": {
+          "repository": "https://github.com/runeditrun/base",
+          "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+          "path": ".",
+          "paths": [
+            "modules/delivery-producer/setup-manifest.mjs",
+            "foundation/template/src/server.dev.ts"
+          ]
+        },
+        "mappings": [
+          {
+            "path": "scripts/delivery/base/setup-manifest.mjs",
+            "originPath": "modules/delivery-producer/setup-manifest.mjs"
+          },
+          {
+            "path": "src/server.dev.ts",
+            "originPath": "foundation/template/src/server.dev.ts"
+          }
         ]
       },
-      "baseline": null
+      "baseline": {
+        "key": "56b5a94fabf190b0c8288cb77e2df9676f0504cc7c5ab102e80e4dfd80c6b5ce",
+        "digest": "a1a0f029be962086cd7a1ff87a150abc49fff4d7b9d2d3c8bdfbe07a0cb731a9",
+        "sha256": "b7523b70ac2a585d7996db18d20c94d391f0325441d7ce6e41be64653176aa12"
+      }
     }
   ],
   "files": {
@@ -60,7 +83,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "f95dc00f0f1089b3b1a559a22b8bd064e639686d898d2c9cae42059fea220c40",
+      "sha256": "06762da479b35d08b467da9b5e863d182f5af97f57191f42d8498c4c52ee75c6",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -76,7 +99,7 @@
       "executable": false
     },
     "base-copies.json": {
-      "sha256": "63e0e3d9fd95e336c8df857187316ed47dece0eb8c82f49d922674e04e37d196",
+      "sha256": "953b1ea405cc85745a4537f98b4961b48d3ce98416863cc2121143597ce9a71d",
       "executable": false
     },
     "CHANGELOG.md": {
@@ -88,7 +111,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "0d261fc009761d625b224b2bd24a96c5d3435577313a57e7621435bf3a29addc",
+      "sha256": "98d686ecb8bf9592d03c518492df807c8c952d10a41fc805dafae169fad009bf",
       "executable": false
     },
     "DEMO.md": {
@@ -192,7 +215,7 @@
       "executable": false
     },
     "edition.json": {
-      "sha256": "ae53be30c49da4ec5e9ca3d1e862e5d75a49ce90da56359cf83656d0324ba1bb",
+      "sha256": "81199e8f47ca4cfce7da0f40a4420be4c58cb5c9548312323cdc1c29ebf70b50",
       "executable": false
     },
     "fixtures/bank/operating-checking-2026-09.csv": {
@@ -808,11 +831,11 @@
       "executable": false
     },
     "OPERATIONS.md": {
-      "sha256": "bd2e9fb5cce35aa1d4f085f7375e90f1408f3ab872941c54f18869802385323f",
+      "sha256": "825efe18b20460d405b92509581a57e3a1fe980cfc6272e725183e1b0b336e46",
       "executable": false
     },
     "package.json": {
-      "sha256": "536bbb6012cb18db033f07137a88619da8b955e092761d3ece94d9cbb2eae72c",
+      "sha256": "7fea9567f1cb890f69f2d2a888632ed8dd5f30d624789f5e29e74118b724996b",
       "executable": false
     },
     "packaging.json": {
@@ -1075,8 +1098,12 @@
       "sha256": "b0e69d86150f8fc4f3491e91db49ea239958de528247d3280cad337424516ce4",
       "executable": false
     },
-    "RELEASE.json": {
+    "release-history/0.2.3.json": {
       "sha256": "2c954810b2b75e13a27514c9ff7a5f4feef0aed321e15812fd0bd3df9438c039",
+      "executable": false
+    },
+    "RELEASE.json": {
+      "sha256": "b55252d9d7cae77649757f42442e3bfff3e168043ddaec05d137f7dec245f904",
       "executable": false
     },
     "rer-project.json": {
@@ -1284,7 +1311,7 @@
       "executable": false
     },
     "seed.json": {
-      "sha256": "a24ec1308a5d203bc54b4292c94b3019ce2557a7a69a7c7b7652d1c1df5897d4",
+      "sha256": "d106314da911a7c0d142047ae34b7f2c67845aca1ce622e7f961c9e4d1f7c7ae",
       "executable": false
     },
     "src/auth.server.ts": {
@@ -4660,7 +4687,7 @@
       "executable": false
     },
     "src/site/styles/docs.css": {
-      "sha256": "72c602e19e1206804e9992840473a0b6586d9b962acef7e08603c631e0be5cb1",
+      "sha256": "9b63dba6859e08174aee3a68cd9705c1f3dc6eeeff58091bd094ad3a4aa26950",
       "executable": false
     },
     "src/site/styles/landing.css": {

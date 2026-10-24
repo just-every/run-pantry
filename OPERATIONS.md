@@ -98,6 +98,12 @@ The producer is exported from the published Base source at
 `4280971d7c0295b8a88c3e1179048efcbbe14f30` (rer 0.2.79), matching this
 checkout's package and recorded Base copies. Its generated workflow pins the
 trusted delivery workflow; production credentials are absent from the build.
+`base-copies.json` records only unchanged producer files and schema support.
+The exported setup module rewrites its two schema references; its Base origin
+and the adapted development server's origin are comparison baselines in
+`edition.json`, with snapshots retained by the source lock. They do not claim
+byte equality. The exported `scripts/delivery/base/packaging.json` is the
+seed-owned copy of the root packaging policy, written by the exporter.
 The optional bank, payroll, payments and attachment-provider accounts are not
 needed to build or list Pantry. A catalogue listing and a qualified platform
 source pin are separate release steps; a valid descriptor alone does not
