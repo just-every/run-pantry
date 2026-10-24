@@ -835,7 +835,7 @@
       "executable": false
     },
     "package.json": {
-      "sha256": "62fe56bc2d3c22512c7dd24eb29a8c19ea46dccc7c27a07e91ec1c3ecfc64b24",
+      "sha256": "a172cb1f339cba7bce6eb3a9779d961c93900dcad5104db8db958354443f67d8",
       "executable": false
     },
     "packaging.json": {
@@ -1075,7 +1075,7 @@
       "executable": false
     },
     "README.md": {
-      "sha256": "2c1cf61d956039b62a3da18fe0a167a8c08c5dae4fe9fc06d497c2c9b75c4d7e",
+      "sha256": "6212bf1dbee94f89a76b79c7bd95c35cf3917924ead462c7354b563bb36692da",
       "executable": false
     },
     "release-assets/pantry-home.webp": {
@@ -1111,7 +1111,7 @@
       "executable": false
     },
     "RELEASE.json": {
-      "sha256": "fd44fdf4ab9249e3a7b3979f33bfa95c59446326ccca547b2a67c360e63ac7a2",
+      "sha256": "7232df37bc6761d5563c7ed05ad36dc62f08e52d944d02390428260f109f5824",
       "executable": false
     },
     "rer-project.json": {
@@ -1343,7 +1343,7 @@
       "executable": false
     },
     "seed.json": {
-      "sha256": "b6b691d847d54a49bb9a86225e430f8a4555b6e6c9fa5518c88f5ce3eb5852e0",
+      "sha256": "9a24c817c2afd0dc511d4c7b477cd49df34966643ba10fdb13ddc1de044027b6",
       "executable": false
     },
     "src/auth.server.ts": {

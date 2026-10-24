@@ -2,7 +2,7 @@
 
 Books and close for one US service business: a USD ledger kept by the owner, a bookkeeper and an outside accountant, fed by your bank, reconciled to statements, closed each month and handed over as an accountant package. Invoices send and follow up; payments match themselves; every report opens to the records behind it, on the cash or accrual basis. Your own agent can prepare matches, entries and close work; a person approves each one. MIT licensed: nothing to buy, no account to create.
 
-Website and guides: [run-pantry.com](https://run-pantry.com) · [docs](https://run-pantry.com/docs).
+Website and guides: [run-pantry.com](https://run-pantry.com) · [docs](https://run-pantry.com/docs) · [Run Pantry](https://run-pantry.com/run).
 
 ## Start Pantry on your computer
 
@@ -38,7 +38,7 @@ rer dev --stop
 rer export --output exports/pantry-books.rer
 ```
 
-The archive holds the whole book, documents included. Restore it into a fresh clone, or start over in the same folder: [Back up and restore](https://run-pantry.com/docs/backup).
+Pantry stores uploaded document and receipt bytes in D1, including ordered parts for files up to 25 MB. It does not configure R2. The archive holds the whole book, documents included. Restore it into a fresh clone, or start over in the same folder: [Back up and restore](https://run-pantry.com/docs/backup).
 
 ## For developers
 
