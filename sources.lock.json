@@ -50,6 +50,10 @@
     }
   ],
   "files": {
+    ".github/assets/release/pantry-overview-1440.png": {
+      "sha256": "5f7ffb007afe6bcdc44e90aeddc9f74b7100865110e8e73f29180a24ad18f48d",
+      "executable": false
+    },
     ".github/workflows/release.yml": {
       "sha256": "ad67ca101605501b4fcf689d1f71d1f379963c54fb754043e4ffc9a783d49855",
       "executable": false
