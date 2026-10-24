@@ -2,7 +2,7 @@ import { createDependencies } from './modules/dependencies/index.mjs'
 import { createIdpOwnerClaimHandler, createOwnerClaimHandler } from './modules/owner-claim/index.mjs'
 import { firstRunResponse } from './base/setup'
 import { fontDocumentResponse } from './base/font-response'
-import { createOperatorAuth, createAuthHandler, createSignInHandler, devGate, devNotFound, type AuthConfig } from './modules/operator-auth/index.mjs'
+import { createOperatorAuth, createAuthHandler, createSignInHandler, safeReturnTo, devGate, devNotFound, type AuthConfig } from './modules/operator-auth/index.mjs'
 import { operatorMail } from './mail.server.mjs'
 import branding from './branding.json'
 import { signOutResponse, withSignOut } from './signout.server'
@@ -64,6 +64,14 @@ export function operatorAuth(env: Bindings) {
 }
 
 const privateHeaders = { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'x-robots-tag': 'noindex, nofollow' }
+/** Forward live sessions while retaining the explicit local person chooser. */
+export async function signedInForward(request: Request, original: Bindings): Promise<Response | null> {
+ const env = runtimeBindings(original), url = new URL(request.url)
+ if (url.pathname !== '/signin' || request.method !== 'GET' || (env.AUTH_LOCAL === 'true' && url.searchParams.get('switch') === '1')) return null
+ if (!await operatorAuth(env).getSession(request)) return null
+ return new Response(null, { status: 303, headers: { ...privateHeaders, location: safeReturnTo(url.searchParams.get('returnTo')) } })
+}
+
 export async function authResponse(request: Request, original: Bindings): Promise<Response | null> {
  const env = runtimeBindings(original), url = new URL(request.url)
  if (url.pathname.startsWith('/.well-known/rer-') || url.pathname.startsWith('/auth/dependencies/')) {
@@ -79,6 +87,8 @@ export async function authResponse(request: Request, original: Bindings): Promis
  }
  // The shared server-rendered sign-in page: plain forms that work before any script.
  if (url.pathname === '/signin') {
+  const forward = await signedInForward(request, env)
+  if (forward) return forward
   const page = await createSignInHandler(operatorAuth(env), { defaultReturnTo: '/setup' })(request)
   if (page) return fontDocumentResponse(await withSignOut(page, request, env))
  }
