@@ -20,7 +20,7 @@ export async function signOutResponse(request: Request, env: Bindings): Promise<
   const local = env.AUTH_LOCAL === 'true'
   const content = `<p>Signed in as ${escape(session.operator.displayName || session.operator.email)} (${escape(session.operator.email)}).</p>`
     + `<form method="post" action="/signout"><button type="submit">Sign out</button></form>`
-    + `<p class="secondary-link">${local ? '<a href="/signin">Switch person</a> · ' : ''}<a href="/app">Back to Pantry</a></p>`
+    + `<p class="secondary-link">${local ? '<a href="/signin?switch=1">Switch person</a> · ' : ''}<a href="/app">Back to Pantry</a></p>`
   return pageResponse({ branding: authConfig(env).branding, heading: 'Sign out of Pantry', content, method: request.method, referrer: 'strict-origin' })
 }
 
