@@ -3,5 +3,45 @@
   "projectId": "just-every/run-pantry",
   "name": "Pantry",
   "sourceRepository": "https://github.com/just-every/run-pantry",
-  "license": "MIT"
+  "license": "MIT",
+  "deployment": {
+    "target": "cloudflare-workers",
+    "artifactFile": "rer-worker-artifact.json"
+  },
+  "operations": {
+    "setup": "pnpm install --frozen-lockfile && pnpm exec rer install",
+    "build": "pnpm run build",
+    "verify": "pnpm exec rer check --profile first-party && pnpm run verify",
+    "artifact": "node scripts/delivery/base/cli.mjs artifact --config packaging.json",
+    "recovery": "Follow docs/backup.md and OPERATIONS.md. Stop writes and scheduled work; retain exact source, private settings, deployment receipts and applied migration bytes. For hosted books run node scripts/hosted-backup.mjs with the private environment file; rer export saves only local books. Restore into fresh empty resources, establish the owner, compare restored books and attachments, then verify owner workflows before switching traffic. Never reset populated books to apply an update."
+  },
+  "verification": {
+    "sensitivePaths": [
+      "src/auth.server.ts",
+      "src/base/**",
+      "src/pantry/**",
+      "scripts/installer/**",
+      "scripts/delivery/**",
+      "rer-setup.json",
+      "packaging.json"
+    ],
+    "migrationDirectories": [
+      "migrations/core"
+    ],
+    "guidanceFiles": [
+      "CONTRACT.md",
+      "README.md",
+      "OPERATIONS.md"
+    ],
+    "testPatterns": [
+      "tests/api/*.test.mjs",
+      "tests/app/*.test.mjs",
+      "tests/restore/*.test.mjs",
+      "tests/site/*.test.mjs"
+    ]
+  },
+  "setup": {
+    "path": "rer-setup.json",
+    "sha256": "4a17bd081c597ad73d4ec715aec84cec266b6ffa28fc065ec21760548b2e49cb"
+  }
 }

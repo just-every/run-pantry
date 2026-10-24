@@ -3,7 +3,7 @@
     {
       "title": "Start here",
       "pages": [
-        { "slug": "getting-started", "title": "Getting started", "file": "getting-started.md", "summary": "Start Pantry on your own computer in two lines, sign in as the owner and finish setup." },
+        { "slug": "getting-started", "title": "Getting started", "file": "getting-started.md", "summary": "Open Terminal and start Pantry on your own computer with one line; sign in as the owner and finish setup." },
         { "slug": "first-month", "title": "Your first month", "file": "first-month.md", "summary": "The five setup steps on Overview, from the business details to your first close." }
       ]
     },

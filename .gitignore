@@ -16,3 +16,7 @@ dist/
 
 # Book archives from rer export stay on this computer.
 exports/
+
+# Credential-free hosted delivery output is generated for each build.
+delivery-artifact/
+rer-package/

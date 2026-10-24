@@ -1,14 +1,14 @@
 {
   "id": "pantry",
   "name": "Pantry",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "maturity": "first-release-local",
   "category": "accounting",
   "spine": {
     "id": "books-and-close",
-    "record": "JournalEntry \u2192 JournalLine \u2190 Match \u2192 BankLine \u2190 Statement \u2192 Reconciliation \u2192 Period lock"
+    "record": "JournalEntry → JournalLine ← Match → BankLine ← Statement → Reconciliation → Period lock"
   },
-  "description": "Books and close for one US business: a balanced accrual ledger with cash- or accrual-basis reports that open to their records, bank and card feeds through your own Plaid keys or CSV/OFX statements with rules and reconciliation, receipts read with your own AI key, invoices emailed and followed up and paid by card from the link through your own Stripe, bills and payments, Stripe payouts and Gusto payrolls booked, Pantry's questions about what doesn't add up, period close with an accountant package, agent proposals a person approves, and move-in from QuickBooks Online or Xero.",
+  "description": "Keep the books for one US business: bank statements, receipts, invoices, bills and a month-end close you can review with your accountant.",
   "capabilities": [
     {
       "id": "business-and-roles",

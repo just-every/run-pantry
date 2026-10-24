@@ -81,3 +81,29 @@ page. A domain that keeps Subaddressing off routes the dash spelling the card
 shows (`receipts-<tag>@`) with a rule of its own instead. Mail to anything but the tagged address is refused unread. RER Managed
 hosting (`MAIL_PROVIDER=rer`) has neither an outbound connection for AI
 providers nor a domain for mail yet; both cards say so in one line.
+
+## Run Edit Run delivery
+
+`rer-project.json` declares the existing setup, build and verification commands.
+`packaging.json` is the source policy for its deployment artifact. After
+`pnpm run build`, run:
+
+```sh
+node scripts/delivery/base/cli.mjs artifact --config packaging.json
+```
+
+It writes `delivery-artifact/rer-worker-artifact.json` and its hashed payload
+files, using the actual Worker, browser assets and unchanged D1 migrations.
+The producer is exported from the published Base source at
+`4280971d7c0295b8a88c3e1179048efcbbe14f30` (rer 0.2.79), matching this
+checkout's package and recorded Base copies. Its generated workflow pins the
+trusted delivery workflow; production credentials are absent from the build.
+The optional bank, payroll, payments and attachment-provider accounts are not
+needed to build or list Pantry. A catalogue listing and a qualified platform
+source pin are separate release steps; a valid descriptor alone does not
+establish that hosting is offered.
+
+To regenerate the descriptor and workflow after an intentional policy change,
+use the producer's `package` command with a fresh output directory and copy its
+generated files. Keep `rer-setup.json` canonical: its exact bytes are bound by
+the descriptor's setup digest. Do not change applied migrations to package them.
