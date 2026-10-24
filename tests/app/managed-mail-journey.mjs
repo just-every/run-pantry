@@ -7,7 +7,7 @@ import { TOKEN } from './worker.mjs'
 export async function managedMailJourney(t) {
   const relayUrl = 'https://management.example.test/api/managed-mail/send'
   const sender = 'apps@example.test', apiKey = 'synthetic-pantry-125', mail = []
-  const app = await providerWorker({ bindings: { AUTH_LOCAL: 'false', MAIL_PROVIDER: 'rer', MAIL_FROM: sender, MAIL_RELAY_URL: relayUrl, MAIL_API_KEY: apiKey }, outbound: async request => {
+  const app = await providerWorker({ bindings: { MAIL_PROVIDER: 'rer', MAIL_FROM: sender, MAIL_RELAY_URL: relayUrl, MAIL_API_KEY: apiKey }, outbound: async request => {
     assert.equal(request.url, relayUrl)
     assert.equal(request.method, 'POST')
     assert.equal(request.headers.get('authorization'), `Bearer ${apiKey}`)
@@ -44,7 +44,7 @@ export async function managedMailJourney(t) {
     if (evidence) await page.screenshot({ path: `${evidence}/mail-signed-in-${width}.png`, fullPage: true })
     await visitor.close()
   }
-  const unconfigured = await providerWorker({ bindings: { AUTH_LOCAL: 'false', MAIL_PROVIDER: '', MAIL_FROM: sender }, outbound: () => { assert.fail('Unconfigured mail must not reach a transport') } }); t.after(() => unconfigured.close())
+  const unconfigured = await providerWorker({ bindings: { MAIL_PROVIDER: '', MAIL_FROM: sender }, outbound: () => { assert.fail('Unconfigured mail must not reach a transport') } }); t.after(() => unconfigured.close())
   const refused = await owner.request.post(`${unconfigured.origin}/auth/magic-link`, { headers: { origin: unconfigured.origin }, data: { email: 'owner@example.test' } })
   assert.equal(refused.status(), 503)
   assert.equal((await refused.json()).error, 'mail_unavailable')

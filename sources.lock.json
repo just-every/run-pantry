@@ -5547,7 +5547,7 @@
       "executable": false
     },
     "tests/app/managed-mail-journey.mjs": {
-      "sha256": "c76cf4fd7614f43cab0de4ab45debc56d29d117665b5335154013b0f90b031ca",
+      "sha256": "585009a068e312157939b1f15dbe28ba6228c8b2c0eb55c11bfd03d5071fa234",
       "executable": false
     },
     "tests/app/move-in-journey.mjs": {
