@@ -120,7 +120,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "0441c43a340dc19fedf2d82f7ba3613692a8605bff6bf050d01beed1e72988a1",
+      "sha256": "a62cb1d005dc098e62ac162bcbcf9a0d0b91c72e0ac0ebfb4ddba1e668701ea6",
       "executable": false
     },
     "docs/close.md": {
@@ -4560,7 +4560,7 @@
       "executable": false
     },
     "src/site/landing/book.ts": {
-      "sha256": "44109f69dc8f6ec717312e399784dc8abd9fc2e7d4b8a7d8e7d6e45f925d725f",
+      "sha256": "c6250b8d1387c90547b1973afa7ac6faeac78b14aa04d1a9226829f1c2496525",
       "executable": false
     },
     "src/site/landing/Hero.tsx": {
@@ -4616,7 +4616,7 @@
       "executable": false
     },
     "src/site/landing/sections/MoveIn.tsx": {
-      "sha256": "0f35f574fa7af259c89430433ba7ccd562fd4b80a0a688f3b2c41b90a1bc6731",
+      "sha256": "5b927f37710821714519c48dfd10efbae6b4609def36e6eecd2c88bfd01701da",
       "executable": false
     },
     "src/site/landing/sections/Receipts.tsx": {
@@ -4688,7 +4688,7 @@
       "executable": false
     },
     "src/site/styles/sections/move-in.css": {
-      "sha256": "e391dd8d233dd3ee7e58476e56f0dfd62b0a2fb8c4332b0d0016e92e136042d4",
+      "sha256": "2a5e852f2db111014189d784491e66241f7bedfa212b7263881be2deffcd170a",
       "executable": false
     },
     "src/site/styles/sections/receipts.css": {

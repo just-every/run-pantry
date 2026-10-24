@@ -27,6 +27,7 @@
 .terminal pre { margin: 0; padding: 12px 20px 26px; font: 400 13.5px/2.1 var(--font-mono); white-space: pre-wrap; }
 .terminal-line { display: block; padding-left: 22px; text-indent: -22px; }
 .prompt { display: inline-block; width: 22px; text-indent: 0; color: #3ed598; font-weight: 600; }
+.terminal-comment, .terminal-comment .prompt { color: #9aa3c7; }
 
 /* 1000-1099 keeps the desktop's two columns (the page stacks below 1100) so the card uses the tablet's width. */
 @media (min-width: 1000px) and (max-width: 1099px) {

@@ -36,7 +36,8 @@ export const TIE_OUT: [string, string, string][] = [
   ['Bank and card balances', '2', '2'],
   ['Attachments', '1,206', '1,206'],
 ]
-export const SETUP = ['git clone https://github.com/just-every/run-pantry.git pantry', 'cd pantry', 'rer install', 'rer setup', 'rer dev']
+// The one start line every Run Edit Run page shows, then the alternative for people who already have Node, as a comment.
+export const SETUP = ['curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-pantry', '# Already have Node 22 or later? npx -y @runeditrun/rer dev just-every/run-pantry']
 
 // ---------- The ledger (Oct 1–19) ----------
 export type LedgerRow = { date: string; account: string; payee: string; amount: string; inflow?: boolean; coded: string; how: string; flag?: 'coded' | 'how'; receipt?: boolean; split?: [string, string][] }

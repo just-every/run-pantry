@@ -15,16 +15,22 @@ function TrialBalance() {
   </div>
 }
 
-// The clone line breaks, when it must, after the host or before the folder, never inside a name.
+// A command breaks only between words (never at a hyphen, as in "run-" / "pantry"), keeps the installer's
+// `install.sh | sh` together, and may break after the installer's host.
 function breakable(line: string) {
-  const [host, rest] = line.split(/(?<=github\.com\/)/)
-  return rest === undefined ? line : <>{host}<wbr /><span className="nowrap">{rest}</span></>
+  return line.split(/(\S*install\.sh \| sh|\S+)/).map((part, i) => {
+    const pipe = /^(.*\/)(install\.sh \| sh)$/.exec(part)
+    if (pipe) return <span key={i}><span className="nowrap">{pipe[1]}</span><wbr /><span className="nowrap">{pipe[2]}</span></span>
+    return part.trim() ? <span className="nowrap" key={i}>{part}</span> : part
+  })
 }
 
 function Terminal() {
   return <div className="terminal">
     <div className="terminal-bar"><span /><span /><span /></div>
-    <pre>{SETUP.map(line => <span className="terminal-line" key={line}><span className="prompt">$</span>{breakable(line)}{'\n'}</span>)}</pre>
+    <pre>{SETUP.map(line => line.startsWith('# ')
+      ? <span className="terminal-line terminal-comment" key={line}><span className="prompt">#</span>{breakable(line.slice(2))}{'\n'}</span>
+      : <span className="terminal-line" key={line}><span className="prompt">$</span>{breakable(line)}{'\n'}</span>)}</pre>
   </div>
 }
 
