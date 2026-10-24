@@ -16,3 +16,8 @@ dist/
 
 # Book archives from rer export stay on this computer.
 exports/
+
+# Regenerable delivery payloads; never source or fleet evidence.
+/delivery-artifact/
+/payload/
+/rer-worker-artifact.json

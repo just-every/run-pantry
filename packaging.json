@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "project": {
+    "schema": 1,
+    "projectId": "just-every/run-pantry",
+    "name": "Pantry",
+    "sourceRepository": "https://github.com/just-every/run-pantry",
+    "license": "MIT",
+    "deployment": {
+      "target": "cloudflare-workers",
+      "artifactFile": "rer-worker-artifact.json"
+    },
+    "operations": {
+      "setup": "pnpm install --frozen-lockfile && pnpm exec rer install",
+      "build": "pnpm exec rer build",
+      "verify": "pnpm exec rer check --profile first-party && pnpm run typecheck && pnpm run test:site",
+      "artifact": "node scripts/build-delivery-artifact.mjs",
+      "recovery": "Preserve the exact source, private settings, deployment receipts and applied migration history. Stop writes before export. Export local books with rer export; back up hosted books with rer run hosted-backup --env-file <private-file>. Restore a verified archive only into an empty destination with rer import, then rer setup to establish the owner. Reconnect sealed provider credentials and verify ledger balances, documents and owner workflows before resuming writes."
+    }
+  },
+  "managed": {
+    "workflowRef": "runeditrun/delivery/.github/workflows/trusted-build.yml@86c8b37399c901bffd9a240dbd1148a65ec83b34",
+    "artifactFile": "rer-worker-artifact.json",
+    "buildProfile": "project",
+    "verificationProfiles": [
+      "full"
+    ]
+  },
+  "edition": {
+    "manifestFile": "edition.json",
+    "componentId": "just-every/pantry"
+  },
+  "artifact": {
+    "specInputs": {
+      "wranglerFile": "wrangler.jsonc",
+      "secretNames": [
+        "SESSION_SECRET",
+        "SETUP_TOKEN",
+        "INSTALLATION_KEY"
+      ],
+      "optionalSecretNames": [
+        "MAIL_API_KEY",
+        "PLAID_CLIENT_ID",
+        "PLAID_SECRET",
+        "XERO_CLIENT_ID",
+        "XERO_CLIENT_SECRET",
+        "GUSTO_CLIENT_ID",
+        "GUSTO_CLIENT_SECRET"
+      ],
+      "publicVariableNames": [
+        "AUTH_ORIGIN",
+        "OWNER_EMAIL",
+        "MAIL_PROVIDER",
+        "MAIL_FROM",
+        "PLAID_ENV",
+        "PLAID_REDIRECT_URI",
+        "GUSTO_ENV"
+      ],
+      "healthPath": "/health",
+      "recovery": "Preserve the exact source, private settings, deployment receipts and applied migration history. Stop writes before export. Export local books with rer export; back up hosted books with rer run hosted-backup --env-file <private-file>. Restore a verified archive only into an empty destination with rer import, then rer setup to establish the owner. Reconnect sealed provider credentials and verify ledger balances, documents and owner workflows before resuming writes.",
+      "providerEffects": [
+        "outbound-mail",
+        "outbound-webhooks",
+        "bank-feeds",
+        "payments",
+        "payroll",
+        "ai"
+      ],
+      "surfaces": {
+        "app": {
+          "path": "/signin",
+          "signIn": {
+            "path": "/signin",
+            "loginHint": true
+          },
+          "originVariable": "AUTH_ORIGIN",
+          "readiness": [
+            {
+              "path": "/health",
+              "statuses": [
+                200
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}
