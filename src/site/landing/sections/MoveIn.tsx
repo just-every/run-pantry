@@ -15,10 +15,9 @@ function TrialBalance() {
   </div>
 }
 
-// The clone line breaks, when it must, after the host or before the folder, never inside a name.
+// Keep the host and pipe as natural wrapping points on narrow screens.
 function breakable(line: string) {
-  const [host, rest] = line.split(/(?<=github\.com\/)/)
-  return rest === undefined ? line : <>{host}<wbr /><span className="nowrap">{rest}</span></>
+  return line.split(/(?<=runeditrun\.com\/)|(?= \| sh)/).map((part, index) => <span key={index}>{index ? <wbr /> : null}{part}</span>)
 }
 
 function Terminal() {
