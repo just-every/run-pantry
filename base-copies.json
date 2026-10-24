@@ -176,7 +176,6 @@
         "scripts/delivery/base/package.mjs": "5a32dec3274b66474e12d5141e973542248ceeecf0f8464f6e9da87d60228cb4",
         "scripts/delivery/base/paths.mjs": "32af2ee0d6e8ce048d04978e2d70f476bdc2a690b1a270d580056641f87a1731",
         "scripts/delivery/base/payloads.mjs": "da3a9d09860c33bdd0b287bca9abc6210b12d13439e569d178a5b31fec563ee5",
-        "scripts/delivery/base/setup-manifest.mjs": "b2746ebde1a8b5e2da26766a289d7f88faa8b454c8baca6ca3a410cfd2d24f76",
         "scripts/delivery/base/sign-in.mjs": "951aada2c00131ab7c808974827654b0fda20bcaeed1f2f97194b25441c03aff",
         "scripts/delivery/base/spec.mjs": "65179ca5222485513260e8d58aaae6740ae6fe1b27065e96f0d95d197fc6d3f0",
         "scripts/delivery/base/sql-statements.mjs": "8819f7f91b7781905796ea35b01dd1a55e08ed3893ff6d8aafaf03d2f35c1c9a"
@@ -198,7 +197,6 @@
         "scripts/delivery/base/package.mjs": "100644",
         "scripts/delivery/base/paths.mjs": "100644",
         "scripts/delivery/base/payloads.mjs": "100644",
-        "scripts/delivery/base/setup-manifest.mjs": "100644",
         "scripts/delivery/base/sign-in.mjs": "100644",
         "scripts/delivery/base/spec.mjs": "100644",
         "scripts/delivery/base/sql-statements.mjs": "100644"
