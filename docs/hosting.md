@@ -1,3 +1,5 @@
+[Or let Run Edit Run host it](https://runeditrun.com).
+
 For Assisted maintenance or Managed hosting, see [Run Edit Run](https://runeditrun.com). Check the available apps, setup requirements and billing eligibility there. The instructions below put Pantry online on your own Cloudflare account from a terminal.
 
 Pantry runs on your own computer first. To reach it from anywhere, send invoices by email and let your accountant sign in, put it online on your own Cloudflare account. `rer deploy` does the work from the `run-pantry` folder on your computer; it takes about ten minutes the first time.

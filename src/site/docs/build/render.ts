@@ -42,7 +42,7 @@ export function renderMarkdown(markdown: string): RenderedPage {
         const name = languageNames[language] ?? language.toUpperCase()
         const head = `<div class="docs-code-head"><span class="docs-code-lang">${escapeHtml(name || 'Code')}</span><button type="button" class="docs-copy" hidden>Copy</button></div>`
         const className = language ? ` class="language-${escapeHtml(language)}"` : ''
-        return `<div class="docs-code">${head}<pre><code${className}>${escapeHtml(text.replace(/\n$/, ''))}</code></pre></div>\n`
+        return `<div class="docs-code">${head}<pre tabindex="0" aria-label="${escapeHtml(name || 'Code')} code"><code${className}>${escapeHtml(text.replace(/\n$/, ''))}</code></pre></div>\n`
       },
       html({ text }) {
         return escapeHtml(text)
