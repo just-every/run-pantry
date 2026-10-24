@@ -1,8 +1,8 @@
 {
-  "key": "56b5a94fabf190b0c8288cb77e2df9676f0504cc7c5ab102e80e4dfd80c6b5ce",
+  "key": "fddbb54a44d3925c9ec3fb1abb762859c3e8f32ea3e34948a93be87b4d0442f7",
   "origin": {
     "repository": "https://github.com/runeditrun/base",
-    "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+    "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
     "path": ".",
     "paths": [
       "modules/delivery-producer/setup-manifest.mjs",

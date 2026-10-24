@@ -95,7 +95,7 @@ node scripts/delivery/base/cli.mjs artifact --config packaging.json
 It writes `delivery-artifact/rer-worker-artifact.json` and its hashed payload
 files, using the actual Worker, browser assets and unchanged D1 migrations.
 The producer is exported from the published Base source at
-`4280971d7c0295b8a88c3e1179048efcbbe14f30` (rer 0.2.79), matching this
+`11f94fec479228d71ba6d7dd6ea7796c0d42c544` (rer 0.2.80), matching this
 checkout's package and recorded Base copies. Its generated workflow pins the
 trusted delivery workflow; production credentials are absent from the build.
 `base-copies.json` records only unchanged producer files and schema support.

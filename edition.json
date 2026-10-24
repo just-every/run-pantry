@@ -25,7 +25,7 @@
         ],
         "origin": {
           "repository": "https://github.com/runeditrun/base",
-          "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+          "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
           "path": ".",
           "paths": [
             "modules/delivery-producer/setup-manifest.mjs",
