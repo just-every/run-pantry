@@ -14,7 +14,7 @@
       "setup": "pnpm install --frozen-lockfile && pnpm exec rer install",
       "build": "pnpm exec rer build",
       "verify": "pnpm exec rer check --profile first-party && pnpm run typecheck && pnpm run test:site",
-      "artifact": "node scripts/build-delivery-artifact.mjs",
+      "artifact": "pnpm exec rer build && node scripts/build-delivery-artifact.mjs",
       "recovery": "Preserve the exact source, private settings, deployment receipts and applied migration history. Stop writes before export. Export local books with rer export; back up hosted books with rer run hosted-backup --env-file <private-file>. Restore a verified archive only into an empty destination with rer import, then rer setup to establish the owner. Reconnect sealed provider credentials and verify ledger balances, documents and owner workflows before resuming writes."
     }
   },
