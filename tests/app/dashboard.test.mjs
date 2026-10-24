@@ -20,7 +20,7 @@ test('REPORT-008 dashboard shows calculated balances and every waiting-work link
   await command('capture-approval-rule.save', { minimum: '2500.00' })
   await command('bill.save', { vendorId: vendor.id, reference: 'ANNUAL-APPROVAL', billDate: '2026-10-01', lines: [{ description: 'Annual support', accountId: acct['6200'], amount: '3100.00' }] })
   await command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-10-01', lines: [{ description: 'Review draft', quantity: '1', rate: '300.00', accountId: acct['4000'], taxCode: 'exempt' }] })
-  const connection = await command('feed.connect', { publicToken: 'dashboard-public-token', institution: { name: 'First Platypus Bank' } })
+  const connection = await command('feed.connect', { publicToken: 'synthetic-pantry-2', institution: { name: 'First Platypus Bank' } })
   await command('feed.map', { itemId: connection.id, accounts: [{ id: connection.accounts.find(a => a.mask === '0000').id, bankAccountId: state.bankAccounts[0].id }] })
   await command('books-agent.run', {})
   plaid.state.loginRequired = true; await command('feed.sync', { itemId: connection.id })

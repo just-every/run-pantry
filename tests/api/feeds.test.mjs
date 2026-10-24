@@ -272,7 +272,7 @@ test('BANK-002 thirteen months of feed history preserve three imported OFX month
   await h.command('feed.link-token', {})
   const request = at(plaid.state.calls, c => c.path === '/link/token/create').body
   assert.ok(request.transactions.days_requested >= 13 * 30, 'the provider is asked for the historical reach needed by this connection')
-  const connection = await h.command('feed.connect', { publicToken: 'historical-public-token', institution: { name: 'First Platypus Bank' } })
+  const connection = await h.command('feed.connect', { publicToken: 'synthetic-pantry-1', institution: { name: 'First Platypus Bank' } })
   const account = at(connection.accounts, a => a.mask === '0000')
   await h.command('feed.map', { itemId: connection.id, accounts: [{ id: account.id, bankAccountId: bank.id, history: { mode: 'booksStart' } }] })
   let feed = await h.view('bank/feeds')

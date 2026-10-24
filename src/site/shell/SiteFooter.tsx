@@ -4,7 +4,7 @@ import { links } from './links'
 export function SiteFooter({ tone = 'paper' }: { tone?: 'paper' | 'on-art' }) {
   return <footer className={`site-footer ${tone}`}>
     <div className="site-wrap"><div>
-      <a className="site-brand" href={links.home}><img src={tone === 'on-art' ? '/brand/mark-light.svg' : '/brand/mark.svg'} alt="" width="22" height="22" /><span>Pantry</span></a>
+      <a className="site-brand" href={links.home}><img src={tone === 'on-art' ? '/brand/pantry-light.svg' : '/brand/pantry.svg'} alt="" width="22" height="22" /><span>Pantry</span></a>
       <nav aria-label="Footer"><a href={links.docs}>Docs</a><a href={links.source}>Source</a><a href={`${links.source}/blob/main/LICENSE`}>MIT licensed</a></nav>
     </div></div>
   </footer>

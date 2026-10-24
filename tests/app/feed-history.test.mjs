@@ -31,7 +31,7 @@ test('BANK-002 history choices, reference-only observations and duplicate decisi
   for (const l of lines) await command('match.approve', { bankLineIds: [l.id], create: [{ type: 'fee', amount: (Math.abs(l.amount_cents) / 100).toFixed(2), accountId: acct['6200'] }] })
   await command('reconciliation.complete', { statementId: statement.statement.id })
   const proof = (await (await owner.request.get(`${app.origin}/api/pantry/reconciliation/${statement.statement.id}`)).json()).completed
-  const connection = await command('feed.connect', { publicToken: 'history-browser-public-token', institution: { name: 'First Platypus Bank' } })
+  const connection = await command('feed.connect', { publicToken: 'synthetic-pantry-3', institution: { name: 'First Platypus Bank' } })
   const signedIn = await owner.storageState()
   for (const width of [1440, 390]) {
     const context = await browser.newContext({ storageState: signedIn, viewport: { width, height: width === 390 ? 844 : 1000 } })

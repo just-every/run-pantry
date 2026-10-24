@@ -812,7 +812,7 @@
       "executable": false
     },
     "package.json": {
-      "sha256": "6b618c20d714501542d03af0c8eac583909f65aca6f8973146545878f06a7695",
+      "sha256": "536bbb6012cb18db033f07137a88619da8b955e092761d3ece94d9cbb2eae72c",
       "executable": false
     },
     "packaging.json": {
@@ -851,11 +851,11 @@
       "sha256": "346b17fd0022c867331da97c333575328ce7e45d2bc5600420cb155c4d1e7400",
       "executable": false
     },
-    "public/brand/mark-light.svg": {
+    "public/brand/pantry-light.svg": {
       "sha256": "5b4c8636bfeae13d17f5c012a5becc5f536a800051eac154715d3f6d49f11b4d",
       "executable": false
     },
-    "public/brand/mark.svg": {
+    "public/brand/pantry.svg": {
       "sha256": "dc3f4540fa94ac83b11a55a46e6972983db241125efbb924cb6cf5d6eb0382ae",
       "executable": false
     },
@@ -908,7 +908,7 @@
       "executable": false
     },
     "public/rer-theme.css": {
-      "sha256": "aac8780b08ba064e1d87d223f6b29353b793f65b5f4e3d174479db7e20f8afbb",
+      "sha256": "a8b630a8c2093870de7ce0639dcfad33146e471997f9cf85bc69c504dd1f84c6",
       "executable": false
     },
     "public/site/closing-1152.avif": {
@@ -1071,8 +1071,12 @@
       "sha256": "671580008f9ee8b1e7cefaeea884c5d2d6e7e0dad15fb6abe2d6af45e9c5984d",
       "executable": false
     },
-    "RELEASE.json": {
+    "release-history/0.2.2.json": {
       "sha256": "b0e69d86150f8fc4f3491e91db49ea239958de528247d3280cad337424516ce4",
+      "executable": false
+    },
+    "RELEASE.json": {
+      "sha256": "2c954810b2b75e13a27514c9ff7a5f4feef0aed321e15812fd0bd3df9438c039",
       "executable": false
     },
     "rer-project.json": {
@@ -1280,7 +1284,7 @@
       "executable": false
     },
     "seed.json": {
-      "sha256": "657e7061850450780896daaf554d892c624bf3746ae9a7411689157e7d73820c",
+      "sha256": "a24ec1308a5d203bc54b4292c94b3019ce2557a7a69a7c7b7652d1c1df5897d4",
       "executable": false
     },
     "src/auth.server.ts": {
@@ -1436,7 +1440,7 @@
       "executable": false
     },
     "src/identity.ts": {
-      "sha256": "bfecb77db610957e17c80a14b69c7fcf7428c023328d61af3e04376c8d056399",
+      "sha256": "f648f4d53fa2b1f26f638ad186709fa342b01d92ff0d15492892669f7a57b79f",
       "executable": false
     },
     "src/mail.server.d.mts": {
@@ -4640,11 +4644,11 @@
       "executable": false
     },
     "src/site/shell/SiteFooter.tsx": {
-      "sha256": "2b0e1c1f1b08406bc15290680576015b1e596475c602ec3ce2f19f450c1c821f",
+      "sha256": "de493f6ec62b1651b72bf524df2ffdad72a4cf2698f14f242b3ab766b9d16a1d",
       "executable": false
     },
     "src/site/shell/SiteHeader.tsx": {
-      "sha256": "e01a70995e520e72c4f6b13736eb10990e31d6f2bc5c23b141397feed1e7d690",
+      "sha256": "bd7e18e4fbd45a78a0be1e5ea453dc4b1656805fbeef424fb5de7e97114c55ce",
       "executable": false
     },
     "src/site/styles/cards.css": {
@@ -5116,7 +5120,7 @@
       "executable": false
     },
     "src/ui/shell.tsx": {
-      "sha256": "89197483d979da848b1abec2da3cdabaeee505b4f0b454dff658e6b83f09800f",
+      "sha256": "a18b102292a78a6c664373c39ff8ecd0ac9097ddda388b995db487738bfe0fe7",
       "executable": false
     },
     "src/ui/statement-columns.tsx": {
@@ -5264,7 +5268,7 @@
       "executable": false
     },
     "tests/api/feeds.test.mjs": {
-      "sha256": "55ce299425baf5d6eb13d83a135054e47b330cdf9a3cbbd9a48bfe3d6e21e313",
+      "sha256": "1ddc9b1a4b0de7c2812f9d4e79914e240299f19891314a1abb8e54c26bb90557",
       "executable": false
     },
     "tests/api/harness.mjs": {
@@ -5460,7 +5464,7 @@
       "executable": false
     },
     "tests/app/dashboard.test.mjs": {
-      "sha256": "f8e060c6162598b50fe6b5a8c550ba4d4ba2432a2d259e90eda2bf2fc3a11474",
+      "sha256": "5f086af47244e2cfaee6f8691b9f11dd097c43f18a3e4d41987d3acc8a6619f7",
       "executable": false
     },
     "tests/app/data001-journey.mjs": {
@@ -5496,7 +5500,7 @@
       "executable": false
     },
     "tests/app/feed-history.test.mjs": {
-      "sha256": "5c36f5a913fabb2733966435f43377890841f20a13f2fa724bd181a9e5ee79f6",
+      "sha256": "4a74725f083aa5279482d2a0920a31663e45f9d80f74f30d6ed9f633de47546e",
       "executable": false
     },
     "tests/app/invoice-documents.test.mjs": {

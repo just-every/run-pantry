@@ -25,7 +25,7 @@
   --rer-code-text: #e7e9f5;
   --rer-wordmark-weight: 700;
   --rer-wordmark-tracking: -.03em;
-  --rer-logo: url('/brand/mark.svg');
+  --rer-logo: url('/brand/pantry.svg');
   /* Base's /contract page: done in the mark's green, partial in its apricot, missing in quiet lavender (not built yet, not an alarm). */
   --rer-done: #19a974;
   --rer-done-ink: #0e8659;
