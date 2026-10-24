@@ -1102,6 +1102,10 @@
       "sha256": "2c954810b2b75e13a27514c9ff7a5f4feef0aed321e15812fd0bd3df9438c039",
       "executable": false
     },
+    "release-history/0.2.4.json": {
+      "sha256": "b55252d9d7cae77649757f42442e3bfff3e168043ddaec05d137f7dec245f904",
+      "executable": false
+    },
     "RELEASE.json": {
       "sha256": "9828e10ba97b2f5c0639034c27f65c03e31c0ac5eb562edfd7d046423d8be1d4",
       "executable": false
@@ -5540,6 +5544,10 @@
     },
     "tests/app/learning-journey.mjs": {
       "sha256": "b4d72621e05d161eff0f89052a653634c2a1ce271c30bb3bd1a80fcdb41cc833",
+      "executable": false
+    },
+    "tests/app/managed-mail-journey.mjs": {
+      "sha256": "a9eac227dd9bfa1129f803481b2801b0b81a0f8eeafacc1fd7133febb78ad007",
       "executable": false
     },
     "tests/app/move-in-journey.mjs": {
