@@ -5560,7 +5560,7 @@
       "executable": false
     },
     "tests/app/assets-journey.mjs": {
-      "sha256": "b87c985d1886716a0b12abf3cd3e02655975ea667b37b3f142cca0956e4baa86",
+      "sha256": "8774c731b37206f076c863bd6363c27b1d5ebba2a090d8a5b0d293a35ce75dbd",
       "executable": false
     },
     "tests/app/bank-rules.test.mjs": {
