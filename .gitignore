@@ -20,3 +20,7 @@ exports/
 # Credential-free hosted delivery output is generated for each build.
 delivery-artifact/
 rer-package/
+
+# Regenerable root delivery payloads.
+/payload/
+/rer-worker-artifact.json
