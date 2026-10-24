@@ -17,10 +17,25 @@ test('the run site builds, its primary action opens /run, and every link and fil
   const home = readFileSync(join(site, 'index.html'), 'utf8')
   assert.match(home, /<a class="site-pill" href="\/run">/, 'the homepage leads with Run Pantry to /run')
   assert.ok(served('run'), '/run is built')
+  const run = JSON.parse(readFileSync(join(root, 'src/site/run.json')))
+  const text = html => html.replace(/<[^>]+>/g, '').replaceAll('&amp;', '&')
+  const commands = [`curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev ${new URL(run.repository).pathname.slice(1)}`, run.clone]
+  for (const path of ['index.html', 'run.html', 'docs/getting-started.html']) {
+    const html = readFileSync(join(site, path), 'utf8'), content = text(html)
+    for (const command of commands) assert.ok(content.includes(command), `${path} offers ${command}`)
+    assert.doesNotMatch(content, /git clone|rer install|rer setup/, `${path} uses the canonical start procedure and declared Node alternative`)
+  }
+  const guide = readFileSync(join(site, 'run.html'), 'utf8')
+  const started = readFileSync(join(site, 'docs/getting-started.html'), 'utf8')
+  for (const html of [guide, started]) assert.ok(text(html).includes(`cd ${run.folder} && rer dev`), 'restart uses the declared folder')
+  for (const href of ['https://runeditrun.com', '/docs/hosting']) assert.ok(attrs(guide, 'href').includes(href), `/run links ${href}`)
+  assert.ok(served('contract'), '/contract remains available')
   const all = pages(site)
   assert.ok(all.length > 3, 'the homepage, /run, the docs and the not-found page')
   for (const file of all) {
     const html = readFileSync(file, 'utf8'), where = relative(site, file)
+    const mainNav = html.match(/<nav aria-label="Main">([\s\S]*?)<\/nav>/)?.[1]
+    if (mainNav) assert.ok(!attrs(mainNav, 'href').includes('/contract'), `${where} keeps contributor progress out of the main nav`)
     const refs = [...attrs(html, 'href'), ...attrs(html, 'src'), ...attrs(html, 'srcSet').concat(attrs(html, 'srcset')).flatMap(set => set.split(',').map(part => part.trim().split(/\s+/)[0]))]
     for (const ref of refs.filter(ref => ref.startsWith('/') && !ref.startsWith('//'))) {
       const path = decodeURIComponent(ref.split(/[?#]/)[0])

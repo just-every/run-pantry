@@ -25,6 +25,21 @@ test('XERO-001 connecting Xero from local dev returns the owner signed in with X
   await page.waitForURL(`${h.origin}/app`)
   const signedIn = async () => { const r = await context.request.get(`${h.origin}/auth/session`); return r.ok() ? (await r.json()).operator.email : r.status() }
   assert.equal(await signedIn(), 'owner@example.test')
+  const signedOut = await browser.newContext(); t.after(() => signedOut.close())
+  assert.equal((await signedOut.request.get(`${h.origin}/signin?login_hint=synthetic-pantry-1@example.test`, { maxRedirects: 0 })).headers().location, '/__dev/key', 'signed-out local admission remains unchanged')
+  for (const [returnTo, expected] of [[undefined, '/app'], ['/app/move-in', '/app/move-in'], ['//outside.example.test', '/app'], ['/%2foutside.example.test', '/app']]) {
+    const query = new URLSearchParams({ login_hint: 'synthetic-pantry-1@example.test', ...(returnTo ? { returnTo } : {}) })
+    const response = await context.request.get(`${h.origin}/signin?${query}`, { maxRedirects: 0 })
+    assert.equal(response.status(), 303, 'a live session bypasses the sign-in form')
+    assert.equal(response.headers().location, expected, 'forward only to a safe local destination')
+  }
+  await page.goto(`${h.origin}/signout`)
+  await page.getByRole('link', { name: 'Switch person', exact: true }).click()
+  await page.getByRole('heading', { name: /Sign in/ }).waitFor()
+  assert.equal(new URL(page.url()).pathname, '/signin', 'Switch person still reaches the local chooser')
+  assert.equal(await signedIn(), 'owner@example.test', 'opening the chooser preserves the session')
+
+  await page.goto(`${h.origin}/app`)
   const { url } = await page.evaluate(async () => (await fetch('/api/pantry/command/move-in.xero.connect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json())
   const authorize = new URL(url), callback = authorize.searchParams.get('redirect_uri')
   assert.equal(callback, `${h.origin}/api/pantry/xero/callback`)

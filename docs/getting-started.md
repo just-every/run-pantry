@@ -16,15 +16,17 @@ Copy this line into the terminal, then press Enter:
 curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-pantry
 ```
 
-It installs `rer`, the Run Edit Run command, and starts Pantry. Git is required; rer brings Node and pnpm. The installer itself does not change your shell startup file. If it prints a command to run for future terminal windows, copy that command into the terminal and press Enter: **that command** makes `rer` available now and saves the setting for future windows.
+It installs `rer`, the Run Edit Run command, and starts Pantry. Git is required; the installer brings Node when needed, and rer brings pnpm. If the installer prints a command for future terminal windows, run it so `rer` stays available when you start again.
 
-If Node is already installed, this alternative starts the same Pantry:
+Already have Node 22 or later? This alternative starts the same Pantry:
 
 ```sh
 npx -y @runeditrun/rer dev just-every/run-pantry
 ```
 
-`rer` gets Pantry into `run-pantry`, installs its dependencies and prepares your local owner account.
+`rer` gets Pantry into a `run-pantry` folder. To start it again later, run `cd run-pantry && rer dev`.
+
+This copy runs only on your computer, so invoices can't be emailed and your accountant can't sign in until it is online. [Put Pantry online](/docs/hosting), or [let Run Edit Run host it](https://runeditrun.com).
 
 When it is ready, the terminal prints:
 

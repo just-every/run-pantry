@@ -51,7 +51,7 @@
   .tb-sign { padding-top: 14px; font-size: 14px; }
   .terminal { margin-top: 28px; border-radius: 14px; }
   .terminal-bar { padding: 14px 16px 2px; }
-  .terminal pre { padding: 10px 16px 18px; font-size: 12.5px; line-height: 1.9; }
+  .terminal pre { padding: 10px 16px 18px; font-size: 13px; line-height: 1.9; }
   .terminal-line { padding-left: 17px; text-indent: -17px; }
   .prompt { width: 17px; }
 }
