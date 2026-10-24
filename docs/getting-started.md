@@ -10,21 +10,16 @@ Allow several minutes for the first start to download and build everything. The 
 
 ## Get Pantry and start it
 
-Copy this line into the terminal, then press Enter:
+Install rer, then get Pantry and start it. It uses `rer`, the Run Edit Run command that installs, starts, backs up and restores Pantry:
 
 ```sh
-curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-pantry
+curl -fsSL https://runeditrun.com/install.sh | sh
+rer dev just-every/run-pantry
 ```
 
-It installs `rer`, the Run Edit Run command, and starts Pantry. Git is required; rer brings Node and pnpm. The installer itself does not change your shell startup file. If it prints a command to run for future terminal windows, copy that command into the terminal and press Enter: **that command** makes `rer` available now and saves the setting for future windows.
+If the installer ends with a line to run, run it before the second command. `rer` clones Pantry into a `run-pantry` folder and starts it. To start it again later, run `cd run-pantry && rer dev`.
 
-If Node is already installed, this alternative starts the same Pantry:
-
-```sh
-npx -y @runeditrun/rer dev just-every/run-pantry
-```
-
-`rer` gets Pantry into `run-pantry`, installs its dependencies and prepares your local owner account.
+This copy runs only on your computer, so invoices can't be emailed and your accountant can't sign in until it is online. [Put Pantry online](/docs/hosting), or [let Run Edit Run host it](https://runeditrun.com).
 
 When it is ready, the terminal prints:
 

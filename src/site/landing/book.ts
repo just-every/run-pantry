@@ -1,3 +1,6 @@
+import { installRer } from '../../base/run-site'
+import run from '../run.json'
+
 // One business's October, the records every homepage section draws: Alder Street Builders (a remodeling
 // contractor; owner Maya, accountant Jordan Kim, CPA) from the Sep 30 move-in to the Nov 2 lock and the Nov 3
 // reports. Dates follow the 2026 calendar (Oct 1 is a Thursday). The hero (HeroCards.tsx) shows the same records:
@@ -36,7 +39,7 @@ export const TIE_OUT: [string, string, string][] = [
   ['Bank and card balances', '2', '2'],
   ['Attachments', '1,206', '1,206'],
 ]
-export const SETUP = ['git clone https://github.com/just-every/run-pantry.git pantry', 'cd pantry', 'rer install', 'rer setup', 'rer dev']
+export const SETUP = [installRer, `rer dev ${new URL(run.repository).pathname.slice(1)}`]
 
 // ---------- The ledger (Oct 1–19) ----------
 export type LedgerRow = { date: string; account: string; payee: string; amount: string; inflow?: boolean; coded: string; how: string; flag?: 'coded' | 'how'; receipt?: boolean; split?: [string, string][] }
