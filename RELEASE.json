@@ -82,7 +82,8 @@
     "migrations/core/0098_document_archives.sql",
     "migrations/core/0099_currency_worksheets.sql",
     "migrations/core/0100_reminder_business_day_recipients.sql",
-    "migrations/core/0101_asset_disposal_approval.sql"
+    "migrations/core/0101_asset_disposal_approval.sql",
+    "migrations/core/0102_contractor_tin_vault.sql"
   ],
   "breaking": false,
   "agentUpdateInstructions": "Before updating local books, stop Pantry with rer dev --stop and save a private archive with rer export --output exports/pantry-before-0.2.2.rer. For hosted books use node scripts/hosted-backup.mjs with the private environment file as documented in docs/backup.md; rer export covers local books only. Retain the exact source, .rer deployment records and private settings. Pull the accepted source, then use rer dev locally or rer deploy with the same private environment file for owner-account hosting. Preserve every applied migration name and byte; never reset populated books to update. Run rer verify and the release upgrade checks before adopting. The checkout pins rer 0.2.79. Registry publication and platform source qualification are separate from building the delivery artifact.",
