@@ -968,7 +968,7 @@
       "executable": false
     },
     "packaging.json": {
-      "sha256": "abe5a7ea92a8ca9f46d2982dee7ac6fa71841900d517a4a693129316b594fcba",
+      "sha256": "4463c637666368ac697a8f0fc540dd9bc51dcdee9aee90714737cda06f2b9bac",
       "executable": false
     },
     "pnpm-lock.yaml": {
@@ -1228,7 +1228,7 @@
       "executable": false
     },
     "rer-project.json": {
-      "sha256": "477a83654f401d457dcf17d8040c70cd85aa19ca0e86629e7be0fa886ad5c953",
+      "sha256": "d57b140e0134dd989ee3557015682c81d2476f296be18ca035328f1f4f9d1c5c",
       "executable": false
     },
     "rer-setup.json": {
