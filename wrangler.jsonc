@@ -19,5 +19,11 @@
       "database_id": "local-foundation-only",
       "migrations_dir": "migrations/core"
     }
-  ]
+  ],
+  "vars": {
+    "MAIL_PROVIDER": "",
+    "MAIL_FROM": "",
+    "MAIL_RELAY_URL": "",
+    "MAIL_ACCOUNT_ID": ""
+  }
 }

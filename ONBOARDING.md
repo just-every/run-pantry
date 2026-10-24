@@ -20,12 +20,20 @@ The foundation edition owns:
   the product presentation for setup surfaces;
 - `src/branding.json`, which stores the app's actual name and color.
 
-The current manifest collects `APP_NAME`, `PRIMARY_COLOR`, `OWNER_EMAIL`,
-`SESSION_SECRET` and `SETUP_TOKEN`. The owner email is required; the local CLI
-may prompt for it or accept the documented owner-email flag. Managed secrets
-are kept private. The branding hook writes application values before the real
-build; the owner-claim step uses the declared owner and setup-token fields.
-Keep setup defaults factual and do not infer owner identity or credentials.
+The manifest collects application branding, the first owner's email, managed
+installation secrets and optional identity-provider settings. The hosted email
+group offers RER managed mail, Resend, SendGrid and Cloudflare Email Sending.
+Managed hosting assigns the relay URL, sender and private mail credential.
+Assisted owners select their provider and supply its verified sender and API
+key; Cloudflare additionally needs its account ID. The relay URL is required
+only for RER. Local development defaults to suppressed email and needs no mail
+credentials. The relay supports single-recipient sign-in and notification
+messages; delivery requiring attachments needs a direct provider.
+
+Managed secrets stay private. The branding hook writes application values
+before the real build; the owner-claim step uses the declared owner and setup
+token fields. Keep setup defaults factual and do not infer owner identity or
+credentials.
 
 The adapter exports `install` and `commandAdapter`. The command adapter points
 to the same root manifest and declares the real internal targets: build,

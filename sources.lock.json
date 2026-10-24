@@ -127,7 +127,7 @@
       "executable": false
     },
     "deploy.json": {
-      "sha256": "eb89f8e836f564c56cc6d098cd3bb42407a0ce0ea495a402c2d616fa2cc1bf7f",
+      "sha256": "880a7d1331f99e27330ccbe9ce1d328369ea18698b0a7eaba9782a2e8da4ea29",
       "executable": false
     },
     "docs/agent-work.md": {
@@ -823,7 +823,7 @@
       "executable": false
     },
     "ONBOARDING.md": {
-      "sha256": "a2a3b34a9178acc5643a510b3e41f781f1d7c5a573161fd4cc97f95de61e4b3f",
+      "sha256": "380bfc8cc095114557d1bdf0bba871f1a4dc01e09c70cf9840dc695b2554729c",
       "executable": false
     },
     "OPERATIONS.json": {
@@ -835,11 +835,11 @@
       "executable": false
     },
     "package.json": {
-      "sha256": "7fea9567f1cb890f69f2d2a888632ed8dd5f30d624789f5e29e74118b724996b",
+      "sha256": "4faa39432552bff97a3e37b8ee4998a79dcf169a6e035a5bc04570f88da4fe38",
       "executable": false
     },
     "packaging.json": {
-      "sha256": "8112c4f58c89ddfe257f63e71fb322987bc9970b8b4579c6ce2e93240c963c08",
+      "sha256": "274204f8777ec87e0058e5ffaafff64c19a502b709232999f8386962359fe346",
       "executable": false
     },
     "pnpm-lock.yaml": {
@@ -1103,7 +1103,7 @@
       "executable": false
     },
     "RELEASE.json": {
-      "sha256": "b55252d9d7cae77649757f42442e3bfff3e168043ddaec05d137f7dec245f904",
+      "sha256": "9828e10ba97b2f5c0639034c27f65c03e31c0ac5eb562edfd7d046423d8be1d4",
       "executable": false
     },
     "rer-project.json": {
@@ -1111,7 +1111,7 @@
       "executable": false
     },
     "rer-setup.json": {
-      "sha256": "4a17bd081c597ad73d4ec715aec84cec266b6ffa28fc065ec21760548b2e49cb",
+      "sha256": "de50dddcda776fc2822fa70475bdc98bc2330e504c709476a36bd6be207dfdc5",
       "executable": false
     },
     "RUN-LOCALLY.md": {
@@ -1311,11 +1311,11 @@
       "executable": false
     },
     "seed.json": {
-      "sha256": "d106314da911a7c0d142047ae34b7f2c67845aca1ce622e7f961c9e4d1f7c7ae",
+      "sha256": "3fbd519026163e90c5706f2c2c27e5387d7c175f8c5c12b93b418dbae0b3ac53",
       "executable": false
     },
     "src/auth.server.ts": {
-      "sha256": "6715b039662c2f27d094aec8345b2a5bd0f1b5950d26858cfdef0d4afce96577",
+      "sha256": "88240ea62c32bcae26d9c98896f60ced7b82a200868fcedc7be438aaaa8bc218",
       "executable": false
     },
     "src/base/contract-filter.ts": {
@@ -1475,7 +1475,7 @@
       "executable": false
     },
     "src/mail.server.mjs": {
-      "sha256": "51a1d78c43f19978fbc3a5959b596ef1a44afe19f3844f8cdcb8bf5573483f5d",
+      "sha256": "fa6d412800998c0b140d4a7246f58d9d3a43d8f52d275f5cae0aa041fd578c7d",
       "executable": false
     },
     "src/modules/ai/client.mjs": {
@@ -5427,7 +5427,7 @@
       "executable": false
     },
     "tests/app/app.test.mjs": {
-      "sha256": "99106319625049fd52c0bcf1b7c59c240fbd051a7840de0044d493812e7efdf0",
+      "sha256": "65dc50f24c188ba510a271e61a0aafcd524e3621b49dd5ce0fbebc3896464975",
       "executable": false
     },
     "tests/app/archive-journey.mjs": {
@@ -5711,7 +5711,7 @@
       "executable": false
     },
     "wrangler.jsonc": {
-      "sha256": "cbd8ca5af1dc528754f3eaf860089256a7c03d3a0b1d7f33960dfd874424bec6",
+      "sha256": "d29870f116ede60a672fcc074355d046c23f41d88e2c6b63a131d6bd2de7edec",
       "executable": false
     }
   }

@@ -1,3 +1,4 @@
+import { managedMailJourney } from './managed-mail-journey.mjs'
 import { currencyJourney } from './currency-journey.mjs'
 import { archiveJourney } from './archive-journey.mjs'
 import { collectionsJourney } from './collections-journey.mjs'
@@ -516,3 +517,5 @@ test('DIM-001 dimension splits, document recoding and generated coding through t
 
 import {reportDeliveryBrowser} from './report-delivery.mjs'
 test('REPORT-007 dedicated exports and owner-consented lender delivery on month lock at 1440 and 390',reportDeliveryBrowser)
+
+test('Managed relay delivers owner sign-in links and unconfigured mail refuses by name', managedMailJourney)
