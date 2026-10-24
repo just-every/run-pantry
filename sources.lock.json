@@ -375,6 +375,10 @@
       "sha256": "2f5076ef027045b9e0e72df8aa61ca8551e54b1877d531656d6e7985b2c32324",
       "executable": false
     },
+    "management/integration/deployment-spec.json": {
+      "sha256": "7b140359e91aa15e3e7e2ec1fbfe4de24f3c2a07e3f6366bd3aa6219ba327976",
+      "executable": false
+    },
     "migrations/core/0001_owner.sql": {
       "sha256": "389e6fc3201a73ab5e7280bbe4fdb793b652b84f157e444bab48cc3c25eb8c41",
       "executable": false
@@ -804,15 +808,15 @@
       "executable": false
     },
     "OPERATIONS.md": {
-      "sha256": "5e2cfec6f4feeb13a0ac407ee8263cc9055ea05c095f58a061ace2e37fe15955",
+      "sha256": "bd2e9fb5cce35aa1d4f085f7375e90f1408f3ab872941c54f18869802385323f",
       "executable": false
     },
     "package.json": {
-      "sha256": "dd5e82ca8abde6a11a3e6e6c4fe1f7504a256b8a1efcb902faedf2f745dc0a87",
+      "sha256": "6b618c20d714501542d03af0c8eac583909f65aca6f8973146545878f06a7695",
       "executable": false
     },
     "packaging.json": {
-      "sha256": "6339d191b7d8cc119368b7edb55ab62a3da73d3edd8923aaebad3210c05dc907",
+      "sha256": "8112c4f58c89ddfe257f63e71fb322987bc9970b8b4579c6ce2e93240c963c08",
       "executable": false
     },
     "pnpm-lock.yaml": {
@@ -1072,7 +1076,7 @@
       "executable": false
     },
     "rer-project.json": {
-      "sha256": "0272bdeb85f1bf4ea97211b96d5ad6db584af557d5c981fe12b6cf2376ad7d6c",
+      "sha256": "10d5d9da9738e651440369d90cba8968437cd7281d0a40e37ae3cf0e16923631",
       "executable": false
     },
     "rer-setup.json": {
@@ -1081,6 +1085,10 @@
     },
     "RUN-LOCALLY.md": {
       "sha256": "5ef11abeaac07592bc04b72cc02e2f293eb2e3903c845360304658a54a1ca412",
+      "executable": false
+    },
+    "scripts/build-deployment-spec.mjs": {
+      "sha256": "a25e803ba202702c63c3bd6f7dd8a52ca324e932475e9f8e17166041348bee66",
       "executable": false
     },
     "scripts/delivery/base/artifact.mjs": {
@@ -1140,7 +1148,7 @@
       "executable": false
     },
     "scripts/delivery/base/packaging.json": {
-      "sha256": "6339d191b7d8cc119368b7edb55ab62a3da73d3edd8923aaebad3210c05dc907",
+      "sha256": "8112c4f58c89ddfe257f63e71fb322987bc9970b8b4579c6ce2e93240c963c08",
       "executable": false
     },
     "scripts/delivery/base/paths.mjs": {

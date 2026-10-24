@@ -107,3 +107,10 @@ To regenerate the descriptor and workflow after an intentional policy change,
 use the producer's `package` command with a fresh output directory and copy its
 generated files. Keep `rer-setup.json` canonical: its exact bytes are bound by
 the descriptor's setup digest. Do not change applied migrations to package them.
+
+The public repository import also requires the committed projection at
+`management/integration/deployment-spec.json`. After a build or policy change,
+run `pnpm delivery:spec` to regenerate it and `pnpm check:deployment-spec` to
+check it against the actual build. Commit the projection with its source
+changes. The import validates this specification and the digest-bound setup
+manifest before offering configuration; the artifact alone is insufficient.

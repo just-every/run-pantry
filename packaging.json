@@ -13,7 +13,7 @@
     "operations": {
       "setup": "pnpm install --frozen-lockfile && pnpm exec rer install",
       "build": "pnpm run build",
-      "verify": "pnpm exec rer check --profile first-party && pnpm run verify",
+      "verify": "pnpm exec rer check --profile first-party && pnpm run verify && pnpm run check:deployment-spec",
       "artifact": "node scripts/delivery/base/cli.mjs artifact --config packaging.json",
       "recovery": "Follow docs/backup.md and OPERATIONS.md. Stop writes and scheduled work; retain exact source, private settings, deployment receipts and applied migration bytes. For hosted books run node scripts/hosted-backup.mjs with the private environment file; rer export saves only local books. Restore into fresh empty resources, establish the owner, compare restored books and attachments, then verify owner workflows before switching traffic. Never reset populated books to apply an update."
     },
@@ -100,7 +100,17 @@
         "outbound-webhooks"
       ],
       "healthPath": "/health",
-      "recovery": "Follow docs/backup.md and OPERATIONS.md. Stop writes and scheduled work; retain exact source, private settings, deployment receipts and applied migration bytes. For hosted books run node scripts/hosted-backup.mjs with the private environment file; rer export saves only local books. Restore into fresh empty resources, establish the owner, compare restored books and attachments, then verify owner workflows before switching traffic. Never reset populated books to apply an update."
+      "recovery": "Follow docs/backup.md and OPERATIONS.md. Stop writes and scheduled work; retain exact source, private settings, deployment receipts and applied migration bytes. For hosted books run node scripts/hosted-backup.mjs with the private environment file; rer export saves only local books. Restore into fresh empty resources, establish the owner, compare restored books and attachments, then verify owner workflows before switching traffic. Never reset populated books to apply an update.",
+      "surfaces": {
+        "app": {
+          "path": "/",
+          "originVariable": "AUTH_ORIGIN",
+          "signIn": {
+            "path": "/signin",
+            "loginHint": false
+          }
+        }
+      }
     }
   }
 }
