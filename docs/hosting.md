@@ -35,7 +35,7 @@ MAIL_API_KEY=your mail provider's API key
 MAIL_FROM=billing@example.com
 ```
 
-- `OWNER_EMAIL` is your own mailbox: the hosted Pantry's owner, where your sign-in links go. Without it, `rer deploy` uses the address Pantry on this computer was first set up with, which is a placeholder ending in `.test` if you started with `rer dev just-every/run-pantry`, and no mail reaches that. **People & settings → Put Pantry online** on this computer shows these lines with your own email filled in; while you still sign in with the placeholder, it asks for your email first.
+- `OWNER_EMAIL` is your own mailbox: the hosted Pantry's owner, where your sign-in links go. Without it, `rer deploy` uses the address Pantry on this computer was first set up with, which is a placeholder ending in `.test` if you started with the one-line install, and no mail reaches that. **People & settings → Put Pantry online** on this computer shows these lines with your own email filled in; while you still sign in with the placeholder, it asks for your email first.
 - `MAIL_PROVIDER` is `resend` or `sendgrid`.
 - `MAIL_FROM` is the address alone, with no name: `rer deploy` refuses `Your Business <billing@…>`. Invoices and reminders show your business's legal name as the sender, and sign-in and invitation emails show Pantry.
 
