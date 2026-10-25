@@ -9,8 +9,8 @@ export async function taxItems(c: Context, year: number) {
   requireThat(Number.isInteger(year) && year >= 2000 && year <= 2100, 'Choose a tax year')
   const deadlines = await all(c.db, 'SELECT * FROM pt_tax_deadlines WHERE due_date BETWEEN ? AND ? AND completed_at IS NULL ORDER BY due_date,id', `${year}-01-01`, `${year+1}-12-31`)
   const to = await ownerEmail(c.db, c.env)
-  return deadlines.map(d => ({ deadlineId:d.id, revision:d.revision, name:'Owner', to, dueDate:d.due_date, amountCents:d.amount_cents,
-    subject:'Tax-readiness reminder', body:`Recorded deadline: ${d.due_date}.${d.amount_cents === null ? '' : ` Estimated amount: ${usd(d.amount_cents)} (estimate).`} Review the recorded deadline in Pantry. This is a readiness reminder, never tax advice, payment authorization or a filing.` }))
+  return deadlines.map(d => ({ deadlineId:d.id, revision:d.revision, name:'Owner', label:d.label, to, dueDate:d.due_date, amountCents:d.amount_cents,
+    subject:'Tax-readiness reminder', body:`Recorded deadline: ${d.label} — ${d.due_date}.${d.amount_cents === null ? '' : ` Estimated amount: ${usd(d.amount_cents)} (estimate).`} Review the recorded deadline in Pantry. This is a readiness reminder, never tax advice, payment authorization or a filing.` }))
 }
 export async function vendorItems(c: Context, ids: unknown, reminder: boolean) {
   requireThat(Array.isArray(ids) && ids.length > 0 && ids.length <= BATCH_CAP && new Set(ids).size === ids.length, 'Select one to ten distinct vendors')
@@ -37,7 +37,7 @@ export function itemGuards(items: Data[]): Sql[] {
 const escaped = (s: string) => s.replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/;/g,'\\;').replace(/,/g,'\\,')
 export function calendar(items: Data[], stamp: string) {
   const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Pantry//Tax readiness//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH']
-  for (const i of items) lines.push('BEGIN:VEVENT',`UID:${i.deadlineId}@pantry.local`,`DTSTAMP:${stamp.replace(/[-:]/g,'').replace(/\.\d{3}/,'')}`,`DTSTART;VALUE=DATE:${i.dueDate.replace(/-/g,'')}`,`SUMMARY:${escaped('Tax-readiness reminder')}`,`DESCRIPTION:${escaped(i.body)}`,'BEGIN:VALARM','ACTION:DISPLAY','TRIGGER:-P1D','DESCRIPTION:Review recorded tax deadline','END:VALARM','END:VEVENT')
+  for (const i of items) lines.push('BEGIN:VEVENT',`UID:${i.deadlineId}@pantry.local`,`DTSTAMP:${stamp.replace(/[-:]/g,'').replace(/\.\d{3}/,'')}`,`DTSTART;VALUE=DATE:${i.dueDate.replace(/-/g,'')}`,`SUMMARY:${escaped(`Tax readiness: ${i.label}`)}`,`DESCRIPTION:${escaped(i.body)}`,'BEGIN:VALARM','ACTION:DISPLAY','TRIGGER:-P1D','DESCRIPTION:Review recorded tax deadline','END:VALARM','END:VEVENT')
   lines.push('END:VCALENDAR')
   // Fold by UTF-8 octets as required for a standard iCalendar file.
   return lines.flatMap(line => {

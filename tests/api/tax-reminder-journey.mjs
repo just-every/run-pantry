@@ -44,9 +44,9 @@ export async function taxReminderJourney(t) {
   await call('tax-reminders.prepare',{kind:'w9-request',contactIds:[v.id]},409)
   await call('tax-reminders.prepare',{kind:'w9-request',contactIds:Array.from({length:11},(_,i)=>'synthetic-pantry-'+i)},400)
   const d=await call('tax.deadline',{label:'Synthetic quarterly review',dueDate:'2026-12-15',amount:'250'},200,accountant)
-  await call('tax-reminders.prepare',{kind:'tax',year:2026},409)
+  await call('tax-reminders.prepare',{kind:'tax',year:2026,deadlineIds:[d.id]},409)
   await call('tax-reminders.preference',{enabled:true})
-  const taxes=await call('tax-reminders.prepare',{kind:'tax',year:2026})
+  const taxes=await call('tax-reminders.prepare',{kind:'tax',year:2026,deadlineIds:[d.id]})
   assert.equal(taxes.items.length,1)
   assert.match(taxes.items[0].body,/Estimated amount: \$250.00 \(estimate\)/)
   assert.match(taxes.items[0].body,/never tax advice, payment authorization or a filing/)
@@ -65,16 +65,16 @@ export async function taxReminderJourney(t) {
   assert.deepEqual(concurrent.map(r=>r.status).sort(),[200,409],'concurrent approval sends the batch once')
   assert.equal(h.mail.length,beforeConcurrentSend+1)
   assert.deepEqual([h.mail.at(-1).to].flat(),['owner@example.test'])
-  const changed=await call('tax-reminders.prepare',{kind:'tax',year:2026})
+  const changed=await call('tax-reminders.prepare',{kind:'tax',year:2026,deadlineIds:[d.id]})
   const old=(await h.view('tax-readiness?year=2026')).deadlines.find(x=>x.id===d.id)
   await call('tax.deadline',{id:d.id,revision:old.revision,label:'Changed estimate',dueDate:'2026-12-16',amount:'300'},200,accountant)
   await call('tax-reminders.send',{id:changed.id,consent:true},409)
   // Exercise the shared daily quota at a pinned instant, through the command door.
   for(let n=0;n<22;n++) {
-    const b=await call('tax-reminders.prepare',{kind:'tax',year:2026})
+    const b=await call('tax-reminders.prepare',{kind:'tax',year:2026,deadlineIds:[d.id]})
     await call('tax-reminders.send',{id:b.id,consent:true})
   }
-  const capped=await call('tax-reminders.prepare',{kind:'tax',year:2026})
+  const capped=await call('tax-reminders.prepare',{kind:'tax',year:2026,deadlineIds:[d.id]})
   await call('tax-reminders.send',{id:capped.id,consent:true},409)
   await call('tax-reminders.send',{id:capped.id,consent:true},200,h.owner,'2026-10-21T12:00:00Z')
   const mailBeforeCron=h.mail.length

@@ -12,15 +12,20 @@ async function batch(c:Context,id:string): Promise<Data> {
   requireThat(row,'Batch not found',404)
   return {...row,items:JSON.parse(row.items),outcomes:JSON.parse(row.outcomes)}
 }
-export async function taxRemindersView(c:Context) {
+export async function taxRemindersView(c:Context,year:number) {
   owner(c)
-  return {vendors:await all(c.db,'SELECT c.id,c.name,c.email,EXISTS(SELECT 1 FROM pt_tax_vendor_stops s WHERE s.contact_id=c.id) AS optedOut FROM pt_contacts c WHERE c.kind=\'vendor\' AND c.active=1 AND c.erased_at IS NULL ORDER BY c.name'),
+  return {deadlines:await taxItems(c,year),vendors:await all(c.db,'SELECT c.id,c.name,c.email,EXISTS(SELECT 1 FROM pt_tax_vendor_stops s WHERE s.contact_id=c.id) AS optedOut FROM pt_contacts c WHERE c.kind=\'vendor\' AND c.active=1 AND c.erased_at IS NULL ORDER BY c.name'),
     batches:await Promise.all((await all(c.db,'SELECT id FROM pt_tax_reminder_batches ORDER BY created_at DESC,rowid DESC LIMIT 30')).map(r=>batch(c,r.id))),
     enabled:!!(await one(c.db,'SELECT enabled FROM pt_tax_reminder_preferences WHERE id=1 AND owner_id=? AND owner_email=?',c.actor.id,c.actor.email))?.enabled,mail:(await sendingView(c.env,c.db)).mail,batchCap:BATCH_CAP,dailyCap:DAILY_CAP}
 }
 const preference:Command={need:'owner',async run(c,b){owner(c);requireThat(typeof b.enabled==='boolean','Choose reminder consent');await run(c.db,[authority(c.actor,'owner'),q('UPDATE pt_tax_reminder_preferences SET enabled=?,owner_id=?,owner_email=? WHERE id=1',b.enabled?1:0,c.actor.id,c.actor.email),audit(who(c.actor),'tax-reminders.consent','tax-reminders','1',{enabled:b.enabled})]);return {enabled:b.enabled}}}
 const stop:Command={need:'owner',async run(c,b){owner(c);const id=text(b.contactId,'Vendor');await run(c.db,[authority(c.actor,'owner'),q('INSERT OR IGNORE INTO pt_tax_vendor_stops(contact_id,at) VALUES(?,?)',id,now()),audit(who(c.actor),'tax-reminders.vendor-opt-out','vendor',id)]);return {optedOut:true}}}
-const prepare:Command={need:'owner',async run(c,b){owner(c);requireThat(['w9-request','w9-reminder','tax'].includes(b.kind),'Choose a reminder type');const items=b.kind==='tax'?await taxItems(c,Number(b.year)):await vendorItems(c,b.contactIds,b.kind==='w9-reminder');requireThat(items.length>0 && items.length<=BATCH_CAP,'Select at most ten active recorded deadlines or vendors');const id=uid();await run(c.db,[authority(c.actor,'owner'),...(b.kind==='tax'?[enabled(c)]:[]),...itemGuards(items),q('INSERT INTO pt_tax_reminder_batches(id,kind,items,created_at) VALUES(?,?,?,?)',id,b.kind,JSON.stringify(items),now()),audit(who(c.actor),'tax-reminders.prepare','tax-reminder-batch',id,{kind:b.kind,items})]);return batch(c,id)}}
+const prepare:Command={need:'owner',async run(c,b){owner(c);requireThat(['w9-request','w9-reminder','tax'].includes(b.kind),'Choose a reminder type');let items:Data[]
+  if(b.kind==='tax') {
+    requireThat(Array.isArray(b.deadlineIds) && b.deadlineIds.length>0 && b.deadlineIds.length<=BATCH_CAP && new Set(b.deadlineIds).size===b.deadlineIds.length,'Select one to ten distinct recorded deadlines')
+    items=(await taxItems(c,Number(b.year))).filter(i=>b.deadlineIds.includes(i.deadlineId))
+    requireThat(items.length===b.deadlineIds.length,'A selected deadline changed or completed; reload',409)
+  } else items=await vendorItems(c,b.contactIds,b.kind==='w9-reminder');requireThat(items.length>0 && items.length<=BATCH_CAP,'Select at most ten active recorded deadlines or vendors');const id=uid();await run(c.db,[authority(c.actor,'owner'),...(b.kind==='tax'?[enabled(c)]:[]),...itemGuards(items),q('INSERT INTO pt_tax_reminder_batches(id,kind,items,created_at) VALUES(?,?,?,?)',id,b.kind,JSON.stringify(items),now()),audit(who(c.actor),'tax-reminders.prepare','tax-reminder-batch',id,{kind:b.kind,items})]);return batch(c,id)}}
 const send:Command={need:'owner',async run(c,b){owner(c);requireThat(b.consent===true,'Approve this exact recipient list and wording');const row=await batch(c,text(b.id,'Batch'));requireThat(row.status==='draft','This batch was already claimed; prepare a new batch for any further send',409);const items:Data[]=row.items,day=now().slice(0,10);
   await run(c.db,[authority(c.actor,'owner'),...(row.kind==='tax'?[enabled(c)]:[]),...itemGuards(items),
     guard('(SELECT COALESCE(SUM(json_array_length(items)),0) FROM pt_tax_reminder_batches WHERE claimed_day=?) + ? <= ?',day,items.length,DAILY_CAP),

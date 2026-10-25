@@ -3279,7 +3279,7 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "b4557611412f5a825d9ff621b15f56bc88a60eda72d736fe419f3e8e768c3a43",
+      "sha256": "7b0cc72d976440502fa2c869d5584b9cd11ce294fe257052957427e8eeb2dcd2",
       "executable": false
     },
     "src/pantry/ask/index.ts": {
@@ -4463,11 +4463,11 @@
       "executable": false
     },
     "src/pantry/tax-reminder-content.ts": {
-      "sha256": "2018cb8dfc7cf6d2c638853aed4b931f6497081d3fec950b173c32d6458d795f",
+      "sha256": "ca8f39db7a1df5059b7d23fa0bdff1d4f0c91064a2d99585f6572da0d799cbb7",
       "executable": false
     },
     "src/pantry/tax-reminders.ts": {
-      "sha256": "ac3aacfda552a338721192be0248e603c180d15c070ebdebcf993b5a7e80ef4a",
+      "sha256": "aa5132347aebb37f04f7ae83513528654a8696f64e63f18f37136a0a74592766",
       "executable": false
     },
     "src/pantry/time/commands.ts": {
@@ -5283,7 +5283,7 @@
       "executable": false
     },
     "src/ui/tax-reminders.tsx": {
-      "sha256": "e07196fdd9f6d6375c6aa934e35034316ceeecc4388f165eb962ea24d4d45ca4",
+      "sha256": "e7aab5bab14c8d9cfa849a39dbc13165375bb11fafe7220938fc461dbd24c000",
       "executable": false
     },
     "src/ui/time.tsx": {
@@ -5535,7 +5535,7 @@
       "executable": false
     },
     "tests/api/tax-reminder-journey.mjs": {
-      "sha256": "49aa9f7bf1dcfd68c27919f681df1f2c79abdaa4cc63e0f2885cc484fc4aa34d",
+      "sha256": "8964d0ce756ff1abd9fecaea05a29af77207423b80e0ba5f29a625c57362d8d6",
       "executable": false
     },
     "tests/api/w9-journey.mjs": {
@@ -5747,7 +5747,7 @@
       "executable": false
     },
     "tests/app/w9-request-journey.mjs": {
-      "sha256": "877cc1d1ce785ff84478b5d7559681ee2fa06089bf1856a04e7de5ab90d9a77f",
+      "sha256": "52f0cf7b810c8044c03c3afb6f51d7900a475e23d5abea2f77936a155bef5b85",
       "executable": false
     },
     "tests/app/webhook-journey.mjs": {

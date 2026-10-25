@@ -4,9 +4,10 @@ import { Action, Chip, Field, Loading, Table, command, day, usd, useView } from 
 type Kind = 'w9-request' | 'w9-reminder' | 'tax'
 type Vendor = { id: string; name: string; email: string | null; optedOut: boolean }
 type Item = { contactId?: string; name: string; to: string; subject: string; body: string; dueDate?: string; deadlineId?: string; amountCents?: number | null }
+type Deadline = Pick<Item, 'name' | 'dueDate' | 'amountCents'> & { deadlineId: string; label: string }
 type Outcome = { to: string; status: string; detail?: string }
 type Batch = { id: string; kind: Kind; status: string; items: Item[]; outcomes: Outcome[]; created_at: string }
-type Reminders = { vendors: Vendor[]; batches: Batch[]; enabled: boolean; mail: 'local' | 'ready' | 'none'; batchCap: number; dailyCap: number }
+type Reminders = { vendors: Vendor[]; deadlines: Deadline[]; batches: Batch[]; enabled: boolean; mail: 'local' | 'ready' | 'none'; batchCap: number; dailyCap: number }
 const kindLabels: Record<Kind, string> = { 'w9-request': 'W-9 request', 'w9-reminder': 'W-9 reminder', tax: 'Owner tax reminder' }
 
 function BatchWording({ batch }: { batch: Batch }) {
@@ -49,6 +50,7 @@ function BatchHistory({ batches }: { batches: Batch[] }) {
 export function TaxReminders({ year }: { year: number }) {
   const { data, error, reload } = useView<Reminders>(`tax-reminders?year=${year}`)
   const [kind, setKind] = useState<Kind>('w9-request'), [selected, setSelected] = useState<string[]>([])
+  const [selectedDeadlineIds, setSelectedDeadlineIds] = useState<string[]>([])
   const [batch, setBatch] = useState<Batch | null>(null), [busy, setBusy] = useState(false)
   const [preference, setPreference] = useState<boolean | null>(null), [preferenceError, setPreferenceError] = useState('')
   const change = async (work: () => Promise<void>) => { setBusy(true); try { await work() } finally { setBusy(false) } }
@@ -66,7 +68,20 @@ export function TaxReminders({ year }: { year: number }) {
       }} /> Enable owner tax reminders and calendar</label>
       {preferenceError && <p className="error" role="alert">{preferenceError}</p>}
       <Field label="Message type" name="reminderKind" value={kind} disabled={busy} options={Object.entries(kindLabels).map(([value, label]) => ({ value, label }))} onChange={(event: ChangeEvent<HTMLSelectElement>) => { setKind(event.target.value as Kind); setBatch(null) }} />
-      {kind === 'tax' ? <p>Only active recorded deadlines go to your owner email. Amounts are labelled estimates. These reminders do not pay or file taxes.</p> : <>
+      {kind === 'tax' ? <>
+        <p>Choose active recorded deadlines to email to you as owner. Amounts are labelled estimates. These reminders do not pay or file taxes.</p>
+        <Table heads={['Recorded deadline', 'Due', 'Estimated amount', 'Include']} empty="No active recorded deadlines.">
+          {data.deadlines.map(deadline => <tr key={deadline.deadlineId}>
+            <td>{deadline.label}</td>
+            <td>{day(deadline.dueDate)}</td>
+            <td>{deadline.amountCents == null ? 'Not set' : `${usd(deadline.amountCents)} · estimate`}</td>
+            <td><label className="check"><input type="checkbox" checked={selectedDeadlineIds.includes(deadline.deadlineId)} disabled={busy || (!selectedDeadlineIds.includes(deadline.deadlineId) && selectedDeadlineIds.length >= data.batchCap)} onChange={event => {
+              setSelectedDeadlineIds(current => event.target.checked ? [...current, deadline.deadlineId] : current.filter(id => id !== deadline.deadlineId)); setBatch(null)
+            }} /> Include {deadline.label}</label></td>
+          </tr>)}
+        </Table>
+        <p>{selectedDeadlineIds.length} of {data.batchCap} deadlines selected for this batch.</p>
+      </> : <>
         <Table heads={['Vendor', 'Include', 'Email permission']} empty="No vendors available for a W-9 email.">
           {data.vendors.map(vendor => <tr key={vendor.id}>
             <td>{vendor.name}<span className="sub block" style={{ overflowWrap: 'anywhere' }}>{vendor.email || 'No email recorded'}</span></td>
@@ -80,9 +95,9 @@ export function TaxReminders({ year }: { year: number }) {
         </Table>
         <p>{selected.length} selected. Vendor opt-outs stay in effect for future batches.</p>
       </>}
-      <Action disabled={busy || (kind !== 'tax' && !selected.length) || (kind === 'tax' && !data.enabled)} run={() => change(async () => {
+      <Action disabled={busy || (kind !== 'tax' && !selected.length) || (kind === 'tax' && (!data.enabled || !selectedDeadlineIds.length))} run={() => change(async () => {
         setBatch(null)
-        const prepared = await command('tax-reminders.prepare', { kind, year, contactIds: kind === 'tax' ? [] : selected })
+        const prepared = await command('tax-reminders.prepare', { kind, year, contactIds: kind === 'tax' ? [] : selected, deadlineIds: kind === 'tax' ? selectedDeadlineIds : [] })
         setBatch(prepared as Batch); await reload()
       })}>Prepare exact batch for review</Action>
       {batch && <BatchReview key={batch.id} batch={batch} busy={busy} disabled={data.mail === 'none' || (batch.kind === 'tax' && !data.enabled)} send={() => change(async () => {

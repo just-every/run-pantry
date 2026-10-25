@@ -168,7 +168,7 @@ async function reader(c: C): Promise<Context> {
 }
 
 const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => { const ctx = await reader(c); return c.json(await projectAccess(ctx, await build(ctx, c))) })
-view('tax-reminders',async(ctx)=>taxRemindersView(ctx))
+view('tax-reminders',async(ctx,c)=>taxRemindersView(ctx,year(c)))
 view('tax-readiness',async(ctx,c)=>taxReadiness(ctx,year(c)))
 view('tax-readiness/:year/package',async(ctx,c)=>taxYearPackage(ctx,Number(c.req.param('year'))))
 view('vendor-w9/:id',async(ctx,c)=>w9Status(ctx.db,c.req.param('id')!))
