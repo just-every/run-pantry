@@ -301,3 +301,6 @@ test('AGENT-007 no-data and unsupported questions produce no invented figures an
 
 import {readinessJourney} from './w9-journey.mjs'
 test('AGENT-009 tax readiness proposes W-9 requests, shows nexus and deadlines and packages open questions',readinessJourney)
+
+import { taxReminderJourney } from './tax-reminder-journey.mjs'
+test('Owner reviewed tax batches respect consent, opt-outs, caps and recorded calendar estimates',taxReminderJourney)

@@ -1,0 +1,91 @@
+import assert from 'node:assert/strict'
+import { books, harness } from './harness.mjs'
+
+export async function taxReminderJourney(t) {
+  const h = await harness()
+  t.after(()=>h.close())
+  await books(h)
+  const clock='2026-10-20T12:00:00Z'
+  const call=async(op,body,status=200,cookie=h.owner,at=clock)=>{
+    const r=await h.send('/api/pantry/command/'+op,body,{cookie,headers:{'x-synthetic-pantry-clock':at}})
+    assert.equal(r.status,status,op+': '+JSON.stringify(r.value));return r.value
+  }
+  const v=await call('contact.save',{kind:'vendor',name:'Synthetic contractor',email:'synthetic-pantry-1@example.test'})
+  const accountant=await h.member('synthetic-pantry-2@example.test','accountant')
+  await call('tax-reminders.prepare',{kind:'w9-request',contactIds:[v.id]},403,accountant)
+  await h.view('tax-reminders',accountant,403)
+  const before=h.mail.length
+  const prepare=()=>call('tax-reminders.prepare',{kind:'w9-request',contactIds:[v.id]})
+  const first=await prepare()
+  assert.equal(h.mail.length,before,'preparation sends nothing')
+  await call('tax-reminders.send',{id:first.id},400)
+  assert.equal(h.mail.length,before,'consent is required')
+  const sent=await call('tax-reminders.send',{id:first.id,consent:true,items:[{to:'other@example.test'}]})
+  assert.equal(sent.outcomes[0].status,'accepted')
+  assert.deepEqual([h.mail.at(-1).to].flat(),[v.email],'send uses immutable reviewed recipients')
+  assert.ok(h.mail.at(-1).text.startsWith(first.items[0].body))
+  const privatePath=new URL(h.mail.at(-1).text.match(/http:\/\/[^\s]+\/w9\/[a-f0-9]+/)[0]).pathname
+  assert.equal((await h.send(privatePath)).status,200)
+  const stored=await h.db.prepare('SELECT items FROM pt_tax_reminder_batches WHERE id=?').bind(first.id).first()
+  assert.ok(!stored.items.includes(privatePath),'private link is not retained in batch or audit')
+  await call('tax-reminders.send',{id:first.id,consent:true},409)
+  const stale=await prepare()
+  await call('contact.save',{...v,kind:'vendor',name:'Changed contractor'})
+  await call('tax-reminders.send',{id:stale.id,consent:true},409)
+  const draft=await prepare()
+  assert.equal((await h.send(privatePath+'/opt-out',undefined,{method:'POST',headers:{origin:'https://example.test'}})).status,403)
+  // A changed contact invalidates the older link; the newly approved batch issues a new one.
+  await call('tax-reminders.send',{id:draft.id,consent:true})
+  const currentPath=new URL(h.mail.at(-1).text.match(/http:\/\/[^\s]+\/w9\/[a-f0-9]+/)[0]).pathname
+  const queued=await prepare()
+  assert.equal((await h.send(currentPath+'/opt-out',undefined,{method:'POST'})).status,200)
+  await call('tax-reminders.send',{id:queued.id,consent:true},409)
+  await call('tax-reminders.prepare',{kind:'w9-request',contactIds:[v.id]},409)
+  await call('tax-reminders.prepare',{kind:'w9-request',contactIds:Array.from({length:11},(_,i)=>'synthetic-pantry-'+i)},400)
+  const d=await call('tax.deadline',{label:'Synthetic quarterly review',dueDate:'2026-12-15',amount:'250'},200,accountant)
+  await call('tax-reminders.prepare',{kind:'tax',year:2026},409)
+  await call('tax-reminders.preference',{enabled:true})
+  const taxes=await call('tax-reminders.prepare',{kind:'tax',year:2026})
+  assert.equal(taxes.items.length,1)
+  assert.match(taxes.items[0].body,/Estimated amount: \$250.00 \(estimate\)/)
+  assert.match(taxes.items[0].body,/never tax advice, payment authorization or a filing/)
+  const counts=await h.db.prepare('SELECT (SELECT COUNT(*) FROM pt_payments) p,(SELECT COUNT(*) FROM pt_journal_entries) j').first()
+  const calendar=await call('tax-reminders.calendar',{year:2026,consent:true})
+  assert.match(calendar.calendar,/DTSTART;VALUE=DATE:20261215/)
+  assert.match(calendar.calendar,/BEGIN:VALARM/)
+  assert.match(calendar.calendar,/estimate/)
+  assert.ok(calendar.calendar.split('\r\n').every(line=>Buffer.byteLength(line)<=75))
+  await call('tax-reminders.preference',{enabled:false})
+  await call('tax-reminders.send',{id:taxes.id,consent:true},409)
+  await call('tax-reminders.calendar',{year:2026,consent:true},409)
+  await call('tax-reminders.preference',{enabled:true})
+  await call('tax-reminders.send',{id:taxes.id,consent:true})
+  assert.deepEqual([h.mail.at(-1).to].flat(),['owner@example.test'])
+  const changed=await call('tax-reminders.prepare',{kind:'tax',year:2026})
+  const old=(await h.view('tax-readiness?year=2026')).deadlines.find(x=>x.id===d.id)
+  await call('tax.deadline',{id:d.id,revision:old.revision,label:'Changed estimate',dueDate:'2026-12-16',amount:'300'},200,accountant)
+  await call('tax-reminders.send',{id:changed.id,consent:true},409)
+  // Exercise the shared daily quota at a pinned instant, through the command door.
+  for(let n=0;n<22;n++) {
+    const b=await call('tax-reminders.prepare',{kind:'tax',year:2026})
+    await call('tax-reminders.send',{id:b.id,consent:true})
+  }
+  const capped=await call('tax-reminders.prepare',{kind:'tax',year:2026})
+  await call('tax-reminders.send',{id:capped.id,consent:true},409)
+  await call('tax-reminders.send',{id:capped.id,consent:true},200,h.owner,'2026-10-21T12:00:00Z')
+  const mailBeforeCron=h.mail.length
+  await h.cron()
+  assert.equal(h.mail.length,mailBeforeCron)
+  assert.deepEqual(await h.db.prepare('SELECT (SELECT COUNT(*) FROM pt_payments) p,(SELECT COUNT(*) FROM pt_journal_entries) j').first(),counts)
+  const history=await h.view('activity')
+  assert.ok(history.events.some(e=>e.action==='tax-reminders.approve' && e.detail.consent))
+  assert.ok(history.events.some(e=>e.action==='tax-reminders.vendor-opt-out'))
+  const local=await harness({bindings:{MAIL_PROVIDER:'development'}})
+  t.after(()=>local.close())
+  await books(local)
+  const lv=await local.command('contact.save',{kind:'vendor',name:'Local contractor',email:'synthetic-pantry-3@example.test'})
+  const lb=await local.command('tax-reminders.prepare',{kind:'w9-reminder',contactIds:[lv.id]})
+  const ls=await local.command('tax-reminders.send',{id:lb.id,consent:true})
+  assert.equal(ls.outcomes[0].status,'suppressed')
+  assert.equal(local.mail.length,0)
+}

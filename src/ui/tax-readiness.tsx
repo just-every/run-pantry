@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Action, Card, Field, Form, Loading, Table, command, useShared, useView, usd, type D } from './kit'
+import { TaxReminders } from './tax-reminders'
 export function TaxReadiness() {
   const { state } = useShared(),
     [year, setYear] = useState(new Date().getFullYear()),
@@ -85,6 +86,7 @@ export function TaxReadiness() {
               </Form>
             </details>
           )}
+          {state.actor.role === 'owner' && <TaxReminders key={year} year={year} />}
           <p>
             <a
               className="btn btn-secondary"

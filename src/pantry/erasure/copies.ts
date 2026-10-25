@@ -15,6 +15,7 @@ const quote = (s: string) => `"${s.replaceAll('"', '""')}"`
 const FIELDS: Record<string, string[]> = {
   pt_assets:['name'],pt_asset_tax:['note'],pt_asset_settings:['safe_harbor'],
   pt_learned_recognition:['evidence','backtest'],pt_agent_permissions:['name','payee','owner_email'],pt_agent_actions:['permission_snapshot'],
+  pt_tax_reminder_batches:['items','outcomes'],
   pt_collection_sends:['snapshot'],
   pt_collection_cases:['subject','body','recipient','evidence','reply_note'],
   pt_deliveries: ['recipient', 'subject', 'detail'],
@@ -56,7 +57,7 @@ const FIELDS: Record<string, string[]> = {
   pt_check_flags: ['title', 'detail', 'setting', 'lines', 'dismissed_reason'],
   pt_contractor_tax: ['address', 'city', 'state', 'zip'],
 }
-const JSON_FIELDS = new Set(['backtest','permission_snapshot','facts', 'choices', 'pending', 'read_vendor_details', 'read_draft_fields', 'read_match_fields', 'payload', 'refs', 'evidence', 'document_template', 'document_values', 'self_approval', 'lines', 'splits', 'feed_snapshot', 'details', 'candidates', 'snapshot', 'left_out', 'definition', 'settings', 'recipients', 'setting'])
+const JSON_FIELDS = new Set(['items','outcomes','backtest','permission_snapshot','facts', 'choices', 'pending', 'read_vendor_details', 'read_draft_fields', 'read_match_fields', 'payload', 'refs', 'evidence', 'document_template', 'document_values', 'self_approval', 'lines', 'splits', 'feed_snapshot', 'details', 'candidates', 'snapshot', 'left_out', 'definition', 'settings', 'recipients', 'setting'])
 // Their scoped trigger exceptions and metadata are owned by the caller. Never
 // attempt a generic update through an immutable accounting/history door.
 const CALLER_OWNED = new Set(['pt_contacts', 'pt_members', 'pt_audit', 'pt_approvals', 'pt_journal_entries', 'pt_journal_lines', 'pt_invoice_documents', 'pt_documents', 'pt_document_parts', 'pt_voided_reconciliations', 'pt_reconciliation_undos', 'pt_line_suggestion_decisions', 'pt_time_entries', 'pt_time_projects','pt_estimates','pt_estimate_documents','pt_estimate_sibling_previews','pt_estimate_sibling_links','pt_estimate_sibling_attempts'])
@@ -89,6 +90,7 @@ export async function eraseCopies(db: D1Database, input: Input) {
     if (!fields.length) return
     if (row.id) affectedRecordIds.add(row.id)
     const before = [...new Set([...keys, ...fields])]
+    if(table==='pt_tax_reminder_batches') statements.push(q("INSERT INTO pt_erasure_scope(erasure_id,table_name,row_id,operation) VALUES(?,'pt_tax_reminder_batches',?,'redact')",input.erasureId,row.id))
     statements.push(q(`UPDATE ${quote(table)} SET ${fields.map(k => `${quote(k)}=?`).join(',')} WHERE ${before.map(k => `${quote(k)} IS ?`).join(' AND ')}`, ...fields.map(k => set[k]), ...before.map(k => row[k])), changed())
     note(table, 'rowsReplaced', 1); note(table, 'fieldsReplaced', fields.length)
   }

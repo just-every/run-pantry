@@ -208,3 +208,11 @@ export async function sendDueReminders(env: Bindings, db: D1Database, today: str
   }
   return sent
 }
+
+/** The installation mail route for an explicitly reviewed tax batch. */
+export async function sendReviewedTaxMail(env: Bindings, recipient: string, subject: string, body: string, deliveryId: string) {
+  const mailer = operatorMail(runtimeBindings(env)) as unknown as InvoiceMailer | undefined
+  requireThat(mailer, 'No mail route is configured', 409)
+  const result = await mailer.send({deliveryId, from: String(env.MAIL_FROM ?? ''), to:[recipient], subject, text:body})
+  return {status:result.status === 'development' ? 'suppressed' : result.status, provider:result.provider, providerMessageId:result.providerMessageId, detail:result.status === 'development' ? 'Development mail suppressed; no email sent.' : result.code ?? ''}
+}
