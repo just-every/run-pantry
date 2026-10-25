@@ -4463,7 +4463,7 @@
       "executable": false
     },
     "src/pantry/tax-reminder-content.ts": {
-      "sha256": "ca8f39db7a1df5059b7d23fa0bdff1d4f0c91064a2d99585f6572da0d799cbb7",
+      "sha256": "0d2f0648b1dbdb19d4839eeac90fc793038f5fbad53b939c4d4c27aac8be686d",
       "executable": false
     },
     "src/pantry/tax-reminders.ts": {

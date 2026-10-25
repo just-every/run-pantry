@@ -34,10 +34,10 @@ export function itemGuards(items: Data[]): Sql[] {
     guard('NOT EXISTS(SELECT 1 FROM pt_contractor_tax WHERE contact_id=? AND w9_completed_at IS NOT NULL AND erased_at IS NULL)',i.contactId),
   ] : [guard("EXISTS(SELECT 1 FROM oa_operators WHERE lower(email)=? AND role='owner' AND status='active')",i.to),guard('EXISTS(SELECT 1 FROM pt_tax_deadlines WHERE id=? AND revision=? AND completed_at IS NULL)',i.deadlineId,i.revision)])
 }
-const escaped = (s: string) => s.replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/;/g,'\\;').replace(/,/g,'\\,')
+const escaped = (s: string) => s.replace(/\\/g,'\\\\').replace(/\r\n|\r|\n/g,'\\n').replace(/;/g,'\\;').replace(/,/g,'\\,')
 export function calendar(items: Data[], stamp: string) {
   const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Pantry//Tax readiness//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH']
-  for (const i of items) lines.push('BEGIN:VEVENT',`UID:${i.deadlineId}@pantry.local`,`DTSTAMP:${stamp.replace(/[-:]/g,'').replace(/\.\d{3}/,'')}`,`DTSTART;VALUE=DATE:${i.dueDate.replace(/-/g,'')}`,`SUMMARY:${escaped(`Tax readiness: ${i.label}`)}`,`DESCRIPTION:${escaped(i.body)}`,'BEGIN:VALARM','ACTION:DISPLAY','TRIGGER:-P1D','DESCRIPTION:Review recorded tax deadline','END:VALARM','END:VEVENT')
+  for (const i of items) lines.push('BEGIN:VEVENT',`UID:${encodeURIComponent(String(i.deadlineId))}@pantry.local`,`DTSTAMP:${stamp.replace(/[-:]/g,'').replace(/\.\d{3}/,'')}`,`DTSTART;VALUE=DATE:${i.dueDate.replace(/-/g,'')}`,`SUMMARY:${escaped(`Tax readiness: ${i.label}`)}`,`DESCRIPTION:${escaped(i.body)}`,'BEGIN:VALARM','ACTION:DISPLAY','TRIGGER:-P1D','DESCRIPTION:Review recorded tax deadline','END:VALARM','END:VEVENT')
   lines.push('END:VCALENDAR')
   // Fold by UTF-8 octets as required for a standard iCalendar file.
   return lines.flatMap(line => {
