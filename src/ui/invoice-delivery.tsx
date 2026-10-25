@@ -23,7 +23,7 @@ export function SendPanel({ i, data, onChange }: { i: D; data: D; onChange: () =
   const deliveries = (data.deliveries as D[]).filter(d => d.invoice_id === i.id)
   const online = (data.onlinePayments as D[]).filter(p => p.invoice_id === i.id)
   const plan = data.reminders as D, next = plan.plans[i.id]
-  const reminder = i.open_cents === 0 ? 'None: the invoice is paid' : !i.sent_at ? 'After the invoice is sent' : i.reminders_paused ? 'Paused for this invoice' : !plan.on ? 'Reminders are off for the business' : next ? (next === plan.today ? 'Due now; it goes out with the next due-work run' : <>On {day(next)}</>) : 'None left in the schedule'
+  const reminder = i.open_cents === 0 ? 'None: the invoice is paid' : i.reminders_paused ? 'Paused for this invoice' : !i.sent_at ? 'After the invoice is sent' : !plan.on ? 'Reminders are off for the business' : next ? (next === plan.today ? 'Due now; it goes out with the next due-work run' : <>On {day(next)}</>) : 'None left in the schedule'
   return <div className="send-panel">
     <h3>Sending</h3>
     <dl className="facts">
@@ -41,7 +41,7 @@ export function SendPanel({ i, data, onChange }: { i: D; data: D; onChange: () =
     {i.open_cents > 0 && state.actor.can.record && <Form label={i.sent_at ? 'Send again' : 'Send invoice'} submit={b => command('invoice.send', { id: i.id, ...(b.to === defaultTo ? {} : { to: b.to }) })} onDone={onChange}>
       <Field label="Send to" name="to" type="email" multiple defaultValue={defaultTo} required hint="The PDF is attached and the email links to the customer page. Separate several addresses with commas." />
     </Form>}
-    {i.sent_at && i.open_cents > 0 && state.actor.can.record && <Action run={async () => { await command('invoice.reminders', { id: i.id, paused: !i.reminders_paused }); await onChange() }}>{i.reminders_paused ? 'Resume reminders' : 'Pause reminders'}</Action>}
+    {i.open_cents > 0 && state.actor.can.record && <Action run={async () => { await command('invoice.reminders', { id: i.id, paused: !i.reminders_paused }); await onChange() }}>{i.reminders_paused ? 'Resume reminders' : 'Pause reminders'}</Action>}
     {online.length > 0 && <><h3>Paid online</h3><ul className="send-log">
       {online.map(p => { const [label, tone] = PAYMENT[p.status]; return <li key={p.id}><span><strong>{usd(p.amount_cents)}</strong> {p.method === 'card' ? 'by card' : 'by ACH bank debit'}</span><Chip tone={tone}>{label}</Chip><small>Started {day(p.created_at)}{p.fee_cents === null ? '' : ` · Stripe fee ${usd(p.fee_cents)}`}</small></li> })}
     </ul></>}

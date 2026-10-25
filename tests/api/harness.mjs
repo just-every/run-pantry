@@ -18,7 +18,7 @@ const BOOTSTRAP = 'local-test-bootstrap-token-0123456789'
 export const fixture = (path) => readFile(new URL(`../../fixtures/${path}`, import.meta.url), 'utf8')
 
 /** `bindings` extend the Worker's; `outbound` answers any request not bound for the mail provider; `entry` swaps the Worker entry. */
-export async function harness({ bindings = {}, outbound, log, entry = 'tests/api/worker.ts', beforeMigration } = {}) {
+export async function harness({ bindings = {}, outbound, log, entry = 'tests/api/worker.ts', beforeMigration, clock, sessionClock } = {}) {
   let mf,origin
   const dir = await mkdtemp(join(tmpdir(), 'pantry-test-'))
   const mail = []
@@ -44,12 +44,13 @@ export async function harness({ bindings = {}, outbound, log, entry = 'tests/api
 
     /** A request through the public door; `raw` sends a body as given (a form post) instead of JSON. */
     async function send(path, body, { cookie = '', method, headers = {}, raw } = {}) {
-      const r = await mf.dispatchFetch(origin + path, { method: method ?? (body === undefined && raw === undefined ? 'GET' : 'POST'), headers: { host: new URL(origin).host, origin, 'content-type': 'application/json', cookie, ...headers }, ...(raw !== undefined ? { body: raw } : body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'manual' })
+      const r = await mf.dispatchFetch(origin + path, { method: method ?? (body === undefined && raw === undefined ? 'GET' : 'POST'), headers: { ...(clock && !path.startsWith('/auth/') ? {'x-synthetic-pantry-clock':clock} : {}), host: new URL(origin).host, origin, 'content-type': 'application/json', cookie, ...headers }, ...(raw !== undefined ? { body: raw } : body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'manual' })
       const text = await r.text()
       let value; try { value = JSON.parse(text) } catch { value = text }
       return { status: r.status, value, cookie: r.headers.get('set-cookie')?.split(';')[0], headers: r.headers }
     }
-    const boot = await send('/auth/bootstrap', { token: BOOTSTRAP, displayName: 'Olivia Owner' })
+    const bootstrapClock = sessionClock ? new Date(Math.max(Date.now(), Date.parse(sessionClock))).toISOString() : undefined
+    const boot = await send('/auth/bootstrap', { token: BOOTSTRAP, displayName: 'Olivia Owner' }, {headers: bootstrapClock ? {'x-synthetic-pantry-clock':bootstrapClock} : {}})
     assert.equal(boot.status, 303, JSON.stringify(boot.value))
     const owner = boot.cookie
 
@@ -94,7 +95,7 @@ export async function harness({ bindings = {}, outbound, log, entry = 'tests/api
       return { status: r.status, text: await r.text() }
     }
     /** Fire the Worker's Cron trigger. */
-    const cron = async (scheduledTime=Date.now()) => (await mf.getWorker()).scheduled({ cron: '*/30 * * * *',scheduledTime })
+    const cron = async (scheduledTime=clock ? Date.parse(clock) : Date.now()) => (await mf.getWorker()).scheduled({ cron: '*/30 * * * *',scheduledTime })
     const close = async () => { await mf.dispose(); await rm(dir, { recursive: true, force: true }) }
     return { db, origin, owner, mail, send, command, view, member, agent, confirmMail, email, cron, close }
   } catch (error) {

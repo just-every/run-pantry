@@ -1,3 +1,4 @@
+import { remindersJourney } from './reminders-journey.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
@@ -19,7 +20,7 @@ test('INVOICE-009 customer records edit contacts and defaults, show every curren
   const view = async path => { const r = await owner.request.get(`${app.origin}/api/pantry/${path}`); assert.equal(r.status(), 200, await r.text()); return r.json() }
   await command('entity.save', { legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2026-01-01', policies: '' })
   await command('chart.start', {})
-  await command('stripe.connect', { secretKey: 'sk_test_' + crypto.randomUUID().replaceAll('-', '') })
+  await command('stripe.connect', { secretKey: 'synthetic-pantry-1003' })
   const state = await view('state'), acct = Object.fromEntries(state.accounts.map(a => [a.code, a.id]))
   const bank = await command('bank-account.save', { name: 'Operating checking', institution: 'Chase', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-01-01', openingBalance: '0.00' })
   const storageState = await owner.storageState()
@@ -119,4 +120,6 @@ test('INVOICE-009 customer records edit contacts and defaults, show every curren
     assert.deepEqual(errors, [], `no page errors at ${width}`)
     await context.close()
   }
+  await browser.close()
+  await remindersJourney(t)
 })

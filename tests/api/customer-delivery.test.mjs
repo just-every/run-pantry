@@ -12,7 +12,7 @@ const PRIVATE = 'PRIVATE-CUSTOMER-COLLECTION-NOTE-6842'
 
 test('INVOICE-009 customer payment offerings are enforced at hosted checkout; invoice, recurring and reminder delivery use billing plus cc once per recipient without exposing internal notes', async t => {
   const sessions = new Map(), stripeBodies = []
-  const h = await harness({ outbound: async request => {
+  const h = await harness({ clock: '2026-10-20T12:00:00Z', outbound: async request => {
     const url = new URL(request.url)
     assert.equal(url.hostname, 'api.stripe.com')
     if (url.pathname === '/v1/account') return Response.json({ id: 'acct_customers', country: 'US', default_currency: 'usd', business_profile: { name: 'Juniper Lane Design' } })
@@ -29,7 +29,7 @@ test('INVOICE-009 customer payment offerings are enforced at hosted checkout; in
     }
     assert.fail(`Unexpected Stripe call: ${request.method} ${url.pathname}`)
   } }); t.after(() => h.close())
-  const { acct } = await books(h), day = today()
+  const { acct } = await books(h), day = '2026-10-20'
   const settings = async (days, on = true) => {
     const { sending } = await h.view('invoicing')
     await h.command('sending.save', { revision: sending.revision, remindersOn: on, reminderDays: days, timeZone: 'America/New_York' })
@@ -70,7 +70,7 @@ test('INVOICE-009 customer payment offerings are enforced at hosted checkout; in
   }
   assert.doesNotMatch(await page(), /Pay by|How to pay/, 'card-only customers get no offline instructions when Stripe is unavailable')
   await pay('card', 409)
-  await h.command('stripe.connect', { secretKey: 'sk_test_' + crypto.randomUUID().replaceAll('-', '') })
+  await h.command('stripe.connect', { secretKey: 'synthetic-pantry-1002' })
   let html = await page()
   assert.match(html, /Pay by card/); assert.doesNotMatch(html, /Pay by bank account|How to pay/)
   await pay('us_bank_account', 409); await pay('offline', 409)
@@ -130,18 +130,17 @@ test('INVOICE-009 customer payment offerings are enforced at hosted checkout; in
   sales = await h.view('sales')
   assert.deepEqual(sales.deliveries.filter(d => d.invoice_id === invoice.id && d.kind === 'reminder').map(d => [d.recipient, d.step]).sort(), [['billing@example.test', -1], ['controller@example.test', -1]])
 
-  // A newly reached step cannot cause a second reminder to the same recipient
-  // today. A newly added cc still gets its own latest reminder.
+  // The invoice-wide batch fences new steps and contacts for the whole day.
   await settings('-1,0')
   await h.cron()
   assert.equal(reminders(invoice.number).length, 2)
   await update({ contacts: [...contacts, { name: 'New billing copy', email: 'new-cc@example.test', roles: ['cc'] }] })
   await Promise.all([h.cron(), h.cron()]); await h.cron()
-  assert.deepEqual(recipients(reminders(invoice.number)), ['billing@example.test', 'controller@example.test', 'new-cc@example.test'])
+  assert.deepEqual(recipients(reminders(invoice.number)), ['billing@example.test', 'controller@example.test'])
   sales = await h.view('sales')
   const deliveries = sales.deliveries.filter(d => d.invoice_id === invoice.id && d.kind === 'reminder')
-  assert.equal(deliveries.length, 3)
-  assert.equal(at(deliveries, d => d.recipient === 'new-cc@example.test').step, 0)
+  assert.equal(deliveries.length, 2)
+  assert.equal(deliveries.some(d => d.recipient === 'new-cc@example.test'), false)
   assert.equal(reminders(fallbackInvoice.number).length, 1)
   assert.equal(h.mail.some(m => m.to.includes('primary@example.test') || m.to.includes('other-primary@example.test')), false)
 
