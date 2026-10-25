@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "baa7fa33ed710c3bfd6e62cf81b0d44b1334669425f5c8b51ec215150834b3cb",
+      "sha256": "c65ce66a05bd7183c2d14043ac87b54ef91c77f6a800191430072fe924bc1040",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "8e67357d6f23c69e265cee23a62f05fb2ada9ccc68076d2f7a8dc5fcf7fa32ae",
+      "sha256": "117deb5aedf413a6e3e34ebf78e9f69a248d269d6ae3bfbd1b068773f20647e2",
       "executable": false
     },
     "DEMO.md": {
@@ -4467,7 +4467,7 @@
       "executable": false
     },
     "src/pantry/tax-reminders.ts": {
-      "sha256": "fbefffe1284019da169aedbe93a615e43103b2986b7571f35e7266b34f8fddeb",
+      "sha256": "ab399c90926ea0a85cf468b1fb9a03989244681e6d8ec2badd164361cd9c922b",
       "executable": false
     },
     "src/pantry/time/commands.ts": {
@@ -5535,7 +5535,7 @@
       "executable": false
     },
     "tests/api/tax-reminder-journey.mjs": {
-      "sha256": "3da30cb91e24f54e62e059d8a205a05c0d892c3f1c5a019f55bb06dc53c8c98e",
+      "sha256": "087871d246337ff008bd2f6280372a56a6fa7ff3fcbf0b2b70604fa72f4cf480",
       "executable": false
     },
     "tests/api/w9-journey.mjs": {
@@ -5747,7 +5747,7 @@
       "executable": false
     },
     "tests/app/w9-request-journey.mjs": {
-      "sha256": "3df1d0ced507b9dbb095726792501ea90a35d22a43d1b1dc802209a120a4c534",
+      "sha256": "5cc1c77c048f75c210e6447309d82a4835b2ad39e73f274d50b943fd9bc6174f",
       "executable": false
     },
     "tests/app/webhook-journey.mjs": {
@@ -5807,7 +5807,7 @@
       "executable": false
     },
     "tests/restore/restore.test.mjs": {
-      "sha256": "2adabb9d371b558ac9b7914e71be8ae29a5cd6d6c5145a2cd154168ee7271e26",
+      "sha256": "0b9cdd0f8521991193c977a69b7c449ec15e16f30c7553f2443481c50d1e22bf",
       "executable": false
     },
     "tests/runtime.mjs": {

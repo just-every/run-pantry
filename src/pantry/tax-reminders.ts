@@ -7,7 +7,7 @@ import { w9Commands } from './w9'
 import { BATCH_CAP, DAILY_CAP, calendar, itemGuards, taxItems, vendorItems } from './tax-reminder-content'
 function owner(c: Context) { requireThat(c.actor.kind==='person' && c.actor.role==='owner','Only the owner manages tax reminder batches',403) }
 const enabled = (c:Context) => guard('EXISTS(SELECT 1 FROM pt_tax_reminder_preferences WHERE id=1 AND enabled=1)')
-async function batch(c:Context,id:string) {
+async function batch(c:Context,id:string): Promise<Data> {
   const row = await one(c.db,'SELECT * FROM pt_tax_reminder_batches WHERE id=?',id)
   requireThat(row,'Batch not found',404)
   return {...row,items:JSON.parse(row.items),outcomes:JSON.parse(row.outcomes)}

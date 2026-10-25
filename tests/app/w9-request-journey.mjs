@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { worker, TOKEN } from './worker.mjs'
@@ -151,6 +151,38 @@ export async function w9Browser(t) {
     await form.getByRole('heading', { name: 'W-9 received' }).waitFor()
     await form.screenshot({ path: join(evidence, `received-${width}.png`), fullPage: true })
     assert.equal((await signedOut.request.get(url)).status(), 404)
+    const reminderVendor = await command('contact.save', {
+      kind: 'vendor', name: `Reminder contractor ${width}`, email: `synthetic-pantry-${width}@example.test`,
+    })
+    await page.goto(app.origin + '/app/agents')
+    await page.getByText('Reminder email and calendar', { exact: true }).click()
+    await page.getByLabel(`Include ${reminderVendor.name}`, { exact: true }).check()
+    await page.getByRole('button', { name: 'Prepare exact batch for review', exact: true }).click()
+    await page.getByRole('region', { name: 'Review exact reminder batch' }).waitFor()
+    await page.screenshot({ path: join(evidence, `batch-review-${width}.png`), fullPage: true })
+    await page.getByLabel('I approve sending this exact batch once to the recipients shown.', { exact: true }).check()
+    await page.getByRole('button', { name: 'Approve and send 1 message', exact: true }).click()
+    await page.getByText(`Batch history (${width === 1440 ? 1 : 2})`, { exact: true }).click()
+    await page.getByText('Development mail suppressed; no email sent.', { exact: true }).first().waitFor()
+    await page.getByLabel('Enable owner tax reminders and calendar', { exact: true }).check()
+    await page.getByText('Calendar download', { exact: true }).click()
+    const downloaded = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Approve calendar download (.ics)', exact: true }).click()
+    const file = await downloaded
+    assert.ok(file.suggestedFilename().endsWith('.ics'))
+    const calendar = await readFile(await file.path(), 'utf8')
+    assert.match(calendar, /BEGIN:VCALENDAR/)
+    assert.match(calendar, /estimate/)
+    await page.getByRole('button', { name: `Stop email to ${reminderVendor.name}`, exact: true }).click()
+    await page.getByText('Stopped · opt-out retained', { exact: true }).first().waitFor()
+    await icons(page)
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    await page.screenshot({ path: join(evidence, `batch-outcomes-${width}.png`), fullPage: true })
+    const privateOptOut = await command('w9.request', { contactId: reminderVendor.id, contactRevision: reminderVendor.revision, consent: true })
+    await form.goto(privateOptOut.url)
+    await form.getByRole('button', { name: 'Opt out of W-9 email', exact: true }).click()
+    await form.getByRole('heading', { name: 'W-9 email stopped', exact: true }).waitFor()
+    await form.screenshot({ path: join(evidence, `vendor-opt-out-${width}.png`), fullPage: true })
     await signedOut.close()
     await page.goto(app.origin + '/app/sales?tab=contacts')
     await page.getByRole('button', { name: v.name, exact: true }).click()
