@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "c65ce66a05bd7183c2d14043ac87b54ef91c77f6a800191430072fe924bc1040",
+      "sha256": "d13d1798ea6cafbf1f91a37da942c3442972212dfeea8f00e70951520e930490",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "117deb5aedf413a6e3e34ebf78e9f69a248d269d6ae3bfbd1b068773f20647e2",
+      "sha256": "8b8cc652954a3482a3e7384901420179602e5b1bc170c06844d52e566779599b",
       "executable": false
     },
     "DEMO.md": {
@@ -3687,7 +3687,7 @@
       "executable": false
     },
     "src/pantry/erasure/copies.ts": {
-      "sha256": "a8b5746edf8aad2063f38d2ffc7fa6d69f8bfed2db436c0227a5ae07197fe08d",
+      "sha256": "addf7f60267947ce634225a44c531341949e627463b3adb7008186e4bc791ef3",
       "executable": false
     },
     "src/pantry/erasure/custody.ts": {
@@ -4467,7 +4467,7 @@
       "executable": false
     },
     "src/pantry/tax-reminders.ts": {
-      "sha256": "aa5132347aebb37f04f7ae83513528654a8696f64e63f18f37136a0a74592766",
+      "sha256": "3dfc7d59fcc401719b66fba4d3a7ee7775d2f5d164f8e35011c50314eab1d260",
       "executable": false
     },
     "src/pantry/time/commands.ts": {

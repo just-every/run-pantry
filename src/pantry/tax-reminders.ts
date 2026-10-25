@@ -31,22 +31,31 @@ const send:Command={need:'owner',async run(c,b){owner(c);requireThat(b.consent==
     guard('(SELECT COALESCE(SUM(json_array_length(items)),0) FROM pt_tax_reminder_batches WHERE claimed_day=?) + ? <= ?',day,items.length,DAILY_CAP),
     q("UPDATE pt_tax_reminder_batches SET status='sending',approved_by=?,approved_at=?,claimed_day=? WHERE id=? AND status='draft'",c.actor.email,now(),day,row.id),changed(),
     approval(who(c.actor),'tax-reminder-batch',row.id,row.id,'send','approved'),audit(who(c.actor),'tax-reminders.approve','tax-reminder-batch',row.id,{consent:true,items})])
+  const claimed=()=>guard("EXISTS(SELECT 1 FROM pt_tax_reminder_batches WHERE id=? AND status='sending')",row.id)
   const outcomes:Data[]=[]
   for (const item of items) {
     // Recheck current consent and source at every network boundary. Never retry a claimed batch.
     try {
       requireThat(now().slice(0,10)===day,'The batch day changed; prepare a fresh batch',409)
-      await run(c.db,[authority(c.actor,'owner'),...(row.kind==='tax'?[enabled(c)]:[]),...itemGuards([item])])
+      await run(c.db,[authority(c.actor,'owner'),claimed(),...(row.kind==='tax'?[enabled(c)]:[]),...itemGuards([item])])
       let body=item.body
       if(item.contactId){const link=await w9Commands['w9.request'].run(c,{contactId:item.contactId,contactRevision:item.contactRevision,consent:true});body+=`\n\n${link.url}`}
-      await run(c.db,[authority(c.actor,'owner'),...(row.kind==='tax'?[enabled(c)]:[]),...itemGuards([item])])
+      await run(c.db,[authority(c.actor,'owner'),claimed(),...(row.kind==='tax'?[enabled(c)]:[]),...itemGuards([item])])
       requireThat(now().slice(0,10)===day,'The batch day changed; prepare a fresh batch',409)
       const result=await sendReviewedTaxMail(c.env,item.to,item.subject,body,`${row.id}-${outcomes.length}`)
       outcomes.push({to:item.to,...result})
-    } catch { outcomes.push({to:item.to,status:'uncertain',detail:'The current source check or mail route did not confirm delivery; no automatic retry.'}) }
-    await run(c.db,[q('UPDATE pt_tax_reminder_batches SET outcomes=? WHERE id=?',JSON.stringify(outcomes),row.id),audit(who(c.actor),'tax-reminders.outcome','tax-reminder-batch',row.id,{outcome:outcomes.at(-1)})])
+    } catch {
+      if((await batch(c,row.id)).status!=='sending')break
+      outcomes.push({to:item.to,status:'uncertain',detail:'The current source check or mail route did not confirm delivery; no automatic retry.'})
+    }
+    try {
+      await run(c.db,[claimed(),q('UPDATE pt_tax_reminder_batches SET outcomes=? WHERE id=?',JSON.stringify(outcomes),row.id),audit(who(c.actor),'tax-reminders.outcome','tax-reminder-batch',row.id,{outcome:outcomes.at(-1)})])
+    } catch(error) {
+      if((await batch(c,row.id)).status==='cancelled')return batch(c,row.id)
+      throw error
+    }
   }
-  await run(c.db,[q("UPDATE pt_tax_reminder_batches SET status='finished' WHERE id=?",row.id)])
+  await run(c.db,[q("UPDATE pt_tax_reminder_batches SET status='finished' WHERE id=? AND status='sending'",row.id)])
   return batch(c,row.id)
 }}
 const download:Command={need:'owner',async run(c,b){owner(c);requireThat(b.consent===true,'Confirm calendar export');const year=Number(b.year),items=await taxItems(c,year);await run(c.db,[authority(c.actor,'owner'),enabled(c),...itemGuards(items),audit(who(c.actor),'tax-reminders.calendar','tax-reminders','1',{consent:true,deadlineIds:items.map(i=>i.deadlineId)})]);return {filename:`tax-reminders-${year}.ics`,calendar:calendar(items,now())}}}

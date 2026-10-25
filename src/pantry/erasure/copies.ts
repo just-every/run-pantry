@@ -15,6 +15,7 @@ const quote = (s: string) => `"${s.replaceAll('"', '""')}"`
 const FIELDS: Record<string, string[]> = {
   pt_assets:['name'],pt_asset_tax:['note'],pt_asset_settings:['safe_harbor'],
   pt_learned_recognition:['evidence','backtest'],pt_agent_permissions:['name','payee','owner_email'],pt_agent_actions:['permission_snapshot'],
+  pt_tax_deadlines:['label'],
   pt_tax_reminder_batches:['items','outcomes'],
   pt_collection_sends:['snapshot'],
   pt_collection_cases:['subject','body','recipient','evidence','reply_note'],
@@ -104,7 +105,7 @@ export async function eraseCopies(db: D1Database, input: Input) {
     const identity = input.member ? columns.filter(c => !c.pk && /(_by$|^(author|reviewer|assignee|actor_email)$)/.test(c.name) && !foreign.some(f => f.from === c.name && !['pt_members', 'oa_operators'].includes(f.table))).map(c => c.name) : []
     const fields = [...new Set([...(FIELDS[table] ?? []).filter(c => names.has(c)), ...identity])]
     if (!fields.length || !keys.length) continue
-    const selected = [...new Set([...keys, ...fields, ...(names.has('revision') ? ['revision'] : []), ...(table === 'pt_receipts' ? ['document_id', 'file_document_id', 'vendor_id'] : []), ...(names.has('erased_at') ? ['erased_at'] : [])])]
+    const selected = [...new Set([...keys, ...fields, ...(names.has('revision') ? ['revision'] : []), ...(table==='pt_tax_reminder_batches' ? ['status'] : []), ...(table === 'pt_receipts' ? ['document_id', 'file_document_id', 'vendor_id'] : []), ...(names.has('erased_at') ? ['erased_at'] : [])])]
     for (const row of await all(db, `SELECT ${selected.map(quote).join(',')} FROM ${quote(table)}`)) {
       if (row.erased_at) continue
       const set: Data = {}
@@ -117,6 +118,7 @@ export async function eraseCopies(db: D1Database, input: Input) {
       if(table==='pt_customer_deposits'&&set.reference!==row.reference)set.reference=`${set.reference}:${row.id}`
       if (table === 'pt_bank_rules' && set.name !== row.name) set.name = `${set.name}:${row.id}`
       if(table==='pt_agent_permissions'&&Object.keys(set).some(k=>set[k]!==row[k]))set.active=0
+      if(table==='pt_tax_reminder_batches' && ['draft','sending'].includes(row.status) && Object.keys(set).some(k=>set[k]!==row[k]))set.status='cancelled'
       if (Object.keys(set).some(k => set[k] !== row[k]) && names.has('revision')) set.revision = crypto.randomUUID()
       if (table === 'pt_receipts' && (Object.keys(set).some(k => set[k] !== row[k]) || (!input.member && row.vendor_id === input.id))) {
         for (const id of [row.document_id, row.file_document_id]) if (id) receiptDocuments.add(id)
