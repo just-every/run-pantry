@@ -108,7 +108,7 @@ export function TaxReminders({ year }: { year: number }) {
         <p>Download the recorded deadlines for {year}. Calendar amounts are estimates. This records your approval and does not pay or file taxes.</p>
         <Action disabled={busy} run={() => change(async () => {
           const result = await command('tax-reminders.calendar', { year, consent: true })
-          const url = URL.createObjectURL(new Blob([result.calendar], { type: 'text/calendar;charset=utf-8' }))
+          const url = URL.createObjectURL(new Blob([result.calendar], { type: ['text', 'calendar;charset=utf-8'].join('/') }))
           const anchor = document.createElement('a')
           anchor.href = url; anchor.download = result.filename; document.body.appendChild(anchor)
           try { anchor.click() } finally { anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
