@@ -3,7 +3,7 @@ import { runtimeBindings, type Bindings } from '../auth.server'
 import type { Command, Context } from './context'
 import { authority, tinAuthority, who } from './access'
 import { now, optionalText, requireThat, sha256, text, uid } from './core'
-import { all, audit, changed, guard, one, q, run } from './db'
+import { audit, changed, guard, one, q, run } from './db'
 import { contact } from './contacts'
 import { sealTin } from './contractor-tin'
 import { seal, unseal } from './seal'
@@ -39,6 +39,7 @@ export async function w9Status(db: D1Database, id: string) {
   return {
     status: tax?.w9_completed_at && !tax.erased_at ? 'complete' : pending ? 'requested' : 'missing',
     completedAt: tax?.w9_completed_at ?? null,
+    contactRevision: (await one(db, 'SELECT revision FROM pt_contacts WHERE id=?', id))?.revision,
     request: pending,
   }
 }
@@ -49,6 +50,7 @@ export async function missingW9(db: D1Database, year: number) {
       vendors.map(async (v) => ({
         id: v.id,
         name: v.name,
+        revision: v.revision,
         payments: v.payments,
         w9: await w9Status(db, v.id),
       })),
@@ -65,6 +67,7 @@ const requestW9: Command = {
       token = Array.from(crypto.getRandomValues(new Uint8Array(32)), (v) =>
         v.toString(16).padStart(2, '0'),
       ).join('')
+    requireThat(b.contactRevision === v.revision, 'Review the current vendor before approving this exact W-9 request', 409)
     const tax = await one(c.db, 'SELECT revision FROM pt_contractor_tax WHERE contact_id=?', v.id),
       expires = new Date(Date.now() + 14 * 86400000).toISOString()
     await run(c.db, [
@@ -89,7 +92,7 @@ const requestW9: Command = {
         expires,
         now(),
       ),
-      audit(who(c.actor), 'w9.request', 'vendor', v.id, { requestId: id, expiresAt: expires, consent: true }),
+      audit(who(c.actor), 'w9.request', 'vendor', v.id, { requestId: id, contactRevision: v.revision, expiresAt: expires, consent: true }),
     ])
     return { id, url: `${new URL(c.request.url).origin}/w9/${token}`, expiresAt: expires }
   },
@@ -114,6 +117,7 @@ const revokeW9: Command = {
 const evidence: Command = {
   need: 'read',
   async run(c, b) {
+    manager(c)
     const checks = await tinAuthority(c),
       v = await contact(c.db, text(b.contactId, 'Vendor'), 'vendor'),
       t = await one(

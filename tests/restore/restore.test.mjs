@@ -64,11 +64,9 @@ async function dev(root, port) {
   const server = { origin: new URL(link).origin, link, async stop() {
     running.delete(server)
     if (child.exitCode !== null) return
-    const { stdout } = await promisify(execFile)('ps', ['-axo', 'pid=,ppid='])
-    const rows = stdout.trim().split('\n').map(line => line.trim().split(/\s+/).map(Number)), owned = new Set([child.pid])
-    for (let changed = true; changed;) { changed = false; for (const [pid, parent] of rows) if (owned.has(parent) && !owned.has(pid)) { owned.add(pid); changed = true } }
-    for (const pid of [...owned].reverse()) try { process.kill(pid, 'SIGTERM') } catch (e) { if (e.code !== 'ESRCH') throw e }
-    if (child.exitCode === null) await new Promise(r => child.once('exit', r))
+    const exited = new Promise(r => child.once('exit', r))
+    process.kill(child.pid, 'SIGTERM')
+    await exited
   } }
   running.add(server)
   return server
@@ -142,7 +140,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   const invoiceState = await (await context.request.get(`${server.origin}/api/pantry/state`)).json()
   const income = invoiceState.accounts.find(a => a.code === '4000').id, rent = invoiceState.accounts.find(a => a.code === '6100').id
   const customer = invoiceState.contacts.find(c => c.kind === 'customer'), vendor = invoiceState.contacts.find(c => c.kind === 'vendor')
-  const w9Request=await command('w9.request',{contactId:vendor.id,consent:true})
+  const w9Request=await command('w9.request',{contactId:vendor.id,contactRevision:vendor.revision,consent:true})
   const branded = await command('invoice-template.save', { name: 'Archived services', layout: 'banner', accentColor: '#174838', textColor: '#202234', termsDays: 45, address: '18 Cedar Street', remitTo: 'Juniper Remittance', paymentInstructions: 'Use invoice reference', footer: 'Thank you', message: 'Archived engagement', fields: [{ key: 'po', label: 'PO number', defaultValue: 'PO-RESTORE' }] })
   const settings = (await (await context.request.get(`${server.origin}/api/pantry/invoice-documents`)).json()).settings
   await command('invoice-document-settings.save', { revision: settings.revision, nextInvoice: 231, defaultTemplateId: branded.id })

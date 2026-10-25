@@ -109,6 +109,12 @@ export async function w9Browser(t) {
     await page.goto(app.origin + '/app/agents')
     await page.getByRole('heading', { name: 'Tax readiness all year', exact: true }).waitFor()
     await page.getByText('NJ: 85% of threshold · review with accountant', { exact: true }).waitFor()
+    await page.getByText('Record a tax deadline', { exact: true }).click()
+    await page.getByLabel('Deadline description', { exact: true }).fill('Synthetic owner estimate')
+    await page.getByLabel('Due date', { exact: true }).fill(`${year}-12-15`)
+    await page.getByLabel('Estimated amount', { exact: true }).fill('250')
+    await page.getByRole('button', { name: 'Save deadline', exact: true }).click()
+    await page.getByRole('cell', { name: '$250.00 · estimate', exact: true }).first().waitFor()
     const row = page
       .getByRole('row')
       .filter({ has: page.getByText(`Request a W-9 from Synthetic contractor ${width}`, { exact: false }) })

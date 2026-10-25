@@ -29,7 +29,7 @@ export function VendorW9({ id }: { id: string }) {
               </p>
               <Action
                 run={async () => {
-                  const r = await command('w9.request', { contactId: id, consent: true })
+                  const r = await command('w9.request', { contactId: id, contactRevision: data.contactRevision, consent: true })
                   setLink(r.url)
                   await reload()
                 }}

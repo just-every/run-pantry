@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { Log, LogLevel } from 'miniflare'
 import { books, harness } from './harness.mjs'
 const details = {
   legalName: 'Synthetic contractor',
@@ -14,7 +15,9 @@ const details = {
   certify: 'yes',
 }
 export async function w9Journey(t) {
-  const h = await harness()
+  const logs = []
+  class CapturedLog extends Log { log(message) { logs.push(message) } }
+  const h = await harness({ log: new CapturedLog(LogLevel.INFO) })
   t.after(() => h.close())
   const { acct } = await books(h),
     v = await h.command('contact.save', { kind: 'vendor', name: 'Synthetic contractor', is1099: true }),
@@ -36,10 +39,11 @@ export async function w9Journey(t) {
   })
   const keeper = await h.member('synthetic-pantry-keeper@example.test', 'bookkeeper'),
     sales = await h.member('synthetic-pantry-sales@example.test', 'sales')
-  await h.command('w9.request', { contactId: v.id, consent: true }, keeper, 403)
+  await h.command('w9.request', { contactId: v.id, contactRevision: v.revision, consent: true }, keeper, 403)
   await h.command('w9.request', { contactId: v.id }, h.owner, 400)
-  const first = await h.command('w9.request', { contactId: v.id, consent: true }),
-    request = await h.command('w9.request', { contactId: v.id, consent: true }),
+  const mailBeforeRequests = h.mail.length
+  const first = await h.command('w9.request', { contactId: v.id, contactRevision: v.revision, consent: true }),
+    request = await h.command('w9.request', { contactId: v.id, contactRevision: v.revision, consent: true }),
     path = new URL(request.url).pathname
   assert.equal((await h.send(new URL(first.url).pathname)).status, 404)
   assert.equal((await h.send(path)).status, 200)
@@ -67,6 +71,9 @@ export async function w9Journey(t) {
   assert.ok(!JSON.stringify(await h.view('reports/contractors?year=2025', keeper)).includes(details.tin))
   await h.command('w9.evidence', { contactId: v.id }, keeper, 403)
   await h.command('w9.evidence', { contactId: v.id }, h.owner, 403)
+  assert.equal(h.mail.length, mailBeforeRequests, 'requests, certification and reads send nothing')
+  const accountant = await h.member('synthetic-pantry-w9-cpa@example.test', 'accountant')
+  await h.command('w9.evidence', { contactId: v.id }, accountant, 403)
   await h.command('contractor.step-up', {})
   const mail = h.mail.findLast((m) => [m.to].flat().includes('owner@example.test')),
     token = new URL(mail.text.match(/http:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get(
@@ -78,21 +85,33 @@ export async function w9Journey(t) {
   await h.view(`vendor-w9/${v.id}`, sales, 403)
   const audit = await h.view('activity')
   assert.ok(!JSON.stringify(audit).includes(details.tin))
-  const revoked = await h.command('w9.request', { contactId: v.id, consent: true })
+  const revoked = await h.command('w9.request', { contactId: v.id, contactRevision: v.revision, consent: true })
   await h.command('w9.revoke', { contactId: v.id })
   assert.equal((await h.send(new URL(revoked.url).pathname)).status, 404)
-  const stale = await h.command('w9.request', { contactId: v.id, consent: true })
-  await h.command('contact.save', { ...v, kind: 'vendor', name: 'Changed contractor' })
+  const stale = await h.command('w9.request', { contactId: v.id, contactRevision: v.revision, consent: true })
+  const changedVendor = await h.command('contact.save', { ...v, kind: 'vendor', name: 'Changed contractor' })
   assert.equal((await h.send(new URL(stale.url).pathname)).status, 404)
-  const expired = await h.command('w9.request', { contactId: v.id, consent: true })
-  assert.equal(
-    (
-      await h.send(new URL(expired.url).pathname, undefined, {
-        headers: { 'x-synthetic-pantry-clock': '2100-01-01T12:00:00Z' },
-      })
-    ).status,
-    404,
-  )
+  await h.command('w9.request', { contactId: v.id, contactRevision: v.revision, consent: true }, h.owner, 409)
+  const expired = await h.send('/api/pantry/command/w9.request', { contactId: v.id, contactRevision: changedVendor.revision, consent: true }, { cookie: h.owner, headers: { 'x-synthetic-pantry-clock': '2026-02-01T12:00:00Z' } })
+  assert.equal(expired.status, 200)
+  assert.equal(expired.value.expiresAt, '2026-02-15T12:00:00.000Z')
+  const oldPath = new URL(expired.value.url).pathname
+  for (const [clock, status] of [['2026-02-15T11:00:00Z', 200], ['2026-02-15T12:00:00Z', 404], ['2026-02-15T13:00:00Z', 404]]) {
+    assert.equal((await h.send(oldPath, undefined, { headers: { 'x-synthetic-pantry-clock': clock } })).status, status)
+  }
+  const reissued = await h.send('/api/pantry/command/w9.request', { contactId: v.id, contactRevision: changedVendor.revision, consent: true }, { cookie: h.owner, headers: { 'x-synthetic-pantry-clock': '2026-02-15T13:00:00Z' } })
+  assert.equal(reissued.status, 200)
+  assert.notEqual(reissued.value.url, expired.value.url)
+  assert.equal((await h.send(new URL(reissued.value.url).pathname, undefined, { headers: { 'x-synthetic-pantry-clock': '2026-02-15T13:00:00Z' } })).status, 200)
+  assert.equal((await h.send(oldPath)).status, 404)
+  assert.ok(!JSON.stringify(await h.view('tax-readiness/2025/package')).includes(details.tin))
+  assert.ok(!JSON.stringify(h.mail).includes(details.tin))
+  assert.ok(!JSON.stringify(await h.view('activity')).includes(details.tin))
+  assert.ok(!JSON.stringify(reissued.value).includes(details.tin))
+  assert.ok(!JSON.stringify(logs).includes(details.tin))
+  const requests = await h.db.prepare('SELECT token_hash FROM pt_w9_requests WHERE token_hash IS NOT NULL').all()
+  assert.ok(requests.results.every(r => !reissued.value.url.includes(r.token_hash)), 'only hashes are stored')
+
 }
 export async function readinessJourney(t) {
   const h = await harness()
@@ -132,6 +151,8 @@ export async function readinessJourney(t) {
   })
   await h.command('invoice.approve', { id: inv.id, revision: inv.revision })
   await h.command('invoice.issue', { id: inv.id })
+  const solo = await h.command('tax.deadline', { label: 'Solo owner estimate', dueDate: '2026-01-25', amount: '250' })
+  assert.equal((await h.view('tax-readiness?year=2025')).canSetDeadlines, true)
   const accountant = await h.member('synthetic-pantry-cpa@example.test', 'accountant'),
     keeper = await h.member('synthetic-pantry-book@example.test', 'bookkeeper')
   await h.command(
@@ -145,15 +166,29 @@ export async function readinessJourney(t) {
     { label: 'Accountant estimated tax', dueDate: '2026-01-20', amount: '400' },
     accountant,
   )
-  const read = async (path) => {
+  const read = async (path, clock = '2026-01-15T12:00:00Z') => {
     const r = await h.send('/api/pantry/' + path, undefined, {
       cookie: accountant,
-      headers: { 'x-synthetic-pantry-clock': '2026-01-15T12:00:00Z' },
+      headers: { 'x-synthetic-pantry-clock': clock },
     })
     assert.equal(r.status, 200, JSON.stringify(r.value))
     return r.value
   }
+  const mailBeforeReadiness = h.mail.length
+  const activityBefore = await h.db.prepare('SELECT (SELECT COUNT(*) FROM pt_payments) AS payments,(SELECT COUNT(*) FROM pt_journal_entries) AS entries,(SELECT COUNT(*) FROM pt_w9_requests) AS requests').first()
+  const before = await read('tax-readiness?year=2025', '2025-12-20T23:59:59Z')
+  assert.equal(before.deadlines.find(x => x.id === d.id).reminder, false)
+  for (let repeat = 0; repeat < 2; repeat++) {
+    const boundary = await read('tax-readiness?year=2025', '2025-12-21T00:00:00Z')
+    assert.equal(boundary.deadlines.filter(x => x.id === d.id && x.reminder).length, 1)
+  }
   const r = await read('tax-readiness?year=2025')
+  assert.equal(r.canSetDeadlines, true)
+  assert.equal((await h.view('tax-readiness?year=2025')).canSetDeadlines, false)
+  assert.equal(r.deadlines.find(x => x.id === solo.id).isEstimate, true)
+  assert.match(r.note, /never tax advice or a filing/)
+  assert.equal(h.mail.length, mailBeforeReadiness)
+  assert.deepEqual(await h.db.prepare('SELECT (SELECT COUNT(*) FROM pt_payments) AS payments,(SELECT COUNT(*) FROM pt_journal_entries) AS entries,(SELECT COUNT(*) FROM pt_w9_requests) AS requests').first(), activityBefore)
   assert.equal(r.w9Proposals[0].paid, 240000)
   assert.equal(r.w9Proposals[0].requiresOwnerApproval, true)
   assert.equal(r.nexus.find((s) => s.state === 'NJ').reached, 8500)
@@ -183,7 +218,12 @@ export async function readinessJourney(t) {
   assert.equal(pack.yearEnd.year, 2025)
   assert.equal(pack.accountantPackage.period.id, '2025-12')
   assert.equal(pack.readiness.w9Proposals[0].contactId, v.id)
-  const request = await h.command('w9.request', { contactId: v.id, consent: true })
+  await h.command('w9.request', { contactId: v.id, contactRevision: v.revision, consent: true }, accountant, 403)
+  await h.command('w9.request', { contactId: v.id, contactRevision: 'synthetic-pantry-stale', consent: true }, h.owner, 409)
+  const request = await h.command('w9.request', { contactId: v.id, contactRevision: v.revision, consent: true })
+  assert.equal(h.mail.length, mailBeforeReadiness + 1, 'only the explicit question action sent mail')
+  const settingsAudit = (await h.view('activity')).audit.filter(e => e.action === 'tax.deadline')
+  assert.equal(settingsAudit.length, 2)
   assert.equal((await h.send(new URL(request.url).pathname)).status, 200)
   assert.equal((await read('tax-readiness?year=2025')).w9Proposals[0].status, 'requested')
 }

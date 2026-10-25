@@ -165,7 +165,7 @@ test('ERASURE-001 retention recomputes unerased supporting items, requires confi
   const pdf=await h.view(`invoice-documents/${i.id}/preview`)
   const vendor=await h.command('contact.save',{kind:'vendor',name:'Archive Vendor LLC'})
   await h.command('contractor.save',{contactId:vendor.id,is1099:true,legalName:'Archive Vendor LLC',tinKind:'ein',tin:'111223333',address:'14 Vendor Road',city:'Albany',state:'NY',zip:'12207'})
-  const requestW9=await h.command('w9.request',{contactId:vendor.id,consent:true})
+  const requestW9=await h.command('w9.request',{contactId:vendor.id,contactRevision:(await h.view(`vendor-w9/${vendor.id}`)).contactRevision,consent:true})
   const certification=await h.send(new URL(requestW9.url).pathname,undefined,{raw:new URLSearchParams({legalName:'Archive Vendor LLC',tinKind:'ein',tin:'111223333',classification:'individual',address:'14 Vendor Road',city:'Albany',state:'NY',zip:'12207',signature:'Archive Vendor',certify:'yes'}).toString(),headers:{'content-type':'application/x-www-form-urlencoded'}})
   assert.equal(certification.status,200)
   assert.equal((await h.view(`vendor-w9/${vendor.id}`)).status,'complete')

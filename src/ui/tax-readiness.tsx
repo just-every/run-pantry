@@ -31,7 +31,7 @@ export function TaxReadiness() {
                   {state.actor.role === 'owner' && (
                     <Action
                       run={async () => {
-                        const r = await command('w9.request', { contactId: v.contactId, consent: true })
+                        const r = await command('w9.request', { contactId: v.contactId, contactRevision: v.contactRevision, consent: true })
                         setLinks((s) => ({ ...s, [v.contactId]: r.url }))
                         await reload()
                       }}
@@ -57,12 +57,12 @@ export function TaxReadiness() {
             ))}
           </ul>
           <h3>Deadline reminders</h3>
-          <Table heads={['Deadline', 'Due', 'Accountant amount', 'Reminder']} empty="No recorded deadlines.">
+          <Table heads={['Deadline', 'Due', 'Estimated amount', 'Reminder']} empty="No recorded deadlines.">
             {data.deadlines.map((d: D) => (
               <tr key={d.id}>
                 <td>{d.label}</td>
                 <td>{d.due_date}</td>
-                <td>{d.amount_cents === null ? 'Not set' : usd(d.amount_cents)}</td>
+                <td>{d.amount_cents === null ? 'Not set' : `${usd(d.amount_cents)} · estimate`}</td>
                 <td>
                   {d.completed_at
                     ? 'Complete'
@@ -75,14 +75,14 @@ export function TaxReadiness() {
               </tr>
             ))}
           </Table>
-          {state.actor.role === 'accountant' && (
+          {data.canSetDeadlines && (
             <details>
-              <summary>Record an accountant deadline</summary>
+              <summary>Record a tax deadline</summary>
               <Form label="Save deadline" submit={(b) => command('tax.deadline', b)} onDone={reload}>
                 <Field label="Deadline description" name="label" required />
                 <Field label="Due date" name="dueDate" type="date" required />
-                {state.actor.role === 'accountant' && (
-                  <Field label="Accountant estimated amount" name="amount" />
+                {data.canSetDeadlines && (
+                  <Field label="Estimated amount" name="amount" />
                 )}
               </Form>
             </details>

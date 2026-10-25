@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "cc5a48ddaaf17dd82e3d93bd5ff1f35753f6d26d6017c68162324f0f114e5abd",
+      "sha256": "baa7fa33ed710c3bfd6e62cf81b0d44b1334669425f5c8b51ec215150834b3cb",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "3d15d4224284d901d2df962580864a50606f67706c844ab737ae33e0e3cccb93",
+      "sha256": "70aaeb9013d1ea1674d3a8c568b9f42396b88c6818f645ae5333c69fc1030047",
       "executable": false
     },
     "DEMO.md": {
@@ -147,7 +147,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "db839bd5326d6de17a878cb0b67b5884fe9335a7dfa2c46ef69316b35da065cc",
+      "sha256": "92ecfc7bc78df5d505bbce1168e85b94bfc968c3392c6120c8a8404b0a9288c1",
       "executable": false
     },
     "docs/close.md": {
@@ -4455,7 +4455,7 @@
       "executable": false
     },
     "src/pantry/tax-readiness.ts": {
-      "sha256": "da1e72d4ffb5b536e79f77e06147bc3718149ddd0c3fdcb58ee963888291e50e",
+      "sha256": "54c61bfa91653e5dcc3a4f7af6f498ec724fd979647f3702bf90fb920af09b74",
       "executable": false
     },
     "src/pantry/time/commands.ts": {
@@ -4483,7 +4483,7 @@
       "executable": false
     },
     "src/pantry/w9.ts": {
-      "sha256": "82d1b6609d95e5765c9add5b61250a8b1a2b4400310288bb67c65d1189e1b9d5",
+      "sha256": "3eb6e1c117eedac63a7904c6a355f79ecb99062ca1ba7309d8d81f50e9dbb4ff",
       "executable": false
     },
     "src/pantry/webhooks/commands.ts": {
@@ -5267,7 +5267,7 @@
       "executable": false
     },
     "src/ui/tax-readiness.tsx": {
-      "sha256": "896e9f5af7766790ec437440589bf84abacf1057cdc2d55f467fbcbbe605b22f",
+      "sha256": "8250076f95a71af4a39f1bad3e1617b10283cdc7a95184908d8373b9882fee44",
       "executable": false
     },
     "src/ui/time.tsx": {
@@ -5279,7 +5279,7 @@
       "executable": false
     },
     "src/ui/w9.tsx": {
-      "sha256": "114a2dc0385ad57f9920e6e6065915e2c2ac8610057898a1c663739db8434455",
+      "sha256": "d5e6123b07470d12c1e6891d4c963ce15c60a3fb2b9f5c70e50e5bc52c86d5f8",
       "executable": false
     },
     "src/ui/webhook-settings.tsx": {
@@ -5503,7 +5503,7 @@
       "executable": false
     },
     "tests/api/security.test.mjs": {
-      "sha256": "cc595a824246aed48a1594335ee30819d931f942128dc9d4592a76b5bea55e13",
+      "sha256": "27b59d3fa7a60f5e901a3702f361ab47dbc84af660916542e0a85d5209616d35",
       "executable": false
     },
     "tests/api/standing-journey.mjs": {
@@ -5519,7 +5519,7 @@
       "executable": false
     },
     "tests/api/w9-journey.mjs": {
-      "sha256": "1b4a0448a314f609b5b573d2691569b60e2d95d717a059453df3b340a81d7893",
+      "sha256": "00f119bb8c3d6ced61dfd11fd632335697a423e3ace2e3be01995d1c1800036e",
       "executable": false
     },
     "tests/api/webhook-journey.mjs": {
@@ -5727,7 +5727,7 @@
       "executable": false
     },
     "tests/app/w9-request-journey.mjs": {
-      "sha256": "32c266be0bf6576e78fc3bff0fcacd123c4ef71ffb9d50309f7f8909c4b21502",
+      "sha256": "029c5fc9f206c006668d00dad2e89641d01810a17520ff1d6be056bcec997cad",
       "executable": false
     },
     "tests/app/webhook-journey.mjs": {
@@ -5787,7 +5787,7 @@
       "executable": false
     },
     "tests/restore/restore.test.mjs": {
-      "sha256": "aae0cf04f6519b31151e0325249c35185fa93f9fef2801b811733210ec00eb0c",
+      "sha256": "2adabb9d371b558ac9b7914e71be8ae29a5cd6d6c5145a2cd154168ee7271e26",
       "executable": false
     },
     "tests/runtime.mjs": {

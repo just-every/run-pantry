@@ -1,7 +1,7 @@
 import type { Command, Context } from './context'
 import { authority, who } from './access'
 import { cents, date, now, requireThat, text, uid } from './core'
-import { all, audit, changed, one, q, run } from './db'
+import { all, audit, changed, guard, one, q, run } from './db'
 import { missingW9 } from './w9'
 import { nexusWatch } from './nexus'
 import { yearEndState } from './year-end'
@@ -14,6 +14,11 @@ function taxReader(c: Context) {
     'Only the owner or accountant reviews tax readiness',
     403,
   )
+}
+const noAccountant = "NOT EXISTS(SELECT 1 FROM pt_members WHERE role='accountant' AND active=1)"
+async function settingAuthority(c: Context) {
+  return c.actor.kind === 'person' && (c.actor.role === 'accountant' ||
+    (c.actor.role === 'owner' && !!await one(c.db, `SELECT 1 WHERE ${noAccountant}`)))
 }
 export async function taxReadiness(c: Context, year: number) {
   taxReader(c)
@@ -36,6 +41,7 @@ export async function taxReadiness(c: Context, year: number) {
   }
   const calendar = [statutory, ...deadlines].map((d) => ({
     ...d,
+    isEstimate: d.amount_cents !== null,
     reminder:
       !d.completed_at && d.due_date <= new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     overdue: !d.completed_at && d.due_date < today,
@@ -46,6 +52,7 @@ export async function taxReadiness(c: Context, year: number) {
     w9Proposals: (await missingW9(c.db, year)).map((v) => ({
       contactId: v.id,
       name: v.name,
+      contactRevision: v.revision,
       paid: v.payments.filter((p) => !p.reversed).reduce((s, p) => s + p.amount, 0),
       status: v.w9.status,
       summary: `Request a W-9 from ${v.name}`,
@@ -53,7 +60,8 @@ export async function taxReadiness(c: Context, year: number) {
     })),
     nexus: nexus.states.filter((s) => s.level >= 80),
     deadlines: calendar,
-    note: 'Readiness signals only. The accountant owns tax decisions and sets all estimated amounts and due dates. No automatic request or payment is sent.',
+    canSetDeadlines: await settingAuthority(c),
+    note: 'Readiness signals and estimates only, never tax advice or a filing. The accountant sets deadlines and estimates; when no accountant is assigned, the owner sets them. No automatic request, outbound message or payment is sent.',
   }
 }
 const deadline: Command = {
@@ -61,8 +69,8 @@ const deadline: Command = {
   async run(c, b) {
     taxReader(c)
     requireThat(
-      c.actor.kind === 'person' && c.actor.role === 'accountant',
-      'Only the accountant sets tax deadlines',
+      await settingAuthority(c),
+      'Only the accountant, or the owner when none is assigned, sets tax deadlines and estimates',
       403,
     )
     const id = b.id ? text(b.id, 'Deadline') : uid(),
@@ -73,13 +81,9 @@ const deadline: Command = {
       amount =
         b.amount === '' || b.amount === undefined ? null : cents(b.amount, 'Accountant estimated amount')
     requireThat(amount === null || amount >= 0, 'Amount cannot be negative')
-    requireThat(
-      c.actor.kind === 'person' && (c.actor.role === 'accountant' || amount === null),
-      'Only the accountant sets estimated-tax amounts',
-      403,
-    )
     await run(c.db, [
       authority(c.actor, 'record'),
+      ...(c.actor.kind === 'person' && c.actor.role === 'owner' ? [guard(noAccountant)] : []),
       q(
         'INSERT INTO pt_tax_deadlines(id,label,due_date,amount_cents,completed_at,revision,set_by) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET label=excluded.label,due_date=excluded.due_date,amount_cents=excluded.amount_cents,completed_at=excluded.completed_at,revision=excluded.revision,set_by=excluded.set_by WHERE pt_tax_deadlines.revision=?',
         id,
