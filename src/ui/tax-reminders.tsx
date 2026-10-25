@@ -105,7 +105,7 @@ export function TaxReminders({ year }: { year: number }) {
         setBatch(sent as Batch); await reload()
       })} />}
       <details className="details"><summary>Calendar download</summary>
-        <p>Download the recorded deadlines for {year}. Calendar amounts are estimates. This records your approval and does not pay or file taxes.</p>
+        <p>Download the recorded deadlines for {year}. Calendar amounts are estimates. Each deadline includes a display reminder one day before it is due. This records your approval and does not pay or file taxes.</p>
         <Action disabled={busy} run={() => change(async () => {
           const result = await command('tax-reminders.calendar', { year, consent: true })
           const url = URL.createObjectURL(new Blob([result.calendar], { type: ['text', 'calendar;charset=utf-8'].join('/') }))
