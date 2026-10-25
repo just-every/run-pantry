@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "06762da479b35d08b467da9b5e863d182f5af97f57191f42d8498c4c52ee75c6",
+      "sha256": "68ae4f95eeb2bf866ff7dddc8c8675063aeef7e357fa4a2f5ef97b1a58f9d62f",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "98d686ecb8bf9592d03c518492df807c8c952d10a41fc805dafae169fad009bf",
+      "sha256": "4f9d0c8827c00d394db09dbc2e9c1e5e9e0cef29ed64b5b865000722b0e03974",
       "executable": false
     },
     "DEMO.md": {
@@ -135,7 +135,7 @@
       "executable": false
     },
     "docs/agent-work.md": {
-      "sha256": "28ce1cc4d0d38aac698e2f5597641e005e3a16b82d397ae067746eab4adb89c7",
+      "sha256": "c9a57c0a5047908fa2fe125fe8b3eef25f27dfb80387bdd9e75cee7fd3d3df80",
       "executable": false
     },
     "docs/backup.md": {
@@ -3267,7 +3267,11 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "4fd9e22c7086e174bf2d53a80b44c416aa094558d657c31470f22130f59d865c",
+      "sha256": "de299e7b43f634c89e56bf2c9af32e567b53bcbfcae68a1a63abe70caff9e68e",
+      "executable": false
+    },
+    "src/pantry/ask/index.ts": {
+      "sha256": "4003964d256c3bb6b3f30d5dbd0805a4adc85663a3b74d0a4e51bccc963f81ef",
       "executable": false
     },
     "src/pantry/assets/index.ts": {
@@ -4838,6 +4842,10 @@
       "sha256": "4fd8c04175a3a152c09074a1ebcde2b25504be5491f228f69d290828db058d9c",
       "executable": false
     },
+    "src/ui/ask-books.tsx": {
+      "sha256": "faafd5884f9dfa37600db6f6ed4e1624462477c455865d04ef08f786a339999f",
+      "executable": false
+    },
     "src/ui/assets.tsx": {
       "sha256": "f19c5dc0600237f0fb471e56ce4bd3a568a1529cc33c258dc72e02af4b88df1f",
       "executable": false
@@ -5203,7 +5211,7 @@
       "executable": false
     },
     "src/ui/reports.tsx": {
-      "sha256": "fd283ae3642d076672b1b36dda3ced0ff80a0924c582b6b636ee216c6c440d86",
+      "sha256": "558f10aa70873ce0b197a529abd94313afc875faab08b4af4cc8c3d169d01dd8",
       "executable": false
     },
     "src/ui/review.tsx": {
@@ -5267,7 +5275,7 @@
       "executable": false
     },
     "tests/api/agent.test.mjs": {
-      "sha256": "bac5d8a74934f4c6209c94d40a48006e006ce738575714d20849df930bba2f3a",
+      "sha256": "4f0044f9ec2c16136f258566060f00fda71020d87f0d87db06b0e6cbacc215df",
       "executable": false
     },
     "tests/api/archive-journey.mjs": {
@@ -5507,11 +5515,15 @@
       "executable": false
     },
     "tests/app/app.test.mjs": {
-      "sha256": "65dc50f24c188ba510a271e61a0aafcd524e3621b49dd5ce0fbebc3896464975",
+      "sha256": "0e01958354f5d847e5cbd08785a32b4295fba06e0d7a282420a65823cc9e6a38",
       "executable": false
     },
     "tests/app/archive-journey.mjs": {
       "sha256": "ac640dc891a70211210c66e14f2c425003b8e5748937cee5005af3d73412b2e6",
+      "executable": false
+    },
+    "tests/app/ask-books-journey.mjs": {
+      "sha256": "bbe6c589cd5328f4166071725f30c8a79a384fb074f3c8f5b3f88450c4ee1ece",
       "executable": false
     },
     "tests/app/assets-journey.mjs": {

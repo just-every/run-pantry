@@ -24,3 +24,11 @@ The commands an agent uses are in the repository's `API.md`, and `scripts/pantry
 ```sh
 PANTRY_URL=http://127.0.0.1:8787 PANTRY_AGENT_TOKEN=… node scripts/pantry-agent.mjs context
 ```
+
+## Ask the books
+
+In **Reports**, use **Ask the books** for contractor spending or net income. For example, ask “what did we spend on contractors in Q3 2026 compared with last year?” or “why is net income down in October 2026?”. Choose cash or accrual. Name one month or quarter; an omitted year means the current UTC year. Contractor spending uses expense accounts whose names contain “contract”, with the selected accounts shown in the answer.
+
+Generated answers calculate from posted native reports and their underlying lines. They show the exact date ranges and basis, the report links, the posted entry links and the account movements behind a comparison. “Last year” compares the same range in the previous year; otherwise the comparison uses the immediately preceding range of the same length, as native custom reports do. Missing records show **No records**; a missing comparison produces no inferred change. Unsupported or ambiguous questions are refused without calling a model.
+
+Choose **Save answer as custom report** to retain the current, prior and change columns in REPORT-006. Net income retains its income-less-expenses formula; contractor spending retains its account selection. The saved definition recalculates from the books when opened. Questions require full financial-report authority, and report links, entry links and saved reports check the reader's current grants again. A sales role or a person with restricted bank visibility cannot use this door to read the whole books.

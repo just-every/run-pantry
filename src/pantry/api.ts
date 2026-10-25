@@ -1,3 +1,4 @@
+import { askBooks } from './ask'
 import { currencyCommands,currencyView } from './currency'
 import { archiveCommands,archivesView } from './cutover/archives'
 import { collectionCommands,collectionsView } from './collections'
@@ -178,6 +179,7 @@ api.route('/api/pantry/integration/v1', integrations)
 view('webhooks', async ctx => webhookSettings(ctx))
 view('data-flows', async ctx => dataFlows(ctx))
 view('erasure', async ctx => { await ownerSession(ctx); return erasureSettings(ctx.db) })
+view('ask', async (ctx, c) => askBooks(ctx, c.req.query('question'), c.req.query('basis')))
 view('integrations', async (ctx, c) => { must(ctx.actor, 'owner'); return integrationSettings(ctx, c.req.query('cursor')) })
 const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10)) => date(c.req.query(name) ?? fallback, name)
 
