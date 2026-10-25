@@ -1,7 +1,8 @@
 /* Pantry's application screens, in the homepage's look: white cards with
    hairlines on the lavender paper, navy ink, the mark's green for what is
    settled and apricot for what needs a look. Visual authority: the 12ui app
-   picks (evidence/br-pantry/desk-app). Tokens are declared once in rer-theme.css. */
+   picks (evidence/br-pantry/desk-app). Tokens are declared once: the --rer-*
+   theme tokens in rer-theme.css, the rest in fonts/fonts.css. */
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; min-height: 100vh; color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; background: var(--glow), var(--paper); background-attachment: fixed; -webkit-font-smoothing: antialiased; }

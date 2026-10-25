@@ -903,7 +903,7 @@
       "executable": false
     },
     "public/fonts/fonts.css": {
-      "sha256": "9a9fa502719dcb5a2c439e7115822c3ee1d8457a375a75925c9113d36009fc4b",
+      "sha256": "94ad0630a13350c653ef322c4ec278d410a5456b8b9dbab533a16dee794aec1e",
       "executable": false
     },
     "public/fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2": {
@@ -915,7 +915,7 @@
       "executable": false
     },
     "public/fonts/README.md": {
-      "sha256": "e63890d2dafc07793df4fb94df63455a263881d0ae0d328782fbde6997337286",
+      "sha256": "0144ef722c5b9c83e104c0f79542d1051c350afa3f73ec26c1a595b279efcbbd",
       "executable": false
     },
     "public/fonts/schibsted-grotesk/LICENSE.txt": {
@@ -931,11 +931,11 @@
       "executable": false
     },
     "public/pantry.css": {
-      "sha256": "d0d51e51edb4a2399d6e7192a1fbb5ba7aa7b5f89e2535dfc1540c0d4bb27e5e",
+      "sha256": "0b609d088a5293cfd9e04cb8a201776d51a5fbd6662604aae67b83c0fd829891",
       "executable": false
     },
     "public/rer-theme.css": {
-      "sha256": "a8b630a8c2093870de7ce0639dcfad33146e471997f9cf85bc69c504dd1f84c6",
+      "sha256": "2e03e5dad63289c8791a4bef567f65ba57f579eb158463c608468d2fab601d70",
       "executable": false
     },
     "public/site/closing-1152.avif": {
@@ -4607,7 +4607,7 @@
       "executable": false
     },
     "src/server.dev.ts": {
-      "sha256": "aecc156756b96f600bfa17fc9d0f8bcdf717a0dbb3f96db819891d7f8a4c3a68",
+      "sha256": "d5c6cddad190f23817b876570ad18396b46520c78d37d5c0b6d0e4e52102120e",
       "executable": false
     },
     "src/server.ts": {
@@ -4811,7 +4811,7 @@
       "executable": false
     },
     "src/site/styles/site.css": {
-      "sha256": "2b861b4da7a1a25336981cc735c7859477a7d164847c82d9f8176e3e69ea8e3d",
+      "sha256": "97cef778bd030f9d2c54197ed04e6f2687492c9b9d920146713b9bac0a0da138",
       "executable": false
     },
     "src/types/portability.d.ts": {
