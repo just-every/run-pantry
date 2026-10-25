@@ -827,7 +827,7 @@
       "executable": false
     },
     "migrations/core/0105_tax_reminder_batches.sql": {
-      "sha256": "bb6b05d24b051374ce76131c92ef596cdeda9a263be7d797472c4b5df8b959a4",
+      "sha256": "8db8ce4f4610fb688ddd315bbeadcb21da373ec6cedfc8c1a79a7dfcb504cb31",
       "executable": false
     },
     "migrations/rewrites.json": {
@@ -1335,7 +1335,7 @@
       "executable": false
     },
     "scripts/installer/portability.mjs": {
-      "sha256": "e517572d860aeeaf0be0635867605d10358b330b04ade5b16f81a3d915558c2d",
+      "sha256": "2fc7c8467cee0dbfafde0b06abb9407c86781d1cd4f1bc46e6d774a5647a1898",
       "executable": false
     },
     "scripts/installer/seed.mjs": {
@@ -4463,11 +4463,11 @@
       "executable": false
     },
     "src/pantry/tax-reminder-content.ts": {
-      "sha256": "a298aa8766b736e0cadf7e73b7840dc1ea4569e22fb7707dcaccf5b102ffb7bd",
+      "sha256": "2018cb8dfc7cf6d2c638853aed4b931f6497081d3fec950b173c32d6458d795f",
       "executable": false
     },
     "src/pantry/tax-reminders.ts": {
-      "sha256": "ab399c90926ea0a85cf468b1fb9a03989244681e6d8ec2badd164361cd9c922b",
+      "sha256": "c161bb31f7e5b2c7faef88492d264d44f8c598eff996869ca49c14cb4d5b2f56",
       "executable": false
     },
     "src/pantry/time/commands.ts": {

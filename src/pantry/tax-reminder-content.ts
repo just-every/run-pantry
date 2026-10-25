@@ -32,7 +32,7 @@ export function itemGuards(items: Data[]): Sql[] {
     guard('NOT EXISTS(SELECT 1 FROM pt_tax_vendor_stops WHERE contact_id=?)',i.contactId),
     guard('(SELECT revision FROM pt_contractor_tax WHERE contact_id=?) IS ?',i.contactId,i.taxRevision),
     guard('NOT EXISTS(SELECT 1 FROM pt_contractor_tax WHERE contact_id=? AND w9_completed_at IS NOT NULL AND erased_at IS NULL)',i.contactId),
-  ] : [guard('EXISTS(SELECT 1 FROM pt_tax_deadlines WHERE id=? AND revision=? AND completed_at IS NULL)',i.deadlineId,i.revision)])
+  ] : [guard("EXISTS(SELECT 1 FROM oa_operators WHERE lower(email)=? AND role='owner' AND status='active')",i.to),guard('EXISTS(SELECT 1 FROM pt_tax_deadlines WHERE id=? AND revision=? AND completed_at IS NULL)',i.deadlineId,i.revision)])
 }
 const escaped = (s: string) => s.replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/;/g,'\\;').replace(/,/g,'\\,')
 export function calendar(items: Data[], stamp: string) {

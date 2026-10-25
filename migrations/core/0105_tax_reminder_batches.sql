@@ -1,5 +1,5 @@
 -- Explicit owner review is required for every outbound batch.
-CREATE TABLE pt_tax_reminder_preferences (id INTEGER PRIMARY KEY CHECK(id=1), enabled INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE pt_tax_reminder_preferences (id INTEGER PRIMARY KEY CHECK(id=1), enabled INTEGER NOT NULL DEFAULT 0, owner_id TEXT NOT NULL DEFAULT '', owner_email TEXT NOT NULL DEFAULT '');
 INSERT INTO pt_tax_reminder_preferences(id) VALUES(1);
 CREATE TABLE pt_tax_vendor_stops (contact_id TEXT PRIMARY KEY REFERENCES pt_contacts(id) ON DELETE CASCADE, at TEXT NOT NULL);
 CREATE TABLE pt_tax_reminder_batches (
