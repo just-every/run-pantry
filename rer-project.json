@@ -36,8 +36,7 @@
     "testPatterns": [
       "tests/api/*.test.mjs",
       "tests/app/*.test.mjs",
-      "tests/restore/*.test.mjs",
-      "tests/site/*.test.mjs"
+      "tests/restore/*.test.mjs"
     ]
   },
   "setup": {

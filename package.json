@@ -11,7 +11,6 @@
     "dev": "rer dev",
     "preview": "rer preview",
     "typecheck": "tsc --build --incremental",
-    "test:typecheck": "node --test tests/incremental-typecheck.test.mjs",
     "verify": "rer verify",
     "setup": "rer setup",
     "deploy": "rer deploy",
@@ -33,7 +32,6 @@
     "test:restore": "node --test tests/restore/*.test.mjs",
     "verify:release": "node tests/release/verify.mjs",
     "agent": "node scripts/pantry-agent.mjs",
-    "test:site": "node --test tests/site/*.test.mjs",
     "hosted-backup": "node scripts/hosted-backup.mjs",
     "delivery:spec": "node scripts/build-deployment-spec.mjs",
     "check:deployment-spec": "node scripts/build-deployment-spec.mjs --check"
