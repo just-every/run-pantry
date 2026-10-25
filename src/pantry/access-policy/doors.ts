@@ -56,7 +56,7 @@ export async function assertDoor(c: Context, path: string, body?: Data) {
       requireThat(/^(invoice\.|estimate\.|customer-deposit\.|bill\.|contact\.save$|payment\.|time\.|time-project\.|statement\.|reconciliation\.)/.test(op), 'This action requires access to all bank accounts', 403)
     }
   }
-  if (actor.policy?.maskTin && /1099|w9|w-9/i.test(door)) requireThat(false, 'Tax identity access is masked for your role', 403)
+  if (actor.policy?.maskTin && /1099|w9|w-9/i.test(door) && !/^(vendor-w9\/|missing-w9$)/.test(door)) requireThat(false, 'Tax identity access is masked for your role', 403)
   if (body && limitedBanks(actor)) await checkBankTargets(c, body)
 }
 

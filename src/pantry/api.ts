@@ -1,3 +1,5 @@
+import { taxReadinessCommands, taxReadiness, taxYearPackage } from './tax-readiness'
+import { w9Commands, w9Public, w9Status, missingW9 } from './w9'
 import { askBooks } from './ask'
 import { currencyCommands,currencyView } from './currency'
 import { archiveCommands,archivesView } from './cutover/archives'
@@ -123,7 +125,7 @@ import { estimateCommands, estimatesView, estimate, registerEstimateRoutes } fro
 import { customerDepositCommands, customerDepositsView } from './customer-deposits'
 
 const commands: Record<string, Command> = {
-  ...currencyCommands,...archiveCommands,...collectionCommands, ...standingCommands, ...learningCommands, ...assetCommands, ...dimensionCommands, ...siblingCommands,
+  ...taxReadinessCommands,...w9Commands, ...currencyCommands,...archiveCommands,...collectionCommands, ...standingCommands, ...learningCommands, ...assetCommands, ...dimensionCommands, ...siblingCommands,
   ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...reportDeliveryCommands, ...ruleCommands, ...feedCommands,
@@ -142,6 +144,7 @@ api.use('*', async (c, next) => {
 })
 api.get('/health', c => c.json({ status: 'ok', ...deploymentHealth(c.env) }))
 api.route('/', customer)
+api.route('/', w9Public)
 api.use('/api/pantry/*', async (c, next) => { await next(); c.header('cache-control', 'no-store'); c.header('x-content-type-options', 'nosniff') })
 // Feed syncs that have come due run after an ordinary read answers, as well as on the Cron trigger.
 api.use('/api/pantry/*', async (c, next) => { await next(); if (c.req.method === 'GET' && await anyDue(c.env)) c.executionCtx.waitUntil(runDue(c.env, 2).catch(e => console.error(e))) })
@@ -164,6 +167,10 @@ async function reader(c: C): Promise<Context> {
 }
 
 const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => { const ctx = await reader(c); return c.json(await projectAccess(ctx, await build(ctx, c))) })
+view('tax-readiness',async(ctx,c)=>taxReadiness(ctx,year(c)))
+view('tax-readiness/:year/package',async(ctx,c)=>taxYearPackage(ctx,Number(c.req.param('year'))))
+view('vendor-w9/:id',async(ctx,c)=>w9Status(ctx.db,c.req.param('id')!))
+view('missing-w9',async(ctx,c)=>({vendors:await missingW9(ctx.db,year(c))}))
 view('currency',async ctx=>currencyView(ctx))
 view('document-archives',async ctx=>archivesView(ctx))
 view('collections',async ctx=>collectionsView(ctx))

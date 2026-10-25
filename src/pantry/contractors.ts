@@ -94,6 +94,7 @@ const saveContractor: Command = { need: 'record', async run(c, b) {
   const details = ['legalName', 'tin', 'address', 'city', 'state', 'zip'].some(k => typeof b[k] === 'string' && b[k].trim())
   let last4 = current?.tin_last4 ?? null
   if (details) {
+    statements.push(q('UPDATE pt_contractor_tax SET w9_completed_at=NULL WHERE contact_id=?',vendor.id))
     const raw = typeof b.tin === 'string' ? b.tin.replace(/[\s-]/g, '') : ''
     requireThat(raw || current, 'Enter the TIN from the W-9')
     requireThat(!raw || /^\d{9}$/.test(raw), 'A TIN is nine digits (an SSN, ITIN or EIN)')

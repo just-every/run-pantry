@@ -142,6 +142,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   const invoiceState = await (await context.request.get(`${server.origin}/api/pantry/state`)).json()
   const income = invoiceState.accounts.find(a => a.code === '4000').id, rent = invoiceState.accounts.find(a => a.code === '6100').id
   const customer = invoiceState.contacts.find(c => c.kind === 'customer'), vendor = invoiceState.contacts.find(c => c.kind === 'vendor')
+  const w9Request=await command('w9.request',{contactId:vendor.id,consent:true})
   const branded = await command('invoice-template.save', { name: 'Archived services', layout: 'banner', accentColor: '#174838', textColor: '#202234', termsDays: 45, address: '18 Cedar Street', remitTo: 'Juniper Remittance', paymentInstructions: 'Use invoice reference', footer: 'Thank you', message: 'Archived engagement', fields: [{ key: 'po', label: 'PO number', defaultValue: 'PO-RESTORE' }] })
   const settings = (await (await context.request.get(`${server.origin}/api/pantry/invoice-documents`)).json()).settings
   await command('invoice-document-settings.save', { revision: settings.revision, nextInvoice: 231, defaultTemplateId: branded.id })
@@ -198,6 +199,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
     for(const credential of credentials)assert.ok(!JSON.stringify(item.row).includes(credential),'every archived row excludes credentials')
     if(item.table==='pt_feed_items')assert.deepEqual([item.row.access_token,item.row.status],['','disconnected'])
     if(item.table==='pt_agents')assert.equal(item.row.active,0)
+    if(item.table==='pt_w9_requests')assert.equal(item.row.token_hash,null,'restored W-9 requests cannot reuse private links')
     if(item.table==='pt_estimates')assert.equal(item.row.link_token,null,'restored estimates cannot reuse customer acceptance links')
     if(item.table==='pt_integrations')assert.equal(item.row.revoked_at,'restored')
     if(item.table==='pt_webhook_subscriptions')archivedSubscriptions.push(item.row)
@@ -216,6 +218,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   assert.match(unverified, /erasure history unverified/i)
   await ok(second, ['setup', '--owner-email', 'you@dev.localhost', '--port', String(port2), '--non-interactive'])
   server = await dev(second, port2); context = await signIn(browser, server)
+  assert.equal((await context.request.get(server.origin+new URL(w9Request.url).pathname)).status(),404,'the restored public W-9 request is closed')
   const restored = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(restored.view, before.view, 'the fresh install holds the same books')
   assert.deepEqual(restored.bytes, pdf, 'the document comes back byte for byte')

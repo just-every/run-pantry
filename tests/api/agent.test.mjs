@@ -298,3 +298,6 @@ test('AGENT-007 no-data and unsupported questions produce no invented figures an
   const agent=await h.agent('synthetic-pantry-5')
   assert.equal((await h.send('/api/pantry/ask?question=net+income+October+2026',undefined,{headers:{authorization:'Bearer '+agent.token}})).status,401)
 })
+
+import {readinessJourney} from './w9-journey.mjs'
+test('AGENT-009 tax readiness proposes W-9 requests, shows nexus and deadlines and packages open questions',readinessJourney)

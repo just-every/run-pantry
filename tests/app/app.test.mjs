@@ -522,3 +522,6 @@ test('REPORT-007 dedicated exports and owner-consented lender delivery on month 
 test('Managed relay delivers owner sign-in links and unconfigured mail refuses by name', managedMailJourney)
 
 test('AGENT-007 calculated answers, citations and saved reports at 1440 and 390', askJourney)
+
+import {w9Browser} from './w9-request-journey.mjs'
+test('TAXFORM-003 and AGENT-009 private request certification and readiness at 1440 and 390',w9Browser)

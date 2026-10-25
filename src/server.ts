@@ -33,7 +33,7 @@ export default withDemo({
     const lobby = await lobbyResponse(request, runtimeBindings(env), identity)
     if (lobby) return lobby
     // Retained invoice and estimate customer links use the API's public routes.
-    if (/^\/(i|e)\//.test(new URL(request.url).pathname)) return api.fetch(request, env, execution)
+    if (/^\/(i|e|w9)\//.test(new URL(request.url).pathname)) return api.fetch(request, env, execution)
     return dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request)))
   },
   // Cron: bank and card feed pulls (each connection is due every few hours, sooner after a webhook),

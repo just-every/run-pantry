@@ -1,5 +1,6 @@
 // Fiscal boundaries and readiness of records Pantry currently holds. These
 // checks never claim that an external return or payroll filing was verified.
+import { missingW9 } from './w9'
 import { all } from './db'
 import { contractors } from './contractors'
 import { prevDay } from './reports'
@@ -35,7 +36,9 @@ export async function yearEndChecks(db: D1Database, year: number, startMonth: nu
   })
   const totals = { gross: 0, employerTax: 0, withheld: 0, net: 0, debit: 0 }
   for (const p of payroll) { totals.gross += p.gross_cents; totals.employerTax += p.employer_tax_cents; totals.withheld += p.withheld_cents; totals.net += p.net_cents; totals.debit += p.debit_cents }
+  const w9 = await missingW9(db,taxYear)
   const checks = [
+    {key:'year-end-w9',title:'Paid vendors without a W-9',ok:w9.length===0,detail:`${w9.length} paid vendors lack a certified W-9. Review classification with the accountant.`,items:w9.map(v=>({kind:'vendor',id:v.id,label:`${v.name}: W-9 ${v.w9.status}`}))},
     { key: 'year-end-1099', title: `1099 readiness · calendar ${taxYear}`, ok: missing.length === 0 && unknown.length === 0 && tax.otherBoxes.length === 0 && !tax.contractors.some(c => c.backupWithholding),
       detail: `${tax.forms.length} forms; ${missing.length} missing TIN and address; ${unknown.length} contractors with unknown payment methods; ${tax.unmarked.length} paid vendors to review for classification. ${tax.otherBoxes.length} vendors use a MISC box requiring separate filing review; ${tax.contractors.filter(c => c.backupWithholding).length} backup-withholding flags require review. Filing and recipient delivery are not verified here.`,
       items: [...tax.otherBoxes.map(c => ({ kind: 'vendor', id: c.id, label: `${c.name}: ${c.taxBox} needs separate filing review` })), ...tax.contractors.filter(c => c.backupWithholding).map(c => ({ kind: 'vendor', id: c.id, label: `${c.name}: review backup withholding` })), ...missing.map(f => ({ kind: 'vendor', id: f.id, label: `${f.name}: missing filing details` })), ...unknown.map(c => ({ kind: 'vendor', id: c.id, label: `${c.name}: payment methods unknown` }))] },

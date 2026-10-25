@@ -1,4 +1,5 @@
 // Agent work, documents and the activity record.
+import { TaxReadiness } from './tax-readiness'
 import { useRef } from 'react'
 import { Action, Card, Chip, command, Details, Empty, Field, FileLink, Form, Loading, PageHead, Table, day, readFileBase64, usd, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
@@ -23,6 +24,7 @@ export function Agents() {
   const waiting = data.proposals.filter((p: D) => p.status === 'proposed'), decided = data.proposals.filter((p: D) => p.status !== 'proposed')
   return <>
     <PageHead title="Agent work" lead="Your agent prepares; a person approves. Approval re-checks every record the agent cited, the period lock and your role." />
+    <TaxReadiness />
     {!waiting.length && <Card title="Nothing waiting" className="empty-card"><Empty><p>No proposals are waiting. {shared.state.actor.can.owner ? 'Create an agent token in People & settings, then follow Agent work in the Pantry docs.' : ''}</p></Empty></Card>}
     {waiting.map((p: D) => <Card key={p.id} title={<><Icon name="agent" /> {KIND[p.kind]} from {p.agent_name}</>} actions={<Chip tone="agent">Proposed</Chip>}>
       <p><strong>{p.summary}</strong></p>
