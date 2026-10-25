@@ -74,6 +74,11 @@ export async function w9Journey(t) {
   assert.equal(h.mail.length, mailBeforeRequests, 'requests, certification and reads send nothing')
   const accountant = await h.member('synthetic-pantry-w9-cpa@example.test', 'accountant')
   await h.command('w9.evidence', { contactId: v.id }, accountant, 403)
+  await h.command('contractor.step-up', {}, accountant)
+  const accountantMail = h.mail.findLast(m => [m.to].flat().includes('synthetic-pantry-w9-cpa@example.test'))
+  const accountantToken = new URL(accountantMail.text.match(/http:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get('token')
+  assert.equal((await h.send('/auth/confirm', { token: accountantToken }, { cookie: accountant })).status, 303)
+  await h.command('w9.evidence', { contactId: v.id }, accountant, 403)
   await h.command('contractor.step-up', {})
   const mail = h.mail.findLast((m) => [m.to].flat().includes('owner@example.test')),
     token = new URL(mail.text.match(/http:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get(
