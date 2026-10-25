@@ -81,9 +81,7 @@ export function TaxReadiness() {
               <Form label="Save deadline" submit={(b) => command('tax.deadline', b)} onDone={reload}>
                 <Field label="Deadline description" name="label" required />
                 <Field label="Due date" name="dueDate" type="date" required />
-                {data.canSetDeadlines && (
-                  <Field label="Estimated amount" name="amount" />
-                )}
+                <Field label="Estimated amount" name="amount" />
               </Form>
             </details>
           )}

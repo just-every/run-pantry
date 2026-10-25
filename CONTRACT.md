@@ -684,8 +684,8 @@ The 23 October ct split (REST rule, ruled at `3961a00`) moves TAXFORM-001's unbu
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 19 | 0 | 0 | 19 |
-| Target and push further | 56 | 45 | 21 | 122 |
-| All | 75 | 45 | 21 | 141 |
+| Target and push further | 58 | 43 | 23 | 124 |
+| All | 77 | 43 | 23 | 143 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |

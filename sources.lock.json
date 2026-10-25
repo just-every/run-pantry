@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "70aaeb9013d1ea1674d3a8c568b9f42396b88c6818f645ae5333c69fc1030047",
+      "sha256": "8e67357d6f23c69e265cee23a62f05fb2ada9ccc68076d2f7a8dc5fcf7fa32ae",
       "executable": false
     },
     "DEMO.md": {
@@ -5267,7 +5267,7 @@
       "executable": false
     },
     "src/ui/tax-readiness.tsx": {
-      "sha256": "8250076f95a71af4a39f1bad3e1617b10283cdc7a95184908d8373b9882fee44",
+      "sha256": "f827fe5fea93a2f9b6c6bad943518aa7e64991b2caf1c1b28bc6bdb714df4204",
       "executable": false
     },
     "src/ui/time.tsx": {
@@ -5519,7 +5519,7 @@
       "executable": false
     },
     "tests/api/w9-journey.mjs": {
-      "sha256": "00f119bb8c3d6ced61dfd11fd632335697a423e3ace2e3be01995d1c1800036e",
+      "sha256": "8cc939a63fd4af62ac515aee7fbb0c4efcbb2e15291f886e8522626e1ec899e4",
       "executable": false
     },
     "tests/api/webhook-journey.mjs": {
@@ -5727,7 +5727,7 @@
       "executable": false
     },
     "tests/app/w9-request-journey.mjs": {
-      "sha256": "029c5fc9f206c006668d00dad2e89641d01810a17520ff1d6be056bcec997cad",
+      "sha256": "3df1d0ced507b9dbb095726792501ea90a35d22a43d1b1dc802209a120a4c534",
       "executable": false
     },
     "tests/app/webhook-journey.mjs": {
