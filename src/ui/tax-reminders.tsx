@@ -85,7 +85,7 @@ export function TaxReminders({ year }: { year: number }) {
         <Table heads={['Vendor', 'Include', 'Email permission']} empty="No vendors available for a W-9 email.">
           {data.vendors.map(vendor => <tr key={vendor.id}>
             <td>{vendor.name}<span className="sub block" style={{ overflowWrap: 'anywhere' }}>{vendor.email || 'No email recorded'}</span></td>
-            <td><label className="check"><input type="checkbox" checked={selected.includes(vendor.id)} disabled={busy || vendor.optedOut || !vendor.email || (!selected.includes(vendor.id) && selected.length >= data.batchCap)} onChange={event => {
+            <td><label className="check"><input type="checkbox" checked={selected.includes(vendor.id)} disabled={busy || (!selected.includes(vendor.id) && (vendor.optedOut || !vendor.email || selected.length >= data.batchCap))} onChange={event => {
               setSelected(current => event.target.checked ? [...current, vendor.id] : current.filter(id => id !== vendor.id)); setBatch(null)
             }} /> Include {vendor.name}</label></td>
             <td>{vendor.optedOut ? 'Stopped · opt-out retained' : <Action disabled={busy} run={() => change(async () => {
