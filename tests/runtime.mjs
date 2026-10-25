@@ -14,13 +14,14 @@ await new Promise(resolve => socket.close(resolve))
 // The installed homepage reads the claim state from D1: run the emitted Worker
 // on its own migrated store, never the checkout's local data.
 const persist = await mkdtemp(join(tmpdir(), 'foundation-runtime-'))
-execFileSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'd1', 'migrations', 'apply', 'foundation', '--local', '--persist-to', persist, '--config', 'dist/server/wrangler.json'], { stdio: 'pipe', maxBuffer: 8 * 1024 * 1024, env: { ...process.env, CI: '1', WRANGLER_SEND_METRICS: 'false' } })
-const worker = spawn(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'dev', '--inspector-port', '0', '--local', '--persist-to', persist, '--ip', '127.0.0.1', '--config', 'dist/server/wrangler.json', '--port', String(port)], { stdio: ['ignore', 'pipe', 'pipe'] })
-let output = ''
-worker.stdout.on('data', chunk => { output += chunk })
-worker.stderr.on('data', chunk => { output += chunk })
-const origin = `http://127.0.0.1:${port}`
+let worker
 try {
+  execFileSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'd1', 'migrations', 'apply', 'foundation', '--local', '--persist-to', persist, '--config', 'dist/server/wrangler.json'], { stdio: 'pipe', maxBuffer: 8 * 1024 * 1024, env: { ...process.env, CI: '1', WRANGLER_SEND_METRICS: 'false' } })
+  worker = spawn(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'dev', '--inspector-port', '0', '--local', '--persist-to', persist, '--ip', '127.0.0.1', '--config', 'dist/server/wrangler.json', '--port', String(port)], { stdio: ['ignore', 'pipe', 'pipe'] })
+  let output = ''
+  worker.stdout.on('data', chunk => { output += chunk })
+  worker.stderr.on('data', chunk => { output += chunk })
+  const origin = `http://127.0.0.1:${port}`
   let ready = false
   for (let attempt = 0; attempt < 120; attempt++) {
     if (worker.exitCode !== null) throw new Error(output)
@@ -42,7 +43,11 @@ try {
   }
   console.log('HTTP-001 passed against emitted local Worker: health, the installed homepage, HTTP and document 404s')
 } finally {
-  worker.kill('SIGTERM')
-  await new Promise(resolve => worker.exitCode !== null ? resolve() : worker.once('exit', resolve))
+  if (worker && worker.exitCode === null && worker.signalCode === null) {
+    worker.kill('SIGTERM')
+    await new Promise(resolve => worker.once('exit', resolve))
+  }
   await rm(persist, { recursive: true, force: true })
+  // wrangler dev keeps its scratch (.wrangler/tmp) beside the config it runs, which here is the emitted Worker; the artifact producer refuses that folder in dist/server, so leave the build output as rer build wrote it.
+  await rm('dist/server/.wrangler', { recursive: true, force: true })
 }

@@ -5687,7 +5687,7 @@
       "executable": false
     },
     "tests/app/worker.mjs": {
-      "sha256": "6f7ae3e6bfb5a0db1a2da96267fdd13a662d6d6d8dba62438c9d8bf06e3e066e",
+      "sha256": "7fba2460d04e1e325b7d49f716879ba9eb8db8a3c5503183d0a99068397201d6",
       "executable": false
     },
     "tests/app/year-end.test.mjs": {
@@ -5747,7 +5747,7 @@
       "executable": false
     },
     "tests/runtime.mjs": {
-      "sha256": "cf2c79d41d1ed711db8cd88fa8047c0ac1c2aa298bb332ce0a8a68947e904588",
+      "sha256": "d4e487c416edd0aacee472b9317653c05fec8f283ce02cec4697aa768f83934e",
       "executable": false
     },
     "tests/siblings/estimates.test.mjs": {
