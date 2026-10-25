@@ -30,10 +30,12 @@ const send:Command={need:'owner',async run(c,b){owner(c);requireThat(b.consent==
   for (const item of items) {
     // Recheck current consent and source at every network boundary. Never retry a claimed batch.
     try {
+      requireThat(now().slice(0,10)===day,'The batch day changed; prepare a fresh batch',409)
       await run(c.db,[authority(c.actor,'owner'),...(row.kind==='tax'?[enabled(c)]:[]),...itemGuards([item])])
       let body=item.body
       if(item.contactId){const link=await w9Commands['w9.request'].run(c,{contactId:item.contactId,contactRevision:item.contactRevision,consent:true});body+=`\n\n${link.url}`}
       await run(c.db,[authority(c.actor,'owner'),...(row.kind==='tax'?[enabled(c)]:[]),...itemGuards([item])])
+      requireThat(now().slice(0,10)===day,'The batch day changed; prepare a fresh batch',409)
       const result=await sendReviewedTaxMail(c.env,item.to,item.subject,body,`${row.id}-${outcomes.length}`)
       outcomes.push({to:item.to,...result})
     } catch { outcomes.push({to:item.to,status:'uncertain',detail:'The current source check or mail route did not confirm delivery; no automatic retry.'}) }
