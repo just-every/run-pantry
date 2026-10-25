@@ -3,6 +3,7 @@
 // page string and command is in run.json; nothing here reads installation data.
 import type { ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { hostingPageHtml } from '../base/hosting-page'
 import { contractPageHtml } from '../base/contract-page'
 import { runPageHtml, siteNotFoundHtml, type RunData, type SiteBuild, type SiteContext } from '../base/run-site'
 import { identity } from '../identity'
@@ -18,7 +19,7 @@ const COPY = "document.querySelectorAll('.docs-copy').forEach(b=>{b.hidden=false
 
 const SHARE_IMAGE = `${identity.runSite}/site/share.jpg`
 
-export function sitePages({ styles, contract }: SiteContext): SiteBuild {
+export function sitePages({ styles, contract, hosting }: SiteContext): SiteBuild {
   const data: RunData = run
   const homepageHeader = { html: renderToStaticMarkup(<SiteHeader />), styles }
   const document = (title: string, description: string, body: ReactElement, script = '') => '<!doctype html>' + renderToStaticMarkup(
@@ -56,7 +57,9 @@ export function sitePages({ styles, contract }: SiteContext): SiteBuild {
       { path: '/run', html: runPageHtml(identity, data, contract, homepageHeader).replace('<main>', '<main id="main">') },
       ...(contract ? [{ path: '/contract', html: contractPageHtml(identity, data, contract) }] : []),
       { path: '/docs', html: document(...head(), <DocsIndex />) },
-      ...docsPages.map(page => ({ path: `/docs/${page.slug}`, html: document(...head(page.slug), <DocsArticle slug={page.slug} />, COPY) })),
+      ...docsPages.map(page => ({ path: `/docs/${page.slug}`, html: page.slug === 'hosting'
+        ? hostingPageHtml(identity, data, hosting ?? null, contract, { ...homepageHeader, html: renderToStaticMarkup(<SiteHeader current="docs" />) }).replace('<main>', '<main id="main">')
+        : document(...head(page.slug), <DocsArticle slug={page.slug} />, COPY) })),
       { path: '/404', html: siteNotFoundHtml(identity, data) },
     ],
     assets: ['rer-theme.css', 'fonts', 'brand', 'site', 'favicon.ico', 'apple-touch-icon.png'],
