@@ -172,7 +172,7 @@ export async function w9Browser(t) {
     assert.ok(file.suggestedFilename().endsWith('.ics'))
     const calendar = await readFile(await file.path(), 'utf8')
     assert.match(calendar, /BEGIN:VCALENDAR/)
-    assert.match(calendar, /estimate/)
+    assert.match(calendar.replace(/\r\n[ \t]/g,''), /estimate/)
     await page.getByRole('button', { name: `Stop email to ${reminderVendor.name}`, exact: true }).click()
     await page.getByText('Stopped · opt-out retained', { exact: true }).first().waitFor()
     await icons(page)

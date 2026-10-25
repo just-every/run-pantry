@@ -53,7 +53,7 @@ export async function taxReminderJourney(t) {
   const calendar=await call('tax-reminders.calendar',{year:2026,consent:true})
   assert.match(calendar.calendar,/DTSTART;VALUE=DATE:20261215/)
   assert.match(calendar.calendar,/BEGIN:VALARM/)
-  assert.match(calendar.calendar,/estimate/)
+  assert.match(calendar.calendar.replace(/\r\n[ \t]/g,''),/estimate/)
   assert.ok(calendar.calendar.split('\r\n').every(line=>Buffer.byteLength(line)<=75))
   await call('tax-reminders.preference',{enabled:false})
   await call('tax-reminders.send',{id:taxes.id,consent:true},409)
