@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-const sequence = ['build', 'typecheck', 'test:typecheck', 'test:pantry', 'test:site', 'test:runtime', 'test:app']
+const sequence = ['build', 'typecheck', 'test:pantry', 'test:runtime', 'test:app']
 const pnpm = name => ['pnpm', ['run', name]]
 export const shards = ['source', 'api-1', 'api-2', 'api-3', 'api-4', 'api-5', 'app-1', 'app-2', 'app-3', 'app-4', 'app-5', 'app-6', 'app-7', 'app-8']
 

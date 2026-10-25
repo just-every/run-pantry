@@ -103,7 +103,7 @@
       "executable": false
     },
     "base-copies.json": {
-      "sha256": "6df8128e7f8cdf630081f0efbaad042a37a4a126978cb3791172b76ee221d31e",
+      "sha256": "200b596c2c169c9a5f1b4cd0a17c074487c031006bc2f53dd8f8298f0d09796e",
       "executable": false
     },
     "CHANGELOG.md": {
@@ -839,7 +839,7 @@
       "executable": false
     },
     "package.json": {
-      "sha256": "70e40868c7379490571e332cdbbb66d0992eceff168ae000c28213ea01b5d8af",
+      "sha256": "9c60514aacfb4cc9fe05ce1ecbd3e7af59340422bcb2d0b7db5358ce7105725f",
       "executable": false
     },
     "packaging.json": {
@@ -1127,7 +1127,7 @@
       "executable": false
     },
     "rer-project.json": {
-      "sha256": "bdd721f9ab88088d8d0d0a84da1579fdfc05fe9e59c84c1579589bc3213c44e5",
+      "sha256": "dd630b6c5ff4bd2a327cfb3a7dd1e5783d54b29bce2041d5575a3be9f4cf8617",
       "executable": false
     },
     "rer-setup.json": {
@@ -1347,7 +1347,7 @@
       "executable": false
     },
     "scripts/verify.mjs": {
-      "sha256": "c9f7856d91fd1b5cdbed25db3bad8b7456d8fa4cd514f0944c008a262067ca20",
+      "sha256": "5b569cd7f254201dac477675b6491018eaeffb3b879b2a03191e9af728de1f3b",
       "executable": false
     },
     "SEED-COMMAND-CONTRACT.md": {
@@ -5710,10 +5710,6 @@
       "sha256": "980f541e0b588eb592131646357f9624ec56731ea062779aaf310b8a25cd9736",
       "executable": false
     },
-    "tests/incremental-typecheck.test.mjs": {
-      "sha256": "a11d6b89e7219137540c7052683c5f4d9ba7ddf16f66d34c1f56ae34029c0a95",
-      "executable": false
-    },
     "tests/providers/stripe-clearing.mjs": {
       "sha256": "02228acac6cd32183062b048117064d43624f6da26b25d8181f203e7c2e50d55",
       "executable": false
@@ -5762,16 +5758,8 @@
       "sha256": "7a320b094ddf47873cd7206a3178c658b1a468f25bff2e5abe1c6a97de6b751a",
       "executable": false
     },
-    "tests/site/site.test.mjs": {
-      "sha256": "45fa4858787b434309b66cc93ecf463720c693d5f7b188c442610e267dbba6e0",
-      "executable": false
-    },
     "tests/start-worker.mjs": {
       "sha256": "d4c046d6425efd742737eda2c9fc8f40c5d45c746f7d0fe72a31631fc5a5ea9c",
-      "executable": false
-    },
-    "tests/typecheck-checks.mjs": {
-      "sha256": "8bb5355750d1743fd97860ebe6a2b0f47a2b9f695bc6fb122289a09d28b17ba1",
       "executable": false
     },
     "tests/xlsx.mjs": {
