@@ -1,0 +1,10 @@
+{
+  "version": "0.2.7",
+  "previousVersion": "0.2.6",
+  "date": "2026-10-25",
+  "publicReleaseNotes": "Pantry adds a real app capture of the Juniper Lane Design demo books for its listing, a direct Run Pantry link, and an explicit declaration that uploaded documents are stored in D1. The rer pin remains 0.2.80 and no migrations change.",
+  "extensionPointChanges": [],
+  "migrations": [],
+  "breaking": false,
+  "agentUpdateInstructions": "Before updating local books, stop Pantry with rer dev --stop and save a private archive with rer export --output exports/pantry-before-0.2.7.rer. For hosted books use node scripts/hosted-backup.mjs with the private environment file as documented in docs/backup.md; rer export covers local books only. Retain the exact source, .rer deployment records and private settings. Pull the accepted source, then use rer dev locally or rer deploy with the same private environment file for owner-account hosting. Preserve every applied migration name and byte; never reset populated books to update. Run rer verify and the release upgrade checks before adopting. The checkout pins rer 0.2.80. Registry publication and platform source qualification are separate from building the delivery artifact. Managed hosting supplies its relay URL, sender and private mail credential. Assisted hosting requires the selected provider, verified sender and provider credentials in setup; Cloudflare also requires its account ID. Local development suppresses mail."
+}

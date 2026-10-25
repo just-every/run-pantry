@@ -1,8 +1,8 @@
 {
-  "version": "0.2.7",
-  "previousVersion": "0.2.6",
+  "version": "0.2.8",
+  "previousVersion": "0.2.7",
   "date": "2026-10-25",
-  "publicReleaseNotes": "Pantry adds a real app capture of the Juniper Lane Design demo books for its listing, a direct Run Pantry link, and an explicit declaration that uploaded documents are stored in D1. The rer pin remains 0.2.80 and no migrations change.",
+  "publicReleaseNotes": "Pantry keeps the exact rer 0.2.80 pin and refreshed Base delivery sources, and clears runtime test state from the built server so the native delivery artifact succeeds after verification on Linux. The existing app capture, direct Run Pantry link and D1 document storage declaration are retained. No migrations change.",
   "extensionPointChanges": [],
   "migrations": [],
   "breaking": false,
