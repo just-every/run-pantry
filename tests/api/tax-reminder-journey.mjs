@@ -24,6 +24,7 @@ export async function taxReminderJourney(t) {
   assert.equal(sent.outcomes[0].status,'accepted')
   assert.deepEqual([h.mail.at(-1).to].flat(),[v.email],'send uses immutable reviewed recipients')
   assert.ok(h.mail.at(-1).text.startsWith(first.items[0].body))
+  assert.equal(h.mail.at(-1).subject,first.items[0].subject)
   const privatePath=new URL(h.mail.at(-1).text.match(/http:\/\/[^\s]+\/w9\/[a-f0-9]+/)[0]).pathname
   assert.equal((await h.send(privatePath,undefined,{headers:{'x-synthetic-pantry-clock':clock}})).status,200)
   const stored=await h.db.prepare('SELECT items FROM pt_tax_reminder_batches WHERE id=?').bind(first.id).first()
@@ -59,7 +60,10 @@ export async function taxReminderJourney(t) {
   await call('tax-reminders.send',{id:taxes.id,consent:true},409)
   await call('tax-reminders.calendar',{year:2026,consent:true},409)
   await call('tax-reminders.preference',{enabled:true})
-  await call('tax-reminders.send',{id:taxes.id,consent:true})
+  const beforeConcurrentSend=h.mail.length
+  const concurrent=await Promise.all([1,2].map(()=>h.send('/api/pantry/command/tax-reminders.send',{id:taxes.id,consent:true},{cookie:h.owner,headers:{'x-synthetic-pantry-clock':clock}})))
+  assert.deepEqual(concurrent.map(r=>r.status).sort(),[200,409],'concurrent approval sends the batch once')
+  assert.equal(h.mail.length,beforeConcurrentSend+1)
   assert.deepEqual([h.mail.at(-1).to].flat(),['owner@example.test'])
   const changed=await call('tax-reminders.prepare',{kind:'tax',year:2026})
   const old=(await h.view('tax-readiness?year=2026')).deadlines.find(x=>x.id===d.id)
