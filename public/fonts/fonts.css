@@ -227,11 +227,8 @@ html.rer-themed label:has(input[type=checkbox]) { align-items: center; gap: 12px
 }
 
 /* Base's Run page (/run) and not-found page, in the same look: heavier display
-   type, white step cards on the lavender paper, navy numerals. */
+   type and the navy command card on lavender paper. */
 body:has(> main > .intro) h1, body:has(> main > .hero) h1 { font-weight: 800; letter-spacing: -.045em; word-spacing: .04em; }
-body:has(> main > .intro) .step { border-radius: 22px; border-color: var(--line); background: var(--surface); box-shadow: var(--shadow-card); }
-body:has(> main > .intro) .num { background: var(--ink); color: #fff; font-weight: 800; }
-body:has(> main > .intro) .step h2 { font-weight: 750; letter-spacing: -.03em; }
 body:has(> main > .intro) .code { background: var(--terminal); }
 body:has(> main) .brand span { font-weight: 700; }
 body:has(> main > .intro), body:has(> main > .hero) { background: var(--glow), var(--paper); }

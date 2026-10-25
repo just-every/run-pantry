@@ -104,6 +104,3 @@
 }
 @media (prefers-reduced-motion: reduce) { .docs-card, .docs-pager-link { transition: none; } .docs-card:hover, .docs-pager-link:hover { transform: none; } }
 
-.run-guide { max-width: 740px; margin-inline: auto; }
-.run-guide .docs-code pre { white-space: pre-wrap; overflow-wrap: anywhere; padding-top: 54px; }
-.run-guide .docs-code-head { display: block; }
