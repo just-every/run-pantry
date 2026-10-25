@@ -1,59 +1,189 @@
 import assert from 'node:assert/strict'
-import {books,harness} from './harness.mjs'
-const details={legalName:'Synthetic contractor',businessName:'Synthetic services',classification:'individual',tinKind:'ein',tin:'000000123',address:'1 Synthetic Lane',city:'Albany',state:'NY',zip:'12207',signature:'Synthetic contractor',certify:'yes'}
-export async function w9Journey(t){
- const h=await harness();t.after(()=>h.close());const {acct}=await books(h),v=await h.command('contact.save',{kind:'vendor',name:'Synthetic contractor',is1099:true}),bank=await h.command('bank-account.save',{name:'Synthetic checking',institution:'Example',accountId:acct['1000'],numberLast4:'0123',openingDate:'2025-01-01',openingBalance:'0'})
- await h.command('payment.record',{direction:'paid',contactId:v.id,date:'2025-06-01',amount:'2400',bankAccountId:bank.id,method:'ach'})
- const keeper=await h.member('synthetic-pantry-keeper@example.test','bookkeeper'),sales=await h.member('synthetic-pantry-sales@example.test','sales')
- await h.command('w9.request',{contactId:v.id,consent:true},keeper,403)
- await h.command('w9.request',{contactId:v.id},h.owner,400)
- const first=await h.command('w9.request',{contactId:v.id,consent:true}),request=await h.command('w9.request',{contactId:v.id,consent:true}),path=new URL(request.url).pathname
- assert.equal((await h.send(new URL(first.url).pathname)).status,404)
- assert.equal((await h.send(path)).status,200);assert.equal((await h.send(path)).headers.get('referrer-policy'),'no-referrer')
- const post=(body,headers={})=>h.send(path,undefined,{raw:new URLSearchParams(body).toString(),headers:{'content-type':'application/x-www-form-urlencoded',...headers}})
- assert.equal((await post({...details,certify:''})).status,400)
- assert.equal((await post(details,{origin:'https://example.test'})).status,403)
- assert.equal((await post({...details,tin:'bad'})).status,400)
- assert.equal((await h.view('missing-w9?year=2025')).vendors[0].id,v.id)
- assert.equal((await h.view('year-end/2025')).checks.find(c=>c.key==='year-end-w9').ok,false)
- assert.equal((await post(details)).status,200)
- assert.equal((await post(details)).status,404,'one-use submission')
- assert.equal((await h.send(path)).status,404)
- assert.equal((await h.view(`vendor-w9/${v.id}`,keeper)).status,'complete')
- assert.equal((await h.view('missing-w9?year=2025')).vendors.length,0)
- assert.equal((await h.view('year-end/2025')).checks.find(c=>c.key==='year-end-w9').ok,true)
- const stored=await h.db.prepare('SELECT * FROM pt_contractor_tax WHERE contact_id=?').bind(v.id).first()
- assert.equal(stored.tin_last4,'0123');assert.ok(!JSON.stringify(stored).includes(details.tin));assert.ok(!stored.w9_evidence_sealed.includes(details.signature))
- assert.ok(!JSON.stringify(await h.view('reports/contractors?year=2025',keeper)).includes(details.tin))
- await h.command('w9.evidence',{contactId:v.id},keeper,403)
- await h.command('w9.evidence',{contactId:v.id},h.owner,403)
- await h.command('contractor.step-up',{})
- const mail=h.mail.findLast(m=>[m.to].flat().includes('owner@example.test')),token=new URL(mail.text.match(/http:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get('token')
- assert.equal((await h.send('/auth/confirm',{token},{cookie:h.owner})).status,303)
- assert.equal((await h.command('contractor.reveal',{contactId:v.id})).tin,details.tin)
- assert.equal((await h.command('w9.evidence',{contactId:v.id})).evidence.electronicConsent,true)
- await h.view(`vendor-w9/${v.id}`,sales,403)
- const audit=await h.view('activity');assert.ok(!JSON.stringify(audit).includes(details.tin))
- const revoked=await h.command('w9.request',{contactId:v.id,consent:true});await h.command('w9.revoke',{contactId:v.id});assert.equal((await h.send(new URL(revoked.url).pathname)).status,404)
- const stale=await h.command('w9.request',{contactId:v.id,consent:true});await h.command('contact.save',{...v,kind:'vendor',name:'Changed contractor'});assert.equal((await h.send(new URL(stale.url).pathname)).status,404)
- const expired=await h.command('w9.request',{contactId:v.id,consent:true});assert.equal((await h.send(new URL(expired.url).pathname,undefined,{headers:{'x-synthetic-pantry-clock':'2100-01-01T12:00:00Z'}})).status,404)
+import { books, harness } from './harness.mjs'
+const details = {
+  legalName: 'Synthetic contractor',
+  businessName: 'Synthetic services',
+  classification: 'individual',
+  tinKind: 'ein',
+  tin: '000000123',
+  address: '1 Synthetic Lane',
+  city: 'Albany',
+  state: 'NY',
+  zip: '12207',
+  signature: 'Synthetic contractor',
+  certify: 'yes',
 }
-export async function readinessJourney(t){
- const h=await harness();t.after(()=>h.close());const {acct}=await books(h),v=await h.command('contact.save',{kind:'vendor',name:'Synthetic tax-ready contractor'}),customer=await h.command('contact.save',{kind:'customer',name:'Synthetic NJ customer'}),bank=await h.command('bank-account.save',{name:'Checking',institution:'Example',accountId:acct['1000'],numberLast4:'0123',openingDate:'2025-01-01',openingBalance:'0'})
- await h.command('payment.record',{direction:'paid',contactId:v.id,date:'2025-06-01',amount:'2400',bankAccountId:bank.id,method:'ach'})
- const inv=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2025-09-01',destinationState:'NJ',lines:[{description:'Synthetic services',quantity:'1',rate:'85000',accountId:acct['4000'],taxCode:'exempt'}]});await h.command('invoice.approve',{id:inv.id,revision:inv.revision});await h.command('invoice.issue',{id:inv.id})
- const accountant=await h.member('synthetic-pantry-cpa@example.test','accountant'),keeper=await h.member('synthetic-pantry-book@example.test','bookkeeper')
- await h.command('tax.deadline',{label:'Accountant estimated tax',dueDate:'2026-01-20',amount:'400'},h.owner,403)
- const d=await h.command('tax.deadline',{label:'Accountant estimated tax',dueDate:'2026-01-20',amount:'400'},accountant)
- const read=async path=>{const r=await h.send('/api/pantry/'+path,undefined,{cookie:accountant,headers:{'x-synthetic-pantry-clock':'2026-01-15T12:00:00Z'}});assert.equal(r.status,200,JSON.stringify(r.value));return r.value}
- const r=await read('tax-readiness?year=2025')
- assert.equal(r.w9Proposals[0].paid,240000);assert.equal(r.w9Proposals[0].requiresOwnerApproval,true)
- assert.equal(r.nexus.find(s=>s.state==='NJ').reached,8500)
- assert.equal(r.deadlines.find(x=>x.id===d.id).amount_cents,40000);assert.equal(r.deadlines.find(x=>x.id===d.id).reminder,true);assert.equal(r.deadlines.find(x=>x.id==='nec-2025').reminder,true)
- await h.view('tax-readiness?year=2025',keeper,403)
- const entry=await h.command('journal.save-draft',{date:'2025-12-31',memo:'Synthetic open question',lines:[{accountId:acct['6000'],debit:'10'},{accountId:acct['1000'],credit:'10'}]});await h.command('journal.post',{id:entry.id,revision:entry.revision})
- const question=(await h.command('question.ask',{subjectKind:'journal',subjectId:entry.id,question:'Please review the tax classification.',assignee:'synthetic-pantry-cpa@example.test'})).question
- const pack=await read('tax-readiness/2025/package');assert.ok(pack.openQuestions.some(q=>q.id===question.id));assert.equal(pack.yearEnd.year,2025);assert.equal(pack.accountantPackage.period.id,'2025-12');assert.equal(pack.readiness.w9Proposals[0].contactId,v.id)
- const request=await h.command('w9.request',{contactId:v.id,consent:true});assert.equal((await h.send(new URL(request.url).pathname)).status,200)
- assert.equal((await read('tax-readiness?year=2025')).w9Proposals[0].status,'requested')
+export async function w9Journey(t) {
+  const h = await harness()
+  t.after(() => h.close())
+  const { acct } = await books(h),
+    v = await h.command('contact.save', { kind: 'vendor', name: 'Synthetic contractor', is1099: true }),
+    bank = await h.command('bank-account.save', {
+      name: 'Synthetic checking',
+      institution: 'Example',
+      accountId: acct['1000'],
+      numberLast4: '0123',
+      openingDate: '2025-01-01',
+      openingBalance: '0',
+    })
+  await h.command('payment.record', {
+    direction: 'paid',
+    contactId: v.id,
+    date: '2025-06-01',
+    amount: '2400',
+    bankAccountId: bank.id,
+    method: 'ach',
+  })
+  const keeper = await h.member('synthetic-pantry-keeper@example.test', 'bookkeeper'),
+    sales = await h.member('synthetic-pantry-sales@example.test', 'sales')
+  await h.command('w9.request', { contactId: v.id, consent: true }, keeper, 403)
+  await h.command('w9.request', { contactId: v.id }, h.owner, 400)
+  const first = await h.command('w9.request', { contactId: v.id, consent: true }),
+    request = await h.command('w9.request', { contactId: v.id, consent: true }),
+    path = new URL(request.url).pathname
+  assert.equal((await h.send(new URL(first.url).pathname)).status, 404)
+  assert.equal((await h.send(path)).status, 200)
+  assert.equal((await h.send(path)).headers.get('referrer-policy'), 'strict-origin')
+  const post = (body, headers = {}) =>
+    h.send(path, undefined, {
+      raw: new URLSearchParams(body).toString(),
+      headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
+    })
+  assert.equal((await post({ ...details, certify: '' })).status, 400)
+  assert.equal((await post(details, { origin: 'https://example.test' })).status, 403)
+  assert.equal((await post({ ...details, tin: 'bad' })).status, 400)
+  assert.equal((await h.view('missing-w9?year=2025')).vendors[0].id, v.id)
+  assert.equal((await h.view('year-end/2025')).checks.find((c) => c.key === 'year-end-w9').ok, false)
+  assert.equal((await post(details)).status, 200)
+  assert.equal((await post(details)).status, 404, 'one-use submission')
+  assert.equal((await h.send(path)).status, 404)
+  assert.equal((await h.view(`vendor-w9/${v.id}`, keeper)).status, 'complete')
+  assert.equal((await h.view('missing-w9?year=2025')).vendors.length, 0)
+  assert.equal((await h.view('year-end/2025')).checks.find((c) => c.key === 'year-end-w9').ok, true)
+  const stored = await h.db.prepare('SELECT * FROM pt_contractor_tax WHERE contact_id=?').bind(v.id).first()
+  assert.equal(stored.tin_last4, '0123')
+  assert.ok(!JSON.stringify(stored).includes(details.tin))
+  assert.ok(!stored.w9_evidence_sealed.includes(details.signature))
+  assert.ok(!JSON.stringify(await h.view('reports/contractors?year=2025', keeper)).includes(details.tin))
+  await h.command('w9.evidence', { contactId: v.id }, keeper, 403)
+  await h.command('w9.evidence', { contactId: v.id }, h.owner, 403)
+  await h.command('contractor.step-up', {})
+  const mail = h.mail.findLast((m) => [m.to].flat().includes('owner@example.test')),
+    token = new URL(mail.text.match(/http:\/\/[^\s]+\/auth\/confirm\?token=[^\s]+/)[0]).searchParams.get(
+      'token',
+    )
+  assert.equal((await h.send('/auth/confirm', { token }, { cookie: h.owner })).status, 303)
+  assert.equal((await h.command('contractor.reveal', { contactId: v.id })).tin, details.tin)
+  assert.equal((await h.command('w9.evidence', { contactId: v.id })).evidence.electronicConsent, true)
+  await h.view(`vendor-w9/${v.id}`, sales, 403)
+  const audit = await h.view('activity')
+  assert.ok(!JSON.stringify(audit).includes(details.tin))
+  const revoked = await h.command('w9.request', { contactId: v.id, consent: true })
+  await h.command('w9.revoke', { contactId: v.id })
+  assert.equal((await h.send(new URL(revoked.url).pathname)).status, 404)
+  const stale = await h.command('w9.request', { contactId: v.id, consent: true })
+  await h.command('contact.save', { ...v, kind: 'vendor', name: 'Changed contractor' })
+  assert.equal((await h.send(new URL(stale.url).pathname)).status, 404)
+  const expired = await h.command('w9.request', { contactId: v.id, consent: true })
+  assert.equal(
+    (
+      await h.send(new URL(expired.url).pathname, undefined, {
+        headers: { 'x-synthetic-pantry-clock': '2100-01-01T12:00:00Z' },
+      })
+    ).status,
+    404,
+  )
+}
+export async function readinessJourney(t) {
+  const h = await harness()
+  t.after(() => h.close())
+  const { acct } = await books(h),
+    v = await h.command('contact.save', { kind: 'vendor', name: 'Synthetic tax-ready contractor' }),
+    customer = await h.command('contact.save', { kind: 'customer', name: 'Synthetic NJ customer' }),
+    bank = await h.command('bank-account.save', {
+      name: 'Checking',
+      institution: 'Example',
+      accountId: acct['1000'],
+      numberLast4: '0123',
+      openingDate: '2025-01-01',
+      openingBalance: '0',
+    })
+  await h.command('payment.record', {
+    direction: 'paid',
+    contactId: v.id,
+    date: '2025-06-01',
+    amount: '2400',
+    bankAccountId: bank.id,
+    method: 'ach',
+  })
+  const inv = await h.command('invoice.save-draft', {
+    customerId: customer.id,
+    issueDate: '2025-09-01',
+    destinationState: 'NJ',
+    lines: [
+      {
+        description: 'Synthetic services',
+        quantity: '1',
+        rate: '85000',
+        accountId: acct['4000'],
+        taxCode: 'exempt',
+      },
+    ],
+  })
+  await h.command('invoice.approve', { id: inv.id, revision: inv.revision })
+  await h.command('invoice.issue', { id: inv.id })
+  const accountant = await h.member('synthetic-pantry-cpa@example.test', 'accountant'),
+    keeper = await h.member('synthetic-pantry-book@example.test', 'bookkeeper')
+  await h.command(
+    'tax.deadline',
+    { label: 'Accountant estimated tax', dueDate: '2026-01-20', amount: '400' },
+    h.owner,
+    403,
+  )
+  const d = await h.command(
+    'tax.deadline',
+    { label: 'Accountant estimated tax', dueDate: '2026-01-20', amount: '400' },
+    accountant,
+  )
+  const read = async (path) => {
+    const r = await h.send('/api/pantry/' + path, undefined, {
+      cookie: accountant,
+      headers: { 'x-synthetic-pantry-clock': '2026-01-15T12:00:00Z' },
+    })
+    assert.equal(r.status, 200, JSON.stringify(r.value))
+    return r.value
+  }
+  const r = await read('tax-readiness?year=2025')
+  assert.equal(r.w9Proposals[0].paid, 240000)
+  assert.equal(r.w9Proposals[0].requiresOwnerApproval, true)
+  assert.equal(r.nexus.find((s) => s.state === 'NJ').reached, 8500)
+  assert.equal(r.deadlines.find((x) => x.id === d.id).amount_cents, 40000)
+  assert.equal(r.deadlines.find((x) => x.id === d.id).reminder, true)
+  assert.equal(r.deadlines.find((x) => x.id === 'nec-2025').reminder, true)
+  await h.view('tax-readiness?year=2025', keeper, 403)
+  const entry = await h.command('journal.save-draft', {
+    date: '2025-12-31',
+    memo: 'Synthetic open question',
+    lines: [
+      { accountId: acct['6000'], debit: '10' },
+      { accountId: acct['1000'], credit: '10' },
+    ],
+  })
+  await h.command('journal.post', { id: entry.id, revision: entry.revision })
+  const question = (
+    await h.command('question.ask', {
+      subjectKind: 'journal',
+      subjectId: entry.id,
+      question: 'Please review the tax classification.',
+      assignee: 'synthetic-pantry-cpa@example.test',
+    })
+  ).question
+  const pack = await read('tax-readiness/2025/package')
+  assert.ok(pack.openQuestions.some((q) => q.id === question.id))
+  assert.equal(pack.yearEnd.year, 2025)
+  assert.equal(pack.accountantPackage.period.id, '2025-12')
+  assert.equal(pack.readiness.w9Proposals[0].contactId, v.id)
+  const request = await h.command('w9.request', { contactId: v.id, consent: true })
+  assert.equal((await h.send(new URL(request.url).pathname)).status, 200)
+  assert.equal((await read('tax-readiness?year=2025')).w9Proposals[0].status, 'requested')
 }
