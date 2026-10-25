@@ -66,6 +66,23 @@ export async function w9Browser(t) {
     openingDate: '2025-01-01',
     openingBalance: '0',
   })
+  const customer = await command('contact.save', { kind: 'customer', name: 'Synthetic nexus customer' })
+  const invoice = await command('invoice.save-draft', {
+    customerId: customer.id,
+    issueDate: `${year - 1}-09-01`,
+    destinationState: 'NJ',
+    lines: [
+      {
+        description: 'Synthetic services',
+        quantity: '1',
+        rate: '85000',
+        accountId: acct['4000'],
+        taxCode: 'exempt',
+      },
+    ],
+  })
+  await command('invoice.approve', { id: invoice.id, revision: invoice.revision })
+  await command('invoice.issue', { id: invoice.id })
   const evidence = process.env.PANTRY_EVIDENCE_DIR ?? join(tmpdir(), 'pantry-w9')
   await mkdir(evidence, { recursive: true })
   for (const width of [1440, 390]) {
@@ -91,6 +108,7 @@ export async function w9Browser(t) {
     page.on('pageerror', (e) => errors.push(String(e)))
     await page.goto(app.origin + '/app/agents')
     await page.getByRole('heading', { name: 'Tax readiness all year', exact: true }).waitFor()
+    await page.getByText('NJ: 85% of threshold · review with accountant', { exact: true }).waitFor()
     const row = page
       .getByRole('row')
       .filter({ has: page.getByText(`Request a W-9 from Synthetic contractor ${width}`, { exact: false }) })

@@ -32,7 +32,7 @@ export async function w9Status(db: D1Database, id: string) {
   const tax = await one(db, 'SELECT w9_completed_at,erased_at FROM pt_contractor_tax WHERE contact_id=?', id)
   const pending = await one(
     db,
-    'SELECT id,expires_at FROM pt_w9_requests WHERE contact_id=? AND token_hash IS NOT NULL AND completed_at IS NULL AND revoked_at IS NULL AND expires_at>? ORDER BY created_at DESC LIMIT 1',
+    'SELECT r.id,r.expires_at FROM pt_w9_requests r JOIN pt_contacts c ON c.id=r.contact_id LEFT JOIN pt_contractor_tax t ON t.contact_id=r.contact_id WHERE r.contact_id=? AND r.token_hash IS NOT NULL AND r.completed_at IS NULL AND r.revoked_at IS NULL AND r.expires_at>? AND c.revision=r.contact_revision AND c.erased_at IS NULL AND t.revision IS r.tax_revision ORDER BY r.created_at DESC LIMIT 1',
     id,
     now(),
   )
