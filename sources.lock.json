@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "da14fc9c5ed3690b2b2fa809a6d2bcf719c9f3e46bbc2005ef1f2f7b13203ef5",
+      "sha256": "cc5a48ddaaf17dd82e3d93bd5ff1f35753f6d26d6017c68162324f0f114e5abd",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "13bba452866ad622c4b5ea77485850a687bdf31bf922acba1a8a8d7c594b87c5",
+      "sha256": "3d15d4224284d901d2df962580864a50606f67706c844ab737ae33e0e3cccb93",
       "executable": false
     },
     "DEMO.md": {
@@ -820,6 +820,10 @@
     },
     "migrations/core/0103_w9_requests.sql": {
       "sha256": "1e3e3648e77bf470bee2d83750bea6d3c9821237c40d290ee0a80c1770ce1187",
+      "executable": false
+    },
+    "migrations/core/0104_w9_retention.sql": {
+      "sha256": "4809b6add03f943a63f8a0099d279be48c39febd1eb0c3cd8ebea9f074d3574d",
       "executable": false
     },
     "migrations/rewrites.json": {
@@ -5711,7 +5715,7 @@
       "executable": false
     },
     "tests/app/taxform-journey.mjs": {
-      "sha256": "3a0bb9d7389eee946b4c1f706a65dc4956455c5e29578524d7640939da5eaf09",
+      "sha256": "c78a7fa1c471ceb2a13723648bf733aff4453e2a1dbe39163b97b7a55522409a",
       "executable": false
     },
     "tests/app/transfers.test.mjs": {
