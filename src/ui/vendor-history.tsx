@@ -1,3 +1,4 @@
+import { VendorW9 } from './w9'
 import { useState } from 'react'
 import type { VendorHistoryData } from '../pantry/vendor-history'
 import { Action, Card, Chip, FileLink, Loading, Metrics, Table, day, usd, useShared, useView, useWho, type D } from './kit'
@@ -46,6 +47,7 @@ export function VendorHistory({ vendorId }: { vendorId: string }) {
   if (!data) return <Card title="Vendor history">{picker}<Loading error={error} what="vendor history" /></Card>
   const s = data.summary
   return <Card title={`${data.vendor.name} · vendor history`} actions={<Action run={reload}>Refresh</Action>}>
+    <VendorW9 id={vendorId} />
     {error && <p role="alert" className="error">{error}</p>}
     <p>{data.vendor.terms_days} day terms · Default account: {data.vendor.account_code ? `${data.vendor.account_code} · ${data.vendor.account_name}` : 'Not set'} · Class: {data.vendor.default_class || 'Unassigned'}</p>
     <p>1099 eligible: {data.vendor.is_1099 ? 'Yes' : 'No'} · Box: {data.vendor.vendor_tax_box} · TIN: {data.vendor.tin || 'Not on file'} · Backup withholding: {data.vendor.backup_withholding ? 'Flagged for review' : 'Not flagged'}</p>
