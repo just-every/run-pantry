@@ -309,5 +309,5 @@ w9Public.post('/w9/:token/opt-out', async c => {
   requireThat(c.req.header('origin') === runtimeBindings(c.env).AUTH_ORIGIN && c.req.header('sec-fetch-site') !== 'cross-site', 'Invalid origin',403)
   const r = await byToken(c.env,c.req.param('token'))
   await run(c.env.DB,[q('INSERT OR IGNORE INTO pt_tax_vendor_stops(contact_id,at) VALUES(?,?)',r.contact_id,now()),q('UPDATE pt_w9_requests SET token_hash=NULL,revoked_at=? WHERE contact_id=?',now(),r.contact_id),audit({kind:'system',email:'vendor:w9'},'tax-reminders.vendor-opt-out','vendor',r.contact_id)])
-  return c.html('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width, initial-scale=1"><title>W-9 email stopped</title><main><h1>W-9 email stopped</h1><p>Your opt-out is recorded. No more W-9 request or reminder email will be sent.</p></main></html>')
+  return c.html('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width, initial-scale=1"><title>W-9 email stopped</title><style>body{font:16px system-ui;color:#173530;background:#f8f7f2;margin:0;padding:24px}main{max-width:680px;margin:auto}p{line-height:1.5}</style><main><h1>W-9 email stopped</h1><p>Your opt-out is recorded. No more W-9 request or reminder email will be sent.</p></main></html>')
 })
