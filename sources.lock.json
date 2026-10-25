@@ -5451,7 +5451,7 @@
       "executable": false
     },
     "tests/api/invoices-out.test.mjs": {
-      "sha256": "46b176acfc9348ceea03fc914b4065ef1cba0aae7a9798f50865f1b8d7410d40",
+      "sha256": "23b723b487f067b8f2ec3cf39574391cb25767b10c93818023f459851c694b39",
       "executable": false
     },
     "tests/api/learning-journey.mjs": {
