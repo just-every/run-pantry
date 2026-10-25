@@ -5,12 +5,15 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { worker, TOKEN } from './worker.mjs'
 async function icons(page) {
-  for (const control of await page.locator('button:visible,a:visible').all()) {
-    if ((await control.innerText()).trim()) continue
-    const label = await control.getAttribute('aria-label')
+  const controls = await page.locator('button:visible,a:visible').evaluateAll(nodes =>
+    nodes.filter(node => !node.innerText.trim()).map(node => ({
+      label: node.getAttribute('aria-label'), role: node.tagName === 'BUTTON' ? 'button' : 'link',
+    })),
+  )
+  for (const { label, role } of controls) {
     assert.ok(label)
-    await control.focus()
-    await page.getByRole('tooltip', { name: label }).waitFor()
+    await page.getByRole(role, { name: label, exact: true }).focus()
+    await page.getByRole('tooltip', { name: label, exact: true }).waitFor()
   }
 }
 export async function w9Browser(t) {
