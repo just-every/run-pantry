@@ -102,3 +102,5 @@ CREATE TABLE pt_stripe_event_comparison_items (
 
 ALTER TABLE pt_invoices ADD COLUMN reminder_cycle TEXT NOT NULL DEFAULT '';
 ALTER TABLE pt_deliveries ADD COLUMN reminder_cycle TEXT NOT NULL DEFAULT '';
+DROP INDEX pt_deliveries_reminder_step;
+CREATE UNIQUE INDEX pt_deliveries_reminder_step ON pt_deliveries(invoice_id,reminder_cycle,step,lower(recipient)) WHERE kind='reminder';

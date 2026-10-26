@@ -59,7 +59,7 @@ export async function paymentEventsJourney(t, factory) {
     assert.equal(response.status, expected, JSON.stringify(response.value)); return response
   }
   const checkout = async (method = 'card', early = false) => {
-    const draft = await h.command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-10-20', dueDate: '2026-11-19', ...(early ? { earlyPayment: { percent: '2', days: '10' } } : {}), lines: [{ description: 'Studio design services', quantity: '1', rate: '100', accountId: acct['4000'], taxCode: 'exempt' }] })
+    const draft = await h.command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-10-10', dueDate: '2026-10-20', ...(early ? { earlyPayment: { percent: '2', days: '10' } } : {}), lines: [{ description: 'Studio design services', quantity: '1', rate: '100', accountId: acct['4000'], taxCode: 'exempt' }] })
     await h.command('invoice.approve', { id: draft.id, revision: draft.revision })
     const invoice = await h.command('invoice.issue', { id: draft.id })
     await h.command('invoice.send', { id: invoice.id })
@@ -97,6 +97,13 @@ export async function paymentEventsJourney(t, factory) {
   assert.match(receipt.text, /4242/)
 
   const ach = await checkout('us_bank_account', true)
+  const sending=(await h.view('invoicing')).sending
+  await h.command('sending.save',{revision:sending.revision,remindersOn:true,reminderDays:'0',timeZone:'America/New_York'})
+  ach.session.status='open';ach.session.payment_intent.status='requires_payment_method'
+  await h.cron(Date.parse(clock))
+  const reminderCount=()=>h.mail.filter(m=>m.subject.startsWith('Reminder:')&&m.subject.includes(ach.invoice.number)).length
+  assert.equal(reminderCount(),1)
+  ach.session.status='complete';ach.session.payment_intent.status='processing'
   await deliver(event('evt_events_processing', 'checkout.session.completed', { id: ach.session.id, object: 'checkout.session' }))
   assert.equal((await paymentRow(ach.session.id)).status, 'processing')
   assert.equal((await invoiceRow(ach.invoice.id)).open_cents, 10000)
@@ -159,5 +166,9 @@ export async function paymentEventsJourney(t, factory) {
   assert.equal(h.mail.length, beforeComparisonMail + 1, 'comparison and repeated comparison send only the dropped receipt')
   const ar=(await h.send('/api/pantry/reports/receivables?to=2026-10-20', undefined, { cookie: h.owner })).value
   assert.equal(ar.agrees,true,JSON.stringify(ar))
+  await h.cron(Date.parse('2026-10-21T12:00:00Z'))
+  assert.equal(reminderCount(),2,'a returned ACH payment starts a fresh reminder cycle while preserving prior history')
+  const history=(await h.view('sales')).deliveries.filter(d=>d.invoice_id===ach.invoice.id&&d.kind==='reminder')
+  assert.equal(history.length,2)
   return { h, customer, card, ach, disputed, dropped }
 }

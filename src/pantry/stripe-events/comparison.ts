@@ -12,9 +12,9 @@ export async function compareStripeEvents(env: Bindings, db: D1Database, force =
   const settings = await stripeSettings(db)
   if (!settings || managedInstall(env)) return { skipped: true }
   const key = await unseal(env, settings.key_sealed), epoch = Math.floor(Date.now() / 1000)
-  let comparison = await one(db, "SELECT * FROM pt_stripe_event_comparisons WHERE account_id=? AND status IN ('running','held') ORDER BY started_at DESC,id DESC LIMIT 1", settings.account_id)
+  let comparison = await one(db, "SELECT * FROM pt_stripe_event_comparisons WHERE account_id=? AND status IN ('running','held') ORDER BY started_at DESC,rowid DESC LIMIT 1", settings.account_id)
   if (!comparison) {
-    const last = await one(db, "SELECT * FROM pt_stripe_event_comparisons WHERE account_id=? AND status='complete' ORDER BY upper_created DESC,id DESC LIMIT 1", settings.account_id)
+    const last = await one(db, "SELECT * FROM pt_stripe_event_comparisons WHERE account_id=? AND status='complete' ORDER BY upper_created DESC,rowid DESC LIMIT 1", settings.account_id)
     if (!force && last && epoch - last.upper_created < DAY) return { skipped: true, comparison: last }
     // Stripe only exposes event payloads for thirty days. Keep the uncovered gap explicit.
     const oldest = epoch - 30 * DAY + 60, desired = last ? last.upper_created - DAY : Math.floor(Date.parse(settings.connected_at) / 1000) - DAY
@@ -67,7 +67,7 @@ export async function stripeEventsView(db: D1Database) {
   const settings = await stripeSettings(db)
   if (!settings) return { runs: [], held: [], disputes: [], missing: [] }
   const [runs, held, disputes] = await Promise.all([
-    all(db, `SELECT r.*,(SELECT COUNT(*) FROM pt_stripe_event_comparison_items x WHERE x.run_id=r.id) AS checked,(SELECT COUNT(*) FROM pt_stripe_event_comparison_items x WHERE x.run_id=r.id AND x.missing=1) AS missing_found,(SELECT COUNT(*) FROM pt_stripe_event_comparison_items x WHERE x.run_id=r.id AND x.status='held') AS held_count FROM pt_stripe_event_comparisons r WHERE r.account_id=? ORDER BY r.started_at DESC,r.id DESC LIMIT 30`, settings.account_id),
+    all(db, `SELECT r.*,(SELECT COUNT(*) FROM pt_stripe_event_comparison_items x WHERE x.run_id=r.id) AS checked,(SELECT COUNT(*) FROM pt_stripe_event_comparison_items x WHERE x.run_id=r.id AND x.missing=1) AS missing_found,(SELECT COUNT(*) FROM pt_stripe_event_comparison_items x WHERE x.run_id=r.id AND x.status='held') AS held_count FROM pt_stripe_event_comparisons r WHERE r.account_id=? ORDER BY r.started_at DESC,r.rowid DESC LIMIT 30`, settings.account_id),
     all(db, "SELECT * FROM pt_stripe_events WHERE account_id=? AND status IN ('pending','held') ORDER BY provider_created DESC,id LIMIT 100", settings.account_id),
     all(db, 'SELECT * FROM pt_stripe_disputes WHERE account_id=? ORDER BY observed_at DESC,id LIMIT 100', settings.account_id),
   ])
