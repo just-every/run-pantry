@@ -40,7 +40,7 @@ export async function declinedCard({ app, browser, headers, command, view, acct,
     const postal = page.getByPlaceholder('ZIP')
     if (await postal.isVisible()) await postal.fill('10001')
     await page.getByRole('button', { name: /^(save|set up|save card)$/i }).click()
-    await page.waitForURL(url => url.origin === app.origin)
+    await page.waitForURL(url => url.origin === app.origin, { waitUntil: 'domcontentloaded' })
     await page.getByText(/Saved card.*Autopay authorized/).waitFor()
     await stage('decline-card-saved', page)
     const saved = await view(`autopay/${customer.id}`)
