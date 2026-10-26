@@ -6267,7 +6267,7 @@
       "executable": false
     },
     "tests/restore/restore.test.mjs": {
-      "sha256": "0bae6babd03f6c170ada755321d39952390ac596528addec38f2b6a86138a2b4",
+      "sha256": "5deb70055019801897f4324e11358ec6f98dd6befebdc49487bda72e7d81aeb0",
       "executable": false
     },
     "tests/runtime.mjs": {

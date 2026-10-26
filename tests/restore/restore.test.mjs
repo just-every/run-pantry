@@ -189,6 +189,8 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   const reminderVendor=await command('contact.save',{kind:'vendor',name:'Synthetic reminder vendor',email:'synthetic-pantry-restore@example.test'})
   const reminderBatch=await command('tax-reminders.prepare',{kind:'w9-request',contactIds:[reminderVendor.id]})
   await command('tax-reminders.vendor-stop',{contactId:reminderVendor.id})
+  const mailBefore = await (await context.request.get(`${server.origin}/api/pantry/autopay/${customer.id}`)).json()
+  const mailStop = await command('autopay.policy', { customerId: customer.id, mailControl: { recipient: mailBefore.noticeRecipients[0].recipient, revision: null, timeZone: 'UTC', suppression: 'complained', reason: 'synthetic-pantry-909 observed complaint' } })
   const before = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(before.bytes, pdf)
   await context.close(); await server.stop()
@@ -229,6 +231,9 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   assert.equal(restoredReminders.enabled,false)
   assert.equal(restoredReminders.batches.find(b=>b.id===reminderBatch.id).status,'cancelled')
   assert.equal(!!restoredReminders.vendors.find(v=>v.id===reminderVendor.id).optedOut,true)
+  const restoredMail = await (await context.request.get(`${server.origin}/api/pantry/autopay/${customer.id}`)).json()
+  assert.deepEqual(restoredMail.noticeRecipients, mailStop.noticeRecipients, 'recipient hours and complaint stops survive restore')
+  assert.equal(restoredMail.policy, null, 'restoring a negative mail preference grants no charge authority')
 
   const restored = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(restored.view, before.view, 'the fresh install holds the same books')
