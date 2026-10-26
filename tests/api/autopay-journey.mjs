@@ -86,6 +86,7 @@ export async function autopayJourney(t, factory = harness) {
   assert.equal((await h.send(ach.page + '/autopay/setup', { method: 'card', accepted: true })).status, 409, 'standing charges start off')
   await h.command('autopay.policy', ach.policyBody, accountant, 403)
   await approve(ach)
+  assert.equal((await h.send(ach.page+'/autopay/setup',{method:'card',accepted:true,policyRevision:ach.policy.revision},{headers:{origin:'https://untrusted.example'}})).status,403)
   assert.equal((await h.send(ach.page + '/autopay/setup', { method: 'us_bank_account', policyRevision: ach.policy.revision, accepted: true }, { headers: { 'x-synthetic-pantry-peer': 'absent', 'x-forwarded-for': '192.0.2.10' } })).status, 409, 'untrusted forwarding cannot become mandate evidence')
   ach.customer = await h.command('contact.save', { ...ach.customer, kind: 'customer', payMethods: ['card'] })
   assert.equal((await h.send(ach.page + '/autopay/setup', { method: 'us_bank_account', policyRevision: ach.policy.revision, accepted: true })).status, 409, 'customer offerings constrain saved methods at the API')

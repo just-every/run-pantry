@@ -37,6 +37,7 @@ const STYLE = '.invoice-pdf{width:100%;height:640px;border:0}' + '.rer-themed ma
   + '.invoice .history{list-style:none;padding:0;margin:0 0 20px}.invoice .history li{padding:8px 0;border-bottom:1px solid var(--line);color:var(--ink)}'
   + '.invoice .pay{display:grid;gap:12px;margin:0 0 20px}.invoice .pay form{margin:0}.invoice .pay form+form button{background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);box-shadow:none}'
   + '.invoice .note{font-size:14px}.invoice h2{font-size:18px;margin:28px 0 8px}.invoice .from{margin:0 0 4px;font-weight:600;color:var(--lavender-ink);font-size:13px;letter-spacing:.12em;text-transform:uppercase}'
+  + '.invoice select{box-sizing:border-box;width:100%;min-height:46px;padding:10px 14px;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit}'
   + '@media(max-width:480px){.invoice th:nth-child(2),.invoice td:nth-child(2){display:none}}'
 const digest = async (text: string) => btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))))
 
@@ -44,7 +45,7 @@ async function page(status: number, title: string, body: string) {
   const frame = await themeFrame({ href: '/rer-theme.css', productName: branding.name, accentColor: branding.primaryColor })
   const policy = frame.policy.replace("style-src 'self'", `style-src 'self' 'sha256-${await digest(STYLE)}'`)
   const html = `<!doctype html><html lang="en"${frame.htmlClass}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escape(title)}</title>${fontHead}${frame.head}<style>${STYLE}</style></head><body><main class="invoice">${body}</main></body></html>`
-  return new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'x-robots-tag': 'noindex, nofollow',
+  return new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'same-origin', 'x-content-type-options': 'nosniff', 'x-robots-tag': 'noindex, nofollow',
     'content-security-policy': `default-src 'none'; frame-src 'self'; ${policy}; form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; base-uri 'none'` } })
 }
 
