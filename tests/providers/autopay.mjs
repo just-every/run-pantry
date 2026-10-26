@@ -101,8 +101,10 @@ try {
     if (autofill) {
       await autofill.click()
       await stage(`bank-details-${step}`)
-      await (await findInFrames(f => f.getByRole('button', { name: 'Submit', exact: true }))).click()
+      await autofill.waitFor({ state: 'hidden', timeout: 15000 })
     } else {
+      const finish = await visible(f => f.getByText('Finish without saving', { exact: true }))
+      if (finish) { await finish.click(); await page.waitForTimeout(750); continue }
       const manual = await visible(f => f.getByText(/enter bank details manually|manually enter bank details|enter bank details instead/i))
       if (manual) {
         await manual.click()
