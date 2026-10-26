@@ -21,7 +21,6 @@ jobs:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
       PLAYWRIGHT_SKIP_BROWSER_GC: '1'
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
       VERIFY_SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
@@ -37,12 +36,15 @@ jobs:
         if: ${{ matrix.shard == 'source' && hashFiles('edition.json', 'sources.lock.json') != '' }}
         run: node scripts/edition-authoring/cli.mjs check
       - run: npm install --global pnpm@10.12.4
+      - name: Prepare runner-owned browser and apt paths
+        run: |
+          mkdir -p "$RUNNER_TEMP/ms-playwright" "$RUNNER_TEMP/rer-apt/archives"
+          printf 'PLAYWRIGHT_BROWSERS_PATH=%s\n' "$RUNNER_TEMP/ms-playwright" >> "$GITHUB_ENV"
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
       - name: Install Chromium with bounded system dependencies
         run: |
           set -euo pipefail
-          mkdir -p "$PLAYWRIGHT_BROWSERS_PATH" "$RUNNER_TEMP/rer-apt/archives"
           sudo env "PATH=$PATH" "APT_ARCHIVES=$RUNNER_TEMP/rer-apt/archives" python3 scripts/install-chromium-deps.py
           pnpm exec playwright install chromium
       # rer verify adds hosted-output and hydration checks after verify:app.
@@ -60,7 +62,6 @@ jobs:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
       PLAYWRIGHT_SKIP_BROWSER_GC: '1'
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
         with:
@@ -70,12 +71,15 @@ jobs:
           node-version: '22.20.0'
           package-manager-cache: false
       - run: npm install --global pnpm@10.12.4
+      - name: Prepare runner-owned browser and apt paths
+        run: |
+          mkdir -p "$RUNNER_TEMP/ms-playwright" "$RUNNER_TEMP/rer-apt/archives"
+          printf 'PLAYWRIGHT_BROWSERS_PATH=%s\n' "$RUNNER_TEMP/ms-playwright" >> "$GITHUB_ENV"
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
       - name: Install Chromium with bounded system dependencies
         run: |
           set -euo pipefail
-          mkdir -p "$PLAYWRIGHT_BROWSERS_PATH" "$RUNNER_TEMP/rer-apt/archives"
           sudo env "PATH=$PATH" "APT_ARCHIVES=$RUNNER_TEMP/rer-apt/archives" python3 scripts/install-chromium-deps.py
           pnpm exec playwright install chromium
       - run: pnpm run test:restore
