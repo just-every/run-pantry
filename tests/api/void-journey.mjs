@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-// Runs inside the existing invoices-out registration with real command/read
+// Runs inside the existing invoices-out registration with real command and read
 // routes. The caller supplies its initialized account chart and operating bank.
 export async function voidJourney(h, { acct, bank }) {
   const customer=await h.command('contact.save',{kind:'customer',name:'Invoice void customer',email:'void-customer@example.test'})
