@@ -228,6 +228,7 @@ test('SALESTAX-002 sales tax by state and code for a period, from invoice lines,
   const after = await h.view(`reports/sales-tax?${OCT}&basis=accrual`)
   assert.deepEqual([after.ledger.accounts[0].fromSales, after.ledger.accounts[0].other, after.ledger.accounts[0].closing, after.ledger.ties], [6319, -2528, 3791, true])
   await h.command('tax-code.save', { name: 'Nowhere', rate: '5', accountId: s.acct['2200'], state: 'XX' }, h.owner, 400)
+  await assert.doesNotReject(() => assertSalesTaxSources(h, s), 'REPORT-005 sales-tax source drill-through after SALESTAX-002 totals')
 })
 
 test('SALESTAX-004 economic nexus: a year of New Jersey invoices alerts owner and accountant at 80% then 100%, and the accountant records the decision on the state row', async t => {
@@ -898,9 +899,8 @@ test('REPORT-005 ageing and everyday-library figures open to their open items, a
   assert.deepEqual((await h.db.prepare('SELECT * FROM pt_journal_entries ORDER BY id').all()).results, before, 'tracing and exports do not alter the ledger')
 })
 
-test('REPORT-005 sales tax figures by code, state and all states, exempt sales and the liability tie open to invoice lines, settled shares and postings on each basis', async t => {
-  const h = await harness(); t.after(() => h.close())
-  const s = await october(h, true)
+// Drill through the sales-tax report just checked by SALESTAX-002, including its credit and remittance.
+async function assertSalesTaxSources(h, s) {
   const viewer = await h.member('tax-source-viewer@example.test', 'viewer'), open = figureOpener(h, viewer)
   const metrics = ['taxable', 'charged', 'collected', 'owed', 'kept', 'reduced', 'taxReduced']
   for (const basis of ['accrual', 'cash']) {
@@ -920,7 +920,7 @@ test('REPORT-005 sales tax figures by code, state and all states, exempt sales a
   }
   const invalid = line => h.view(`reports/detail?${new URLSearchParams({ report: 'sales-tax', line: JSON.stringify(line), from: '2026-10-01', to: '2026-10-31', basis: 'accrual' })}`, h.owner, 404)
   await invalid(['code', 'nope', 'taxable']); await invalid(['total', 'kept']); await invalid(['account', 'nope', 'opening']); await invalid(['exempt', 'owed'])
-})
+}
 
 import {dimensionBudgets} from './dimension-extensions.mjs'
 test('DIM-001 class and location budgets import and split to tied actual, plan, variance and source figures',dimensionBudgets)

@@ -9,9 +9,8 @@ async function reconciledSeptember(h) {
   return { s, st }
 }
 
-test('PAN-12 trial balance, general ledger, profit and loss, balance sheet and ageing all come from the same ledger', async t => {
-  const h = await harness(); t.after(() => h.close())
-  await reconciledSeptember(h)
+// Read the reconciled reports before closing and exporting the same September books.
+async function assertSeptemberReports(h) {
   const lines = (await h.db.prepare("SELECT a.code, a.type, SUM(l.debit_cents - l.credit_cents) AS net FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id JOIN pt_accounts a ON a.id = l.account_id WHERE e.status = 'posted' AND e.entry_date <= '2026-09-30' GROUP BY a.code").all()).results
   const net = code => Number(lines.find(l => l.code === code)?.net ?? 0)
   const tb = await h.view('reports/trial-balance?to=2026-09-30&basis=accrual')
@@ -30,7 +29,7 @@ test('PAN-12 trial balance, general ledger, profit and loss, balance sheet and a
   assert.deepEqual([ar.itemsTotal, ar.control.balance, ar.agrees], [235000, net('1200'), true])
   assert.deepEqual([ap.itemsTotal, ap.control.balance, ap.agrees], [0, -net('2000') || 0, true])
   assert.equal(at(ar.items, i => i.contact === 'Northstar Consulting').open, 235000)
-})
+}
 
 test('PAN-13 a period closes through its checklist and lock; locked dates refuse people and agents; reopening needs an approved request', async t => {
   const h = await harness(); t.after(() => h.close())
@@ -81,6 +80,7 @@ test('PAN-14 the accountant package holds the period\'s reports, reconciliations
   await (await import('./portability-journey.mjs')).destinationPortability(t)
   const h = await harness(); t.after(() => h.close())
   const { s, st } = await reconciledSeptember(h)
+  await assert.doesNotReject(() => assertSeptemberReports(h), 'PAN-12 report tie-outs before PAN-14 accountant package')
   const fix = await h.command('journal.save-draft', { date: '2026-09-29', memo: 'Equipment', lines: [{ accountId: s.acct['1500'], debit: '300.00' }, { accountId: s.acct['3000'], credit: '300.00' }] })
   const posted = await h.command('journal.post', { id: fix.id, revision: fix.revision })
   await h.command('journal.reverse', { id: posted.id, date: '2026-09-30', memo: 'Belonged to October' })

@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "2dd2f7afc738168e554a7b043c595e005bfb6f2a4b42eb89c1bd4768c57344ee",
+      "sha256": "5ae7ef41225fecb582ef7866f112620aa96e81cc0bf4a29720b0ed4db18c15b2",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "79c5e65ee377629d8d3f1294259adb3ca02838b5d3b1552ba7dcf7b677bdb194",
+      "sha256": "85a9199c8359a66493434e68186a077a4a28e4029b3f1a4617a6179b06809c1a",
       "executable": false
     },
     "DEMO.md": {
@@ -5675,7 +5675,7 @@
       "executable": false
     },
     "tests/api/bank.test.mjs": {
-      "sha256": "3988bd447ccef4e5745f9ceebb517de540b7d48d994b0631de859244652899b5",
+      "sha256": "9ace022c8c4fade8624a2b502d68e810f108050bd613d8e2938830c9f0455706",
       "executable": false
     },
     "tests/api/bill-lifecycle-scenario.mjs": {
@@ -5699,7 +5699,7 @@
       "executable": false
     },
     "tests/api/close.test.mjs": {
-      "sha256": "6d7f806cec35e34b17724049329b5a6a70afaea256f9e8215194e47d6152cfac",
+      "sha256": "1b700cf4074422b5bba6227f4a75d3579eaf61291498f6e26e4ca31eb644757e",
       "executable": false
     },
     "tests/api/collections-journey.mjs": {
@@ -5879,7 +5879,7 @@
       "executable": false
     },
     "tests/api/reports.test.mjs": {
-      "sha256": "06cce655175e4d0dd7ea7906aedda392913eaed75bbd5b4ef3fcb2692522af66",
+      "sha256": "f20edbebb078501d7616f30902c305f42cd47a81059d4880b3ac6d81161c1212",
       "executable": false
     },
     "tests/api/resources-journey.mjs": {

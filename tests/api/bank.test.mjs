@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { at, books, fixture, harness } from './harness.mjs'
-import { importStatements, matchSeptember, september } from './scenario.mjs'
+import { matchSeptember, september } from './scenario.mjs'
 import { fakePlaid } from './plaid.mjs'
 
 const count = async (h, sql) => Number((await h.db.prepare(sql).first()).n)
@@ -159,10 +159,9 @@ test('BANK-005 / PAN-07 CSV and OFX statements import against the right bank acc
   await h.command('statement.import', { ...base, fileName: 'bad.csv', content: 'When,What\n09/01/2026,x\n', confirmLast4: '4821' }, h.owner, 400)
 })
 
-test('PAN-08 statement lines match to the books through splits, fees, transfers and partial settlements, never posting a recorded payment twice', async t => {
-  const h = await harness(); t.after(() => h.close())
+// PAN-08 matching is the first step of PAN-09 reconciliation on these same statements.
+async function assertStatementMatches(h, s, st, before) {
   const entries = () => count(h, "SELECT COUNT(*) AS n FROM pt_journal_entries WHERE status = 'posted'")
-  const s = await september(h), before = await entries(), st = await importStatements(h, s)
   const r = await h.view(`reconciliation/${st.checking.id}`)
   const ln = text => at(r.lines, l => l.description.includes(text))
   // The Cedar payment recorded on 3 September meets its bank line, which names Cedar, as the statement arrives: no new posting.
@@ -187,11 +186,12 @@ test('PAN-08 statement lines match to the books through splits, fees, transfers 
   const tb = await h.view('reports/trial-balance?to=2026-09-30&basis=accrual')
   assert.ok(tb.balanced)
   assert.equal(at(tb.rows, x => x.code === '1010').net, 200125)
-})
+}
 
 test('BANK-005 / PAN-09 a statement reconciles only when its balances are proven, and every difference is explained first', async t => {
   const h = await harness(); t.after(() => h.close())
   const s = await september(h)
+  const before = await count(h, "SELECT COUNT(*) AS n FROM pt_journal_entries WHERE status = 'posted'")
   // A statement whose stated closing does not follow from its lines is blocked.
   const csv = await fixture('bank/operating-checking-2026-09.csv')
   const bad = await h.command('statement.import', { bankAccountId: s.checking.id, fileName: 'checking.csv', content: csv, opening: '24813.52', closing: '27800.00', start: '2026-09-01', end: '2026-09-30', confirmLast4: '4821' })
@@ -201,7 +201,7 @@ test('BANK-005 / PAN-09 a statement reconciles only when its balances are proven
   await h.command('reconciliation.complete', { statementId: bad.statement.id }, h.owner, 409)
   await h.command('statement.correct-balances', { id: bad.statement.id, opening: '24813.52', closing: '27797.02', reason: 'Closing balance mistyped from the PDF statement' })
   const st = { checking: bad.statement, savings: (await h.command('statement.import', { bankAccountId: s.reserve.id, fileName: 'savings-2026-09.ofx', content: await fixture('bank/savings-2026-09.ofx') })).statement }
-  await matchSeptember(h, s, st)
+  await assert.doesNotReject(() => assertStatementMatches(h, s, st, before), 'PAN-08 matching before PAN-09 reconciliation')
   r = await h.view(`reconciliation/${st.checking.id}`)
   assert.deepEqual([r.difference, r.cleared, r.ready], [0, 2779702, true])
   const done = await h.command('reconciliation.complete', { statementId: st.checking.id })
