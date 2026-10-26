@@ -5,13 +5,13 @@ import type { ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { hostingPageHtml } from '../base/hosting-page'
 import { contractPageHtml } from '../base/contract-page'
-import { runPageHtml, siteNotFoundHtml, type RunData, type SiteBuild, type SiteContext } from '../base/run-site'
+import { runPageHtml, siteNotFoundHtml, type SiteBuild, type SiteContext } from '../base/run-site'
 import { identity } from '../identity'
 import { DocsArticle } from './docs/DocsArticle'
 import { DocsIndex } from './docs/DocsIndex'
 import { docsHead, docsPages } from './docs/pages'
 import { Landing } from './landing/Landing'
-import run from './run.json'
+import { run } from './run'
 import { SiteHeader } from './shell/SiteHeader'
 
 // Code cards get their Copy button only when script runs; without it the command is still there to select.
@@ -20,7 +20,7 @@ const COPY = "document.querySelectorAll('.docs-copy').forEach(b=>{b.hidden=false
 const SHARE_IMAGE = `${identity.runSite}/site/share.jpg`
 
 export function sitePages({ styles, contract, hosting }: SiteContext): SiteBuild {
-  const data: RunData = run
+  const data = run
   const homepageHeader = { html: renderToStaticMarkup(<SiteHeader />), styles }
   const document = (title: string, description: string, body: ReactElement, script = '') => '<!doctype html>' + renderToStaticMarkup(
     <html lang="en">

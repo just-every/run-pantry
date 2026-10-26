@@ -1,4 +1,24 @@
-Pantry runs on your own computer. This copy is free and MIT licensed. Its books stay on this computer; it sends no email, and your accountant cannot sign in from another computer. To share it online, read [Put Pantry online](/docs/hosting).
+Copy this line into your terminal, then press Enter:
+
+<!-- rer:launch -->
+```sh
+curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-pantry
+```
+<!-- /rer:launch -->
+
+<!-- rer:requirements -->
+macOS, Linux or Windows with WSL2. git is required; rer brings Node and pnpm.
+<!-- /rer:requirements -->
+
+It installs `rer`, the Run Edit Run command, and starts Pantry. This copy is free and MIT licensed. Its books stay on this computer; it sends no email, and your accountant cannot sign in from another computer. To share it online, read [Put Pantry online](/docs/hosting).
+
+Already have Node 22 or later? This alternative starts the same Pantry:
+
+<!-- rer:alternative -->
+```sh
+npx -y @runeditrun/rer dev just-every/run-pantry
+```
+<!-- /rer:alternative -->
 
 ## Before you start
 
@@ -8,21 +28,9 @@ Check that Git is installed by typing `git --version` and pressing Enter. If it 
 
 Allow several minutes for the first start to download and build everything. The time depends on your computer and connection; progress appears in the terminal. Later starts reuse the installation.
 
-## Get Pantry and start it
+## Start Pantry
 
-Copy this line into the terminal, then press Enter:
-
-```sh
-curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-pantry
-```
-
-It installs `rer`, the Run Edit Run command, and starts Pantry. Git is required; the installer brings Node when needed, and rer brings pnpm. If the installer prints a command for future terminal windows, run it so `rer` stays available when you start again.
-
-Already have Node 22 or later? This alternative starts the same Pantry:
-
-```sh
-npx -y @runeditrun/rer dev just-every/run-pantry
-```
+If the installer prints a command for future terminal windows, run it so `rer` stays available when you start again.
 
 `rer` gets Pantry into a `run-pantry` folder. To start it again later, run `cd run-pantry && rer dev`.
 

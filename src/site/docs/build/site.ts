@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { PATHS, startLine } from '../../../base/run-site.ts'
+import { run } from '../../run.ts'
 import type { DocsBody, DocsSection } from '../types.ts'
 import { docsDirectory, manifestPath, readManifest } from './manifest.ts'
 import { renderMarkdown } from './render.ts'
@@ -19,7 +21,13 @@ export function buildDocs(root: string): DocsSite {
   const rendered = new Map(pages.map(page => {
     const file = join(root, docsDirectory, page.file)
     files.push(file)
-    return [page.slug, renderMarkdown(readFileSync(file, 'utf8'))] as const
+    // Keep Markdown useful on GitHub while deriving published launch instructions
+    // from the same RunData and Base wording as the chooser.
+    const markdown = readFileSync(file, 'utf8')
+      .replace(/<!-- rer:launch -->[\s\S]*?<!-- \/rer:launch -->/g, `\n\`\`\`sh\n${startLine(run)}\n\`\`\`\n`)
+      .replace(/<!-- rer:alternative -->[\s\S]*?<!-- \/rer:alternative -->/g, `\n\`\`\`sh\n${run.clone}\n\`\`\`\n`)
+      .replace(/<!-- rer:requirements -->[\s\S]*?<!-- \/rer:requirements -->/g, PATHS.self.requirements)
+    return [page.slug, renderMarkdown(markdown)] as const
   }))
   const problems: string[] = []
   for (const page of pages) {

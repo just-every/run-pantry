@@ -535,6 +535,17 @@
       }
     },
     {
+      "path": "src/base/hosting-page.ts",
+      "originPath": "foundation/runtime/hosting-page.ts",
+      "revision": "886e67333a8815aba8a8c28860d23d03e4a5e8ff",
+      "files": {
+        "src/base/hosting-page.ts": "f8c00b4a1d4f21dc36971b784da747ffffc6428c28b15fc7d35f6ab2317d2cf5"
+      },
+      "modes": {
+        "src/base/hosting-page.ts": "100644"
+      }
+    },
+    {
       "path": "src/base/hydration/intro-guard.ts",
       "originPath": "foundation/runtime/hydration/intro-guard.ts",
       "revision": "886e67333a8815aba8a8c28860d23d03e4a5e8ff",
@@ -631,6 +642,28 @@
       },
       "modes": {
         "src/base/rejected-response.ts": "100644"
+      }
+    },
+    {
+      "path": "src/base/run-chooser-style.ts",
+      "originPath": "foundation/runtime/run-chooser-style.ts",
+      "revision": "886e67333a8815aba8a8c28860d23d03e4a5e8ff",
+      "files": {
+        "src/base/run-chooser-style.ts": "62cd0b43762dbe406958d929ee6d27440658ffaead40bb51229eca7c4aea0756"
+      },
+      "modes": {
+        "src/base/run-chooser-style.ts": "100644"
+      }
+    },
+    {
+      "path": "src/base/run-pricing.ts",
+      "originPath": "foundation/runtime/run-pricing.ts",
+      "revision": "886e67333a8815aba8a8c28860d23d03e4a5e8ff",
+      "files": {
+        "src/base/run-pricing.ts": "f95bdf9b5e62c7d302e97a57ae4dcb580846197fa4cf2222e17a5e1b2c0a02fd"
+      },
+      "modes": {
+        "src/base/run-pricing.ts": "100644"
       }
     },
     {
@@ -1704,28 +1737,6 @@
       },
       "modes": {
         "src/router.tsx": "100644"
-      }
-    },
-    {
-      "path": "src/base/run-chooser-style.ts",
-      "originPath": "foundation/runtime/run-chooser-style.ts",
-      "revision": "886e67333a8815aba8a8c28860d23d03e4a5e8ff",
-      "files": {
-        "src/base/run-chooser-style.ts": "62cd0b43762dbe406958d929ee6d27440658ffaead40bb51229eca7c4aea0756"
-      },
-      "modes": {
-        "src/base/run-chooser-style.ts": "100644"
-      }
-    },
-    {
-      "path": "src/base/hosting-page.ts",
-      "originPath": "foundation/runtime/hosting-page.ts",
-      "revision": "886e67333a8815aba8a8c28860d23d03e4a5e8ff",
-      "files": {
-        "src/base/hosting-page.ts": "f8c00b4a1d4f21dc36971b784da747ffffc6428c28b15fc7d35f6ab2317d2cf5"
-      },
-      "modes": {
-        "src/base/hosting-page.ts": "100644"
       }
     }
   ]
