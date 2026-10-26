@@ -28,5 +28,7 @@ export async function unappliedRows(db: D1Database, kind: Kind, asOf: string): P
     ? "SELECT a.id, a.source_id, a.target_id, a.allocation_date AS date, a.amount_cents FROM pt_allocations a WHERE a.source_kind = 'credit' AND a.target_kind = 'invoice' AND a.allocation_date <= ? AND (a.voided_on IS NULL OR a.voided_on > ?) ORDER BY a.allocation_date, a.id"
     : "SELECT a.id, a.source_id, a.target_id, a.allocation_date AS date, a.amount_cents, v.journal_id FROM pt_allocations a LEFT JOIN pt_vendor_credits v ON v.id = a.source_id WHERE a.source_kind = 'credit' AND a.target_kind = 'bill' AND a.allocation_date <= ? ORDER BY a.allocation_date, a.id", ...(kind === 'receivable' ? [asOf, asOf] : [asOf])))
     .map(a => ({ part: 'credit-applied', id: a.id, date: a.date, amount: -a.amount_cents, record: kind === 'receivable' ? { kind: 'invoice', id: a.source_id } : { kind: 'entry', id: a.journal_id }, target: a.target_id }))
-  return [...payments, ...applied, ...credits, ...creditApplied]
+  const refunds = kind === 'receivable' ? (await all(db, "SELECT id,refund_date,journal_id,amount_cents FROM pt_customer_refunds WHERE status='succeeded' AND refund_date<=? ORDER BY refund_date,id", asOf))
+    .map(r => ({ part: 'refund', id: r.id, date: r.refund_date, amount: -r.amount_cents, record: { kind: 'entry', id: r.journal_id } })) : []
+  return [...payments, ...applied, ...credits, ...creditApplied, ...refunds]
 }

@@ -1,3 +1,4 @@
+import { refundsBrowser,voidBrowser } from './refunds-journey.mjs'
 import { approvedAdjustmentsBrowser } from './approved-adjustments-journey.mjs'
 import { lateFeeBrowser } from './late-fee-journey.mjs'
 import { statementsBrowser } from './statements-journey.mjs'
@@ -120,6 +121,8 @@ test('INVOICE-009 customer records edit contacts and defaults, show every curren
     }
     await statementsBrowser({ page, context, customer, width, origin: app.origin, history })
     await lateFeeBrowser({ page, context, invoice: inv, width, origin: app.origin, accountId: acct['4000'] })
+    await refundsBrowser({page,width,origin:app.origin,command,view,customer,acct,bank})
+    await voidBrowser({page,width,origin:app.origin,command,view,customer,acct})
     await approvedAdjustmentsBrowser({ page, context, width, origin: app.origin, command, view, customer, acct, bank })
     await page.getByRole('link', { name: 'Reconcile with receivables aging', exact: true }).click()
     await page.getByRole('heading', { name: /^Receivables aging/ }).waitFor()

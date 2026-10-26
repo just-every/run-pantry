@@ -1,3 +1,4 @@
+import { RefundCustomerBalance } from './customer-refunds'
 // Sales & bills: invoices and credits (sent, viewed, reminded, paid online),
 // recurring invoices, bills with their evidence, payments recorded from outside
 // Pantry, every delivery, and the customers and vendors behind them.
@@ -19,6 +20,7 @@ import { CustomerDeposits } from './customer-deposits'
 import { mayRecordDeposits } from './estimate-economics'
 
 function invoiceStatus(i: D): [string, 'good' | 'warn' | 'info' | 'neutral'] {
+  if (i.status === 'void') return ['Voided','neutral']
   if (i.status === 'draft') return ['Draft', 'neutral']
   if (i.status === 'approved') return ['Approved', 'info']
   if (i.kind === 'credit') return [i.open_cents ? 'Unapplied credit' : 'Applied', 'good']
@@ -40,7 +42,7 @@ function InvoicePanel({ i, data, onChange, onEdit, onCredit }: { i: D; data: D; 
     {untaxed > 0 && <div className="callout callout-warn"><strong>Tax treatment needed before approval</strong><span>{untaxed} line{untaxed === 1 ? '' : 's'} without a sales tax code.</span></div>}
     {i.lines.length > 0 && <Table heads={['Description', 'Quantity', 'Amount', 'Tax']} figures={[1, 2, 3]}>{i.lines.map((l: D) => <tr key={l.id}><td>{l.description}</td><td className="fig">{l.quantity_milli / 1000}</td><td className="fig">{usd(l.amount_cents)}</td><td className="fig">{l.tax_code === 'exempt' ? 'Exempt' : l.tax_code ? usd(l.tax_cents) : 'Needed'}</td></tr>)}</Table>}
     <div className="row-actions">
-      {i.status !== 'issued' && !i.estimate_id && !i.write_off && !i.early_detail?.honoredAfterWindow && state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit</button>}
+      {['draft','approved'].includes(i.status) && !i.estimate_id && !i.write_off && !i.early_detail?.honoredAfterWindow && state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit</button>}
       {i.status === 'draft' && i.estimate_id && (i.early_terms || i.early_offer) && state.actor.can.record && <Action run={async () => { await command('estimate.refresh-invoice', { id: i.estimate_id, invoiceId: i.id, revision: i.revision }); await onChange() }}>Refresh early-payment treatment</Action>}
       {i.self_approval && <p className="hint">Self-approved within limit · {usd(JSON.parse(i.self_approval).limit)} · {JSON.parse(i.self_approval).source}</p>}
       {i.status === 'draft' && selfAllowed && <Action tone="primary" run={async () => { await command('invoice.approve-issue', { id: i.id, revision: i.revision, limitRevision: state.settings.issuingLimits.effective.revision }); await onChange() }}>Approve and issue within limit</Action>}
@@ -67,6 +69,15 @@ function InvoicePanel({ i, data, onChange, onEdit, onCredit }: { i: D; data: D; 
     </details>}
     {!!i.early_detail?.honoredAfterWindow && <p>Early-payment discount honored after window · {i.memo}</p>}
     {i.kind === 'credit' && i.status === 'issued' && i.open_cents > 0 && !i.early_reversal_id && state.actor.can.record && ['owner', 'accountant', 'bookkeeper'].includes(state.actor.role) && state.actor.policy?.bankAccounts == null && <ApplyCustomerCredit credit={i} invoices={data.invoices} onDone={onChange} />}
+    {i.kind === 'credit' && i.status === 'issued' && state.actor.can.record && <RefundCustomerBalance sourceKind="credit" source={i} data={data} onDone={onChange} />}
+    {i.status === 'void' && <p>Voided on {day(i.void_date)} · {i.void_reason} · <a href={`/app/reports?record=${encodeURIComponent(`entry:${i.void_reversal_id}`)}`}>View linked reversal</a></p>}
+    {i.kind === 'invoice' && i.status === 'issued' && state.actor.role === 'owner' && <details className="details"><summary>Void invoice</summary>
+      <p>End this invoice and stop its payment link, reminders and collections. Undo any existing payment or credit application first. The original record and a linked reversal remain in the books.</p>
+      <Form label="Void invoice" submit={b => command('invoice.void',{...b,id:i.id,revision:i.revision})} onDone={onChange}>
+        <Field label="Void date" name="date" type="date" defaultValue={today()} required />
+        <Field label="Void reason" name="reason" required />
+      </Form>
+    </details>}
     <Details facts={{ id: i.id, revision: i.revision, 'prepared by': who(i.prepared_by), 'approved by': i.approved_by && who(i.approved_by), 'issued by': i.issued_by && who(i.issued_by), journal: i.journal_id, ...(i.recurring_id ? { 'recurring invoice': (data.recurring as D[]).find(t => t.id === i.recurring_id)?.number } : {}) }} />
   </Card>
 }
@@ -150,16 +161,17 @@ function Payments({ data, reload }: { data: D; reload: () => Promise<void> }) {
   // The open item the amount pays is filled in for you; once you change an allocation yourself, it is yours.
   const setAlloc = (f: (a: Record<string, string>) => Record<string, string>) => { setTyped(true); setAllocState(f) }
   const choose = (nextContact: string, nextAmount: string, nextDirection = direction) => { setTyped(false); setAllocState(likelyAllocation(openFor(data, nextDirection, nextContact), nextAmount)) }
-  const current = (data.payments as D[]).find(p => p.id === selected && !p.reversal_id && p.unallocated_cents > 0)
+  const current = (data.payments as D[]).find(p => p.id === selected && !p.reversal_id)
   return <div className="split split-wide-left">
     <Card title="Payments recorded">
-      <p className="hint">Payments received at your bank, paid online from an invoice link through your Stripe account, or made to vendors. Pantry records them; it never moves money itself. Choose a payment with an unapplied amount to apply it to an invoice or bill.</p>
+      <p className="hint">Payments received at your bank, paid online from an invoice link through your Stripe account, or made to vendors. Approve customer balance refunds here, including returns through Stripe. Choose a payment with an unapplied amount to apply it to an invoice or bill.</p>
       <Table heads={['Date', 'Direction', 'Customer or vendor', 'Bank', 'Amount', 'Unapplied']} figures={[4, 5]} empty="No payments recorded yet.">
         {(data.payments as D[]).map(p => <tr key={p.id} className={p.reversal_id ? 'muted' : selected === p.id ? 'selected' : ''} tabIndex={0} onClick={() => setSelected(p.id)} onKeyDown={k => { if (k.key === 'Enter') setSelected(p.id) }}><td>{day(p.payment_date)}</td><td>{p.direction === 'received' ? 'Received' : 'Paid'}{p.reversal_id ? ' (reversed)' : ''}</td><td>{p.contact_name}</td><td>{p.bank_name}<small className="sub block">{p.method}{p.card_last4 ? ` · …${p.card_last4}` : ''}</small></td><td className="fig">{usd(p.amount_cents)}</td><td className="fig">{usd(p.unallocated_cents)}{!p.reversal_id && p.unallocated_cents > 0 && state.actor.can.record && <> <button type="button" className="btn btn-link" onClick={() => setSelected(p.id)}>Apply</button></>}</td></tr>)}
       </Table>
     </Card>
     <div className="stack">
-    {current && state.actor.can.record && <ApplyPayment key={current.id + current.unallocated_cents} p={current} data={data} onDone={async () => { setSelected(null); await reload() }} />}
+    {current && current.direction === 'received' && state.actor.can.record && <Card title="Customer balance refund"><RefundCustomerBalance sourceKind="payment" source={current} data={data} onDone={reload} /></Card>}
+    {current && current.unallocated_cents > 0 && state.actor.can.record && <ApplyPayment key={current.id + current.unallocated_cents} p={current} data={data} onDone={async () => { setSelected(null); await reload() }} />}
     {state.actor.can.record && <Card title="Record a payment">
       <Form key={formKey} label="Record payment" submit={b => command('payment.record', { ...b, allocations: Object.entries(alloc).filter(([, v]) => v).map(([targetId, amount]) => ({ targetId, amount })) })} onDone={async () => { setAllocState({}); setTyped(false); setAmount(''); setContact(''); setBankId(''); setFormKey(k => k + 1); await reload() }}>
         <div className="grid-form">

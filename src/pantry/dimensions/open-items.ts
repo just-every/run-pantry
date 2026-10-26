@@ -20,7 +20,7 @@ export async function dimensionOpenItems(db:D1Database,kind:'receivable'|'payabl
   const amount=effective.length?effective.filter(p=>inDimension(p,dimension)).reduce((n,p)=>n+p.amount,0):dimension.value===''?total:0
   documents.set(row.id,{id:row.id,kind,journalId:row.journal_id,amount,total,recognizable:!!row.journal_id&&parts.length>0})
  }
- const invoices=await all(db,"SELECT * FROM pt_invoices WHERE status='issued' AND issue_date<=?",asOf)
+ const invoices=await all(db,"SELECT * FROM pt_invoices WHERE status='issued' AND (void_date IS NULL OR void_date>?) AND issue_date<=?",asOf,asOf)
  const invoiceLines=await all(db,'SELECT * FROM pt_invoice_lines ORDER BY invoice_id,line_no')
  for(const i of invoices) {
   const lines=invoiceLines.filter(l=>l.invoice_id===i.id),after=afterTaxShares(lines,JSON.parse(i.discounts??'[]'),i.after_tax_discount_cents)
@@ -48,10 +48,12 @@ export async function dimensionOpenItems(db:D1Database,kind:'receivable'|'payabl
   }
  }
  const paymentCoding=new Map((await all(db,`SELECT p.id,l.class_name,l.location_name,l.project_name FROM pt_payments p JOIN pt_journal_lines l ON l.entry_id=p.journal_id JOIN pt_accounts a ON a.id=l.account_id WHERE a.subtype=?`,kind)).map(p=>[p.id,p]))
+ const refundLines=await all(db,"SELECT l.* FROM pt_journal_lines l JOIN pt_customer_refunds r ON r.journal_id=l.entry_id JOIN pt_accounts a ON a.id=l.account_id WHERE r.status='succeeded' AND r.refund_date<=? AND a.subtype='receivable'",asOf)
  const byJournal=new Map([...documents.values()].map(d=>[d.journalId,d]))
  const unapplied=(await unappliedRows(db,kind,asOf)).map((u):Data=>{
   let amount=0
-  if(u.part.startsWith('payment'))amount=inDimension(paymentCoding.get(u.record.id)??{},dimension)?u.amount:0
+  if(u.part==='refund')amount=-refundLines.filter(l=>l.entry_id===u.record.id&&inDimension(l,dimension)).reduce((n,l)=>n+l.debit_cents-l.credit_cents,0)
+  else if(u.part.startsWith('payment'))amount=inDimension(paymentCoding.get(u.record.id)??{},dimension)?u.amount:0
   else {
    const doc=u.part==='credit'?documents.get(u.id):u.record.kind==='invoice'?documents.get(u.record.id):byJournal.get(u.record.id)
    amount=u.part==='credit'?(doc?.amount??0):-(allocated.get((doc?.id??'')+':'+u.id)??0)

@@ -155,8 +155,11 @@ export async function startCheckout(env: Bindings, db: D1Database, token: string
     metadata: { pantry_invoice: inv.id, pantry_number: inv.number }, payment_intent_data: { description: `Invoice ${inv.number}`, metadata: { pantry_invoice: inv.id, pantry_number: inv.number } },
     success_url: `${link}?checkout={CHECKOUT_SESSION_ID}`, cancel_url: link,
   })
-  await run(db, [q("INSERT INTO pt_stripe_payments (id, invoice_id, method, amount_cents, status, created_at, updated_at, early_window_end) VALUES (?, ?, ?, ?, 'open', ?, ?, ?)", session.id, inv.id, method, charge.amount, now(), now(), charge.windowEnd),
-    audit(pantry('customer'), 'stripe.checkout', 'invoice', inv.id, { method, amount: charge.amount, earlyPaymentWindowEnd: charge.windowEnd })])
+  try { await run(db, [guard("EXISTS(SELECT 1 FROM pt_invoices WHERE id=? AND status='issued' AND void_date IS NULL AND revision=? AND link_token=?)",inv.id,inv.revision,token), q("INSERT INTO pt_stripe_payments (id, invoice_id, method, amount_cents, status, created_at, updated_at, early_window_end) VALUES (?, ?, ?, ?, 'open', ?, ?, ?)", session.id, inv.id, method, charge.amount, now(), now(), charge.windowEnd),
+    audit(pantry('customer'), 'stripe.checkout', 'invoice', inv.id, { method, amount: charge.amount, earlyPaymentWindowEnd: charge.windowEnd })]) } catch (error) {
+    await stripeCall(await unseal(env,s.key_sealed),'POST',`/checkout/sessions/${encodeURIComponent(session.id)}/expire`)
+    throw error
+  }
   return String(session.url)
 }
 

@@ -20,6 +20,9 @@ const FIELDS: Record<string, string[]> = {
   pt_collection_sends:['snapshot'],
   pt_collection_cases:['subject','body','recipient','evidence','reply_note'],
   pt_deliveries: ['recipient', 'subject', 'detail'],
+  pt_payment_notices: ['recipient','subject','detail'],
+  pt_stripe_payments: ['payer_email','method_brand','method_bank','return_reason'],
+  pt_customer_refunds: ['reason'],
   pt_estimate_deliveries: ['recipient','detail'],
   pt_customer_deposits: ['reference','memo'],
   pt_questions: ['title', 'question', 'why', 'facts', 'choices', 'pending', 'answer', 'emailed_to', 'email_detail'],
@@ -29,7 +32,7 @@ const FIELDS: Record<string, string[]> = {
   pt_notes: ['body', 'evidence'],
   pt_proposals: ['summary', 'payload', 'refs', 'decision_note'],
   pt_history_lines: ['name', 'memo', 'split'],
-  pt_invoices: ['memo', 'document_template', 'document_values', 'self_approval'],
+  pt_invoices: ['void_reason', 'memo', 'document_template', 'document_values', 'self_approval'],
   pt_bills: ['memo', 'scheduled_note'],
   pt_payments: ['reference', 'memo'],
   pt_recurring: ['name', 'memo', 'lines'],
@@ -114,7 +117,7 @@ export async function eraseCopies(db: D1Database, input: Input) {
         else set[field] = replacement(row[field], field, input)
       }
       if (table === 'pt_contractor_tax' && !input.member && row.contact_id === input.id) for (const field of ['address', 'city', 'state', 'zip']) set[field] = input.marker
-      if (table === 'pt_deliveries' && set.recipient !== row.recipient) set.recipient = `${input.marker}:${row.id}`
+      if (['pt_deliveries','pt_payment_notices'].includes(table) && set.recipient !== row.recipient) set.recipient = `${input.marker}:${row.id}`
       if(table==='pt_customer_deposits'&&set.reference!==row.reference)set.reference=`${set.reference}:${row.id}`
       if (table === 'pt_bank_rules' && set.name !== row.name) set.name = `${set.name}:${row.id}`
       if(table==='pt_agent_permissions'&&Object.keys(set).some(k=>set[k]!==row[k]))set.active=0

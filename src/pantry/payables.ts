@@ -1,3 +1,4 @@
+import { refunded } from './refunds/store'
 import { dimensionRefusal, dimensionsView, dimensionTags, dimensionValues } from './dimensions'
 import { dimensionAmounts } from './dimensions/allocations'
 // Payables and recorded money movement. Bills post expense against payables;
@@ -163,7 +164,7 @@ const allocate: Command = { need: 'record', async run(c, b) {
   const day = date(b.date ?? payment.payment_date, 'Allocation date')
   requireThat(day >= payment.payment_date, 'Allocate on or after the payment date')
   await assertOpen(c.db, day)
-  const allocated = await allocations(c.db, payment.direction, payment.contact_id, b.allocations, payment.amount_cents - used)
+  const allocated = await allocations(c.db, payment.direction, payment.contact_id, b.allocations, payment.amount_cents - used - await refunded(c.db, 'payment', payment.id))
   requireThat(allocated.list.length, 'Choose what to allocate')
   const early = payment.direction === 'received' ? await takeEarlyDiscounts(c.db, who(c.actor), allocated.list, day, { payments: payment.id }) : { allocations: allocated.list.map(a => ({ ...a, counted: false })), before: [], after: [] }
   await run(c.db, [authority(c.actor, 'record'), ...nativeApprovalAuthority(c.actor, 'payment', payment.amount_cents), ...bankAuthority(c.actor, [payment.bank_account_id]), ...early.before, ...early.allocations.map(a => allocationInsert(c.actor, payment.id, payment.direction === 'received' ? 'invoice' : 'bill', a, day)), ...allocated.guards, ...early.after,
@@ -200,6 +201,6 @@ export async function billsView(db: D1Database) {
 export async function paymentsView(db: D1Database) {
   const rows = await all(db, `SELECT p.*, c.name AS contact_name, CASE WHEN p.customer_deposit_id IS NOT NULL THEN 'Customer deposit applied' ELSE b.name END AS bank_name FROM pt_payments p JOIN pt_contacts c ON c.id = p.contact_id JOIN pt_bank_accounts b ON b.id = p.bank_account_id ORDER BY p.payment_date DESC, p.created_at DESC, p.id LIMIT 500`)
   const allocs = await all(db, "SELECT * FROM pt_allocations WHERE source_kind = 'payment' ORDER BY created_at, id")
-  for (const r of rows) { r.allocations = allocs.filter(a => a.source_id === r.id); r.unallocated_cents = r.amount_cents - r.allocations.reduce((s: number, a: Data) => s + a.amount_cents, 0) }
+  for (const r of rows) { r.allocations = allocs.filter(a => a.source_id === r.id); r.unallocated_cents = r.amount_cents - r.allocations.filter((a: Data) => !a.voided_by).reduce((s: number, a: Data) => s + a.amount_cents, 0) - await refunded(db, 'payment', r.id) }
   return rows
 }

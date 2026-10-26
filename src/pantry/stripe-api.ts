@@ -21,11 +21,11 @@ export function form(value: Data, prefix = '', out = new URLSearchParams()) {
   return out
 }
 
-export async function stripeCall(key: string, method: 'GET' | 'POST' | 'DELETE', path: string, params: Data = {}) {
+export async function stripeCall(key: string, method: 'GET' | 'POST' | 'DELETE', path: string, params: Data = {}, idempotencyKey?: string) {
   const body = form(params), get = method !== 'POST'
   let response: Response
   try {
-    response = await fetch(`${API}${path}${get && [...body].length ? `?${body}` : ''}`, { method, headers: { authorization: `Bearer ${key}`, 'stripe-version': STRIPE_VERSION, ...(get ? {} : { 'content-type': 'application/x-www-form-urlencoded' }) }, ...(get ? {} : { body }) })
+    response = await fetch(`${API}${path}${get && [...body].length ? `?${body}` : ''}`, { method, headers: { authorization: `Bearer ${key}`, 'stripe-version': STRIPE_VERSION, ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}), ...(get ? {} : { 'content-type': 'application/x-www-form-urlencoded' }) }, ...(get ? {} : { body }) })
   } catch {
     throw new Fault(502, 'Pantry could not reach Stripe; try again in a minute')
   }

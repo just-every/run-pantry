@@ -16,6 +16,9 @@ export const changed = (n = 1) => q(`INSERT INTO pt_guard SELECT CASE WHEN chang
 
 export function faultFrom(error: unknown): Fault | null {
   const message = String((error as Error)?.message ?? error)
+  if (message.includes('Voided invoice is retained')) return new Fault(409, 'This invoice is voided and its original record is retained')
+  if (message.includes('PANTRY_REFUND_AVAILABLE')) return new Fault(409, 'Customer balance is already applied or reserved for a refund; reload')
+  if (message.includes('PANTRY_REFUND_RETAINED')) return new Fault(409, 'A refund depends on this payment; retain its original receipt')
   if (message.includes('Asset depreciation plan is retained') || message.includes('Asset source reversed or disposed')) return new Fault(409, 'The retained asset plan or source changed; review the asset before posting')
   if (message.includes('PANTRY_ASSET_DISPOSAL')) return new Fault(409, 'The asset, its depreciation or the prepared disposal changed; review the asset and prepare the disposal again')
   if (message.includes('PANTRY_DIMENSION_REQUIRED_OR_UNKNOWN')) return new Fault(409, 'A required dimension is missing or a dimension value is inactive or unknown; review the line coding')
@@ -65,7 +68,7 @@ export function audit(actor: AuditActor, action: string, subjectKind: string, su
 // This maps domain records to their storage, not actions to individual writers.
 // Unversioned records receive a stored history revision in the same batch.
 const AUDIT_RECORDS: Record<string, [string, string?]> = {
-  estimate: ['pt_estimates'], 'customer-deposit': ['pt_customer_deposits'], 'close-task': ['pt_close_tasks'], item: ['pt_items'], check: ['pt_checks'], 'check-batch': ['pt_check_batches'], budget: ['pt_budgets'], recognition: ['pt_recognition_schedules'],
+  'customer-refund': ['pt_customer_refunds'], estimate: ['pt_estimates'], 'customer-deposit': ['pt_customer_deposits'], 'close-task': ['pt_close_tasks'], item: ['pt_items'], check: ['pt_checks'], 'check-batch': ['pt_check_batches'], budget: ['pt_budgets'], recognition: ['pt_recognition_schedules'],
   'recurring-journal': ['pt_recurring_journals'], journal: ['pt_journal_entries'], invoice: ['pt_invoices'], credit: ['pt_invoices'], bill: ['pt_bills'], payment: ['pt_payments'],
   account: ['pt_accounts'], customer: ['pt_contacts'], vendor: ['pt_contacts'], proposal: ['pt_proposals'], member: ['pt_members', 'email'],
   agent: ['pt_agents'], entity: ['pt_entity'], document: ['pt_documents'], statement: ['pt_statements'], period: ['pt_periods'],

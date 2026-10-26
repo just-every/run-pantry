@@ -53,6 +53,15 @@ export async function salesTaxContributions(db: D1Database, from: string, to: st
     const sign = l.kind === 'credit' ? -1 : 1
     put('accrual', key, 'taxable', sign * l.amount_cents, sale);if(l.discount_cents)put('accrual',key,'taxable',-sign*l.discount_cents,discount); put('accrual', key, 'charged', sign * l.tax_cents, source)
   }
+  // A void retains the original sale and removes it on the dated reversal.
+  const voids = await all(db, `SELECT i.id,i.journal_id,i.number,i.issue_date,i.credit_for,i.void_date AS entry_date,l.id AS line_id,l.line_no,l.class_name,l.location_name,l.project_name,l.description,l.tax_code,l.amount_cents,l.discount_cents,l.tax_cents FROM pt_invoices i JOIN pt_invoice_lines l ON l.invoice_id=i.id
+    WHERE i.kind='invoice' AND i.void_date IS NOT NULL AND i.void_date BETWEEN ? AND ? ORDER BY i.void_date,i.number,l.line_no`, from, to)
+  for (const l of voids) {
+    const key=l.tax_code??'exempt', source={...l,kind:'reversal'}, tags=(role:'sale'|'discount')=>Object.fromEntries(Object.entries(coding(l,role)).map(([k,v])=>[k.replace('Name','_name'),v]))
+    put('accrual',key,'taxable',-l.amount_cents,{...source,...tags('sale')})
+    put('accrual',key,'taxable',l.discount_cents,{...source,line_id:l.line_id+':discount',...tags('discount')})
+    put('accrual',key,'charged',-l.tax_cents,source)
+  }
   // Paid in the period: the settled shares of each line and of its tax.
   const writeOffs = await writeOffCredits(db)
   for (const [index, c] of (await cashLines(db, from, to)).entries()) {
@@ -109,7 +118,7 @@ async function earlyItems(db: D1Database, from: string, to: string, dimension?: 
 }
 
 /** Liability postings that come from invoices and credits, or from reversing an early-payment discount credit. */
-export const FROM_SALES = "(e.source_kind IN ('invoice', 'credit') OR (e.source_kind = 'reversal' AND EXISTS (SELECT 1 FROM pt_invoices d WHERE d.journal_id = e.reverses_id AND d.early_discount = 1)))"
+export const FROM_SALES = "(e.source_kind IN ('invoice', 'credit') OR (e.source_kind = 'reversal' AND EXISTS (SELECT 1 FROM pt_invoices d WHERE d.journal_id = e.reverses_id AND (d.early_discount = 1 OR d.void_reversal_id = e.id))))"
 
 export const writeOffCredits = async (db: D1Database) => new Set((await all(db, 'SELECT id FROM pt_invoices WHERE write_off = 1')).map(r => r.id))
 export const writtenOff = (c: CashLine, ids: Set<string>) => ids.has(c.docId) || (c.settlement?.creditId ? ids.has(c.settlement.creditId) : false)

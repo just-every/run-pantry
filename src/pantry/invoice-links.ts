@@ -16,7 +16,7 @@ export async function ensureLink(db: D1Database, invoiceId: string) {
 
 export async function invoiceByLink(db: D1Database, token: string) {
   if (!LINK_TOKEN.test(token)) return null
-  const row = await one(db, "SELECT id FROM pt_invoices WHERE link_token = ? AND kind = 'invoice' AND status = 'issued'", token)
+  const row = await one(db, "SELECT id FROM pt_invoices WHERE link_token = ? AND kind = 'invoice' AND status = 'issued' AND void_date IS NULL", token)
   if (!row) return null
   const inv = await invoice(db, row.id)
   if (inv.open_cents <= 0) {

@@ -159,6 +159,7 @@ export async function reversalStatements(db: D1Database, actor: AuditActor, orig
 
 const reverse: Command = { need: 'post', async run(c, b) {
   const original = await entry(c.db, text(b.id, 'Entry'))
+  requireThat(!await one(c.db, 'SELECT 1 FROM pt_customer_refunds WHERE journal_id=?', original.id), 'Refund postings retain their provider or recorded outcome', 409)
   requireThat(!await one(c.db, `SELECT 1 FROM pt_checks WHERE status <> 'void' AND ((? = 'payment' AND payment_id = ?) OR (? = 'bill' AND expense_bill_id = ?))`, original.source_kind, original.source_id, original.source_kind, original.source_id), 'Void this payment from Checks so its number and reason are retained', 409)
   requireThat(!['invoice', 'credit'].includes(original.source_kind), original.source_kind === 'credit' && await one(c.db, 'SELECT 1 FROM pt_invoices WHERE id = ? AND early_discount = 1', original.source_id)
     ? 'An early-payment discount is reversed with its payment, or by someone with the post grant giving a reason' : 'Correct an issued invoice by issuing a credit for it', 409)

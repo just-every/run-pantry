@@ -1,3 +1,4 @@
+import { refundProvider,recordedRefundJourney,stripeRefundScenario,creditRefundJourney } from './customer-refunds-journey.mjs'
 import { lateDiscountJourney } from './late-discount-journey.mjs'
 import { approvedWriteOffJourney } from './approved-write-off-journey.mjs'
 import { lateFeeJourney } from './late-fee-journey.mjs'
@@ -142,7 +143,8 @@ test('PAN-05 bills post to payables with their evidence; a bill without evidence
 })
 
 test('PAN-06 payments made outside Pantry are recorded and allocated to open items without moving money', async t => {
-  const h = await harness(); t.after(() => h.close())
+  const provider = refundProvider()
+  const h = await harness({ outbound: provider.outbound, clock: '2026-10-26T12:00:00Z' }); t.after(() => h.close())
   const { acct, customer, vendor, bank } = await setup(h)
   const bea = await h.member('bea@example.test', 'bookkeeper'), ann = await h.member('ann@example.test', 'accountant', { canPost: true })
   const inv = await h.command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-09-02', lines: [{ description: 'Workshop', quantity: '1', rate: '1000.00', accountId: acct['4000'], taxCode: 'exempt' }] }, bea)
@@ -159,6 +161,9 @@ test('PAN-06 payments made outside Pantry are recorded and allocated to open ite
   assert.equal(at((await h.view('sales')).invoices, i => i.id === inv.id).open_cents, 0)
   ar = await h.view('reports/receivables?to=2026-09-30')
   assert.deepEqual([ar.itemsTotal, ar.unapplied], [0, 20000]); assert.ok(ar.agrees)
+  await recordedRefundJourney({h,pay,customer,bank,bea,ann})
+  const paid = await stripeRefundScenario({h,acct,key:'synthetic-pantry-1010',createIntent:async({amount,invoiceId})=>{const intent={id:'synthetic-pantry-intent-1',status:'succeeded',amount_received:amount,currency:'usd',metadata:{pantry_invoice:invoiceId}};provider.intents.set(intent.id,intent);return intent}})
+  await creditRefundJourney({h,acct,bank,provider,paid})
   // Paying a vendor, then reversing that payment, reopens the bill.
   const bill = await h.command('bill.save', { vendorId: vendor.id, reference: 'INV-88', billDate: '2026-09-01', lines: [{ description: 'Suite', accountId: acct['6200'], amount: '640.00' }], post: true }, bea)
   const out = await h.command('payment.record', { direction: 'paid', contactId: vendor.id, date: '2026-09-12', amount: '640.00', bankAccountId: bank.id, allocations: [{ targetId: bill.id, amount: '640.00' }] }, bea)

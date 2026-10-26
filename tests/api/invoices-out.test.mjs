@@ -1,3 +1,4 @@
+import { voidJourney } from './void-journey.mjs'
 import { statementsJourney } from './statements-journey.mjs'
 import { remindersJourney } from './reminders-journey.mjs'
 import { fakePlaid } from './plaid.mjs'
@@ -106,7 +107,7 @@ test('INVOICE-009 the private customer record preserves preferences and follows 
 
 test('INVOICE-002/003/004 an issued invoice is emailed with its PDF and customer link; the first customer view is recorded; reminders follow the schedule once and stop when paid', async t => {
   const h = await harness(); t.after(() => h.close())
-  const { bank, c, issue } = await setup(h), day = today()
+  const { acct, bank, c, issue } = await setup(h), day = today()
   const { sending } = await h.view('invoicing')
   await h.command('sending.save', { revision: sending.revision, remindersOn: true, reminderDays: '7, -3, 0', timeZone: 'America/New_York' })
   const soon = await issue('Cedar Studio', addDays(day, -27), addDays(day, 3), '2400.00')
@@ -157,6 +158,7 @@ test('INVOICE-002/003/004 an issued invoice is emailed with its PDF and customer
   assert.equal(sales.deliveries.filter(d => d.kind === 'invoice').length, 3)
   assert.equal(sales.reminders.plans[soon.id], addDays(day, 3), 'the next reminder is on the due date')
   assert.equal(sales.reminders.plans[late.id], null, 'no steps left after the last')
+  await voidJourney(h, {acct,bank})
   await remindersJourney(t)
 })
 

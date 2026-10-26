@@ -1,3 +1,4 @@
+import { refundsView } from './refunds/store'
 import { estimate } from './estimates/store'
 import { customerDeposit } from './customer-deposits/store'
 // Customer history is complete, unlike the capped sales screen. Its invoice
@@ -12,7 +13,7 @@ import { statementHistory } from './statements/store'
 const scope = `WITH customer_invoices AS (SELECT * FROM pt_invoices WHERE customer_id = ?),
   customer_payments AS (SELECT * FROM pt_payments WHERE contact_id = ? AND direction = 'received'),
   customer_entries AS (SELECT journal_id AS id FROM customer_invoices UNION SELECT journal_id FROM customer_payments
-    UNION SELECT reversal_id FROM customer_payments) `
+    UNION SELECT reversal_id FROM customer_payments UNION SELECT void_reversal_id FROM customer_invoices) `
 
 /** Call only through the native-session reader, as with the other private views. */
 export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: string, includeStatements = true) {
@@ -48,6 +49,8 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
       FROM pt_exemption_certificates e JOIN pt_documents d ON d.id = e.document_id
       LEFT JOIN pt_exemption_reminders r ON r.certificate_id = e.id WHERE e.customer_id = ? ORDER BY e.created_at DESC, e.id`, id),
   ])
+  const refunds = await refundsView(db, id)
+  const refundedAt = (kind: string, source: string) => refunds.filter(r => r.source_kind === kind && r.source_id === source && r.status === 'succeeded' && r.refund_date <= asOf).reduce((n,r) => n+r.amount_cents,0)
   const recordHref = (kind: string, recordId: string) => `/app/reports?record=${encodeURIComponent(`${kind}:${recordId}`)}`
   const documentHref = (documentId: string) => `/api/pantry/documents/${encodeURIComponent(documentId)}`
   const sum = (rows: Data[], key: string) => rows.reduce((n, r) => n + Number(r[key]), 0)
@@ -65,15 +68,16 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
   const openItems = (receivables.items as Data[]).filter(i => i.contact_id === id)
   const openById = new Map(openItems.map(i => [i.id, i.open]))
   const rows: Data[] = invoices.map(i => {
-    const issued = i.status === 'issued' && i.issue_date <= asOf
+    const issued = (i.status === 'issued' && (!i.void_date || i.void_date > asOf)) && i.issue_date <= asOf
     const applied = allocations.filter(a => i.kind === 'credit' ? a.source_kind === 'credit' && a.source_id === i.id : a.target_kind === 'invoice' && a.target_id === i.id)
     // A reversed early-payment discount credit (INVOICE-010) nets to nothing from its reversal date.
     const reversed = i.kind === 'credit' && applied.some(a => a.voided_on && a.voided_on <= asOf)
-    const balance = !issued ? null : reversed ? 0 : i.kind === 'credit' ? i.total_cents - sum(applied.filter(a => a.included_in_balance), 'amount_cents') : openById.get(i.id) ?? 0
+    const balance = !issued ? null : reversed ? 0 : i.kind === 'credit' ? i.total_cents - sum(applied.filter(a => a.included_in_balance), 'amount_cents') - refundedAt('credit', i.id) : openById.get(i.id) ?? 0
     return { kind: i.kind, id: i.id, date: i.issue_date, due_date: i.due_date, created_at: i.created_at, reference: i.number,
       href: recordHref('invoice', i.id), total_cents: i.total_cents, balance_cents: balance,
       balance_label: i.kind === 'credit' ? 'Unallocated' : 'Open', included_in_balance: issued,
-      status: !issued ? i.status === 'issued' ? 'After reporting date' : i.status : reversed ? 'Reversed' : balance === 0 ? i.kind === 'credit' ? 'Fully applied' : 'Paid' : i.kind === 'credit' ? 'Unallocated' : 'Open',
+      status: !issued ? i.void_date && i.void_date <= asOf ? 'Voided' : i.status === 'issued' ? 'After reporting date' : i.status : reversed ? 'Reversed' : balance === 0 ? i.kind === 'credit' ? 'Fully applied' : 'Paid' : i.kind === 'credit' ? 'Unallocated' : 'Open',
+      void_date: i.void_date, void_reason: i.void_reason, reversal_href: i.void_reversal_id ? recordHref('entry', i.void_reversal_id) : null,
       memo: i.memo, credit_for: i.credit_for, credit_for_href: i.credit_for ? recordHref('invoice', i.credit_for) : null,
       allocations: applied, documents: docsFor('invoice', i), deliveries: deliveries.filter(d => d.invoice_id === i.id),
       exemption: i.exemption_evidence ? JSON.parse(i.exemption_evidence) : null }
@@ -81,7 +85,7 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
   for (const p of payments) {
     const active = p.payment_date <= asOf && (!p.reversal_id || p.reversal_date > asOf)
     const applied = allocations.filter(a => a.source_kind === 'payment' && a.source_id === p.id)
-    const balance = active ? p.amount_cents - sum(applied.filter(a => a.included_in_balance), 'amount_cents') : null
+    const balance = active ? p.amount_cents - sum(applied.filter(a => a.included_in_balance), 'amount_cents') - refundedAt('payment', p.id) : null
     rows.push({ kind: 'payment', id: p.id, date: p.payment_date, created_at: p.created_at, reference: p.reference,
       href: recordHref('payment', p.id), total_cents: p.amount_cents, balance_cents: balance, balance_label: 'Unallocated',
       included_in_balance: active, status: p.payment_date > asOf ? 'After reporting date' : !active ? 'Reversed' : balance === 0 ? 'Fully applied' : 'Unallocated',
@@ -97,7 +101,7 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
     const dep=await customerDeposit(db,r.id)
     return {...dep,kind:'customer-deposit',reference:dep.reference,total_cents:dep.amount_cents,balance_cents:null,included_in_balance:false,status:'Held customer deposit',href:`/app/sales?tab=estimates&deposit=${encodeURIComponent(dep.id)}`,allocations:[],documents:[],deliveries:[]}
   }))
-  rows.push(...estimateRows,...depositRows)
+  rows.push(...estimateRows,...depositRows, ...refunds.map(r => ({...r, kind:'refund',date:r.refund_date,reference:'Customer refund',total_cents:r.amount_cents,balance_cents:null,included_in_balance:false,href:r.journal_id?recordHref('entry',r.journal_id):`/app/sales?tab=payments`,allocations:[],documents:[],deliveries:[]})))
   const statements = includeStatements ? await statementHistory(db, id) : []
   for (const s of statements) for (const d of s.deliveries) deliveries.push({ ...d, number: s.subject })
   rows.sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at) || `${a.kind}:${a.id}`.localeCompare(`${b.kind}:${b.id}`))

@@ -107,7 +107,7 @@ const bucket = (overdue: number) => overdue <= 0 ? 0 : overdue <= 30 ? 1 : overd
 /** Open items as of a date and their tie-out to the control account. */
 export async function ageing(db: D1Database, kind: 'receivable' | 'payable', asOf: string, dimension?: DimensionScope) {
   const items = kind === 'receivable'
-    ? await all(db, "SELECT i.id, i.number AS ref, i.issue_date AS doc_date, i.due_date, i.total_cents, c.name AS contact, c.id AS contact_id FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id WHERE i.kind = 'invoice' AND i.status = 'issued' AND i.issue_date <= ? ORDER BY i.due_date, i.number, i.id", asOf)
+    ? await all(db, "SELECT i.id, i.number AS ref, i.issue_date AS doc_date, i.due_date, i.total_cents, c.name AS contact, c.id AS contact_id FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id WHERE i.kind = 'invoice' AND i.status = 'issued' AND (i.void_date IS NULL OR i.void_date > ?) AND i.issue_date <= ? ORDER BY i.due_date, i.number, i.id", asOf, asOf)
     : await all(db, "SELECT b.id, b.reference AS ref, b.bill_date AS doc_date, b.due_date, b.total_cents, c.name AS contact, c.id AS contact_id FROM pt_bills b JOIN pt_contacts c ON c.id = b.vendor_id WHERE (b.status = 'posted' OR (b.opening = 1 AND b.status <> 'void')) AND b.bill_date <= ? ORDER BY b.due_date, b.reference, b.id", asOf)
   const applied = new Map<string, number>()
   for (const a of await appliedAsOf(db, kind, asOf)) applied.set(a.target_id, (applied.get(a.target_id) ?? 0) + a.amount_cents)

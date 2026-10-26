@@ -36,7 +36,7 @@ export const customerLink = (env: Bindings, token: string) => `${runtimeBindings
 
 /** The PDF and the customer page show the same facts. */
 export async function invoiceDocument(db: D1Database, inv: Data) {
-  return inv.status === 'issued' ? (await issuedDocument(db, inv.id)).document : buildInvoiceDocument(db, inv)
+  return ['issued','void'].includes(inv.status) ? (await issuedDocument(db, inv.id)).document : buildInvoiceDocument(db, inv)
 }
 
 function reminderSubject(number: string, step: number, business: string) {
@@ -178,7 +178,7 @@ export async function reminderPlans(db: D1Database) {
   const settings = await sendingSettings(db), today = businessDay(settings.time_zone), plans: Record<string, string | null> = {}
   if (!settings.reminders_on) return { today, on: false, days: settings.reminder_days, plans }
   const sent = await all<{ invoice_id: string; step: number; recipient: string }>(db, "SELECT invoice_id, step, recipient FROM pt_deliveries WHERE kind = 'reminder' AND step IS NOT NULL")
-  for (const inv of await all(db, "SELECT id, customer_id, due_date FROM pt_invoices WHERE kind = 'invoice' AND status = 'issued' AND sent_at IS NOT NULL AND reminders_paused = 0")) {
+  for (const inv of await all(db, "SELECT id, customer_id, due_date FROM pt_invoices WHERE kind = 'invoice' AND status = 'issued' AND void_date IS NULL AND sent_at IS NOT NULL AND reminders_paused = 0")) {
     const customer = (await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', inv.customer_id))!
     if (!await one(db, `SELECT 1 WHERE ${reminderEligible}`, inv.id)) { plans[inv.id] = null; continue }
     const batch = await one(db, 'SELECT 1 FROM pt_reminder_batches WHERE invoice_id=? AND day=?', inv.id, today)
@@ -198,7 +198,7 @@ export async function sendDueReminders(env: Bindings, db: D1Database, today: str
   const settings = await sendingSettings(db)
   if (!settings.reminders_on || !operatorMail(runtimeBindings(env))) return []
   const open = await all(db, `SELECT i.id, i.due_date, i.customer_id FROM pt_invoices i
-    WHERE i.kind = 'invoice' AND i.status = 'issued' AND i.sent_at IS NOT NULL AND i.reminders_paused = 0
+    WHERE i.kind = 'invoice' AND i.status = 'issued' AND i.void_date IS NULL AND i.sent_at IS NOT NULL AND i.reminders_paused = 0
       AND NOT EXISTS (SELECT 1 FROM pt_stripe_payments sp WHERE sp.invoice_id = i.id AND sp.status = 'processing')`)
   const sent: Data[] = []
   for (const row of open) {

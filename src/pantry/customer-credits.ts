@@ -1,3 +1,4 @@
+import { refunded } from './refunds/store'
 // Applying an already issued customer credit moves no money and posts no sale.
 import { authority, who } from './access'
 import { date, now, requireThat, text, uid } from './core'
@@ -15,7 +16,7 @@ const apply: Command = { need: 'record', async run(c, b) {
   requireThat(day >= credit.issue_date, 'Apply a credit on or after its date')
   await assertOpen(c.db, day)
   const used = Number((await one(c.db, "SELECT COALESCE(SUM(amount_cents),0) AS n FROM pt_allocations WHERE source_kind='credit' AND source_id=? AND target_kind='invoice' AND voided_by IS NULL", credit.id))?.n ?? 0)
-  const prepared = await allocations(c.db, 'received', credit.customer_id, b.allocations, credit.total_cents - used)
+  const prepared = await allocations(c.db, 'received', credit.customer_id, b.allocations, credit.total_cents - used - await refunded(c.db, 'credit', credit.id))
   requireThat(prepared.list.length, 'Choose invoices to apply the credit to')
   const withdrawals = []
   for (const a of prepared.list) {
