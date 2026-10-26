@@ -45,6 +45,7 @@ try {
   app = await providerWorker({ clock: true, bindings: {}, outbound: async request => {
     assert.equal(new URL(request.url).hostname, 'api.stripe.com', 'Only the connected real Stripe account may receive upstream traffic')
     const response = await fetch(request.url, { method: request.method, headers: Object.fromEntries(['authorization', 'content-type', 'stripe-version', 'idempotency-key'].filter(n => request.headers.has(n)).map(n => [n, request.headers.get(n)])), ...(!['GET', 'HEAD'].includes(request.method) ? { body: await request.text() } : {}),signal:AbortSignal.timeout(20000) })
+    if(response.status>=400){const failure=await response.clone().json().catch(()=>({}));const parameter=failure.error?.param;receipt.providerFailure={http:response.status,code:failure.error?.code??null,parameter:typeof parameter==='string'&&/^[a-zA-Z0-9_\[\].]+$/.test(parameter)?parameter:null};await retain()}
     return new Response(await response.arrayBuffer(), { status: response.status, headers: Object.fromEntries([...response.headers].filter(([name])=>!['content-encoding','content-length','transfer-encoding'].includes(name))) })
   } })
   browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })

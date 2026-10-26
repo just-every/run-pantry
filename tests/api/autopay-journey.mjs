@@ -12,7 +12,7 @@ export function autopayProvider() {
     const pm = { id: id(), type: s.method, customer: s.customer, [s.method]: { last4: '6789' } }
     const mandate = s.method === 'us_bank_account' ? { id: id(), status: 'active', customer_acceptance: { type: 'online', accepted_at: 1792497600, online: { ip_address: '192.0.2.10', user_agent: 'Pantry provider edge' } } } : null
     if (mandate) mandates.set(mandate.id, mandate)
-    s.setup_intent = { id: id(), status: 'succeeded', customer: s.customer, payment_method: pm, mandate, metadata: { pantry_autopay_setup: s.client_reference_id } }
+    s.setup_intent = { id: id(), status: 'succeeded', usage:'off_session', customer: s.customer, payment_method: pm, mandate, metadata: { pantry_autopay_setup: s.client_reference_id } }
     s.status = 'complete'
     return s
   }
@@ -25,7 +25,7 @@ export function autopayProvider() {
       if (path === '/customers' && request.method === 'POST') { const row = { id: id() }; customers.set(row.id, row); return Response.json(row) }
       if (path === '/checkout/sessions' && request.method === 'POST') {
         const b = new URLSearchParams(await request.text())
-        assert.equal(b.get('mode'), 'setup'); assert.equal(b.get('setup_intent_data[usage]'), 'off_session')
+        assert.equal(b.get('mode'), 'setup')
         const row = { id: id(), mode: 'setup', status: 'open', livemode: false, customer: b.get('customer'), client_reference_id: b.get('client_reference_id'), method: b.get('allowed_payment_method_types[0]') }
         sessions.set(row.id, row); return Response.json({ ...row, url: `https://checkout.stripe.com/c/pay/${row.id}` })
       }

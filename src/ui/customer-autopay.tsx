@@ -9,7 +9,7 @@ export function CustomerAutopay({ customerId }: { customerId: string }) {
   const p = data.policy, saved = data.saved
   const templates = (sales?.recurring ?? []).filter((r: D) => r.customer_id === customerId && r.status === 'active' && r.mode === 'send')
   return <Card title="Saved payment and autopay" actions={<Chip tone={saved?.active ? 'good' : 'neutral'}>{saved?.active ? 'Authorized' : 'Off'}</Chip>}>
-    {saved && <dl className="facts"><div><dt>Saved method</dt><dd>{saved.method === 'card' ? 'Card' : 'ACH bank account'} ending {saved.last4}</dd></div><div><dt>Customer authorization</dt><dd>{day(saved.acceptedAt)}{saved.acceptedIP && <> · IP {saved.acceptedIP}</>}{saved.revokedAt && <> · Revoked {day(saved.revokedAt)}</>}</dd></div></dl>}
+    {saved && <dl className="facts"><div><dt>Saved method</dt><dd>{saved.method === 'card' ? 'Card' : 'ACH bank account'} ending {saved.last4}</dd></div><div><dt>Customer authorization</dt><dd>{day(saved.acceptedAt)}{saved.acceptedIP && <> · IP {saved.acceptedIP}</>}{saved.revokedAt && <> · {saved.revokedAt === 'restored' ? 'Restored: new authorization required' : <>Revoked {day(saved.revokedAt)}</>}</>}</dd></div></dl>}
     {p && <p>{p.valid ? 'Approved schedule' : 'Schedule needs fresh approval'} · {p.purpose}. Retry days: {p.retryDays.join(', ')}.</p>}
     <details className="details"><summary>Authorization and schedule</summary>
       {saved?.mandateText && <p>{saved.mandateText}</p>}

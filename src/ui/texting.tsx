@@ -44,7 +44,7 @@ export function CustomerTextConsent({customer}:{customer:D}) {
    <Field label="Consent given at" name="consentedAt" type="datetime-local" required hint="Use the time the customer gave permission, in your device’s time zone." />
   </Form>
   <Table heads={['Number','Purposes','Consent evidence','Status']} empty="No text consent recorded.">
-   {consents.map((c:D)=><tr key={c.phone}><td>{c.phone}<small className="sub block">{c.time_zone}</small></td><td>{c.purposes.join(', ')}</td><td><details><summary>{c.source}</summary><p>{c.wording}</p><p>Given {new Date(c.consented_at).toLocaleString()}. Recorded {new Date(c.recorded_at).toLocaleString()} by {c.recorded_by}.</p></details></td><td>{c.revoked_at?<Chip tone="warn">Opted out</Chip>:<><Chip tone="good">Consented</Chip><Action tone="danger" run={async()=>{await command('texting.consent',{customerId:customer.id,phone:c.phone,revoke:true});await reload()}}>Revoke text consent</Action></>}</td></tr>)}
+   {consents.map((c:D)=><tr key={c.phone}><td>{c.phone}<small className="sub block">{c.time_zone}</small></td><td>{c.purposes.join(', ')}</td><td><details><summary>{c.source}</summary><p>{c.wording}</p><p>Given {new Date(c.consented_at).toLocaleString()}. Recorded {new Date(c.recorded_at).toLocaleString()} by {c.recorded_by}.</p></details></td><td>{c.revoked_at?<Chip tone="warn">{c.revoked_at==='restored'?'New consent required':'Opted out'}</Chip>:<><Chip tone="good">Consented</Chip><Action tone="danger" run={async()=>{await command('texting.consent',{customerId:customer.id,phone:c.phone,revoke:true});await reload()}}>Revoke text consent</Action></>}</td></tr>)}
   </Table>
  </Card>
 }

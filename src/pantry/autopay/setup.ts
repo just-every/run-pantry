@@ -47,7 +47,7 @@ export async function startAutopaySetup(env: Bindings, db: D1Database, token: st
   try {
     const link = customerLink(env, token)
     session = await stripeCall(key, 'POST', '/checkout/sessions', { mode: 'setup', currency: 'usd', customer: stripeCustomer.id, allowed_payment_method_types: [method], client_reference_id: id,
-      setup_intent_data: { usage: 'off_session', metadata: { pantry_autopay_setup: id, pantry_customer: state.c.id, pantry_policy: state.policy!.revision } }, metadata: { pantry_autopay_setup: id },
+      setup_intent_data: { metadata: { pantry_autopay_setup: id, pantry_customer: state.c.id, pantry_policy: state.policy!.revision } }, metadata: { pantry_autopay_setup: id },
       custom_text: { submit: { message: `Save this method for automatic payment of recurring invoices, under the purpose, address, due dates and retry schedule you accepted on the Pantry invoice page. You may revoke future submissions from that page. For bank debits, also accept Stripe's mandate displayed here.` } }, success_url: `${link}?autopay_setup={CHECKOUT_SESSION_ID}`, cancel_url: link }, `pantry-autopay-setup-${id}`)
     requireThat(session.id && session.url, 'Stripe did not return hosted Checkout', 502)
   } catch (error) {
@@ -69,7 +69,7 @@ export async function confirmAutopaySetup(env: Bindings, db: D1Database, token: 
   const session = await stripeCall(key, 'GET', `/checkout/sessions/${encodeURIComponent(sessionId)}`, { expand: ['setup_intent.payment_method', 'setup_intent.mandate'] })
   const intent = typeof session.setup_intent === 'object' ? session.setup_intent : await stripeCall(key, 'GET', `/setup_intents/${encodeURIComponent(objectId(session.setup_intent) ?? '')}`, { expand: ['payment_method', 'mandate'] })
   requireThat(session.mode === 'setup' && session.status === 'complete' && session.client_reference_id === setup.id && objectId(session.customer) === setup.stripe_customer && Number(session.livemode) === state.stripe!.livemode, 'Stripe has not completed this setup for this customer', 409)
-  requireThat(intent.status === 'succeeded' && objectId(intent.customer) === setup.stripe_customer && intent.metadata?.pantry_autopay_setup === setup.id, 'Stripe has not confirmed this saved method', 409)
+  requireThat(intent.status === 'succeeded' && intent.usage === 'off_session' && objectId(intent.customer) === setup.stripe_customer && intent.metadata?.pantry_autopay_setup === setup.id, 'Stripe has not confirmed this saved method', 409)
   const method = typeof intent.payment_method === 'object' ? intent.payment_method : await stripeCall(key, 'GET', `/payment_methods/${encodeURIComponent(objectId(intent.payment_method))}`)
   requireThat(method?.id && method.type === setup.method && state.methods.includes(method.type) && objectId(method.customer) === setup.stripe_customer, 'This saved payment method is no longer offered or belongs to another customer', 409)
   const mandate = typeof intent.mandate === 'object' ? intent.mandate : intent.mandate ? await stripeCall(key, 'GET', `/mandates/${encodeURIComponent(intent.mandate)}`) : null
