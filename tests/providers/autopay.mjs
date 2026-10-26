@@ -22,7 +22,10 @@ const retain = async () => writeFile(join(proof, 'autopay-provider.json'), JSON.
 const stage = async (name, screen = page, capture = true) => {
   receipt.stage = name
   await retain()
-  if (screen && capture) await screen.screenshot({ path: join(proof, `autopay-provider-${name}.png`), fullPage: true, animations: 'disabled' })
+  if (screen && capture) {
+    try { await screen.screenshot({ path: join(proof, `autopay-provider-${name}.png`), fullPage: new URL(screen.url()).origin === app?.origin, animations: 'disabled', timeout: 5000 }) }
+    catch { receipt.captureFailures ??= []; receipt.captureFailures.push(name); await retain() }
+  }
 }
 const stripe = async (path, params) => {
   const response = await fetch(`https://api.stripe.com/v1${path}`, { method: params ? 'POST' : 'GET', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/x-www-form-urlencoded', 'stripe-version': '2026-09-30.endive' }, ...(params ? { body: new URLSearchParams(params) } : {}), signal: AbortSignal.timeout(20000) })
