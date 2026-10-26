@@ -36,20 +36,51 @@ function InvoicePanel({ i, data, onChange, onEdit, onCredit }: { i: D; data: D; 
     <p>{i.kind === 'credit' ? 'Credit' : 'Invoice'} for {usd(i.total_cents)}{i.kind === 'invoice' && i.status === 'issued' ? `, ${usd(i.open_cents)} open, due ` : ', due '}{day(i.due_date)}.</p>
     {i.estimate_id && <div className="callout"><strong><a href={`/app/sales?tab=estimates&estimate=${encodeURIComponent(i.estimate_id)}`}>View accepted estimate</a></strong><span>Previously billed: {usd(i.estimate_billed_before_cents)} · This invoice: {usd(i.total_cents)} · Remaining: {usd(i.estimate_remaining_cents)}</span><span>This invoice keeps the accepted estimate's pricing.</span></div>}
     <ExemptionCitation invoice={i} />
+    {!!i.write_off && <p>Bad-debt write-off · {i.memo}</p>}
     {untaxed > 0 && <div className="callout callout-warn"><strong>Tax treatment needed before approval</strong><span>{untaxed} line{untaxed === 1 ? '' : 's'} without a sales tax code.</span></div>}
     {i.lines.length > 0 && <Table heads={['Description', 'Quantity', 'Amount', 'Tax']} figures={[1, 2, 3]}>{i.lines.map((l: D) => <tr key={l.id}><td>{l.description}</td><td className="fig">{l.quantity_milli / 1000}</td><td className="fig">{usd(l.amount_cents)}</td><td className="fig">{l.tax_code === 'exempt' ? 'Exempt' : l.tax_code ? usd(l.tax_cents) : 'Needed'}</td></tr>)}</Table>}
     <div className="row-actions">
-      {i.status !== 'issued' && !i.estimate_id && state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit</button>}
+      {i.status !== 'issued' && !i.estimate_id && !i.write_off && !i.early_detail?.honoredAfterWindow && state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit</button>}
       {i.status === 'draft' && i.estimate_id && (i.early_terms || i.early_offer) && state.actor.can.record && <Action run={async () => { await command('estimate.refresh-invoice', { id: i.estimate_id, invoiceId: i.id, revision: i.revision }); await onChange() }}>Refresh early-payment treatment</Action>}
       {i.self_approval && <p className="hint">Self-approved within limit · {usd(JSON.parse(i.self_approval).limit)} · {JSON.parse(i.self_approval).source}</p>}
       {i.status === 'draft' && selfAllowed && <Action tone="primary" run={async () => { await command('invoice.approve-issue', { id: i.id, revision: i.revision, limitRevision: state.settings.issuingLimits.effective.revision }); await onChange() }}>Approve and issue within limit</Action>}
       {i.status === 'draft' && (mayApprove ? <Action tone="primary" run={async () => { await command('invoice.approve', { id: i.id, revision: i.revision }); await onChange() }}>Approve</Action> : <span className="hint">Approval needs the posting grant and a different person from the preparer, unless an issuing limit permits self-approval.</span>)}
-      {i.status === 'approved' && state.actor.can.record && <Action tone="primary" run={async () => { await command('invoice.issue', { id: i.id }); await onChange() }}>Issue</Action>}
+      {i.status === 'approved' && state.actor.can.record && (!(i.write_off || i.early_detail?.honoredAfterWindow) || state.actor.can.post) && <Action tone="primary" run={async () => { await command('invoice.issue', { id: i.id }); await onChange() }}>Issue</Action>}
       {i.kind === 'invoice' && i.status === 'issued' && !i.opening && state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={onCredit}>Issue a credit</button>}
     </div>
     {i.kind === 'invoice' && i.status === 'issued' && <SendPanel i={i} data={data} onChange={onChange} />}
+    {i.kind === 'invoice' && i.status === 'issued' && i.open_cents > 0 && state.actor.can.record && ['owner', 'accountant', 'bookkeeper'].includes(state.actor.role) && state.actor.policy?.bankAccounts == null && <details className="details"><summary>Prepare a write-off</summary>
+      <p>Prepare a marked bad-debt credit for {usd(i.open_cents)}. Review and approve the exact credit before issuing it. Bulk write-offs keep their separate ceiling.</p>
+      <Form label="Prepare write-off credit" submit={b => command('write-off.prepare', { ...b, invoiceId: i.id })} onDone={async result => { await onChange(); window.location.assign(`/app/sales?invoice=${encodeURIComponent(result.id)}`) }}>
+        <Field label="Write-off date" name="date" type="date" defaultValue={today()} required />
+        <Field label="Bad-debt account" name="accountId" required options={accountOptions(state.accounts, a => a.subtype === 'other' && ['income', 'expense'].includes(a.type))} />
+        <Field label="Write-off reason" name="reason" required />
+        <DimensionFormFields label="Write-off" />
+      </Form>
+    </details>}
+    {i.kind === 'invoice' && i.status === 'issued' && i.early_offer && !i.early_withdrawn_by && !data.invoices.some((credit: D) => credit.credit_for === i.id && credit.early_discount && !credit.early_reversal_id) && state.actor.can.record && ['owner', 'accountant', 'bookkeeper'].includes(state.actor.role) && state.actor.policy?.bankAccounts == null && <details className="details"><summary>Honor a late discount</summary>
+      <p>Prepare the approved early-payment discount of {usd(i.early_offer.discount + i.early_offer.reduction)} as a credit honored after window. Normal credit approval is required.</p>
+      <Form label="Prepare late discount credit" submit={b => command('early-discount.prepare-late', { ...b, invoiceId: i.id })} onDone={async result => { await onChange(); window.location.assign(`/app/sales?invoice=${encodeURIComponent(result.id)}`) }}>
+        <Field label="Honor date" name="date" type="date" defaultValue={today()} required />
+        <Field label="Reason for honoring the discount" name="reason" required />
+      </Form>
+    </details>}
+    {!!i.early_detail?.honoredAfterWindow && <p>Early-payment discount honored after window · {i.memo}</p>}
+    {i.kind === 'credit' && i.status === 'issued' && i.open_cents > 0 && !i.early_reversal_id && state.actor.can.record && ['owner', 'accountant', 'bookkeeper'].includes(state.actor.role) && state.actor.policy?.bankAccounts == null && <ApplyCustomerCredit credit={i} invoices={data.invoices} onDone={onChange} />}
     <Details facts={{ id: i.id, revision: i.revision, 'prepared by': who(i.prepared_by), 'approved by': i.approved_by && who(i.approved_by), 'issued by': i.issued_by && who(i.issued_by), journal: i.journal_id, ...(i.recurring_id ? { 'recurring invoice': (data.recurring as D[]).find(t => t.id === i.recurring_id)?.number } : {}) }} />
   </Card>
+}
+
+function ApplyCustomerCredit({ credit, invoices, onDone }: { credit: D; invoices: D[]; onDone: () => Promise<void> }) {
+  const [alloc, setAlloc] = useState<Record<string, string>>({})
+  const open = invoices.filter(i => i.kind === 'invoice' && i.status === 'issued' && i.customer_id === credit.customer_id && i.open_cents > 0)
+  return <details className="details"><summary>Apply customer credit</summary>
+    <p>{usd(credit.open_cents)} is available for this customer's invoices. This applies an existing credit; it does not send money.</p>
+    <Form label="Apply customer credit" submit={b => command('customer-credit.allocate', { ...b, creditId: credit.id, allocations: Object.entries(alloc).filter(([, amount]) => amount).map(([targetId, amount]) => ({ targetId, amount })) })} onDone={onDone}>
+      <Field label="Credit application date" name="date" type="date" defaultValue={today()} required />
+      <OpenItems open={open} alloc={alloc} setAlloc={setAlloc} legend="Apply credit to these invoices" />
+    </Form>
+  </details>
 }
 
 function Invoices({ data, reload }: { data: D; reload: () => Promise<void> }) {

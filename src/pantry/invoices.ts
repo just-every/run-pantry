@@ -1,3 +1,5 @@
+import { lateDiscountChecks } from './late-discount'
+import { writeOffChecks } from './approved-write-offs'
 import { dimensionTags, dimensionValues } from './dimensions'
 import { dimensionAmounts } from './dimensions/allocations'
 import { depositForIssue } from './customer-deposits/applications'
@@ -7,7 +9,7 @@ import { depositForIssue } from './customer-deposits/applications'
 import { bankAuthority } from './access-policy/banks'
 import { invoiceTime } from './time/invoicing'
 import { withinLimit } from './issuing-limits'
-import { authority, who } from './access'
+import { authority, must, who } from './access'
 import { addDays, date, list, now, optionalText, quantity, requireThat, scale, text, uid, cents, type Data } from './core'
 import { all, approval, assertOpen, audit, changed, one, periodOpen, q, run, type AuditActor, type Sql } from './db'
 import { controlAccount } from './accounts'
@@ -116,6 +118,8 @@ export async function nextNumber(db: D1Database, kind: 'invoice' | 'credit') {
 const saveDraft: Command = { need: 'record', async run(c, b) {
   const kind = b.kind === 'credit' ? 'credit' : 'invoice'
   const previous = b.id ? await invoice(c.db, text(b.id, 'Invoice')) : null
+  requireThat(!previous?.early_detail?.honoredAfterWindow, 'A late honor keeps the approved offer calculation; prepare a new honor instead', 409)
+  requireThat(!previous?.write_off, 'A prepared write-off keeps its reviewed purpose and coding; prepare a new write-off instead', 409)
   requireThat(!previous?.estimate_id, 'A converted estimate draft keeps its accepted pricing; issue it without editing', 409)
   const time = await invoiceTime(c.db, b)
   const p = await parseInvoice(c.db, { ...time.body, templateId: b.templateId ?? previous?.document_template_id, customFields: b.customFields ?? (previous ? JSON.parse(previous.document_values) : undefined) })
@@ -152,7 +156,7 @@ const saveDraft: Command = { need: 'record', async run(c, b) {
 } }
 
 async function approvalChecks(db: D1Database, current: Data) {
-  const certificateGuards = await assertInvoiceExemption(db, current)
+  const certificateGuards = [...await assertInvoiceExemption(db, current), ...await writeOffChecks(db, current), ...await lateDiscountChecks(db, current)]
   const untaxed = current.lines.filter((l: Data) => !l.tax_code)
   requireThat(!untaxed.length, `Tax treatment needed before approval: line ${untaxed.map((l: Data) => l.line_no).join(', ')}`, 409)
   requireThat(!current.discounts.length || current.discount_account_id, 'No discounts account was chosen when this draft was saved: ask your accountant to choose one in Settings, then save the draft again', 409)
@@ -181,12 +185,12 @@ const approve: Command = { need: 'post', async run(c, b) {
 
 /** The invoice fields issuing reads; an invoice being created in the same batch passes them directly. */
 export type Issuable = { id: string; kind: string; number: string; customer_id: string; customer_name: string; issue_date: string; total_cents: number; credit_for?: string | null; revision: string; destination_state?: string; exemption_evidence?: string | null
-  discounts?: import('./discounts').Discount[]; discount_cents?: number; after_tax_discount_cents?: number; discount_account_id?: string | null; deposit?: Deposit | null; early_offer?: Offer | null; early_for_number?: string
+  discounts?: import('./discounts').Discount[]; discount_cents?: number; after_tax_discount_cents?: number; discount_account_id?: string | null; deposit?: Deposit | null; early_offer?: Offer | null; early_for_number?: string; write_off?: number; early_detail?: Data; early_discount?: number
   lines: { account_id: string; amount_cents: number; description: string; tax_code: string | null; tax_cents: number; discount_cents?:number;line_kind?:string; class_name?:string;location_name?:string;project_name?:string }[] }
 
 /** Issue posts the approved revision: receivable against income and sales tax (reversed for a credit). */
 export async function issueStatements(db: D1Database, current: Issuable, actor: AuditActor, preparedBy = actor.email, parsed?: Data): Promise<{ journalId: string; statements: Sql[] }> {
-  const certificateGuards = await assertInvoiceExemption(db, current)
+  const certificateGuards = [...await assertInvoiceExemption(db, current), ...await writeOffChecks(db, current), ...await lateDiscountChecks(db, current)]
   const receivable = await controlAccount(db, 'receivable')
   const taxAccounts = new Map((await all(db, 'SELECT id, account_id FROM pt_tax_codes')).map(t => [t.id, t.account_id]))
   const credit = current.kind === 'credit'
@@ -211,12 +215,13 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
   coded.forEach((l,i)=>add(current.discount_account_id!,l.discount_cents+after[i],!credit,`Discounts ${current.number}`,l))
   for (const l of coded) add(taxAccounts.get(l.tax_code!)!,l.tax_cents,credit,`Sales tax ${current.number}`,l)
   lines.push(...extra.values(), ...controls.slice(1))
+  const lateHonor = !!current.early_detail?.honoredAfterWindow
   const issuedRevision = uid()
   const documents = await issuedDocumentStatements(db, current, issuedRevision, parsed)
   const journalId = uid(), statements: Sql[] = [
     ...certificateGuards,
     ...entryStatements({ id: journalId, date: current.issue_date, memo: `${credit ? 'Credit' : 'Invoice'} ${current.number} — ${current.customer_name}`, sourceKind: current.kind, sourceId: current.id, preparedBy, preparedKind: 'person', lines }, actor.email),
-    q("UPDATE pt_invoices SET status = 'issued', journal_id = ?, issued_by = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'approved'", journalId, actor.email, issuedRevision, current.id, current.revision), changed(), ...documents]
+    q("UPDATE pt_invoices SET status = 'issued', journal_id = ?, issued_by = ?, revision = ?, early_discount = ? WHERE id = ? AND revision = ? AND status = 'approved'", journalId, actor.email, issuedRevision, lateHonor || current.early_for_number || current.early_discount ? 1 : 0, current.id, current.revision), changed(), ...documents]
   if (current.deposit) {
     // The deposit received at issue is a payment applied to this invoice from its issue date.
     const d = current.deposit, deposit = await paymentStatements(db, actor, { ...dimensionTags(d), direction: 'received', contactId: current.customer_id, date: d.date, amount: (d.amount / 100).toFixed(2), method: d.method,
@@ -229,7 +234,7 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
   if (credit) {
     const target = await invoice(db, current.credit_for!)
     // Any credit other than the early-payment discount itself withdraws a live early-payment offer (INVOICE-010).
-    if (!current.early_for_number) statements.push(...await withdrawalStatements(db, actor, target, current.id, current.number))
+    if (!current.early_for_number && !lateHonor) statements.push(...await withdrawalStatements(db, actor, target, current.id, current.number))
     const applied = Math.min(current.total_cents, target.open_cents)
     if (applied > 0) statements.push(q("INSERT INTO pt_allocations (id, source_kind, source_id, target_kind, target_id, amount_cents, allocation_date, created_by, created_at) VALUES (?, 'credit', ?, 'invoice', ?, ?, ?, ?, ?)", uid(), current.id, target.id, applied, current.issue_date, actor.email, now()))
   }
@@ -239,10 +244,11 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
 
 const issue: Command = { need: 'record', async run(c, b) {
   const current = await invoice(c.db, text(b.id, 'Invoice'))
+  if (current.write_off || current.early_detail?.honoredAfterWindow) must(c.actor, 'post')
   requireThat(current.status === 'approved' && current.approved_revision === current.revision, 'Approve the current version before issuing', 409)
   await assertOpen(c.db, current.issue_date)
   const issued = await issueStatements(c.db, current as Issuable, c.actor)
-  await run(c.db, [authority(c.actor, 'record'), ...issued.statements])
+  await run(c.db, [authority(c.actor, 'record'), ...(current.write_off || current.early_detail?.honoredAfterWindow ? [authority(c.actor, 'post')] : []), ...issued.statements])
   return invoice(c.db, current.id)
 } }
 
