@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "a59e2650ef26e9dc23a76ffef5fb00001feef50d50136719b3a5568731defa31",
+      "sha256": "b12d60c6b47d0824e573ef9e831af9443eff23f6366bf1b7ad2ab263a21e166e",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "94b1bcc3d301e0a8a97750e25ff3f5eef99cd3a1959ecb888b4f7f90fe6f0fb8",
+      "sha256": "eb3232d574e5b67fc5362b9afd6611190d5478b5d9521530b38e1d2741aaab2e",
       "executable": false
     },
     "DEMO.md": {
@@ -5607,7 +5607,7 @@
       "executable": false
     },
     "tests/api/invoices-out.test.mjs": {
-      "sha256": "3f323783caa9dc38b7436e80bf5263a950f46f7e832997c74637a1da6cfc393c",
+      "sha256": "eb94d5c3e7d08bcda1cc1a9978e3ca7359d52703b30855b06d60138f586c06b8",
       "executable": false
     },
     "tests/api/late-discount-journey.mjs": {
@@ -5639,7 +5639,7 @@
       "executable": false
     },
     "tests/api/payment-notices-journey.mjs": {
-      "sha256": "79d75aa9e3a81f335fd510542ba48f0bdc416dafe7696f946fdd78a6ea6642d4",
+      "sha256": "4359f49224fb66ce60dc65e0fe28db0f1bc10d41ee414a6c27b53b83da65e074",
       "executable": false
     },
     "tests/api/plaid.mjs": {

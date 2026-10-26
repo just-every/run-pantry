@@ -311,6 +311,15 @@ test('PAY-004 invoice-named deposits clear automatically, amount-only wires awai
   assert.equal((await invoiceOf(h, north.id)).open_cents, 0)
   const payments = (await h.view('sales')).payments
   assert.equal(payments.length, 3, 'repeat confirmation posts nothing twice')
+  const matchedPayment = at(payments, p => p.contact_id === c['Cedar Studio'].id && p.amount_cents === 120000)
+  const matchedReceipt = await h.command('payment.receipt', { paymentId: matchedPayment.id, invoiceId: cedar.id })
+  assert.equal(matchedReceipt.deliveries[0].status, 'accepted')
+  const matchedMail = h.mail.at(-1), receiptCount = h.mail.length
+  assert.deepEqual(matchedMail.to, ['ap@cedar.example'])
+  assert.ok(matchedMail.text.includes(cedar.number)); assert.match(matchedMail.text, /Amount: \$1,200\.00/)
+  assert.match(matchedMail.text, /Remaining balance: \$0\.00/)
+  await h.command('payment.receipt', { paymentId: matchedPayment.id, invoiceId: cedar.id })
+  assert.equal(h.mail.length, receiptCount, 'a bank-applied payment receipt is claimed once')
   r = await h.view(`reconciliation/${imported.statement.id}`)
   assert.ok(at(r.lines, l => l.id === wire.id).match_id)
   const audit = await h.view('activity')
@@ -319,6 +328,7 @@ test('PAY-004 invoice-named deposits clear automatically, amount-only wires awai
   assert.equal((await h.view('sales')).payments.length, 3, 'feed replay cannot duplicate a receipt')
   await h.command('match.undo', { id: automatic.match_id })
   assert.equal((await invoiceOf(h, cedar.id)).open_cents, 120000)
+  await h.command('payment.receipt', { paymentId: matchedPayment.id, invoiceId: cedar.id }, h.owner, 409)
   assert.ok(audit.audit.some(e => e.action === 'match.automatic' && e.subject_id === refLine.match_id))
   await h.command('match.undo', { id: refLine.match_id })
   assert.equal((await invoiceOf(h, referenced.id)).open_cents, 37500)

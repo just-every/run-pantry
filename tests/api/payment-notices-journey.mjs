@@ -53,7 +53,7 @@ export async function paymentNoticesJourney(t) {
   await h.command('payment.receipts-preference', { enabled: false }, viewer, 403)
 
   // Online payer communication flows through the same public customer return.
-  await h.command('stripe.connect', { secretKey: 'synthetic-notices-key' })
+  await h.command('stripe.connect', { secretKey: 'synthetic-pantry-1014' })
   const onlineInvoice = await issue()
   await h.command('invoice.send', { id: onlineInvoice.id })
   const page = new URL(h.mail.at(-1).text.match(/http:\/\/[^\s]+\/i\/[A-Za-z0-9_-]{32}/)[0]).pathname
