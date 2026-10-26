@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "04324fe4882a3ba319654b03a0e5b61fae56311c64ff34226eabc8ce31cb52de",
+      "sha256": "094984803727effc2a58f242b489881bb37eac21259d57c65de7d2d9df3c41c9",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "cc18d3de2c32dfb5357c6fe5c25c6b37b652e51c759a6c8205c2ec1698a11599",
+      "sha256": "be8d363357c0b87e6c3cfda6b1bc1f3532860518bf06ae95e6316f47e8da3df2",
       "executable": false
     },
     "DEMO.md": {
@@ -6087,7 +6087,7 @@
       "executable": false
     },
     "tests/providers/qbo-destination-sandbox.mjs": {
-      "sha256": "03711f1a9a75e8138563670898d56374af1903e0126f34010815963cb3430e42",
+      "sha256": "e6b8bbf976155f24db1b134d4d61bf395dfead927f9ffbbc23f10f6ae1deda71",
       "executable": false
     },
     "tests/providers/stripe-clearing.mjs": {

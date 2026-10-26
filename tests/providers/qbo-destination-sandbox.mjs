@@ -68,5 +68,5 @@ try {
  const invoices=await query('Invoice'),bills=await query('Bill')
  assert.equal(cents(invoices.find(v=>v.Id===ids[`Invoice:${source.invoice.id}`]).Balance),source.invoice.total_cents)
  assert.equal(cents(bills.find(v=>v.Id===ids[`Bill:${source.bill.id}`]).Balance),source.bill.total_cents)
- console.log(JSON.stringify({sandbox:'Intuit',realmSuffix:realm.slice(-4),label,created,uploaded,trialBalanceAccounts:manifest.closingTrialBalance.accounts.length,trialBalanceAgrees:true,openItemsAgree:true,sourceDebitMinor:manifest.closingTrialBalance.debitMinor,sourceCreditMinor:manifest.closingTrialBalance.creditMinor}))
+ console.log(JSON.stringify({sandbox:'Intuit',realmSuffix:realm.slice(-4),label,created,uploaded,trialBalanceAccounts:manifest.closingTrialBalance.accounts.length,trialBalanceDeltaAgrees:true,openItemsAgree:true,sourceDebitMinor:manifest.closingTrialBalance.debitMinor,sourceCreditMinor:manifest.closingTrialBalance.creditMinor}))
 } finally {await h.close();console.log(JSON.stringify({sandboxRecordsRetained:created,label}))}
