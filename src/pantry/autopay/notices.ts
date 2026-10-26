@@ -1,3 +1,4 @@
+import { renderNotice } from './notice-template'
 import type { Bindings } from '../../auth.server'
 import { runtimeBindings } from '../../auth.server'
 import { operatorMail } from '../../mail.server.mjs'
@@ -14,7 +15,9 @@ export async function queueFailureNotice(db: D1Database, attemptId: string) {
   if (!a || a.status !== 'failed') return
   const c = await one(db, 'SELECT * FROM pt_contacts WHERE id=? AND erased_at IS NULL', a.customer_id)
   if (!c) return
-  const inv = await invoice(db, a.invoice_id), subject = `Automatic payment failed: invoice ${inv.number}`
+  const p=await one(db,'SELECT notice_subject FROM pt_autopay_policies WHERE customer_id=? AND revision=?',a.customer_id,a.policy_revision)
+  if(!p)return
+  const inv = await invoice(db, a.invoice_id), subject = renderNotice(p.notice_subject,{invoice:inv.number})
   await run(db, customerRecipients(c).map(recipient => q("INSERT INTO pt_autopay_notices(id,attempt_id,invoice_id,recipient,subject,status,at) VALUES(?,?,?,?,?,'queued',?) ON CONFLICT(attempt_id,recipient) DO NOTHING", uid(), a.id, inv.id, recipient, subject, now())))
 }
 
@@ -36,11 +39,12 @@ export async function sendAutopayNotices(env: Bindings, db: D1Database) {
       if (!fresh.valid || !fresh.consented || fresh.policy!.revision !== notice.policy_revision || binding(fresh.c) !== binding(state.c)) { status = 'cancelled'; detail = 'Standing mail consent changed' }
       else {
         const entity = await one(db, 'SELECT legal_name FROM pt_entity WHERE id=1'), days = JSON.parse(fresh.policy!.retry_days), next = days[notice.sequence]
-        const body = `${entity?.legal_name ?? 'The business'}\nInvoice ${inv.number}\n\nThe automatic payment of ${usd(notice.amount_cents)} failed. ${next === undefined ? 'Automatic retries are exhausted; ordinary invoice reminders will follow.' : `The next retry is scheduled ${next} days after the first attempt.`}\nYou can revoke automatic payment from your invoice's autopay controls or contact the business.\n`
+        const body = renderNotice(fresh.policy!.notice_template,{business:entity?.legal_name??'The business',invoice:inv.number,amount:usd(notice.amount_cents),next_retry:next===undefined?'Automatic retries are exhausted; ordinary invoice reminders will follow.':`The next retry is scheduled ${next} days after the first attempt.`})
+        const subject = renderNotice(fresh.policy!.notice_subject,{invoice:inv.number})
         const mailer = operatorMail(runtimeBindings(env)) as unknown as { send(message: Data): Promise<{ status: string; provider: string; providerMessageId?: string | null; code?: string }> } | undefined
         if (!mailer || !env.MAIL_FROM) { status = 'failed'; detail = 'The configured mail route is unavailable' }
         else {
-          const result = await mailer.send({ deliveryId: notice.id, from: String(env.MAIL_FROM), to: [notice.recipient], subject: notice.subject, text: body, replyTo: settings.reply_to || await ownerEmail(db, env) })
+          const result = await mailer.send({ deliveryId: notice.id, from: String(env.MAIL_FROM), to: [notice.recipient], subject, text: body, replyTo: settings.reply_to || await ownerEmail(db, env) })
           status = result.status === 'development' ? 'suppressed' : result.status
           provider = result.provider; providerId = result.providerMessageId ?? null; detail = result.code ?? ''
         }

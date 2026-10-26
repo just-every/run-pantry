@@ -37,16 +37,21 @@ export async function autopayBrowser(t) {
     await card.getByText('Off',{exact:true}).waitFor();await card.locator('summary',{hasText:'Authorization and schedule'}).click()
     await card.getByLabel('Recurring template',{exact:true}).selectOption(recurring.id)
     await card.getByLabel('Charge purpose',{exact:true}).fill('Monthly studio design retainer')
-    await card.getByLabel('I approve this schedule and its retry notices for this customer.',{exact:true}).check()
+    await card.getByLabel('I approve this schedule and the retry email template above for this customer.',{exact:true}).check()
     await card.getByRole('button',{name:'Approve autopay schedule',exact:true}).click()
     await card.getByText(/Approved schedule/).waitFor()
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
     if(proof)await card.screenshot({path:`${proof}/autopay-owner-approved-${width}.png`})
     const payer=await browser.newContext({extraHTTPHeaders:{...clock,'cf-connecting-ip':'192.0.2.10'},viewport:{width,height:width===390?844:1000}}),hosted=await payer.newPage()
-    await hosted.route('https://checkout.stripe.com/**',async route=>{
-      const sessionId=new URL(route.request().url()).pathname.split('/').at(-1)
+    await hosted.route('**/autopay/start',async route=>{
+      const response=await route.fetch({maxRedirects:0})
+      if(response.status()!==303){await route.fulfill({response});return}
+      const location=new URL(response.headers().location)
+      assert.equal(location.hostname,'checkout.stripe.com')
+      // Exercise the real form, then complete the paid provider hop at its edge.
+      const sessionId=location.pathname.split('/').at(-1)
       provider.completeSetup(sessionId)
-      await route.fulfill({status:302,headers:{location:`${app.origin}/i/${inv.link_token}?autopay_setup=${sessionId}`},body:''})
+      await route.fulfill({status:303,headers:{...response.headers(),location:`${app.origin}/i/${inv.link_token}?autopay_setup=${sessionId}`},body:''})
     })
     await hosted.goto(`${app.origin}/i/${inv.link_token}`)
     await hosted.getByText('Save a method for recurring invoices',{exact:true}).click()
@@ -58,7 +63,10 @@ export async function autopayBrowser(t) {
     const [setupResponse]=await Promise.all([hosted.waitForResponse(r=>r.url().endsWith('/autopay/start')),hosted.getByRole('button',{name:'Continue to Stripe to save method',exact:true}).click()])
     if(setupResponse.status()!==303&&proof)await hosted.screenshot({path:`${proof}/autopay-payer-refused-${width}.png`,fullPage:true})
     assert.equal(setupResponse.status(),303,setupResponse.status()===303?undefined:await setupResponse.text())
-    await hosted.getByText(/ACH bank account ending 6789. Autopay authorized/).waitFor()
+    await hosted.getByText(/ACH bank account ending 6789. Autopay authorized/).waitFor({timeout:10000}).catch(async error=>{
+      if(proof)await hosted.screenshot({path:`${proof}/autopay-payer-return-${width}.png`,fullPage:true})
+      throw new Error(`Autopay return at ${new URL(hosted.url()).hostname}: ${await hosted.locator('body').innerText()}`)
+    })
     if(proof)await hosted.screenshot({path:`${proof}/autopay-payer-saved-${width}.png`,fullPage:true})
     await page.reload();await card.getByText('Authorized',{exact:true}).waitFor()
     if(proof)await card.screenshot({path:`${proof}/autopay-owner-authorized-${width}.png`})

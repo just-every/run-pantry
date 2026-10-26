@@ -14,11 +14,12 @@ export function CustomerAutopay({ customerId }: { customerId: string }) {
     <details className="details"><summary>Authorization and schedule</summary>
       {saved?.mandateText && <p>{saved.mandateText}</p>}
       <p>The customer saves their method on a sent invoice’s page. Owner approval applies to the selected recurring template, its current schedule and this customer’s billing address and email.</p>
+      <p><strong>Retry email subject:</strong> {data.notice.subject}</p><pre style={{whiteSpace:"pre-wrap"}}>{data.notice.body}</pre>
       <Form label="Approve autopay schedule" submit={b => command('autopay.policy', { customerId, recurringId: b.recurringId, purpose: b.purpose, retryDays: String(b.retryDays).split(',').filter(Boolean).map(Number), consent: b.consent === 'on', enabled: true })} onDone={reload}>
         <Field label="Recurring template" name="recurringId" required defaultValue={p?.recurring_id} options={templates.map((r: D) => ({ value: r.id, label: `${r.number} · ${r.customer_name}` }))} />
         <Field label="Charge purpose" name="purpose" required defaultValue={p?.purpose} />
         <Field label="Retry days after due date" name="retryDays" required defaultValue={p?.retryDays.join(', ') ?? '1, 3, 7'} />
-        <label className="check"><input type="checkbox" name="consent" required /> I approve this schedule and its retry notices for this customer.</label>
+        <label className="check"><input type="checkbox" name="consent" required /> I approve this schedule and the retry email template above for this customer.</label>
       </Form>
     </details>
     {p?.enabled && <Action tone="danger" run={async () => { await command('autopay.policy', { customerId, enabled: false }); await reload() }}>Disable scheduled charges</Action>}

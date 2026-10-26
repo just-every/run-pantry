@@ -108,6 +108,8 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
   const statements = includeStatements ? await statementHistory(db, id) : []
   for (const s of statements) for (const d of s.deliveries) deliveries.push({ ...d, number: s.subject })
   rows.sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at) || `${a.kind}:${a.id}`.localeCompare(`${b.kind}:${b.id}`))
+  deliveries.push(...await all(db,"SELECT n.*,i.number,'autopay-failed' AS kind FROM pt_autopay_notices n JOIN pt_invoices i ON i.id=n.invoice_id WHERE i.customer_id=?",id))
+  deliveries.sort((a,b)=>b.at.localeCompare(a.at)||b.id.localeCompare(a.id))
   const open = sum(openItems, 'open')
   const unallocatedPayment = sum(rows.filter(r => r.kind === 'payment' && r.included_in_balance), 'balance_cents')
   const unallocatedCredit = sum(rows.filter(r => r.kind === 'credit' && r.included_in_balance), 'balance_cents')

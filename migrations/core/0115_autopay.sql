@@ -3,6 +3,8 @@ CREATE TABLE pt_autopay_policies (
  recurring_id TEXT NOT NULL REFERENCES pt_recurring(id),
  enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN(0,1)),
  purpose TEXT NOT NULL,
+ notice_subject TEXT NOT NULL,
+ notice_template TEXT NOT NULL,
  retry_days TEXT NOT NULL CHECK(json_valid(retry_days)),
  template_revision TEXT NOT NULL,
  schedule TEXT NOT NULL CHECK(json_valid(schedule)),

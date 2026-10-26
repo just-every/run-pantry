@@ -121,6 +121,8 @@ export async function autopayJourney(t, factory = harness) {
   const failed = await state(card)
   assert.equal(failed.attempts.length, 4); assert.ok(failed.attempts.every(a => a.status === 'failed'))
   assert.equal(failed.notices.length, 4); assert.ok(failed.notices.every(n => n.status === 'accepted'))
+  const customerMail=(await h.view(`customers/${card.customer.id}`)).deliveries.filter(d=>d.kind==='autopay-failed')
+  assert.equal(customerMail.length,4);assert.ok(customerMail.every(d=>d.status==='accepted'))
   const sends = h.mail.filter(m => m.subject.startsWith('Automatic payment failed:') && m.to.includes(card.customer.email)).length
   await due('2026-10-29')
   assert.equal((await state(card)).attempts.length, 4)
