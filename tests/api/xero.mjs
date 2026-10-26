@@ -19,7 +19,7 @@ export async function xeroExports(overrides = {}) {
 export async function fakeXero() {
   const token = await load('token-authorization-code'), tenants = await load('connections'), invoices = await load('invoices'), lists = await load('attachments')
   const tenant = tenants.find(t => t.tenantName === 'Juniper Lane Design LLC').tenantId
-  const state = { calls: [], codes: new Set(['recorded-authorization-code']), revoked: [] }
+  const state = { calls: [], codes: new Set(['recorded-authorization-code']), revoked: [], connections: tenants }
   const answer = (value, status = 200) => Response.json(value, { status })
   const files = Object.values(lists).flatMap(l => l.Attachments)
 
@@ -37,7 +37,7 @@ export async function fakeXero() {
     }
     if (url.host !== 'api.xero.com') throw new Error(`unexpected outbound ${request.method} ${request.url}`)
     if (auth !== `Bearer ${token.access_token}`) return answer({ Title: 'Unauthorized', Status: 401 }, 401)
-    if (url.pathname === '/connections') return answer(tenants)
+    if (url.pathname === '/connections') return answer(state.connections)
     if (request.method === 'DELETE' && url.pathname.startsWith('/connections/')) return new Response(null, { status: 204 })
     if (request.headers.get('xero-tenant-id') !== tenant) return answer({ Title: 'Forbidden', Detail: 'AuthenticationUnsuccessful' }, 403)
     const path = url.pathname.replace('/api.xro/2.0', '')

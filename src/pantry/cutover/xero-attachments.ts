@@ -8,14 +8,14 @@ import type { Bindings } from '../../auth.server'
 import { authority, must, person, who } from '../access'
 import { documentInsert } from '../contacts'
 import { now, requireThat, text, uid, Fault } from '../core'
-import { all, audit, one, q, run } from '../db'
+import { all, audit, changed, one, q, run } from '../db'
 import { open, seal } from '../feeds/vault'
 import type { Command, Context } from '../context'
 import { accounting, authorizeUrl, connections, disconnect, exchangeCode, refreshTokens, xeroAvailability, XeroWait, type Tokens, type XeroAttachment, type XeroInvoice } from './xero-api'
+import { chooseOrganization, completeConnection, pendingSelection, SIGN_IN_EXPIRED, STATE_MINUTES } from './xero-selection'
 
 const MAX_BYTES = 1_500_000 // Pantry's document limit
 const CALLS = 40 // Xero calls per batch: well inside a Worker's subrequest limit
-const STATE_MINUTES = 15
 
 function available(env: Bindings) {
   const a = xeroAvailability(env)
@@ -46,6 +46,7 @@ const imported = (db: D1Database) => all(db, `SELECT i.id, 'invoice' AS kind, i.
 
 export async function xeroView(c: Context) {
   const a = xeroAvailability(c.env), l = await link(c.db)
+  const selection = await pendingSelection(c, l)
   const items = await imported(c.db)
   const looked = await all(c.db, 'SELECT * FROM pt_xero_items')
   const files = await all(c.db, 'SELECT a.id, a.item_id, a.item_kind, a.file_name, a.media_type, a.size, a.status, a.document_id, i.number FROM pt_xero_attachments a JOIN pt_xero_items i ON i.item_id = a.item_id ORDER BY i.number, a.file_name')
@@ -53,6 +54,7 @@ export async function xeroView(c: Context) {
   return {
     available: a.available, reason: a.available ? '' : a.reason, needsKeys: !a.available && !!a.needsKeys,
     connection: l?.status === 'connected' ? { tenantName: l.tenant_name, connectedBy: l.connected_by, connectedAt: l.connected_at } : null,
+    choices: selection?.choices.map(({ id, tenantName }) => ({ id, tenantName })) ?? [],
     items: items.length, checked: looked.length,
     notFound: looked.filter(x => x.status === 'not-found').map(x => ({ kind: x.item_kind, number: x.number })),
     files, carried: files.filter(f => f.status === 'carried').length, tooLarge: files.filter(f => f.status === 'too-large').length,
@@ -65,7 +67,7 @@ const connect: Command = { need: 'record', async run(c) {
   requireThat(await one(c.db, "SELECT 1 FROM ik_jobs WHERE destination = 'books' AND namespace = 'xero-cutover' AND state = 'completed'"), 'Import your Xero exports first; attachments are carried onto the records that import brings in', 409)
   const state = uid()
   await run(c.db, [authority(c.actor, 'record'),
-    q("INSERT INTO pt_xero_connection (id, status, state, state_by, state_at) VALUES (1, 'pending', ?, ?, ?) ON CONFLICT(id) DO UPDATE SET state = excluded.state, state_by = excluded.state_by, state_at = excluded.state_at, status = CASE WHEN status = 'connected' THEN status ELSE 'pending' END", state, c.actor.email, now())])
+    q("INSERT INTO pt_xero_connection (id, status, state, state_by, state_at) VALUES (1, 'pending', ?, ?, ?) ON CONFLICT(id) DO UPDATE SET state = excluded.state, state_by = excluded.state_by, state_at = excluded.state_at, tokens = CASE WHEN status = 'connected' THEN tokens ELSE NULL END, status = CASE WHEN status = 'connected' THEN status ELSE 'pending' END", state, c.actor.email, now())])
   return { url: authorizeUrl(c.env, state) }
 } }
 
@@ -134,6 +136,7 @@ const unlink: Command = { need: 'record', async run(c) {
 
 export const xeroCommands: Record<string, Command> = {
   'move-in.xero.connect': connect,
+  'move-in.xero.choose': chooseOrganization,
   'move-in.xero.carry': carry,
   'move-in.xero.disconnect': unlink,
 }
@@ -153,16 +156,21 @@ export function xeroRoutes(api: Hono<{ Bindings: Bindings }>) {
     try {
       available(c.env)
       const l = await link(c.env.DB), state = c.req.query('state') ?? ''
-      requireThat(l?.state && l.state === state && l.state_by === actor.email && Date.parse(l.state_at) > Date.now() - STATE_MINUTES * 60_000, 'This Xero sign-in was not started here or has expired; connect Xero again', 409)
+      requireThat(l?.state && l.state === state && l.state_by === actor.email && Date.parse(l.state_at) > Date.now() - STATE_MINUTES * 60_000, SIGN_IN_EXPIRED, 409)
       requireThat(!c.req.query('error'), 'Xero sign-in was declined; connect again when ready.', 409)
       const t = await exchangeCode(c.env, text(c.req.query('code'), 'Xero code', 2000))
-      const chosen = (await connections(t.access)).filter(x => x.tenantType === 'ORGANISATION' && (!t.authEventId || x.authEventId === t.authEventId))
-      requireThat(chosen.length === 1, chosen.length ? 'Choose one Xero organization when Xero asks, then connect again' : 'Xero connected no organization; choose the one you moved from', 409)
-      const org = chosen[0], ctx: Context = { db: c.env.DB, env: c.env, request: c.req.raw, actor }
-      await run(c.env.DB, [authority(actor, 'record'),
-        q("UPDATE pt_xero_connection SET status = 'connected', state = NULL, tenant_id = ?, tenant_name = ?, connection_id = ?, tokens = ?, connected_by = ?, connected_at = ? WHERE id = 1 AND state = ?",
-          org.tenantId, org.tenantName, org.id, await seal(c.env.SESSION_SECRET, JSON.stringify({ access: t.access, refresh: t.refresh, expiresAt: t.expiresAt })), actor.email, now(), state),
-        audit(who(ctx.actor), 'move-in.xero-connect', 'xero', org.tenantId, { tenant: org.tenantName })])
+      const list = (await connections(t.access)).filter(x => x.tenantType === 'ORGANISATION')
+      const matching = list.filter(x => x.authEventId === t.authEventId)
+      // Re-consenting to an existing tenant creates no connection for this event.
+      const chosen = matching.length ? matching : list
+      requireThat(chosen.length, 'Xero connected no organization; choose the one you moved from', 409)
+      const ctx: Context = { db: c.env.DB, env: c.env, request: c.req.raw, actor }
+      if (chosen.length > 1) {
+        await run(c.env.DB, [authority(actor, 'record'),
+          q("UPDATE pt_xero_connection SET status = 'pending', tokens = ? WHERE id = 1 AND state = ? AND state_by = ?", await seal(c.env.SESSION_SECRET, JSON.stringify({ access: t.access, refresh: t.refresh, expiresAt: t.expiresAt, choices: chosen })), state, actor.email), changed()])
+        return back('xero=choose')
+      }
+      await completeConnection(ctx, t, chosen[0], state)
       return back('xero=connected')
     } catch (e) {
       if (e instanceof Fault) return back(`xero_error=${encodeURIComponent(e.message)}`)
