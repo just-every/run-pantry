@@ -59,7 +59,7 @@ export async function editNoticeRecipient(db: D1Database, customer: Data, input:
 
 export async function noticeMailState(db: D1Database, customerId: string, recipient: string, businessZone: string) {
   const row = (await all(db, 'SELECT * FROM pt_autopay_mail_controls WHERE customer_id=? AND recipient=?', customerId, recipient))[0]
-  if (row?.suppression) return { row, status: 'suppressed', detail: `Owner-recorded ${row.suppression}; retry email suppressed` }
+  if (row?.suppression) return { row, status: 'suppressed', detail: `Owner-recorded ${row.suppression}; automatic email suppressed` }
   if (!row) return { row, status: 'queued', detail: 'Waiting for the owner to save this email recipient time zone' }
   const at = new Date()
   const open = [businessZone, row.time_zone].every(timeZone => {

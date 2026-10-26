@@ -3351,7 +3351,7 @@
       "executable": false
     },
     "src/pantry/autopay/mail-controls.ts": {
-      "sha256": "9c9d242271cfc431d4ad265d38f0cb174a14d80e02a6c22c862291d633260de0",
+      "sha256": "e6f21ae2dc78c82a9cdaf7c027081917f2723269da6b43e3177cd368dd7e7711",
       "executable": false
     },
     "src/pantry/autopay/notice-template.ts": {
