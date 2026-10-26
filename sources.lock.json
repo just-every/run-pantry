@@ -5655,7 +5655,7 @@
       "executable": false
     },
     "tests/api/autopay-journey.mjs": {
-      "sha256": "4208034af9bb74b39569853a0f90bdd69a5c3d7d137772e7923208deb1e2a092",
+      "sha256": "4c75f0e599be4252f839185dfc9789613245855875ee750e22679e6bd28fb5d3",
       "executable": false
     },
     "tests/api/bank.test.mjs": {
@@ -5794,6 +5794,10 @@
       "sha256": "d1f79c977921cb645fb935cd5846aaa493d3223d2e5d676792f058c0c366e406",
       "executable": false
     },
+    "tests/api/member-at.mjs": {
+      "sha256": "414eb0d11bca9e52f2741a35d673b7cfbd0358bb176c1c354c2c685769be9fa8",
+      "executable": false
+    },
     "tests/api/move-in.test.mjs": {
       "sha256": "b4011f277106f93e74aa227e9f0a0997a6452eab2ebcd458c62c72fc458c4298",
       "executable": false
@@ -5911,7 +5915,7 @@
       "executable": false
     },
     "tests/api/texting-journey.mjs": {
-      "sha256": "4f484c55bd7fb420fdc3a2a6914585f8f383b1a182c23b0c1daf32197ceedd46",
+      "sha256": "bd4de9f94cbd21ce6848c3e482c0e606c6c867738572baad44fdbc6f4a1cfbfd",
       "executable": false
     },
     "tests/api/void-journey.mjs": {
@@ -6147,7 +6151,7 @@
       "executable": false
     },
     "tests/app/texting-journey.mjs": {
-      "sha256": "b65931f1e8bc12abd0db942bb3cebee436ed3a42092bb0a953e0bb8a294770c6",
+      "sha256": "c9fcf7d23ef848ccbddb8ae617ff537df0d10228f19192a31dd25a38adaa73e8",
       "executable": false
     },
     "tests/app/transfers.test.mjs": {

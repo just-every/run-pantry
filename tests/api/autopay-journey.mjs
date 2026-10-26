@@ -1,3 +1,4 @@
+import { memberAt } from './member-at.mjs'
 import assert from 'node:assert/strict'
 import { books, harness } from './harness.mjs'
 
@@ -56,10 +57,10 @@ export async function autopayJourney(t, factory = harness) {
   await h.command('stripe.connect', { secretKey: 'synthetic-pantry-101' })
   const discount = await h.command('account.save', { code: '4952', name: 'Autopay early discounts', type: 'expense' })
   await h.command('discount-settings.save', { discountAccountId: discount.id, earlyAccountId: discount.id })
-  const accountant = await h.member('autopay-accountant@example.test', 'accountant', { canPost: true })
+  const accountant = await memberAt(h,clock,'autopay-accountant@example.test', 'accountant', { canPost: true })
   const scene = async (name, { early = false, termsDays = 1 } = {}) => {
     const customer = await h.command('contact.save', { kind: 'customer', name, email: `${name.toLowerCase().replace(/\s+/g, '-')}@example.test`, billingAddress: '12 Cedar Street, New York, NY 10001', termsDays })
-    let recurring = await h.command('recurring.save', { customerId: customer.id, startDate: '2026-10-20', every: 1, unit: 'month', termsDays, mode: 'send', ...(early ? { earlyPayment: { percent: '2', days: 10 } } : {}), lines: [{ description: 'Monthly design retainer', quantity: '1', rate: '100', accountId: acct['4000'], taxCode: 'exempt' }] })
+    let recurring = await h.command('recurring.save', { customerId: customer.id, startDate: '2026-10-20', every: 1, unit: 'month', termsDays, mode: 'send', ...(early ? { earlyPayment: { percent: '2', days: Math.min(10,termsDays) } } : {}), lines: [{ description: 'Monthly design retainer', quantity: '1', rate: '100', accountId: acct['4000'], taxCode: 'exempt' }] })
     recurring = await h.command('recurring.approve', { id: recurring.id, revision: recurring.revision })
     await h.cron(Date.parse(clock))
     const invoice = (await h.view('sales')).invoices.find(i => i.recurring_id === recurring.id)
@@ -88,6 +89,8 @@ export async function autopayJourney(t, factory = harness) {
   assert.equal((await h.send(ach.page + '/autopay/setup', { method: 'us_bank_account', policyRevision: ach.policy.revision, accepted: true }, { headers: { 'x-synthetic-pantry-peer': 'absent', 'x-forwarded-for': '192.0.2.10' } })).status, 409, 'untrusted forwarding cannot become mandate evidence')
   ach.customer = await h.command('contact.save', { ...ach.customer, kind: 'customer', payMethods: ['card'] })
   assert.equal((await h.send(ach.page + '/autopay/setup', { method: 'us_bank_account', policyRevision: ach.policy.revision, accepted: true })).status, 409, 'customer offerings constrain saved methods at the API')
+  assert.doesNotMatch((await h.send(ach.page)).value, /<option value="us_bank_account"/,'hosted saved-method controls hide unoffered ACH')
+  assert.deepEqual((await h.send(ach.page+'/autopay')).value.methods,['card'])
   ach.customer = await h.command('contact.save', { ...ach.customer, kind: 'customer', payMethods: null })
   await setup(ach)
   const authorized = await state(ach)

@@ -21,11 +21,11 @@ export async function textingBrowser(t) {
   await owner.request.post(app.origin+'/setup',{headers:{origin:app.origin},form:{confirm:'yes'},maxRedirects:0})
   const command=async(op,data)=>{const r=await owner.request.post(`${app.origin}/api/pantry/command/${op}`,{headers:{origin:app.origin},data});assert.equal(r.status(),200,`${op}: ${await r.text()}`);return r.json()}
   const view=async path=>{const r=await owner.request.get(`${app.origin}/api/pantry/${path}`);assert.equal(r.status(),200,await r.text());return r.json()}
-  await command('entity.save',{legalName:'synthetic-pantry-1',entityType:'single-member-llc',state:'NY',fiscalYearStart:1,taxMethod:'cash',booksStart:'2026-01-01',policies:''})
+  await command('entity.save',{legalName:'Juniper Lane Design LLC',entityType:'single-member-llc',state:'NY',fiscalYearStart:1,taxMethod:'cash',booksStart:'2026-01-01',policies:''})
   await command('chart.start',{})
   const accountId=(await view('state')).accounts.find(a=>a.code==='4000').id
-  const customer=await command('contact.save',{kind:'customer',name:'synthetic-pantry-1',phone:'+15005550006',email:'synthetic-pantry-1@example.test'})
-  let inv=await command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-10-20',dueDate:'2026-10-21',lines:[{description:'synthetic-pantry-1',quantity:'1',rate:'100',accountId,taxCode:'exempt'}]})
+  const customer=await command('contact.save',{kind:'customer',name:'Cedar Studio',phone:'+15005550006',email:'synthetic-pantry-1@example.test'})
+  let inv=await command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-10-20',dueDate:'2026-10-21',lines:[{description:'Monthly studio design',quantity:'1',rate:'100',accountId,taxCode:'exempt'}]})
   inv=await command('invoice.approve',{id:inv.id,revision:inv.revision});inv=await command('invoice.issue',{id:inv.id});await command('invoice.send',{id:inv.id})
   const storageState=await owner.storageState(),proof=process.env.PANTRY_PROOF_DIR
   if(proof)await mkdir(proof,{recursive:true})
@@ -45,7 +45,7 @@ export async function textingBrowser(t) {
      await submit('texting.connect',()=>settings.getByRole('button',{name:'Connect test account',exact:true}).click())
     }
     await settings.getByRole('checkbox',{name:'Enable consented test texts',exact:true}).check()
-    await settings.getByLabel('Business contact for HELP',{exact:true}).fill('synthetic-pantry-1 support: synthetic-pantry-1@example.test')
+    await settings.getByLabel('Business contact for HELP',{exact:true}).fill('Juniper Lane Design: support@example.test')
     await settings.getByLabel('Text reminder days',{exact:true}).fill('0, 7')
     await settings.getByRole('checkbox',{name:'I approve these exact templates and reminder days for the consented purposes.',exact:true}).check()
     await submit('texting.settings',()=>settings.getByRole('button',{name:'Approve text settings',exact:true}).click())
@@ -56,7 +56,8 @@ export async function textingBrowser(t) {
     const consent=page.locator('section.card').filter({has:page.getByRole('heading',{name:'Customer text consent',exact:true})})
     await consent.getByLabel('Consented mobile number',{exact:true}).fill('+15005550006')
     await consent.getByLabel('Customer time zone',{exact:true}).fill('America/New_York')
-    await consent.getByLabel('Consent source',{exact:true}).fill('synthetic-pantry-1 signed form')
+    await consent.getByRole('checkbox',{name:'Estimate links',exact:true}).check()
+    await consent.getByLabel('Consent source',{exact:true}).fill('Signed studio agreement')
     await consent.getByLabel('Exact consent wording',{exact:true}).fill('I consent to invoice links and reminders. Reply STOP to stop.')
     await consent.getByLabel('Consent given at',{exact:true}).fill('2026-10-19T10:00')
     await submit('texting.consent',()=>consent.getByRole('button',{name:'Record text consent',exact:true}).click())
@@ -84,6 +85,18 @@ export async function textingBrowser(t) {
     if(proof){await panel.scrollIntoViewIfNeeded();await panel.screenshot({path:`${proof}/texting-invoice-${width}.png`});await page.screenshot({path:`${proof}/texting-invoice-page-${width}.png`,fullPage:true})}
     const deliveries=(await view('sales')).deliveries.filter(d=>d.invoice_id===inv.id)
     assert.ok(deliveries.some(d=>d.kind==='invoice'&&d.status==='accepted'))
+    let estimate=await command('estimate.save-draft',{customerId:customer.id,issueDate:'2026-10-20',dueDate:'2026-11-20',lines:[{description:'Studio expansion proposal',quantity:'1',rate:'12000',accountId,taxCode:'exempt'}]})
+    estimate=await command('estimate.send',{id:estimate.id,revision:estimate.revision})
+    await page.goto(`${app.origin}/app/sales?tab=estimates&estimate=${estimate.id}`)
+    const estimatePanel=page.getByRole('region',{name:'Text invoice link',exact:true})
+    const estimateAnchor=estimatePanel.getByRole('link',{name:'Text the link',exact:true})
+    await estimateAnchor.waitFor()
+    assert.ok(decodeURIComponent(await estimateAnchor.getAttribute('href')).includes(estimate.public_path))
+    await submit('texting.share',()=>estimateAnchor.click())
+    await submit('texting.send',()=>estimatePanel.getByRole('button',{name:'Send test text from Pantry',exact:true}).click())
+    await estimatePanel.getByText('queued',{exact:true}).first().waitFor()
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+    if(proof)await estimatePanel.screenshot({path:`${proof}/texting-estimate-${width}.png`})
     assert.deepEqual(errors,[])
    } finally {await context.close()}
   }

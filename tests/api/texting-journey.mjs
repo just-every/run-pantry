@@ -1,3 +1,4 @@
+import { memberAt } from './member-at.mjs'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { books, harness } from './harness.mjs'
@@ -16,7 +17,7 @@ export async function textingJourney(t,{credentials={testAccountSid:'synthetic-p
   const form=new URLSearchParams(await request.clone().text())
   assert.equal(form.get('From'),'+15005550006','Real senders are forbidden in this proof')
   assert.equal(form.get('To'),'+15005550006','Only the Twilio magic test destination is used')
-  assert.ok(form.get('Body').includes('/i/'))
+  assert.match(form.get('Body'), /\/(?:i|e)\//)
   sends++
   if(uncertain)throw new Error('synthetic-pantry-3: connection interrupted after acceptance may have occurred')
   if(provider)return provider(request,sends)
@@ -40,7 +41,7 @@ export async function textingJourney(t,{credentials={testAccountSid:'synthetic-p
  assert.ok(view.shares.some(s=>s.subject_id===inv.id&&s.actor_email==='owner@example.test'&&s.at))
  assert.equal(view.settings.enabled,false)
  await call('texting.send',{id:inv.id,requestId:'synthetic-pantry-1'},409)
- const viewer=await h.member('synthetic-pantry-2@example.test','viewer')
+ const viewer=await memberAt(h,'2026-10-17T14:00:00Z','synthetic-pantry-2@example.test','viewer')
  await h.command('texting.connect',{...credentials,confirmTestOnly:true},viewer,403)
  await call('texting.connect',{...credentials,confirmTestOnly:true})
  view=await h.view('texting')
@@ -92,6 +93,14 @@ export async function textingJourney(t,{credentials={testAccountSid:'synthetic-p
  if(!provider){
   // A network exception is retained as uncertain and cannot open a new send.
   await call('texting.consent',{customerId:customer.id,phone,timeZone:'America/New_York',purposes:['invoice'],source:'synthetic-pantry-2 signed form',wording:'I renew consent to invoice links.',consentedAt:'2026-10-20T13:00:00Z'},200,'2026-10-20T14:00:00Z')
+  let estimate=await call('estimate.save-draft',{customerId:customer.id,issueDate:'2026-10-17',dueDate:'2026-11-17',lines:[{description:'Design estimate',quantity:'1',rate:'250',accountId:acct['4000'],taxCode:'exempt'}]})
+  estimate=await call('estimate.send',{id:estimate.id,revision:estimate.revision})
+  await call('texting.send',{id:estimate.id,kind:'estimate',purpose:'estimate',requestId:'synthetic-pantry-50'},409,'2026-10-20T14:00:00Z')
+  await call('texting.consent',{customerId:customer.id,phone,timeZone:'America/New_York',purposes:['invoice','estimate'],source:'Signed design agreement',wording:'I consent to invoice and estimate links.',consentedAt:'2026-10-20T13:30:00Z'},200,'2026-10-20T14:00:00Z')
+  const estimateShare=await call('texting.share',{id:estimate.id,kind:'estimate'})
+  assert.ok(decodeURIComponent(estimateShare.smsUri).includes(estimate.public_path))
+  const estimateText=await call('texting.send',{id:estimate.id,kind:'estimate',purpose:'estimate',requestId:'synthetic-pantry-51'},200,'2026-10-20T14:00:00Z')
+  assert.equal(estimateText.status,'queued');assert.ok(estimateText.body.includes(estimate.public_path))
   const inv2=await make();uncertain=true
   const unknown=await call('texting.send',{id:inv2.id,requestId:'synthetic-pantry-6'},200,'2026-10-20T14:00:00Z')
   assert.equal(unknown.status,'uncertain');const count=sends
