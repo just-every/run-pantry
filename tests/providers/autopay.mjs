@@ -19,10 +19,10 @@ await mkdir(proof, { recursive: true, mode: 0o700 })
 const receipt = { head: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), ranAt: new Date().toISOString(), testMode: true, isolatedEdges: ['account-wide event listing'], stage: 'starting', status: 'running' }
 let app, browser, page
 const retain = async () => writeFile(join(proof, 'autopay-provider.json'), JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 })
-const stage = async (name, screen = page) => {
+const stage = async (name, screen = page, capture = true) => {
   receipt.stage = name
   await retain()
-  if (screen) await screen.screenshot({ path: join(proof, `autopay-provider-${name}.png`), fullPage: true })
+  if (screen && capture) await screen.screenshot({ path: join(proof, `autopay-provider-${name}.png`), fullPage: true, animations: 'disabled' })
 }
 const stripe = async (path, params) => {
   const response = await fetch(`https://api.stripe.com/v1${path}`, { method: params ? 'POST' : 'GET', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/x-www-form-urlencoded', 'stripe-version': '2026-09-30.endive' }, ...(params ? { body: new URLSearchParams(params) } : {}), signal: AbortSignal.timeout(20000) })
@@ -94,9 +94,14 @@ try {
   await page.getByRole('button', { name: 'Continue to Stripe to save method', exact: true }).click()
   await page.waitForURL(url => url.hostname === 'checkout.stripe.com')
   await stage('stripe-checkout')
+  const setups = await app.db.prepare('SELECT session_id FROM pt_autopay_setups WHERE customer_id=? ORDER BY accepted_at DESC LIMIT 1').bind(customer.id).first()
+  assert.ok(setups?.session_id)
+  receipt.checkoutSession = setups.session_id
+  await retain()
   // Use Stripe’s own sandbox bank Autofill control on its hosted form.
-  for (let step = 0; step < 18; step++) {
+  for (let step = 0; step < 30; step++) {
     if (new URL(page.url()).origin === app.origin) break
+    if ((await stripe(`/checkout/sessions/${setups.session_id}`)).status === 'complete') break
     const fullName = await visible(f => f.getByRole('textbox', { name: 'Full name', exact: true }))
     if (fullName && !await fullName.inputValue()) await fullName.fill('Synthetic Pantry')
     const autofill = await visible(f => f.getByRole('button', { name: 'Autofill', exact: true }))
@@ -123,10 +128,8 @@ try {
       }
     }
     await page.waitForTimeout(750)
-    await stage(`hosted-stage-${step}`)
+    await stage(`hosted-stage-${step}`, page, false)
   }
-  const setups = await app.db.prepare('SELECT session_id FROM pt_autopay_setups WHERE customer_id=? ORDER BY accepted_at DESC LIMIT 1').bind(customer.id).first()
-  assert.ok(setups?.session_id)
   let session = await stripe(`/checkout/sessions/${setups.session_id}?expand[]=setup_intent`)
   receipt.checkoutSession = session.id; receipt.setupIntent = session.setup_intent?.id; receipt.checkoutStatus = session.status; receipt.setupStatus = session.setup_intent?.status
   await retain()
