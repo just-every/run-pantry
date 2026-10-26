@@ -5915,7 +5915,7 @@
       "executable": false
     },
     "tests/api/texting-journey.mjs": {
-      "sha256": "bd4de9f94cbd21ce6848c3e482c0e606c6c867738572baad44fdbc6f4a1cfbfd",
+      "sha256": "bf16898c8255c8805b9d330a132d045a12f7d6d67bc0afb1c2588dd926f38aa1",
       "executable": false
     },
     "tests/api/void-journey.mjs": {

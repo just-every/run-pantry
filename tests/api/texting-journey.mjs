@@ -51,7 +51,7 @@ export async function textingJourney(t,{credentials={testAccountSid:'synthetic-p
  await call('texting.send',{id:inv.id,purpose:'reminder',requestId:'synthetic-pantry-3'},409)
  await call('texting.consent',{customerId:customer.id,phone,timeZone:'America/New_York',purposes:['invoice','reminder'],source:'synthetic-pantry-1 signed form',wording:'I consent to invoice links and invoice reminders. Reply STOP to stop.',consentedAt:'2026-10-17T13:30:00Z'})
  const initial=await call('texting.send',{id:inv.id,requestId:'synthetic-pantry-4'})
- assert.equal(initial.status,'queued');assert.ok(initial.provider_message_id);assert.equal(sends,1)
+ assert.equal(initial.status,'queued',JSON.stringify({initial,sends}));assert.ok(initial.provider_message_id);assert.equal(sends,1)
  assert.equal((await call('texting.send',{id:inv.id,requestId:'synthetic-pantry-4'})).id,initial.id);assert.equal(sends,1)
  const signed=async(path,fields,{invalid=false,clock}={})=>{
   const signature=invalid?'synthetic-pantry-1':twilioSignature(credentials.testAuthToken,h.origin+path,fields)
