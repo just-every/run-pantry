@@ -4615,7 +4615,7 @@
       "executable": false
     },
     "src/pantry/settings.ts": {
-      "sha256": "7535c0ae9e5efa7695d3212aabc426812f58287e5cf14af4b2b7844d2a81a87b",
+      "sha256": "669713b194614d13280ab68beea0a863104c7747b3f1806f089ac4c2e4371e09",
       "executable": false
     },
     "src/pantry/standing/index.ts": {
