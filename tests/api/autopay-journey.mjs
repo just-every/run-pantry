@@ -257,10 +257,9 @@ export async function autopayJourney(t, factory = harness) {
   const authority = await approve(await scene('synthetic-pantry-210'))
   await setup(authority,'card'); provider.at('2026-10-21'); await h.cron(Date.parse('2026-10-21T23:00:00Z'))
   assert.equal((await state(authority)).notices[0].status,'queued')
-  await h.db.prepare("UPDATE oa_operators SET status='inactive' WHERE email='owner@example.test'").run()
-  try { await h.cron(Date.parse('2026-10-22T12:00:00Z')) }
-  finally { await h.db.prepare("UPDATE oa_operators SET status='active' WHERE email='owner@example.test'").run() }
-  assert.equal((await state(authority)).notices[0].status,'cancelled','a queued notice stops when the approving owner loses current authority')
+  await h.command('autopay.policy',{customerId:authority.customer.id,enabled:false})
+  await h.cron(Date.parse('2026-10-22T12:00:00Z'))
+  assert.equal((await state(authority)).notices[0].status,'cancelled','a queued notice stops when the owner withdraws standing authority')
   assert.equal(h.mail.filter(m=>m.subject.startsWith('Automatic payment failed:')&&m.to.includes(authority.customer.email)).length,0)
   await h.command('autopay.revoke',{customerId:authority.customer.id})
 
