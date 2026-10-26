@@ -1,5 +1,7 @@
 // Run through the owner's credential injector after the production app is built.
-// Stripe requests and its hosted collection UI are real; local mail is suppressed.
+// Setup, mandates, methods, charges and hosted collection use real Stripe.
+// Unrelated account-wide event discovery is isolated at its network edge;
+// the API journey proves comparison independently. Local mail is suppressed.
 import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -14,7 +16,7 @@ assert.ok(key && key.includes('_test_'), 'Injected Stripe test access is require
 const proof = process.env.PANTRY_PROOF_DIR
 assert.ok(proof, 'PANTRY_PROOF_DIR is required for private stage evidence')
 await mkdir(proof, { recursive: true, mode: 0o700 })
-const receipt = { head: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), ranAt: new Date().toISOString(), testMode: true, stage: 'starting', status: 'running' }
+const receipt = { head: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), ranAt: new Date().toISOString(), testMode: true, isolatedEdges: ['account-wide event listing'], stage: 'starting', status: 'running' }
 let app, browser, page
 const retain = async () => writeFile(join(proof, 'autopay-provider.json'), JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 })
 const stage = async (name, screen = page) => {
@@ -46,6 +48,7 @@ try {
   await stage('starting')
   app = await providerWorker({ clock: true, bindings: {}, outbound: async request => {
     assert.equal(new URL(request.url).hostname, 'api.stripe.com', 'Only the connected real Stripe account may receive upstream traffic')
+    if (new URL(request.url).pathname === '/v1/events') return Response.json({ data: [], has_more: false })
     const response = await fetch(request.url, { method: request.method, headers: Object.fromEntries(['authorization', 'content-type', 'stripe-version', 'idempotency-key'].filter(n => request.headers.has(n)).map(n => [n, request.headers.get(n)])), ...(!['GET', 'HEAD'].includes(request.method) ? { body: await request.text() } : {}),signal:AbortSignal.timeout(20000) })
     if(response.status>=400){const failure=await response.clone().json().catch(()=>({}));const parameter=failure.error?.param;receipt.providerFailure={http:response.status,code:failure.error?.code??null,parameter:typeof parameter==='string'&&/^[a-zA-Z0-9_\[\].]+$/.test(parameter)?parameter:null};await retain()}
     return new Response(await response.arrayBuffer(), { status: response.status, headers: Object.fromEntries([...response.headers].filter(([name])=>!['content-encoding','content-length','transfer-encoding'].includes(name))) })
@@ -58,12 +61,13 @@ try {
   const command = async (op, data) => { const r = await owner.request.post(`${app.origin}/api/pantry/command/${op}`, { headers: { origin: app.origin }, data }); assert.equal(r.status(), 200, `Pantry command refused: ${op}`); return r.json() }
   const view = async path => { const r = await owner.request.get(`${app.origin}/api/pantry/${path}`); assert.equal(r.status(), 200, 'Pantry read refused'); return r.json() }
   await command('entity.save', { legalName: 'Synthetic Pantry test business', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: day, policies: '' })
-  await command('chart.start', {}); await stage('connecting-stripe'); await command('stripe.connect', { secretKey: key })
+  await command('chart.start', {}); await stage('connecting-stripe'); await command('stripe.connect', { secretKey: key }); await stage('stripe-connected')
   const acct = (await view('state')).accounts.find(a => a.code === '4000').id
   const customer = await command('contact.save', { kind: 'customer', name: 'Synthetic Pantry', email: 'synthetic-pantry@example.test', billingAddress: '12 Cedar Street, New York NY 10001', termsDays: 1 })
   let recurring = await command('recurring.save', { customerId: customer.id, startDate: day, every: 1, unit: 'month', termsDays: 1, mode: 'send', lines: [{ description: 'Synthetic recurring test service', quantity: '1', rate: '1', accountId: acct, taxCode: 'exempt' }] })
   recurring = await command('recurring.approve', { id: recurring.id, revision: recurring.revision })
   await app.cron(Date.parse(clock))
+  await stage('recurring-invoice-issued')
   const invoice = (await view('sales')).invoices.find(i => i.recurring_id === recurring.id)
   assert.ok(invoice?.link_token)
   await command('autopay.policy', { customerId: customer.id, recurringId: recurring.id, enabled: true, consent: true, purpose: 'Synthetic recurring test service at the billing address', noticeRecipients: [{ recipient: customer.email, timeZone: 'America/New_York' }] })
