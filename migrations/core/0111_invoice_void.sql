@@ -7,8 +7,9 @@ ALTER TABLE pt_invoices ADD COLUMN void_reversal_id TEXT REFERENCES pt_journal_e
 ALTER TABLE pt_invoices ADD COLUMN voided_by TEXT;
 CREATE TRIGGER pt_invoice_void_terminal BEFORE UPDATE ON pt_invoices
 WHEN OLD.void_date IS NOT NULL AND (
- NEW.void_date IS NOT OLD.void_date OR NEW.void_reason IS NOT OLD.void_reason OR
- NEW.void_reversal_id IS NOT OLD.void_reversal_id OR NEW.voided_by IS NOT OLD.voided_by OR
+ NEW.void_date IS NOT OLD.void_date OR
+ ((NEW.void_reason IS NOT OLD.void_reason OR NEW.voided_by IS NOT OLD.voided_by) AND NOT EXISTS(SELECT 1 FROM pt_erasure_scope s JOIN pt_erasure_journal j ON j.id=s.erasure_id WHERE s.table_name='pt_invoices' AND s.row_id=OLD.id AND s.operation='redact')) OR
+ NEW.void_reversal_id IS NOT OLD.void_reversal_id OR
  NEW.status IS NOT OLD.status OR NEW.journal_id IS NOT OLD.journal_id OR
  NEW.customer_id IS NOT OLD.customer_id OR NEW.total_cents IS NOT OLD.total_cents
 ) BEGIN SELECT RAISE(ABORT,'Voided invoice is retained'); END;

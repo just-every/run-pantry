@@ -81,6 +81,7 @@ export async function creditRefundJourney({h,acct,bank,provider,paid}) {
     let c=await h.command('invoice.save-draft',{kind:'credit',customerId:customer.id,creditFor:invoice.id,issueDate:'2026-10-26',lines:[{description:'Goodwill allowance',quantity:'1',rate:amount,accountId:acct['4000'],taxCode:'exempt'}]})
     await h.command('invoice.approve',{id:c.id,revision:c.revision});return h.command('invoice.issue',{id:c.id})
   }
+  const cashBefore=await h.view('reports/profit-and-loss?from=2026-10-01&to=2026-10-31&basis=cash')
   const c=await credit('100')
   let refund=await h.command('customer-refund.prepare',{sourceKind:'credit',sourceId:c.id,paymentId:payment.id,bankAccountId:bank.id,method:'stripe',amount:'100',date:'2026-10-26',reason:'Return the customer credit balance'})
   await h.command('customer-refund.approve',{id:refund.id,revision:refund.revision})
@@ -93,6 +94,8 @@ export async function creditRefundJourney({h,acct,bank,provider,paid}) {
   refund=await h.command('customer-refund.post',{id:refund.id})
   assert.equal(refund.status,'succeeded');assert.ok(refund.journal_id)
   assert.equal((await h.view('reports/receivables?to=2026-10-26')).agrees,true)
+  const cashAfter=await h.view('reports/profit-and-loss?from=2026-10-01&to=2026-10-31&basis=cash')
+  assert.equal(cashAfter.netIncome,cashBefore.netIncome-10000,'refunding a customer credit recognizes the negative sale on the cash basis')
   const failedCredit=await credit('50')
   let failed=await h.command('customer-refund.prepare',{sourceKind:'credit',sourceId:failedCredit.id,paymentId:payment.id,bankAccountId:bank.id,method:'stripe',amount:'50',date:'2026-10-26',reason:'A failed provider refund must retain its outcome'})
   await h.command('customer-refund.approve',{id:failed.id,revision:failed.revision})

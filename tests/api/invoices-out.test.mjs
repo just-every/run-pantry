@@ -1,6 +1,6 @@
 import { paymentEventsJourney } from './payment-events-journey.mjs'
 import { paymentNoticesJourney } from './payment-notices-journey.mjs'
-import { voidJourney } from './void-journey.mjs'
+import { voidJourney,erasedVoidJourney } from './void-journey.mjs'
 import { statementsJourney } from './statements-journey.mjs'
 import { remindersJourney } from './reminders-journey.mjs'
 import { fakePlaid } from './plaid.mjs'
@@ -161,6 +161,7 @@ test('INVOICE-002/003/004 an issued invoice is emailed with its PDF and customer
   assert.equal(sales.reminders.plans[soon.id], addDays(day, 3), 'the next reminder is on the due date')
   assert.equal(sales.reminders.plans[late.id], null, 'no steps left after the last')
   await voidJourney(h, {acct,bank})
+  await erasedVoidJourney(h,{acct,bank})
   await remindersJourney(t)
 })
 

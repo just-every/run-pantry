@@ -166,6 +166,8 @@ export async function paymentEventsJourney(t, factory) {
   assert.equal(h.mail.length, beforeComparisonMail + 1, 'comparison and repeated comparison send only the dropped receipt')
   const ar=(await h.send('/api/pantry/reports/receivables?to=2026-10-20', undefined, { cookie: h.owner })).value
   assert.equal(ar.agrees,true,JSON.stringify(ar))
+  const cash=await h.view('reports/profit-and-loss?from=2026-10-01&to=2026-10-31&basis=cash')
+  assert.equal(cash.netIncome,36700,'returns and partial refunds reverse their settled cash shares exactly once')
   await h.cron(Date.parse('2026-10-21T12:00:00Z'))
   assert.equal(reminderCount(),2,'a returned ACH payment starts a fresh reminder cycle while preserving prior history')
   const history=(await h.view('sales')).deliveries.filter(d=>d.invoice_id===ach.invoice.id&&d.kind==='reminder')

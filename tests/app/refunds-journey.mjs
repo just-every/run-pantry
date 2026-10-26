@@ -8,7 +8,7 @@ export async function refundsBrowser({page,width,origin,command,view,customer,ac
   await command('invoice.approve',{id:inv.id,revision:inv.revision});inv=await command('invoice.issue',{id:inv.id})
   const payment=await command('payment.record',{direction:'received',contactId:customer.id,date:'2026-10-10',bankAccountId:bank.id,amount:'300',reference:`Cedar overpayment ${width}`,allocations:[{targetId:inv.id,amount:'100'}]})
   await page.goto(`${origin}/app/sales?tab=payments`)
-  await page.getByRole('row').filter({has:page.getByText('$300.00',{exact:true})}).last().click()
+  await page.getByRole('row').filter({hasText:`Cedar overpayment ${width}`}).click()
   const panel=page.locator('section.card').filter({has:page.getByRole('heading',{name:'Customer balance refund',exact:true})})
   await panel.locator('summary',{hasText:'Refund customer balance'}).click()
   await panel.getByLabel('Refund date',{exact:true}).fill('2026-10-30')

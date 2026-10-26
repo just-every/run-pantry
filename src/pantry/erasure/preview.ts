@@ -42,17 +42,18 @@ export async function erasurePreview(c: Context, input: Data) {
       for (const row of rows) {
         if(['issued','posted'].includes(row.status))posted=true
         if (['draft','approved'].includes(row.status)) blockers.push({kind:table==='pt_invoices'?'invoice':'bill',id:row.id,number:row[date],reason:'unposted draft'})
-        if ((table==='pt_invoices' && row.status==='issued' && row.kind==='invoice') || (table==='pt_bills' && row.status==='posted')) {
+        if ((table==='pt_invoices' && row.status==='issued' && !row.void_date && row.kind==='invoice') || (table==='pt_bills' && row.status==='posted')) {
           if (await openBalance(c.db,table==='pt_invoices'?'invoice':'bill',row.id,row.total_cents)>0) blockers.push({kind:table==='pt_invoices'?'invoice':'bill',id:row.id,number:row[date],reason:'open balance'})
         }
       }
     }
-    const unapplied = await all(c.db,`SELECT p.id,p.amount_cents-COALESCE((SELECT sum(a.amount_cents) FROM pt_allocations a WHERE a.source_kind='payment' AND a.source_id=p.id),0) AS amount FROM pt_payments p WHERE p.contact_id=? AND p.reversal_id IS NULL`,id)
+    const unapplied = await all(c.db,`SELECT p.id,p.amount_cents-COALESCE((SELECT sum(a.amount_cents) FROM pt_allocations a WHERE a.source_kind='payment' AND a.source_id=p.id AND a.voided_by IS NULL),0)-COALESCE((SELECT SUM(r.amount_cents) FROM pt_customer_refunds r WHERE r.source_kind='payment' AND r.source_id=p.id AND r.status='succeeded'),0) AS amount FROM pt_payments p WHERE p.contact_id=? AND p.reversal_id IS NULL`,id)
     blockers.push(...unapplied.filter(p=>p.amount>0).map(p=>({kind:'payment',id:p.id,reason:'unapplied open balance'})))
     blockers.push(...(await all(c.db,`SELECT d.id FROM pt_capture_drafts d JOIN pt_receipts r ON r.id=d.receipt_id WHERE r.vendor_id=? AND d.status IN ('draft','approved')`,id)).map(r=>({kind:'capture-draft',id:r.id,reason:'unposted draft'})))
-    const credits=await all(c.db,`SELECT id FROM pt_vendor_credits v WHERE vendor_id=? AND amount_cents>COALESCE((SELECT sum(amount_cents) FROM pt_allocations a WHERE a.source_kind='credit' AND a.source_id=v.id),0) UNION SELECT id FROM pt_invoices i WHERE customer_id=? AND kind='credit' AND status='issued' AND early_reversal_id IS NULL AND total_cents>COALESCE((SELECT sum(amount_cents) FROM pt_allocations a WHERE a.source_kind='credit' AND a.source_id=i.id AND a.voided_on IS NULL),0)`,id,id)
+    const credits=await all(c.db,`SELECT id FROM pt_vendor_credits v WHERE vendor_id=? AND amount_cents>COALESCE((SELECT sum(amount_cents) FROM pt_allocations a WHERE a.source_kind='credit' AND a.source_id=v.id),0) UNION SELECT id FROM pt_invoices i WHERE customer_id=? AND kind='credit' AND status='issued' AND early_reversal_id IS NULL AND total_cents>COALESCE((SELECT sum(amount_cents) FROM pt_allocations a WHERE a.source_kind='credit' AND a.source_id=i.id AND a.voided_on IS NULL),0)+COALESCE((SELECT SUM(r.amount_cents) FROM pt_customer_refunds r WHERE r.source_kind='credit' AND r.source_id=i.id AND r.status='succeeded'),0)`,id,id)
     blockers.push(...credits.map(r=>({kind:'credit',id:r.id,reason:'unapplied open balance'})))
     blockers.push(...(await all(c.db,`SELECT DISTINCT r.id FROM pt_recurring_journals r,json_each(r.lines) l WHERE r.status IN ('active','awaiting-approval') AND (json_extract(l.value,'$.contactId')=? OR json_extract(l.value,'$.contact_id')=?)`,id,id)).map(r=>({kind:'recurring-journal',id:r.id,reason:'active recurring template'})))
+    blockers.push(...(await all(c.db,"SELECT id FROM pt_customer_refunds WHERE customer_id=? AND status IN ('draft','approved','pending')",id)).map(r=>({kind:'customer-refund',id:r.id,reason:'refund requires completion or cancellation'})))
     const pending = await all(c.db,"SELECT p.id FROM pt_stripe_payments p JOIN pt_invoices i ON i.id=p.invoice_id WHERE i.customer_id=? AND p.status IN ('creating','open','processing','pending')",id)
     blockers.push(...pending.map(p=>({kind:'provider-payment',id:p.id,reason:'pending provider payment'})))
     for (const [table,column] of [['pt_recurring','customer_id'],['pt_recurring_bills','vendor_id']] as const) {

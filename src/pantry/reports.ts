@@ -56,6 +56,7 @@ export function settlementMemo(l: { docKind: string; docRef: string; contactName
   const s = l.settlement, amount = (Math.abs(s.amount) / 100).toFixed(2), of = (l.docTotal / 100).toFixed(2)
   if (s.kind === 'payment') return `${doc}: ${amount} of ${of} paid${s.paymentReference ? ` (${s.paymentReference})` : ''}`
   if (s.kind === 'payment-reversed') return `${doc}: payment of ${amount} reversed`
+  if (s.kind === 'credit-refunded') return `${doc}: ${amount} refunded${s.paymentReference ? ` (${s.paymentReference})` : ''}`
   if (s.kind === 'credit-reversed') return `${doc}: early-payment discount of ${amount} reversed`
   if (s.kind === 'credit') return `${doc}: ${amount} of ${of} settled by credit ${s.creditNumber}`
   return `${doc}: ${amount} of ${of} applied to ${s.appliedToNumber}`

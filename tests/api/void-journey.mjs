@@ -4,8 +4,8 @@ import assert from 'node:assert/strict'
 // routes. The caller supplies its initialized account chart and operating bank.
 export async function voidJourney(h, { acct, bank }) {
   const customer=await h.command('contact.save',{kind:'customer',name:'Invoice void customer',email:'void-customer@example.test'})
-  const make=async()=>{
-    let i=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-10-01',dueDate:'2026-10-01',lines:[{description:'Cancelled work',quantity:'1',rate:'100',accountId:acct['4000'],taxCode:'exempt'}]})
+  const make=async(customerId=customer.id)=>{
+    let i=await h.command('invoice.save-draft',{customerId,issueDate:'2026-10-01',dueDate:'2026-10-01',lines:[{description:'Cancelled work',quantity:'1',rate:'100',accountId:acct['4000'],taxCode:'exempt'}]})
     i=await h.command('invoice.approve',{id:i.id,revision:i.revision})
     return h.command('invoice.issue',{id:i.id})
   }
@@ -52,4 +52,18 @@ export async function voidJourney(h, { acct, bank }) {
   const current=(await h.view('sales')).invoices.find(i=>i.id===settled.id)
   await h.command('invoice.void',{...request,id:current.id,revision:current.revision},h.owner,409)
   assert.equal((await h.view('sales')).invoices.find(i=>i.id===settled.id).open_cents,9000)
+}
+
+export async function erasedVoidJourney(h,{acct,bank}) {
+  const customer=await h.command('contact.save',{kind:'customer',name:'Cedar cancellation contact',email:'cancelled@example.test'})
+  let inv=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-10-01',lines:[{description:'Cancelled project',quantity:'1',rate:'100',accountId:acct['4000'],taxCode:'exempt'}]})
+  await h.command('invoice.approve',{id:inv.id,revision:inv.revision});inv=await h.command('invoice.issue',{id:inv.id})
+  const voided=await h.command('invoice.void',{id:inv.id,revision:inv.revision,date:'2026-10-20',reason:`Cancellation requested by ${customer.email}`})
+  const preview=await h.command('erasure.preview',{kind:'contact',id:customer.id})
+  assert.deepEqual(preview.blockers,[],'a void is a closed receivable for erasure')
+  await h.command('erasure.execute',{kind:'contact',id:customer.id,fingerprint:preview.fingerprint,requester:'Customer',channel:'email',reason:'Remove private contact facts',confirm:'ERASE'})
+  const retained=(await h.view('sales')).invoices.find(i=>i.id===inv.id)
+  assert.equal(retained.status,'void');assert.equal(retained.void_reversal_id,voided.void_reversal_id)
+  assert.ok(!retained.void_reason.includes(customer.email))
+  assert.equal((await h.view('reports/receivables?to=2026-10-20')).agrees,true)
 }

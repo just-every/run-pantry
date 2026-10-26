@@ -34,7 +34,7 @@ const DOCUMENT_KINDS = "('invoice', 'credit', 'bill')"
 export const sameOnCash = (e = 'e') => `NOT (${e}.source_kind IN ${DOCUMENT_KINDS} OR EXISTS (SELECT 1 FROM pt_reclassifications dc WHERE dc.correcting_entry_id=${e}.id AND dc.document_line_id IS NOT NULL) OR (${e}.source_kind = 'reversal' AND EXISTS (SELECT 1 FROM pt_journal_entries o WHERE o.id = ${e}.reverses_id AND o.source_kind IN ${DOCUMENT_KINDS})))`
 
 export type Settlement = {
-  allocationId?: string; kind: 'payment' | 'payment-reversed' | 'credit' | 'credit-applied' | 'credit-reversed'
+  allocationId?: string; kind: 'payment' | 'payment-reversed' | 'credit' | 'credit-applied' | 'credit-reversed' | 'credit-refunded'
   date: string; amount: number
   paymentId: string | null; paymentReference: string; paymentJournalId: string | null; reversalJournalId: string | null
   creditId: string | null; creditNumber: string | null; appliedToId: string | null; appliedToNumber: string | null
@@ -76,9 +76,9 @@ async function documents(db: D1Database): Promise<Map<string, Doc>> {
   const control = new Map((await all(db, "SELECT subtype, id FROM pt_accounts WHERE subtype IN ('receivable', 'payable')")).map(a => [a.subtype, a.id]))
   // Only documents something has settled matter on the cash basis.
   const invoices = await all(db, `SELECT i.id, i.kind, i.number, i.total_cents, i.journal_id, i.customer_id, i.after_tax_discount_cents, i.discounts, i.discount_account_id, c.name AS contact_name FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id
-    WHERE i.journal_id IS NOT NULL AND (i.id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice') OR i.id IN (SELECT source_id FROM pt_allocations WHERE source_kind = 'credit'))`)
+    WHERE i.journal_id IS NOT NULL AND (i.id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice') OR i.id IN (SELECT source_id FROM pt_allocations WHERE source_kind = 'credit' UNION SELECT source_id FROM pt_customer_refunds WHERE source_kind='credit' AND status='succeeded'))`)
   const invoiceLines = await all(db, `SELECT l.invoice_id, l.line_no, l.line_kind, l.description, l.amount_cents, l.discount_cents, l.tax_cents, l.tax_code, l.account_id, l.item_id, l.early_treatment, l.class_name,l.location_name,l.project_name, t.account_id AS tax_account FROM pt_invoice_lines l LEFT JOIN pt_tax_codes t ON t.id = l.tax_code
-    WHERE l.invoice_id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice' UNION SELECT source_id FROM pt_allocations WHERE source_kind = 'credit') ORDER BY l.invoice_id, l.line_no`)
+    WHERE l.invoice_id IN (SELECT target_id FROM pt_allocations WHERE target_kind = 'invoice' UNION SELECT source_id FROM pt_allocations WHERE source_kind = 'credit' UNION SELECT source_id FROM pt_customer_refunds WHERE source_kind='credit' AND status='succeeded') ORDER BY l.invoice_id, l.line_no`)
   for (const i of invoices) {
     // An invoice debits receivables and credits income and tax; a credit note the reverse.
     const s: 1 | -1 = i.kind === 'invoice' ? 1 : -1
@@ -129,8 +129,12 @@ async function events(db: D1Database, docs: Map<string, Doc>): Promise<Event[]> 
     if (a.source_kind === 'credit' && docs.has(a.source_id))
       out.push({ docId: a.source_id, date: a.allocation_date, order, delta: a.amount_cents, settlement: { ...base, kind: 'credit-applied', date: a.allocation_date, amount: a.amount_cents } })
     // A credit allocation voided by a linked reversal (a reversed early-payment discount) un-recognises both sides on its date.
-    if (a.voided_on) for (const docId of [a.target_id, a.source_id]) if (docs.has(docId))
+    if (a.voided_on && !a.reversal_id) for (const docId of [a.target_id, a.source_id]) if (docs.has(docId))
       out.push({ docId, date: a.voided_on, order: `~${order}`, delta: -a.amount_cents, settlement: { ...base, kind: 'credit-reversed', date: a.voided_on, amount: -a.amount_cents, reversalJournalId: a.voided_by } })
+  }
+  for (const refund of await all(db, "SELECT r.*,i.number FROM pt_customer_refunds r JOIN pt_invoices i ON i.id=r.source_id WHERE r.source_kind='credit' AND r.status='succeeded' ORDER BY r.refund_date,r.created_at,r.id")) {
+    if (!docs.has(refund.source_id)) continue
+    out.push({docId:refund.source_id,date:refund.refund_date,order:`${refund.created_at}|${refund.id}`,delta:refund.amount_cents,settlement:{kind:'credit-refunded',date:refund.refund_date,amount:refund.amount_cents,paymentId:refund.payment_id,paymentReference:refund.provider_id??'Recorded refund',paymentJournalId:refund.journal_id,reversalJournalId:null,creditId:refund.source_id,creditNumber:refund.number,appliedToId:null,appliedToNumber:null}})
   }
   return out.sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : x.order < y.order ? -1 : x.order > y.order ? 1 : 0)
 }
