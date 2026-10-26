@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 export function refundProvider() {
   const intents = new Map(), refunds = new Map()
   let status = 'succeeded'
-  return { intents, refunds, pending: () => { status = 'pending' }, succeed: () => { status = 'succeeded'; for (const r of refunds.values()) r.status = status },
+  return { intents, refunds, pending: () => { status = 'pending' }, succeed: () => { status = 'succeeded'; for (const r of refunds.values()) if(r.status==='pending')r.status = status }, fail: () => {status='failed';for(const r of refunds.values())if(r.status==='pending')r.status=status},
     async outbound(request) {
       const url = new URL(request.url)
       assert.equal(url.host, 'api.stripe.com')
@@ -38,7 +38,17 @@ export async function recordedRefundJourney({h,pay,customer,bank,bea,ann}) {
   const journal=(await h.view('journal')).entries.find(e=>e.id===refund.journal_id)
   assert.equal(journal.lines.reduce((n,l)=>n+l.debit_cents-l.credit_cents,0),0)
   await h.command('journal.reverse',{id:pay.journal_id,date:'2026-09-13',memo:'Invalid reversal after refund'},ann,409)
+  const extra=await h.command('payment.record',{direction:'received',contactId:customer.id,date:'2026-09-12',amount:'20',bankAccountId:bank.id,allocations:[]})
+  const drafts=await Promise.all([1,2].map(()=>h.command('customer-refund.prepare',{...body,sourceId:extra.id,amount:'20'},bea)))
+  const approvals=await Promise.all(drafts.map(r=>h.send('/api/pantry/command/customer-refund.approve',{id:r.id,revision:r.revision},{cookie:ann})))
+  assert.deepEqual(approvals.map(r=>r.status).sort(),[200,409],'concurrent approvals cannot reserve the same money twice')
+  const winner=approvals.find(r=>r.status===200).value
+  await h.command('customer-refund.post',{id:winner.id},ann)
+  const loser=drafts.find(r=>r.id!==winner.id)
+  await h.command('customer-refund.cancel',{id:loser.id,revision:loser.revision},ann)
+  assert.equal((await h.view('reports/receivables?to=2026-09-30')).agrees,true)
 }
+
 
 /** Shared HTTP scenario used with a network fake and with the held Stripe test account. */
 export async function stripeRefundScenario({h,acct,createIntent,key,date='2026-10-26'}) {
@@ -83,6 +93,13 @@ export async function creditRefundJourney({h,acct,bank,provider,paid}) {
   refund=await h.command('customer-refund.post',{id:refund.id})
   assert.equal(refund.status,'succeeded');assert.ok(refund.journal_id)
   assert.equal((await h.view('reports/receivables?to=2026-10-26')).agrees,true)
+  const failedCredit=await credit('50')
+  let failed=await h.command('customer-refund.prepare',{sourceKind:'credit',sourceId:failedCredit.id,paymentId:payment.id,bankAccountId:bank.id,method:'stripe',amount:'50',date:'2026-10-26',reason:'A failed provider refund must retain its outcome'})
+  await h.command('customer-refund.approve',{id:failed.id,revision:failed.revision})
+  provider.pending();failed=await h.command('customer-refund.post',{id:failed.id});provider.fail()
+  failed=await h.command('customer-refund.post',{id:failed.id})
+  assert.equal(failed.status,'failed');assert.equal(failed.journal_id,null)
+  assert.equal((await h.view('sales')).invoices.find(i=>i.id===failedCredit.id).open_cents,5000,'a confirmed failed refund releases the reserved credit')
   const discount=await h.command('account.save',{code:'4960',name:'Customer discounts',type:'expense'})
   const settings=(await h.view('invoicing')).discounts.settings
   await h.command('discount-settings.save',{discountAccountId:discount.id,earlyAccountId:discount.id,revision:settings?.revision})

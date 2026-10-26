@@ -47,6 +47,15 @@ export async function paymentStatusBrowser(t) {
       }
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${name} fits ${width}`)
       if(proof)await page.screenshot({path:`${proof}/provider-${name}-${width}.png`,fullPage:true})
+      if(name==='disputed') {
+        const payer=await browser.newContext({viewport:{width,height:width===390?844:1000},extraHTTPHeaders:{'x-synthetic-pantry-clock':'2026-10-20T12:00:00Z'}})
+        const hosted=await payer.newPage()
+        await hosted.goto(h.origin+item.page)
+        await hosted.getByText('Payment disputed',{exact:true}).waitFor()
+        assert.equal(await hosted.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+        if(proof)await hosted.screenshot({path:`${proof}/payer-disputed-${width}.png`,fullPage:true})
+        await payer.close()
+      }
     }
     await page.goto(`${h.origin}/app/sales?tab=contacts&customer=${customer.id}`)
     const preference=page.locator('details').filter({has:page.locator('summary',{hasText:'Payment receipt preference'})})
