@@ -3,25 +3,27 @@
 import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { chromium } from '@playwright/test'
 import { providerWorker } from '../app/provider-worker.mjs'
 import { TOKEN } from '../app/worker.mjs'
+import { declinedCard } from './autopay-card.mjs'
 
 const key = process.env.STRIPE_US_TEST_SECRET_KEY
 assert.ok(key && key.includes('_test_'), 'Injected Stripe test access is required')
 const proof = process.env.PANTRY_PROOF_DIR
 assert.ok(proof, 'PANTRY_PROOF_DIR is required for private stage evidence')
 await mkdir(proof, { recursive: true, mode: 0o700 })
-const receipt = { ranAt: new Date().toISOString(), testMode: true, stage: 'starting', status: 'running' }
+const receipt = { head: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), ranAt: new Date().toISOString(), testMode: true, stage: 'starting', status: 'running' }
 let app, browser, page
 const retain = async () => writeFile(join(proof, 'autopay-provider.json'), JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 })
-const stage = async name => {
+const stage = async (name, screen = page) => {
   receipt.stage = name
   await retain()
-  if (page) await page.screenshot({ path: join(proof, `autopay-provider-${name}.png`), fullPage: true })
+  if (screen) await screen.screenshot({ path: join(proof, `autopay-provider-${name}.png`), fullPage: true })
 }
 const stripe = async (path, params) => {
-  const response = await fetch(`https://api.stripe.com/v1${path}`, { method: params ? 'POST' : 'GET', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/x-www-form-urlencoded', 'stripe-version': '2026-09-30.endive' }, ...(params ? { body: new URLSearchParams(params) } : {}) })
+  const response = await fetch(`https://api.stripe.com/v1${path}`, { method: params ? 'POST' : 'GET', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/x-www-form-urlencoded', 'stripe-version': '2026-09-30.endive' }, ...(params ? { body: new URLSearchParams(params) } : {}), signal: AbortSignal.timeout(20000) })
   assert.equal(response.status, 200, `Stripe HTTP ${response.status}`)
   return response.json()
 }
@@ -49,7 +51,7 @@ try {
     return new Response(await response.arrayBuffer(), { status: response.status, headers: Object.fromEntries([...response.headers].filter(([name])=>!['content-encoding','content-length','transfer-encoding'].includes(name))) })
   } })
   browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
-  const instant = new Date(), clock = instant.toISOString(), day = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(instant), headers = { 'x-synthetic-pantry-clock': clock }
+  const clock = '2026-10-26T16:00:00Z', day = '2026-10-26', headers = { 'x-synthetic-pantry-clock': clock, 'cf-connecting-ip': '192.0.2.10' }
   const owner = await browser.newContext({ extraHTTPHeaders: headers })
   assert.equal((await owner.request.post(app.origin + '/auth/bootstrap', { headers: { origin: app.origin }, data: { token: TOKEN, displayName: 'Synthetic Pantry' }, maxRedirects: 0 })).status(), 303)
   await owner.request.post(app.origin + '/setup', { headers: { origin: app.origin }, form: { confirm: 'yes' }, maxRedirects: 0 })
@@ -64,7 +66,7 @@ try {
   await app.cron(Date.parse(clock))
   const invoice = (await view('sales')).invoices.find(i => i.recurring_id === recurring.id)
   assert.ok(invoice?.link_token)
-  await command('autopay.policy', { customerId: customer.id, recurringId: recurring.id, enabled: true, consent: true, purpose: 'Synthetic recurring test service at the billing address' })
+  await command('autopay.policy', { customerId: customer.id, recurringId: recurring.id, enabled: true, consent: true, purpose: 'Synthetic recurring test service at the billing address', noticeRecipients: [{ recipient: customer.email, timeZone: 'America/New_York' }] })
   const payer = await browser.newContext({ extraHTTPHeaders: headers, viewport: { width: 1280, height: 1000 } })
   page = await payer.newPage()
   page.setDefaultTimeout(20000)
@@ -102,11 +104,12 @@ try {
   }
   const setups = await app.db.prepare('SELECT session_id FROM pt_autopay_setups WHERE customer_id=? ORDER BY accepted_at DESC LIMIT 1').bind(customer.id).first()
   assert.ok(setups?.session_id)
-  const session = await stripe(`/checkout/sessions/${setups.session_id}?expand[]=setup_intent`)
+  let session = await stripe(`/checkout/sessions/${setups.session_id}?expand[]=setup_intent`)
   receipt.checkoutSession = session.id; receipt.setupIntent = session.setup_intent?.id; receipt.checkoutStatus = session.status; receipt.setupStatus = session.setup_intent?.status
   await retain()
   let intent = session.setup_intent
   if (intent?.status === 'requires_action' && intent.next_action?.type === 'verify_with_microdeposits') intent = await stripe(`/setup_intents/${intent.id}/verify_microdeposits`, { descriptor_code: 'SM11AA' })
+  session = await stripe(`/checkout/sessions/${setups.session_id}?expand[]=setup_intent`)
   assert.equal(intent?.status, 'succeeded', 'Hosted ACH setup has not completed')
   assert.equal(session.status, 'complete', 'Checkout has not completed')
   await page.goto(`${app.origin}/i/${invoice.link_token}?autopay_setup=${session.id}`)
@@ -127,12 +130,14 @@ try {
   await command('autopay.revoke', { customerId: customer.id })
   await app.cron(Date.parse(due + 'T16:00:00Z'))
   assert.equal((await view(`autopay/${customer.id}`)).attempts.length, 1)
+  await declinedCard({ app, browser, headers, command, view, acct, day, stripe, receipt, retain, stage })
   receipt.revoked = true; receipt.status = providerIntent.status === 'succeeded' ? 'completed' : 'processing'; receipt.stage = 'retained-provider-outcome'
   await retain()
   console.log(JSON.stringify(receipt))
-} catch {
+} catch (error) {
   receipt.status = 'blocked'
   receipt.reason = 'The live hosted setup or provider outcome did not complete; inspect the retained private stage screenshots.'
+  await writeFile(join(proof, 'autopay-provider-error.txt'), String(error.stack), { mode: 0o600 })
   await retain()
   if (page) await page.screenshot({ path: join(proof, 'autopay-provider-blocked.png'), fullPage: true }).catch(() => {})
   console.log(JSON.stringify(receipt))

@@ -1,4 +1,5 @@
 import { Action, Card, Chip, command, day, Field, Form, Loading, Table, useShared, useView, type D } from './kit'
+import { AutopayMailControls } from './autopay-mail-controls'
 
 export function CustomerAutopay({ customerId }: { customerId: string }) {
   const { state } = useShared()
@@ -15,13 +16,15 @@ export function CustomerAutopay({ customerId }: { customerId: string }) {
       {saved?.mandateText && <p>{saved.mandateText}</p>}
       <p>The customer saves their method on a sent invoice’s page. Owner approval applies to the selected recurring template, its current schedule and this customer’s billing address and email.</p>
       <p><strong>Retry email subject:</strong> {data.notice.subject}</p><pre style={{whiteSpace:"pre-wrap"}}>{data.notice.body}</pre>
-      <Form label="Approve autopay schedule" submit={b => command('autopay.policy', { customerId, recurringId: b.recurringId, purpose: b.purpose, retryDays: String(b.retryDays).split(',').filter(Boolean).map(Number), consent: b.consent === 'on', enabled: true })} onDone={reload}>
+      <Form label="Approve autopay schedule" submit={b => command('autopay.policy', { customerId, recurringId: b.recurringId, purpose: b.purpose, retryDays: String(b.retryDays).split(',').filter(Boolean).map(Number), noticeRecipients: data.noticeRecipients.map((r: D, i: number) => ({ recipient: r.recipient, timeZone: b[`noticeZone${i}`] })), consent: b.consent === 'on', enabled: true })} onDone={reload}>
         <Field label="Recurring template" name="recurringId" required defaultValue={p?.recurring_id} options={templates.map((r: D) => ({ value: r.id, label: `${r.number} · ${r.customer_name}` }))} />
         <Field label="Charge purpose" name="purpose" required defaultValue={p?.purpose} />
         <Field label="Retry days after first attempt" name="retryDays" required defaultValue={p?.retryDays.join(', ') ?? '1, 3, 7'} />
+        {data.noticeRecipients.map((r: D, i: number) => <Field key={r.recipient} label={`Retry email time zone for ${r.recipient}`} name={`noticeZone${i}`} required defaultValue={r.timeZone} placeholder="America/New_York" />)}
         <label className="check"><input type="checkbox" name="consent" required /> I approve this schedule and the retry email template above for this customer.</label>
       </Form>
     </details>
+    <AutopayMailControls customerId={customerId} recipients={data.noticeRecipients} reload={reload} />
     {p?.enabled && <Action tone="danger" run={async () => { await command('autopay.policy', { customerId, enabled: false }); await reload() }}>Disable scheduled charges</Action>}
     {saved && !saved.revokedAt && <Action tone="danger" run={async () => { await command('autopay.revoke', { customerId }); await reload() }}>Revoke autopay</Action>}
     {data.attempts.length > 0 && <Table heads={['Invoice', 'Date', 'Attempt', 'Outcome']} empty="No automatic charges yet.">{data.attempts.map((a: D) => <tr key={a.id}><td><a href={`/app/sales?invoice=${encodeURIComponent(a.invoice_id)}`}>{a.invoice_number}</a></td><td>{day(a.attempted_on)}</td><td>{a.sequence === 0 ? 'Due date' : `Retry ${a.sequence}`}</td><td><Chip>{a.status}</Chip>{a.failure_code && <p>{a.failure_code}</p>}</td></tr>)}</Table>}

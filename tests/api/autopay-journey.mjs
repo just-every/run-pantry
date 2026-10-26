@@ -67,7 +67,7 @@ export async function autopayJourney(t, factory = harness) {
     await h.cron(Date.parse(clock))
     const invoice = (await h.view('sales')).invoices.find(i => i.recurring_id === recurring.id)
     assert.ok(invoice?.link_token)
-    const page = `/i/${invoice.link_token}`, policyBody = { customerId: customer.id, recurringId: recurring.id, enabled: true, purpose: 'Monthly design retainer at the customer billing address', consent: true }
+    const page = `/i/${invoice.link_token}`, policyBody = { customerId: customer.id, recurringId: recurring.id, enabled: true, purpose: 'Monthly design retainer at the customer billing address', consent: true, noticeRecipients: [{recipient:customer.email,timeZone:'America/New_York'}] }
     return { h, customer, recurring, invoice, page, policyBody }
   }
   const approve = async s => {
@@ -87,6 +87,8 @@ export async function autopayJourney(t, factory = harness) {
   const ach = await scene('Autopay ACH customer')
   assert.equal((await h.send(ach.page + '/autopay/setup', { method: 'card', accepted: true })).status, 409, 'standing charges start off')
   await h.command('autopay.policy', ach.policyBody, accountant, 403)
+  await h.command('autopay.policy', { ...ach.policyBody, noticeRecipients: undefined }, h.owner, 400)
+  await h.command('autopay.policy', { ...ach.policyBody, noticeRecipients: [{recipient:ach.customer.email,timeZone:'synthetic-pantry-201'}] }, h.owner, 400)
   await approve(ach)
   assert.equal((await h.send(ach.page+'/autopay/setup',{method:'card',accepted:true,policyRevision:ach.policy.revision},{headers:{origin:'https://untrusted.example'}})).status,403)
   assert.equal((await h.send(ach.page + '/autopay/setup', { method: 'us_bank_account', policyRevision: ach.policy.revision, accepted: true }, { headers: { 'x-synthetic-pantry-peer': 'absent', 'x-forwarded-for': '192.0.2.10' } })).status, 409, 'untrusted forwarding cannot become mandate evidence')
@@ -187,6 +189,90 @@ export async function autopayJourney(t, factory = harness) {
   await h.cron(Date.parse('2026-10-22T12:00:00Z'))
   assert.ok((await state(quiet)).notices.every(n => n.status === 'accepted'))
   await h.command('autopay.revoke', { customerId: quiet.customer.id })
+
+  const zoned = await scene('synthetic-pantry-202')
+  zoned.customer = await h.command('contact.save', { ...zoned.customer, kind:'customer', contacts:[
+    {email:zoned.customer.email,roles:['billing']}, {email:'synthetic-pantry-203@example.test',roles:['cc']}
+  ] })
+  zoned.policyBody.noticeRecipients = [{recipient:zoned.customer.email,timeZone:'America/Los_Angeles'}, {recipient:'synthetic-pantry-203@example.test',timeZone:'America/New_York'}]
+  await h.command('autopay.policy', { ...zoned.policyBody, noticeRecipients:[zoned.policyBody.noticeRecipients[0]] }, h.owner, 400)
+  await approve(zoned); await setup(zoned,'card'); provider.outcome('requires_payment_method'); provider.at('2026-10-21')
+  await h.cron(Date.parse('2026-10-21T12:00:00Z'))
+  let zonedState = await state(zoned)
+  assert.equal(zonedState.notices.find(n=>n.recipient===zoned.customer.email).status,'queued','a west coast recipient waits while the business is open')
+  assert.equal(zonedState.notices.find(n=>n.recipient==='synthetic-pantry-203@example.test').status,'accepted','a recipient whose local morning has started receives a separate email')
+  await Promise.all([h.cron(Date.parse('2026-10-21T15:00:00Z')),h.cron(Date.parse('2026-10-21T15:00:00Z'))])
+  zonedState = await state(zoned)
+  assert.ok(zonedState.notices.every(n=>n.status==='accepted'))
+  assert.equal(h.mail.filter(m=>m.subject.startsWith('Automatic payment failed:')&&m.to.includes(zoned.customer.email)).length,1)
+  await h.command('autopay.revoke',{customerId:zoned.customer.id})
+
+  const blocked = await scene('synthetic-pantry-204')
+  blocked.customer = await h.command('contact.save', { ...blocked.customer, kind:'customer', contacts:[
+    {email:blocked.customer.email,roles:['billing']}, {email:'synthetic-pantry-205@example.test',roles:['cc']}
+  ] })
+  blocked.policyBody.noticeRecipients = [blocked.customer.email,'synthetic-pantry-205@example.test'].map(recipient=>({recipient,timeZone:'America/New_York'}))
+  await approve(blocked)
+  const mailControl = async (recipient, changes, cookie=h.owner, status=200) => {
+    const current=(await state(blocked)).noticeRecipients.find(r=>r.recipient===recipient)
+    return h.command('autopay.policy',{customerId:blocked.customer.id,mailControl:{recipient,revision:current.revision,...changes}},cookie,status)
+  }
+  const observed = {suppression:'bounced',reason:'synthetic-pantry-206 observed permanent rejection'}
+  await mailControl(blocked.customer.email,observed,accountant,403)
+  await mailControl(blocked.customer.email,observed)
+  const stale=(await state(blocked)).noticeRecipients.find(r=>r.recipient===blocked.customer.email)
+  await mailControl(blocked.customer.email,{timeZone:'America/Chicago'})
+  await h.command('autopay.policy',{customerId:blocked.customer.id,mailControl:{recipient:blocked.customer.email,revision:stale.revision,timeZone:'America/New_York'}},h.owner,409)
+  await mailControl('synthetic-pantry-205@example.test',{suppression:'complained',reason:'synthetic-pantry-207 recipient reported unwanted email'})
+  await approve(blocked)
+  assert.ok((await state(blocked)).noticeRecipients.every(r=>r.suppression&&r.suppressionSource==='owner_recorded'),'approving a charge policy preserves owner-recorded email stops')
+  await setup(blocked,'card'); await due('2026-10-21'); await due('2026-10-21')
+  let blockedState=await state(blocked)
+  assert.equal(blockedState.attempts[0].status,'failed','email suppression does not authorize or prevent a scheduled charge')
+  assert.equal(blockedState.notices.length,2); assert.ok(blockedState.notices.every(n=>n.status==='suppressed'))
+  assert.equal(h.mail.filter(m=>m.subject.startsWith('Automatic payment failed:')&&m.to.some(r=>[blocked.customer.email,'synthetic-pantry-205@example.test'].includes(r))).length,0)
+  await mailControl(blocked.customer.email,{suppression:null,reason:'synthetic-pantry-208 mailbox repaired'},h.owner,409)
+  await mailControl(blocked.customer.email,{suppression:null,confirmReset:true,reason:'synthetic-pantry-208 mailbox repaired'})
+  await due('2026-10-22')
+  blockedState=await state(blocked)
+  assert.equal(blockedState.notices.filter(n=>n.recipient===blocked.customer.email&&n.status==='accepted').length,1,'an explicit reset permits only future retry notices')
+  assert.equal(blockedState.notices.filter(n=>n.recipient==='synthetic-pantry-205@example.test'&&n.status==='suppressed').length,2)
+  await due('2026-10-24'); await due('2026-10-28')
+  const handoff=(await h.view('sales')).deliveries.filter(d=>d.invoice_id===blocked.invoice.id&&d.kind==='reminder')
+  assert.ok(handoff.some(d=>d.recipient==='synthetic-pantry-205@example.test'&&d.status==='suppressed'),'ordinary reminders inherit the complaint stop after retries are exhausted')
+  assert.ok(handoff.some(d=>d.recipient===blocked.customer.email&&d.status==='accepted'))
+  await h.command('autopay.revoke',{customerId:blocked.customer.id})
+
+  const missing = await approve(await scene('synthetic-pantry-209'))
+  await setup(missing,'card')
+  await h.db.prepare('DELETE FROM pt_autopay_mail_controls WHERE customer_id=?').bind(missing.customer.id).run()
+  await due('2026-10-21')
+  assert.equal((await state(missing)).attempts[0].status,'failed','a migrated policy without recipient settings retains its separate charge authority')
+  assert.equal((await state(missing)).notices[0].status,'queued','no recipient time zone is guessed for an existing policy')
+  await h.command('autopay.policy',{customerId:missing.customer.id,mailControl:{recipient:missing.customer.email,revision:null,timeZone:'America/New_York'}})
+  await due('2026-10-21')
+  assert.equal((await state(missing)).notices[0].status,'accepted')
+  await h.command('autopay.revoke',{customerId:missing.customer.id})
+
+  const authority = await approve(await scene('synthetic-pantry-210'))
+  await setup(authority,'card'); provider.at('2026-10-21'); await h.cron(Date.parse('2026-10-21T23:00:00Z'))
+  assert.equal((await state(authority)).notices[0].status,'queued')
+  await h.db.prepare("UPDATE oa_operators SET status='inactive' WHERE email='owner@example.test'").run()
+  try { await h.cron(Date.parse('2026-10-22T12:00:00Z')) }
+  finally { await h.db.prepare("UPDATE oa_operators SET status='active' WHERE email='owner@example.test'").run() }
+  assert.equal((await state(authority)).notices[0].status,'cancelled','a queued notice stops when the approving owner loses current authority')
+  assert.equal(h.mail.filter(m=>m.subject.startsWith('Automatic payment failed:')&&m.to.includes(authority.customer.email)).length,0)
+  await h.command('autopay.revoke',{customerId:authority.customer.id})
+
+  await h.command('recurring.status',{id:blocked.recurring.id,status:'ended'})
+  const eraseInvoice=(await h.view('sales')).invoices.find(i=>i.id===blocked.invoice.id)
+  await h.command('invoice.void',{id:eraseInvoice.id,revision:eraseInvoice.revision,date:'2026-10-20',reason:'synthetic-pantry-215 cancelled service'})
+  for (const subject of [blocked.customer,await h.command('contact.save',{kind:'customer',name:'synthetic-pantry-211',email:'synthetic-pantry-211@example.test'})]) {
+    if(subject.id!==blocked.customer.id)await h.command('autopay.policy',{customerId:subject.id,mailControl:{recipient:subject.email,revision:null,timeZone:'America/New_York',suppression:'bounced',reason:'synthetic-pantry-212 observed bounce'}})
+    const preview=await h.command('erasure.preview',{kind:'contact',id:subject.id})
+    await h.command('erasure.execute',{kind:'contact',id:subject.id,fingerprint:preview.fingerprint,requester:'synthetic-pantry-213',channel:'email',reason:'synthetic-pantry-214 remove contact information',confirm:'ERASE'})
+    assert.equal((await h.db.prepare('SELECT count(*) AS count FROM pt_autopay_mail_controls WHERE customer_id=?').bind(subject.id).first()).count,0,'erasure removes mail controls for both posted and transaction-free customers')
+  }
   const browserScene = await scene('Autopay browser customer')
   return { ...browserScene, provider, accountant, approve: () => approve(browserScene), setup: method => setup(browserScene, method), due, state: () => state(browserScene) }
 }

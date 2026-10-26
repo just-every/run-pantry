@@ -8,7 +8,8 @@ import { all, audit, changed, one, q, run } from '../db'
 import { customerRecipients } from '../customer-profile'
 import { sendingSettings } from '../delivery'
 import { invoice } from '../invoices'
-import { binding, policyState } from './policy'
+import { binding, policyFence, policyState } from './policy'
+import { noticeMailFence, noticeMailState } from './mail-controls'
 
 export async function queueFailureNotice(db: D1Database, attemptId: string) {
   const a = await one(db, 'SELECT * FROM pt_autopay_attempts WHERE id=?', attemptId)
@@ -23,12 +24,15 @@ export async function queueFailureNotice(db: D1Database, attemptId: string) {
 
 export async function sendAutopayNotices(env: Bindings, db: D1Database) {
   const settings = await sendingSettings(db)
-  const hour = Number(new Intl.DateTimeFormat('en-US', { timeZone: settings.time_zone, hour: 'numeric', hourCycle: 'h23' }).format(new Date()))
-  if (hour < 8 || hour >= 18) return
   for (const notice of await all(db, "SELECT n.*,a.customer_id,a.sequence,a.amount_cents,a.policy_revision FROM pt_autopay_notices n JOIN pt_autopay_attempts a ON a.id=n.attempt_id WHERE n.status='queued' ORDER BY n.at LIMIT 100")) {
     const state = await policyState(env, db, notice.customer_id), inv = await invoice(db, notice.invoice_id)
     if (!state.valid || !state.consented || state.policy!.revision !== notice.policy_revision || !customerRecipients(state.c).includes(notice.recipient) || inv.status !== 'issued' || inv.void_date || inv.open_cents <= 0) {
       await run(db, [q("UPDATE pt_autopay_notices SET status='cancelled',detail='Authority, recipient or invoice changed',finished_at=? WHERE id=? AND status='queued'", now(), notice.id)])
+      continue
+    }
+    const control = await noticeMailState(db, notice.customer_id, notice.recipient, settings.time_zone)
+    if (control.status !== 'ready') {
+      await run(db, [q("UPDATE pt_autopay_notices SET status=?,detail=?,finished_at=? WHERE id=? AND status='queued'", control.status, control.detail, control.status === 'suppressed' ? now() : null, notice.id)])
       continue
     }
     const claimed = await db.prepare("UPDATE pt_autopay_notices SET status='sending' WHERE id=? AND status='queued'").bind(notice.id).run()
@@ -38,13 +42,20 @@ export async function sendAutopayNotices(env: Bindings, db: D1Database) {
       const fresh = await policyState(env, db, notice.customer_id)
       if (!fresh.valid || !fresh.consented || fresh.policy!.revision !== notice.policy_revision || binding(fresh.c) !== binding(state.c)) { status = 'cancelled'; detail = 'Standing mail consent changed' }
       else {
+        const liveSettings = await sendingSettings(db), live = await noticeMailState(db, notice.customer_id, notice.recipient, liveSettings.time_zone)
+        if (live.status !== 'ready' || live.row.revision !== control.row.revision) {
+          await run(db, [q("UPDATE pt_autopay_notices SET status=?,detail=?,finished_at=? WHERE id=? AND status='sending'", live.status === 'suppressed' ? 'suppressed' : 'queued', live.detail || 'Email recipient settings changed before sending', live.status === 'suppressed' ? now() : null, notice.id)])
+          continue
+        }
         const entity = await one(db, 'SELECT legal_name FROM pt_entity WHERE id=1'), days = JSON.parse(fresh.policy!.retry_days), next = days[notice.sequence]
         const body = renderNotice(fresh.policy!.notice_template,{business:entity?.legal_name??'The business',invoice:inv.number,amount:usd(notice.amount_cents),next_retry:next===undefined?'Automatic retries are exhausted; ordinary invoice reminders will follow.':`The next retry is scheduled ${next} days after the first attempt.`})
         const subject = renderNotice(fresh.policy!.notice_subject,{invoice:inv.number})
         const mailer = operatorMail(runtimeBindings(env)) as unknown as { send(message: Data): Promise<{ status: string; provider: string; providerMessageId?: string | null; code?: string }> } | undefined
         if (!mailer || !env.MAIL_FROM) { status = 'failed'; detail = 'The configured mail route is unavailable' }
         else {
-          const result = await mailer.send({ deliveryId: notice.id, from: String(env.MAIL_FROM), to: [notice.recipient], subject, text: body, replyTo: settings.reply_to || await ownerEmail(db, env) })
+          const replyTo = liveSettings.reply_to || await ownerEmail(db, env)
+          await run(db, [policyFence(fresh), noticeMailFence(notice.customer_id, notice.recipient, live.row.revision)])
+          const result = await mailer.send({ deliveryId: notice.id, from: String(env.MAIL_FROM), to: [notice.recipient], subject, text: body, replyTo })
           status = result.status === 'development' ? 'suppressed' : result.status
           provider = result.provider; providerId = result.providerMessageId ?? null; detail = result.code ?? ''
         }

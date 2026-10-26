@@ -13,6 +13,7 @@ type Input = { id: string; member: boolean; memberEmail?: string; posted: boolea
 type Column = { name: string; pk: number }
 const quote = (s: string) => `"${s.replaceAll('"', '""')}"`
 const FIELDS: Record<string, string[]> = {
+  pt_autopay_mail_controls:['recipient','reason'],
   pt_autopay_policies:['purpose','customer_binding'],pt_autopay_setups:['mandate_text','accepted_ip'],pt_autopay_notices:['recipient','subject','detail'],
   pt_text_consents:['source','wording'],pt_text_messages:['phone','body','detail'],pt_text_shares:['phone','body'],
   pt_assets:['name'],pt_asset_tax:['note'],pt_asset_settings:['safe_harbor'],
@@ -118,6 +119,14 @@ export async function eraseCopies(db: D1Database, input: Input) {
       for (const field of fields) {
         if (identity.includes(field)) { if (row[field] === input.id) set[field] = input.marker }
         else set[field] = replacement(row[field], field, input)
+      }
+      if (table === 'pt_autopay_mail_controls') {
+        if (!input.member && !input.posted && row.customer_id === input.id) continue
+        if ((!input.member && row.customer_id === input.id) || set.recipient !== row.recipient) {
+          statements.push(q('DELETE FROM pt_autopay_mail_controls WHERE customer_id=? AND recipient=? AND revision=?', row.customer_id, row.recipient, row.revision), changed())
+          removed.push({ table, key: { customer_id: row.customer_id, recipient: row.recipient } }); note(table, 'rowsRemoved', 1)
+          continue
+        }
       }
       if (table === 'pt_contractor_tax' && !input.member && row.contact_id === input.id) for (const field of ['address', 'city', 'state', 'zip']) set[field] = input.marker
       if (['pt_deliveries','pt_payment_notices'].includes(table) && set.recipient !== row.recipient) set.recipient = `${input.marker}:${row.id}`

@@ -1,4 +1,5 @@
 import { autopayHolding } from './autopay'
+import { noticeMailFence, noticeMailState } from './autopay/mail-controls'
 // Sending invoices. An issued invoice goes to the customer by email with its
 // PDF attached and a link to its customer page; every message is a delivery
 // row written before the send and finished with the provider's answer, so a
@@ -60,6 +61,8 @@ export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, 
   requireThat(inv.kind === 'invoice' && inv.status === 'issued', 'Issue the invoice before sending it', 409)
   const token = await ensureLink(db, inv.id), link = customerLink(env, token)
   const retained = await issuedDocument(db, inv.id), doc = retained.document, pdf = retained.pdf, settings = await sendingSettings(db)
+  const mailControl = kind === 'reminder' ? await noticeMailState(db, inv.customer_id, recipient, settings.time_zone) : null
+  if (mailControl?.row && mailControl.status === 'queued') return null
   const customer = (await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', inv.customer_id))!
   const merge = (value: string) => renderReminder(value, inv, doc.business, customer.name, link)
   const subject = approved?.subject ?? (kind === 'reminder' && settings.reminder_subject ? merge(settings.reminder_subject) : null) ?? (kind === 'invoice' ? `Invoice ${inv.number} from ${doc.business}: ${usd(inv.open_cents)} due ${longDay(inv.due_date)}` : reminderSubject(inv.number, step!, doc.business))
@@ -72,27 +75,37 @@ export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, 
     if (kind === 'reminder' && (/UNIQUE/i.test(String((error as Error).message)) || String((error as Error).message).startsWith('That record already exists: '))) return null
     throw error
   }
+  if (mailControl?.row && mailControl.status === 'suppressed') {
+    await run(db, [q("UPDATE pt_deliveries SET status='suppressed',detail=?,finished_at=? WHERE id=?", mailControl.detail, now(), id), audit(actor, 'invoice.remind', 'invoice', inv.id, { recipient, status:'suppressed', step })])
+    return one(db, 'SELECT * FROM pt_deliveries WHERE id=?', id)
+  }
   const lead = approved?.body ?? (kind === 'reminder' && settings.reminder_body ? merge(settings.reminder_body) : null) ?? (kind === 'invoice' ? `${doc.business} has sent you invoice ${inv.number} for ${usd(inv.total_cents)}, due ${longDay(inv.due_date)}.` : `This is a reminder that invoice ${inv.number} from ${doc.business} ${step! < 0 ? `is due on ${longDay(inv.due_date)}` : step === 0 ? 'is due today' : `was due on ${longDay(inv.due_date)}`}. ${usd(inv.open_cents)} is still open.`)
   const textBody = `${lead}\n\nView the invoice and pay: ${link}\n\nThe invoice is attached as a PDF. Reply to this email to reach ${doc.business}.\n`
   const html = `<p>${escapeHtml(lead)}</p><p><a href="${escapeHtml(link)}">View invoice ${escapeHtml(inv.number)}</a></p><p>The invoice is attached as a PDF. Reply to this email to reach ${escapeHtml(doc.business)}.</p>`
   const fromName = doc.business.replace(/[<>"\\,;:@()[\]]/g, '').trim()
   const from = String(env.MAIL_FROM ?? '').trim()
-  let result: MailResult | null = null, detail = ''
+  let result: MailResult | null = null, detail = '', held = false
   try {
     requireThat(from, 'MAIL_FROM is not set for this installation', 409)
-    result = await mailer.send({
+    const replyTo = settings.reply_to || await ownerEmail(db, env)
+    const live = kind === 'reminder' ? await noticeMailState(db, inv.customer_id, recipient, (await sendingSettings(db)).time_zone) : null
+    if (live?.row && live.status !== 'ready') { held = true; detail = live.detail }
+    else {
+      if (live?.row) await run(db, [noticeMailFence(inv.customer_id, recipient, live.row.revision)])
+      result = await mailer.send({
       deliveryId: id, from: fromName ? `${fromName} <${from.replace(/^.*<([^>]+)>.*$/, '$1')}>` : from, to: [recipient], subject, text: textBody, html,
-      replyTo: settings.reply_to || await ownerEmail(db, env), attachments: [{ filename: `${inv.number}.pdf`, contentType: 'application/pdf', content: pdf }],
-    })
-    detail = result.code ?? ''
+      replyTo, attachments: [{ filename: `${inv.number}.pdf`, contentType: 'application/pdf', content: pdf }],
+      })
+      detail = result.code ?? ''
+    }
   } catch (error) {
     // The mail module refuses a malformed message with a MailValidationError naming its code.
     const mailCode = (error as Error)?.name === 'MailValidationError' ? (error as Data).code : null
     if (!mailCode && !(error instanceof Error && 'status' in error)) throw error
     detail = mailCode ? `The message was refused before sending (${mailCode})` : (error as Error).message
   }
-  const status = !result ? 'failed' : result.status === 'development' ? 'suppressed' : result.status
-  if (status === 'suppressed') detail = 'Local runs send no email; deploy with a mail provider to send it'
+  const status = held ? 'suppressed' : !result ? 'failed' : result.status === 'development' ? 'suppressed' : result.status
+  if (result?.status === 'development') detail = 'Local runs send no email; deploy with a mail provider to send it'
   await run(db, [
     q('UPDATE pt_deliveries SET status = ?, provider = ?, provider_message_id = ?, detail = ?, finished_at = ? WHERE id = ?', status, result?.provider ?? '', result?.providerMessageId ?? null, detail, now(), id),
     ...(status === 'accepted' && kind === 'invoice' ? [q('UPDATE pt_invoices SET sent_at = COALESCE(sent_at, ?) WHERE id = ?', now(), inv.id)] : []),
@@ -216,6 +229,8 @@ export async function sendDueReminders(env: Bindings, db: D1Database, today: str
       return {recipient, step}
     }).filter(d => d.step !== null && daysBetween(inv.due_date, today) - d.step <= 30)
     if (!due.length) continue
+    const controls = await Promise.all(due.map(d => noticeMailState(db, inv.customer_id, d.recipient, settings.time_zone)))
+    if (controls.some(c => c.row && c.status === 'queued')) continue
     const batch = await claimReminderBatch(db, inv.id, today)
     if (!batch) continue
     for (const {recipient, step} of due) {

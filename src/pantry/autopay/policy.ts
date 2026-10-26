@@ -6,6 +6,7 @@ import { now, requireThat, text, uid, type Data } from '../core'
 import { all, approval, audit, changed, guard, one, q, run } from '../db'
 import { customerRecipients } from '../customer-profile'
 import { offeredMethods, stripeSettings } from '../stripe'
+import { approveNoticeRecipients, editNoticeRecipient, noticeRecipients } from './mail-controls'
 
 export const binding = (customer: Data) => JSON.stringify({ address: customer.billing_address ?? '', serviceAddress: customer.service_address ?? '', recipients: customerRecipients(customer).sort() })
 export const schedule = (template: Data) => JSON.stringify({ every: template.every, unit: template.unit, startDate: template.start_date, endDate: template.end_date, termsDays: template.terms_days, prices: template.autopay_prices ?? [] })
@@ -39,7 +40,7 @@ export function policyFence(state: Awaited<ReturnType<typeof policyState>>) {
 
 export async function autopayView(env: Bindings, db: D1Database, customerId: string): Promise<Data> {
   const state = await policyState(env, db, customerId), { c, policy, valid, consented, methods } = state
-  return { notice: {subject:NOTICE_SUBJECT,body:NOTICE_BODY}, policy: policy ? { ...policy, retryDays: JSON.parse(policy.retry_days), schedule: JSON.parse(policy.schedule), enabled: !!policy.enabled, valid } : null,
+  return { notice: {subject:NOTICE_SUBJECT,body:NOTICE_BODY}, noticeRecipients: await noticeRecipients(db, c), policy: policy ? { ...policy, retryDays: JSON.parse(policy.retry_days), schedule: JSON.parse(policy.schedule), enabled: !!policy.enabled, valid } : null,
     methods, saved: c.autopay_setup_id ? { method: c.autopay_method, last4: c.autopay_last4, acceptedAt: c.autopay_accepted_at, acceptedIP: c.autopay_accepted_ip, mandateText: c.autopay_mandate_text, revokedAt: c.autopay_revoked_at, active: !!consented } : null,
     attempts: await all(db, 'SELECT a.*,i.number AS invoice_number FROM pt_autopay_attempts a JOIN pt_invoices i ON i.id=a.invoice_id WHERE a.customer_id=? ORDER BY a.created_at DESC LIMIT 100', customerId),
     notices: await all(db, 'SELECT n.* FROM pt_autopay_notices n JOIN pt_autopay_attempts a ON a.id=n.attempt_id WHERE a.customer_id=? ORDER BY n.at DESC LIMIT 200', customerId) }
@@ -54,6 +55,12 @@ export async function revokeCustomer(db: D1Database, customerId: string, actor =
 const policy: Command = { need: 'owner', async run(c, b) {
   must(c.actor, 'owner')
   const row = await customer(c.db, text(b.customerId, 'Customer'))
+  if (b.mailControl !== undefined) {
+    const control = await editNoticeRecipient(c.db, row, b.mailControl, c.actor.email)
+    await run(c.db, [authority(c.actor, 'owner'), guard('EXISTS(SELECT 1 FROM pt_contacts WHERE id=? AND revision=? AND erased_at IS NULL)', row.id, row.revision), ...control.statements,
+      audit(who(c.actor), 'autopay.mail-control', 'customer', row.id, { recipient: control.recipient, timeZone: control.timeZone, suppression: control.suppression, suppressionSource: control.suppression ? 'owner_recorded' : null, reason: control.reason })])
+    return autopayView(c.env, c.db, row.id)
+  }
   if (b.enabled === false) {
     await run(c.db, [authority(c.actor, 'owner'), q('UPDATE pt_autopay_policies SET enabled=0,revision=? WHERE customer_id=?', uid(), row.id), audit(who(c.actor), 'autopay.disable', 'customer', row.id)])
     return autopayView(c.env, c.db, row.id)
@@ -63,6 +70,7 @@ const policy: Command = { need: 'owner', async run(c, b) {
   requireThat(t && t.status === 'active' && t.mode === 'send' && t.approved_revision === t.revision, 'Choose a currently approved automatic recurring template', 409)
   t.autopay_prices = await prices(c.db, t.id)
   requireThat(customerRecipients(row).length && row.billing_address, 'Add the billing address and billing email before approving autopay', 409)
+  const mail = await approveNoticeRecipients(c.db, row, b.noticeRecipients, c.actor.email)
   const purpose = text(b.purpose, 'Purpose of these scheduled charges', 500), days = b.retryDays ?? [1, 3, 7]
   requireThat(Array.isArray(days) && days.length <= 12 && days.every((d, i) => Number.isInteger(d) && d > 0 && d <= 90 && (i === 0 || d > days[i - 1])), 'Retry days must increase, between 1 and 90 days after the first attempt')
   const stripe = await stripeSettings(c.db)
@@ -70,9 +78,10 @@ const policy: Command = { need: 'owner', async run(c, b) {
   const revision = uid()
   await run(c.db, [authority(c.actor, 'owner'), guard("EXISTS(SELECT 1 FROM pt_recurring WHERE id=? AND revision=? AND approved_revision=revision AND status='active')", t.id, t.revision),
     guard('EXISTS(SELECT 1 FROM pt_contacts WHERE id=? AND revision=?)', row.id, row.revision),
+    ...mail.statements,
     q(`INSERT INTO pt_autopay_policies(customer_id,recurring_id,enabled,purpose,notice_subject,notice_template,retry_days,template_revision,schedule,customer_binding,stripe_account,approved_by,owner_id,approved_at,revision) VALUES(?,?,1,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(customer_id) DO UPDATE SET recurring_id=excluded.recurring_id,enabled=1,purpose=excluded.purpose,notice_subject=excluded.notice_subject,notice_template=excluded.notice_template,retry_days=excluded.retry_days,template_revision=excluded.template_revision,schedule=excluded.schedule,customer_binding=excluded.customer_binding,stripe_account=excluded.stripe_account,approved_by=excluded.approved_by,owner_id=excluded.owner_id,approved_at=excluded.approved_at,revision=excluded.revision`, row.id, t.id, purpose, NOTICE_SUBJECT, NOTICE_BODY, JSON.stringify(days), t.revision, schedule(t), binding(row), stripe.account_id, c.actor.email, c.actor.id, now(), revision),
-    approval(who(c.actor), 'autopay', row.id, revision, 'scheduled-charge', 'approved', purpose), audit(who(c.actor), 'autopay.approve', 'customer', row.id, { recurringId: t.id, templateRevision: t.revision, revision, purpose, noticeSubject:NOTICE_SUBJECT,noticeTemplate:NOTICE_BODY, retryDays: days, schedule: JSON.parse(schedule(t)) })])
+    approval(who(c.actor), 'autopay', row.id, revision, 'scheduled-charge', 'approved', purpose), audit(who(c.actor), 'autopay.approve', 'customer', row.id, { recurringId: t.id, templateRevision: t.revision, revision, purpose, noticeSubject:NOTICE_SUBJECT,noticeTemplate:NOTICE_BODY, retryDays: days, schedule: JSON.parse(schedule(t)), noticeRecipients: mail.recipients })])
   return autopayView(c.env, c.db, row.id)
 } }
 const revoke: Command = { need: 'owner', async run(c, b) {
