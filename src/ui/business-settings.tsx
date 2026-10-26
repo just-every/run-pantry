@@ -13,7 +13,7 @@ export function Business() {
   return <Card title={<><Icon name="building" /> Accounting details</>}>
     {!owner && !e && <p>The owner sets up the business.</p>}
     {owner ? <Form label={e ? 'Save business' : 'Set up the business'} submit={b => command('entity.save', { ...b, revision: e?.revision })} onDone={reload} className="grid-form">
-      <Field label="Legal name" name="legalName" defaultValue={e?.legal_name} required />
+      <Field label="Legal name" name="legalName" defaultValue={e?.legal_name ?? state.settings.business?.legalName ?? state.settings.business?.name} required />
       <Field label="Entity type" name="entityType" defaultValue={e?.entity_type} required options={choices.entityTypes.map((t: string) => ({ value: t, label: ENTITY_LABEL[t] }))} />
       <Field label="State of organization" name="state" defaultValue={e?.state} required options={choices.states.map((s: string) => ({ value: s, label: s }))} />
       <Field label="Fiscal year starts" name="fiscalYearStart" defaultValue={e?.fiscal_year_start ?? 1} required options={MONTHS.map((m, i) => ({ value: String(i + 1), label: m }))} />
@@ -26,12 +26,13 @@ export function Business() {
 
 export function BusinessSetup() {
   const { state } = useShared()
+  const business = state.settings.business
   return <>
     <PageHead title={state.settings.entity ? 'Business details' : 'Set up the business'} lead="Choose your shared Business first, then confirm the accounting details for these books." />
     <Card title="Your shared Business">
-      <p>Already use a Business in another Run Edit Run app? Open that same Business here.</p>
-      <a className="btn btn-secondary" href="https://app.runeditrun.com/business" target="_blank" rel="noreferrer">Use your existing Business</a>
-      <p>Business opens in a new tab and may ask you to sign in. Its name is not copied into Pantry yet; confirm the legal name below.</p>
+      {business ? <p><strong>{business.name}</strong> · {new URL(business.origin).host}</p> : <p>Already use a Business in another Run Edit Run app? Open that same Business here.</p>}
+      <a className="btn btn-secondary" href={business?.url ?? 'https://app.runeditrun.com/business'} target="_blank" rel="noreferrer">{business ? 'Open your Business' : 'Use your existing Business'}</a>
+      <p>Business opens in a new tab and may ask you to sign in.</p>
     </Card>
     <Business />
     <p><Link className="btn btn-secondary" to="/app">Continue to setup steps</Link></p>
@@ -42,7 +43,7 @@ export function BusinessSetup() {
 export function BusinessSummary() {
   const { state } = useShared()
   return <Card title={<><Icon name="building" /> The business</>}>
-    <p>{state.settings.entity?.legal_name ?? 'Choose your shared Business and set up the accounting details for these books.'}</p>
+    <p>{state.settings.entity?.legal_name ?? state.settings.business?.name ?? 'Choose your shared Business and set up the accounting details for these books.'}</p>
     <Link className="btn btn-secondary" to="/app/settings" search={{ step: 'business' }}>{state.settings.entity ? 'Business details' : 'Set up the business'}</Link>
   </Card>
 }

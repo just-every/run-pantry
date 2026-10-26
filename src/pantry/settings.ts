@@ -157,7 +157,20 @@ export const settingsCommands: Record<string, Command> = {
 
 export async function settingsView(c: Context): Promise<Data> {
   const owner = c.actor.kind === 'person' && c.actor.role === 'owner'
+  let business = null
+  try {
+    const carried = JSON.parse(c.env.RER_BUSINESS ?? 'null')
+    const origin = carried && new URL(carried.origin)
+    if (carried?.version === 1 && origin && origin.origin === carried.origin &&
+      (origin.protocol === 'https:' || (origin.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname))) &&
+      typeof carried.name === 'string' && carried.name.length >= 1 && carried.name.length <= 200 && !/[\u0000-\u001f\u007f-\u009f]/u.test(carried.name) &&
+      typeof carried.business_url === 'string' && carried.business_url.startsWith(carried.origin + '/business/') &&
+      (carried.legal_name === null || typeof carried.legal_name === 'string')) {
+      business = { name: carried.name, legalName: carried.legal_name, origin: carried.origin, url: carried.business_url }
+    }
+  } catch { /* A malformed display prefill leaves local setup available. */ }
   return {
+    business,
     issuingLimits: await limitsView(c.db, c.actor),
     rolePrivacy: owner ? await privacyView(c.db) : [],
     entity: await entity(c.db),
