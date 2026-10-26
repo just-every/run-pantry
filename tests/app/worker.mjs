@@ -18,7 +18,7 @@ async function freePort() {
 }
 
 /** The emitted Worker on 127.0.0.1 with a local owner; resolves once /health answers. */
-export async function worker() {
+export async function worker(extraVars = {}) {
   const port = await freePort(), origin = `http://127.0.0.1:${port}`, persist = await mkdtemp(join(tmpdir(), 'pantry-app-'))
   let child
   const close = async () => {
@@ -32,7 +32,7 @@ export async function worker() {
   }
   try {
     execFileSync(process.execPath, [...wrangler, 'd1', 'migrations', 'apply', 'foundation', '--local', '--persist-to', persist, '--config', 'dist/server/wrangler.json'], { stdio: 'pipe', maxBuffer: 8 * 1024 * 1024, env: quiet })
-    const vars = { AUTH_ORIGIN: origin, AUTH_LOCAL: 'true', OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: 'app-test-session-secret-0123456789abcdef', SETUP_TOKEN: TOKEN, MAIL_PROVIDER: 'development', MAIL_FROM: 'Pantry <pantry@example.test>' }
+    const vars = { AUTH_ORIGIN: origin, AUTH_LOCAL: 'true', OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: 'app-test-session-secret-0123456789abcdef', SETUP_TOKEN: TOKEN, MAIL_PROVIDER: 'development', MAIL_FROM: 'Pantry <pantry@example.test>', ...extraVars }
     child = spawn(process.execPath, [...wrangler, 'dev', '--inspector-port', '0', '--local', '--persist-to', persist, '--ip', '127.0.0.1', '--port', String(port), '--config', 'dist/server/wrangler.json', ...Object.entries(vars).flatMap(([k, v]) => ['--var', `${k}:${v}`])], { stdio: ['ignore', 'pipe', 'pipe'], env: quiet })
     let output = ''
     child.stdout.on('data', c => { output += c }); child.stderr.on('data', c => { output += c })
