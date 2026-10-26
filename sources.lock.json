@@ -3807,7 +3807,7 @@
       "executable": false
     },
     "src/pantry/erasure/copies.ts": {
-      "sha256": "8e1c38b90406ca69530953b99af75ec62f19e6e399a40365d805da3567d68846",
+      "sha256": "b92988ef7c984fa8acd7456dbe3a1b686ed8f4f5e7558073baccf589a219012a",
       "executable": false
     },
     "src/pantry/erasure/custody.ts": {

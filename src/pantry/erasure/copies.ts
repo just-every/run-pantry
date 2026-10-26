@@ -129,7 +129,7 @@ export async function eraseCopies(db: D1Database, input: Input) {
         }
       }
       if (table === 'pt_contractor_tax' && !input.member && row.contact_id === input.id) for (const field of ['address', 'city', 'state', 'zip']) set[field] = input.marker
-      if (['pt_deliveries','pt_payment_notices'].includes(table) && set.recipient !== row.recipient) set.recipient = `${input.marker}:${row.id}`
+      if (['pt_deliveries','pt_payment_notices','pt_autopay_notices'].includes(table) && set.recipient !== row.recipient) set.recipient = `${input.marker}:${row.id}`
       if(table==='pt_customer_deposits'&&set.reference!==row.reference)set.reference=`${set.reference}:${row.id}`
       if (table === 'pt_bank_rules' && set.name !== row.name) set.name = `${set.name}:${row.id}`
       if(table==='pt_agent_permissions'&&Object.keys(set).some(k=>set[k]!==row[k]))set.active=0
