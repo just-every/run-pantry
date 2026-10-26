@@ -26,7 +26,7 @@ export async function cardSchedule({ app, payer, invoice, customer, template, da
   assert.ok(current.notices.every(n => n.status === 'suppressed'))
   receipt.card.emailOutcomes = current.notices.map(n => ({ attemptId: n.attempt_id, status: n.status, provider: n.provider }))
   receipt.card.emailTransport = 'development suppression; accepted mail is asserted at the network edge in the API journey'
-  const response = await payer.request.post(`${app.origin}/i/${invoice.link_token}/autopay/revoke`, { headers: { origin: app.origin }, maxRedirects: 0 })
+  const response = await payer.request.post(`${app.origin}/i/${invoice.link_token}/autopay/stop`, { headers: { origin: app.origin }, maxRedirects: 0 })
   assert.equal(response.status(), 303)
   receipt.card.revocationDoor = 'Hosted invoice revoke form action'
   const submissions = receipt.paymentSubmissions
