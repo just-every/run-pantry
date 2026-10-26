@@ -5983,7 +5983,7 @@
       "executable": false
     },
     "tests/app/autopay-journey.mjs": {
-      "sha256": "9a0b0f0259e3e68dcc9f96d33179e0ec2ee4f490a057f381952aa05de3b05413",
+      "sha256": "602015b0a7e0e2deb58bba96092c8f7027684b0709d69b1f981506f83574c8ae",
       "executable": false
     },
     "tests/app/bank-rules.test.mjs": {
