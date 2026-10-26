@@ -16,7 +16,7 @@ export async function sendTestText(env:Bindings,s:Data,m:Data) {
  const {sid,token}=await credentials(env,s)
  let response:Response
  try {
-  response=await fetch(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`,{method:'POST',redirect:'error',headers:{authorization:'Basic '+btoa(sid+':'+token),'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({From:TEST_FROM,To:m.phone,Body:m.body,StatusCallback:callbackUrl(env,'status?messageId='+encodeURIComponent(m.id))}),signal:AbortSignal.timeout(15000)})
+  response=await fetch(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`,{method:'POST',redirect:'manual',headers:{authorization:'Basic '+btoa(sid+':'+token),'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({From:TEST_FROM,To:m.phone,Body:m.body,StatusCallback:callbackUrl(env,'status?messageId='+encodeURIComponent(m.id))}),signal:AbortSignal.timeout(15000)})
  } catch {return {status:'uncertain',providerId:null,detail:'Provider acceptance is unknown. This attempt will never be replayed automatically.'}}
  const value=await response.json().catch(()=>null) as Data|null
  if(!response.ok) return {status:response.status>=500?'uncertain':'failed',providerId:null,detail:`Twilio test request HTTP ${response.status}; no automatic replay.`}
