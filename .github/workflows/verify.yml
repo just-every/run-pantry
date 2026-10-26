@@ -37,6 +37,8 @@ jobs:
       - run: npm install --global pnpm@10.12.4
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
+      - name: Use Ubuntu archive for browser dependencies
+        run: printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
       - run: pnpm exec playwright install --with-deps chromium
       # rer verify adds hosted-output and hydration checks after verify:app.
       - name: Verify source, emitted runtime, site and hosted hydration
@@ -63,6 +65,8 @@ jobs:
       - run: npm install --global pnpm@10.12.4
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
+      - name: Use Ubuntu archive for browser dependencies
+        run: printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run test:restore
   # Preserve the required check name and reject failed, cancelled or skipped work.
