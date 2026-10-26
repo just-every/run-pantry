@@ -93,7 +93,10 @@ try {
       await (await findInFrames(f => f.getByRole('button', { name: 'Submit', exact: true }))).click()
     } else {
       const manual = await visible(f => f.getByText(/enter bank details manually|manually enter bank details|enter bank details instead/i))
-      if (manual) await manual.click()
+      if (manual) {
+        await manual.click()
+        await findInFrames(f => f.getByRole('button', { name: 'Autofill', exact: true }))
+      }
       else {
         const connect = await visible(f => f.getByRole('button', { name: /connect bank account|add bank account|link bank account|choose bank/i }))
         if (connect) await connect.click()
@@ -142,7 +145,11 @@ try {
 } catch (error) {
   receipt.status = 'blocked'
   receipt.reason = 'The live hosted setup or provider outcome did not complete; inspect the retained private stage screenshots.'
-  await writeFile(join(proof, 'autopay-provider-error.txt'), String(error.stack), { mode: 0o600 })
+  const diagnostic = String(error.stack)
+    .replace(/\b(?:seti|pi)_[A-Za-z0-9]+_secret_[A-Za-z0-9]+\b/g, '[redacted Stripe capability]')
+    .replace(/\b(?:sk|rk)_test_[A-Za-z0-9]+\b/g, '[redacted test credential]')
+    .replace(/https:\/\/checkout\.stripe\.com\/[^\s"'<>]+/g, 'https://checkout.stripe.com/[redacted]')
+  await writeFile(join(proof, 'autopay-provider-error.txt'), diagnostic, { mode: 0o600 })
   await retain()
   if (page) await page.screenshot({ path: join(proof, 'autopay-provider-blocked.png'), fullPage: true }).catch(() => {})
   console.log(JSON.stringify(receipt))
