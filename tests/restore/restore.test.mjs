@@ -64,11 +64,9 @@ async function dev(root, port) {
   const server = { origin: new URL(link).origin, link, async stop() {
     running.delete(server)
     if (child.exitCode !== null) return
-    const { stdout } = await promisify(execFile)('ps', ['-axo', 'pid=,ppid='])
-    const rows = stdout.trim().split('\n').map(line => line.trim().split(/\s+/).map(Number)), owned = new Set([child.pid])
-    for (let changed = true; changed;) { changed = false; for (const [pid, parent] of rows) if (owned.has(parent) && !owned.has(pid)) { owned.add(pid); changed = true } }
-    for (const pid of [...owned].reverse()) try { process.kill(pid, 'SIGTERM') } catch (e) { if (e.code !== 'ESRCH') throw e }
-    if (child.exitCode === null) await new Promise(r => child.once('exit', r))
+    const exited = new Promise(r => child.once('exit', r))
+    process.kill(child.pid, 'SIGTERM')
+    await exited
   } }
   running.add(server)
   return server
@@ -142,6 +140,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   const invoiceState = await (await context.request.get(`${server.origin}/api/pantry/state`)).json()
   const income = invoiceState.accounts.find(a => a.code === '4000').id, rent = invoiceState.accounts.find(a => a.code === '6100').id
   const customer = invoiceState.contacts.find(c => c.kind === 'customer'), vendor = invoiceState.contacts.find(c => c.kind === 'vendor')
+  const w9Request=await command('w9.request',{contactId:vendor.id,contactRevision:vendor.revision,consent:true})
   const branded = await command('invoice-template.save', { name: 'Archived services', layout: 'banner', accentColor: '#174838', textColor: '#202234', termsDays: 45, address: '18 Cedar Street', remitTo: 'Juniper Remittance', paymentInstructions: 'Use invoice reference', footer: 'Thank you', message: 'Archived engagement', fields: [{ key: 'po', label: 'PO number', defaultValue: 'PO-RESTORE' }] })
   const settings = (await (await context.request.get(`${server.origin}/api/pantry/invoice-documents`)).json()).settings
   await command('invoice-document-settings.save', { revision: settings.revision, nextInvoice: 231, defaultTemplateId: branded.id })
@@ -184,6 +183,10 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   const webhook=await command('webhook.create',{destination:'https://receiver.example.test/pantry',events:['created']})
   await command('contact.save',{kind:'customer',name:'Synthetic Pantry webhook enquiry',email:'synthetic-pantry-webhook@example.test'})
   const dimensionEvidence=await dimensionsForRestore(context,server.origin)
+  await command('tax-reminders.preference',{enabled:true})
+  const reminderVendor=await command('contact.save',{kind:'vendor',name:'Synthetic reminder vendor',email:'synthetic-pantry-restore@example.test'})
+  const reminderBatch=await command('tax-reminders.prepare',{kind:'w9-request',contactIds:[reminderVendor.id]})
+  await command('tax-reminders.vendor-stop',{contactId:reminderVendor.id})
   const before = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(before.bytes, pdf)
   await context.close(); await server.stop()
@@ -198,6 +201,9 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
     for(const credential of credentials)assert.ok(!JSON.stringify(item.row).includes(credential),'every archived row excludes credentials')
     if(item.table==='pt_feed_items')assert.deepEqual([item.row.access_token,item.row.status],['','disconnected'])
     if(item.table==='pt_agents')assert.equal(item.row.active,0)
+    if(item.table==='pt_tax_reminder_preferences')assert.equal(item.row.enabled,0,'restored reminders require new owner consent')
+    if(item.table==='pt_tax_reminder_batches')assert.notEqual(item.row.status,'draft','restored batches cannot retain pending approval')
+    if(item.table==='pt_w9_requests')assert.equal(item.row.token_hash,null,'restored W-9 requests cannot reuse private links')
     if(item.table==='pt_estimates')assert.equal(item.row.link_token,null,'restored estimates cannot reuse customer acceptance links')
     if(item.table==='pt_integrations')assert.equal(item.row.revoked_at,'restored')
     if(item.table==='pt_webhook_subscriptions')archivedSubscriptions.push(item.row)
@@ -216,6 +222,12 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   assert.match(unverified, /erasure history unverified/i)
   await ok(second, ['setup', '--owner-email', 'you@dev.localhost', '--port', String(port2), '--non-interactive'])
   server = await dev(second, port2); context = await signIn(browser, server)
+  assert.equal((await context.request.get(server.origin+new URL(w9Request.url).pathname)).status(),404,'the restored public W-9 request is closed')
+  const restoredReminders=await (await context.request.get(`${server.origin}/api/pantry/tax-reminders`)).json()
+  assert.equal(restoredReminders.enabled,false)
+  assert.equal(restoredReminders.batches.find(b=>b.id===reminderBatch.id).status,'cancelled')
+  assert.equal(!!restoredReminders.vendors.find(v=>v.id===reminderVendor.id).optedOut,true)
+
   const restored = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(restored.view, before.view, 'the fresh install holds the same books')
   assert.deepEqual(restored.bytes, pdf, 'the document comes back byte for byte')

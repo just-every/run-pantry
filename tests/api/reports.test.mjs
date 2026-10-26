@@ -1026,3 +1026,6 @@ test('TAXFORM-001 native TIN reveal binds proof to the session and keeps withhol
  await h.command('contractor.reveal',{contactId:vendor.id},h.owner,403)
  for(const format of ['csv','pdf','xlsx'])assert.equal((await h.send(`/api/pantry/reports/contractors/2025/1099-nec.${format}?fullTin=true`,undefined,{cookie:h.owner})).status,403,'expired proof refuses every full-TIN format')
 })
+
+import {w9Journey} from './w9-journey.mjs'
+test('TAXFORM-003 signed-out certification closes links and updates masked vendor and year-end readiness',w9Journey)

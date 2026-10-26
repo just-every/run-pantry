@@ -13,10 +13,12 @@ function ContactEditor({ editing, onDone, onCancel }: { editing: D | null; onDon
   const [kind, setKind] = useState(editing?.kind ?? fixedKind ?? 'customer')
   const [people, setPeople] = useState<D[]>(() => parsed(editing?.contacts_json, []))
   const [methods, setMethods] = useState<string[] | null>(() => parsed(editing?.pay_methods, null))
+  const [businessReminders, setBusinessReminders] = useState(editing?.reminder_days == null)
+  const [reminderDays, setReminderDays] = useState(() => (parsed(editing?.reminder_days, []) as number[]).join(', '))
   const patch = (index: number, values: D) => setPeople(p => p.map((v, i) => i === index ? { ...v, ...values } : v))
   return <Card title={editing ? `Edit ${editing.name}` : 'Add a customer or vendor'}>
     <Form label={editing ? 'Save' : 'Add'} submit={b => command('contact.save', { ...b, id: editing?.id, revision: editing?.revision, kind,
-      active: b.active !== 'no', contacts: people, ...(kind === 'customer' ? { payMethods: methods } : {}) })} onDone={onDone}
+      active: b.active !== 'no', contacts: people, ...(kind === 'customer' ? { payMethods: methods, reminderDays: businessReminders ? null : reminderDays } : {}) })} onDone={onDone}
       secondary={editing && <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>}>
       {!editing && !fixedKind && <Field label="Kind" name="kind" value={kind} onChange={(e: any) => setKind(e.target.value)} required options={[{ value: 'customer', label: 'Customer' }, { value: 'vendor', label: 'Vendor' }]} />}
       <Field label="Name" name="name" defaultValue={editing?.name} required />
@@ -37,6 +39,10 @@ function ContactEditor({ editing, onDone, onCancel }: { editing: D | null; onDon
         <Field label="Billing address" name="billingAddress" type="textarea" defaultValue={editing?.billing_address} />
         <Field label="Service address" name="serviceAddress" type="textarea" defaultValue={editing?.service_address} />
         <Field label="Internal notes" name="internalNotes" type="textarea" defaultValue={editing?.internal_notes} hint="Only inside your books. Never included on customer documents, invoice links or email." />
+        <fieldset className="allocations"><legend>Invoice reminders</legend>
+          <label className="check"><input type="checkbox" checked={businessReminders} onChange={e => setBusinessReminders(e.target.checked)} />Use business reminder schedule</label>
+          {!businessReminders && <Field label="Customer reminder days" name="reminderDays" value={reminderDays} onChange={(e: any) => setReminderDays(e.target.value)} hint="Days from the due date: -3 is three days before, 0 the due date, 7 a week after. Leave blank for no reminders to this customer." />}
+        </fieldset>
         <Field label="How their payments read on your bank statement (customers)" name="bankReference" defaultValue={editing?.bank_reference} hint="For example CEDAR STUDIO LLC. A deposit naming this, or the invoice number, clears automatically when exactly one open invoice of that amount fits. Amount-only deposits wait for confirmation." />
         <fieldset className="allocations"><legend>Payment methods offered</legend>
           <label className="check"><input type="checkbox" checked={methods === null} onChange={e => setMethods(e.target.checked ? null : METHODS.map(([id]) => id))} />All available methods</label>

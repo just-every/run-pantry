@@ -49,7 +49,7 @@ const saveContact: Command = { need: 'record', async run(c, b) {
     const contacts = customerProfile({ contacts: b.contacts }, current).contacts
     statements.push(q('UPDATE pt_contacts SET vendor_tax_box=?, provider_payment_method=?, payment_provider=?, contacts_json=? WHERE id=?', box, method, provider, contacts, id), changed())
   }
-  if (customer) statements.push(q('UPDATE pt_contacts SET contacts_json = ?, billing_address = ?, service_address = ?, phone = ?, internal_notes = ?, pay_methods = ?, invoice_template_id = ?, invoice_terms_override = ? WHERE id = ?', customer.contacts, customer.billingAddress, customer.serviceAddress, customer.phone, customer.internalNotes, customer.payMethods, customer.invoiceTemplateId, b.termsDays === undefined ? current?.invoice_terms_override ?? 0 : b.termsDays === '' ? 0 : 1, id), changed())
+  if (customer) statements.push(q('UPDATE pt_contacts SET contacts_json = ?, billing_address = ?, service_address = ?, phone = ?, internal_notes = ?, pay_methods = ?, invoice_template_id = ?, invoice_terms_override = ?, reminder_days = ? WHERE id = ?', customer.contacts, customer.billingAddress, customer.serviceAddress, customer.phone, customer.internalNotes, customer.payMethods, customer.invoiceTemplateId, b.termsDays === undefined ? current?.invoice_terms_override ?? 0 : b.termsDays === '' ? 0 : 1, customer.reminderDays, id), changed())
   statements.push(audit(who(c.actor), b.id ? 'contact.update' : 'contact.create', kind, id, { name }))
   await run(c.db, statements)
   return contact(c.db, id)

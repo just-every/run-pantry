@@ -1,3 +1,6 @@
+import { lateDiscountJourney } from './late-discount-journey.mjs'
+import { approvedWriteOffJourney } from './approved-write-off-journey.mjs'
+import { lateFeeJourney } from './late-fee-journey.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { at, books, harness } from './harness.mjs'
@@ -71,7 +74,7 @@ test('SALESTAX-003 certificates exempt only covered destinations, remind before 
 
 test('PAN-04 invoices are drafted, approved and issued; unknown tax stops approval; credits reduce what is owed', async t => {
   const h = await harness(); t.after(() => h.close())
-  const { acct, tax, customer } = await setup(h)
+  const { acct, tax, customer, bank } = await setup(h)
   const bea = await h.member('bea@example.test', 'bookkeeper'), ann = await h.member('ann@example.test', 'accountant', { canPost: true })
   let inv = await h.command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-09-02', lines: [
     { description: 'Brand workshop', quantity: '8', rate: '175.00', accountId: acct['4000'], taxCode: 'exempt' },
@@ -109,6 +112,9 @@ test('PAN-04 invoices are drafted, approved and issued; unknown tax stops approv
   second = await h.command('invoice.save-draft', { id: second.id, revision: second.revision, customerId: customer.id, issueDate: '2026-09-25', lines: [{ description: 'Retainer', quantity: '1', rate: '9000.00', accountId: acct['4000'], taxCode: 'exempt' }] }, ann)
   assert.equal(second.prepared_by, 'ann@example.test')
   await h.command('invoice.approve', { id: second.id, revision: second.revision }, ann, 403)
+  await lateFeeJourney({ h, acct, customer, bea, ann })
+  await approvedWriteOffJourney({ h, acct, customer, bea, ann, bank })
+  await lateDiscountJourney({ h, acct, customer, bank, ann })
 })
 
 test('PAN-05 bills post to payables with their evidence; a bill without evidence is a close exception until resolved', async t => {

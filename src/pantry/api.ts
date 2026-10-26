@@ -1,3 +1,11 @@
+import { customerCreditCommands } from './customer-credits'
+import { lateDiscountCommands } from './late-discount'
+import { approvedWriteOffCommands } from './approved-write-offs'
+import { lateFeeCommands, lateFeesView } from './late-fees'
+import { taxReminderCommands, taxRemindersView } from './tax-reminders'
+import { taxReadinessCommands, taxReadiness, taxYearPackage } from './tax-readiness'
+import { w9Commands, w9Public, w9Status, missingW9 } from './w9'
+import { askBooks } from './ask'
 import { currencyCommands,currencyView } from './currency'
 import { archiveCommands,archivesView } from './cutover/archives'
 import { collectionCommands,collectionsView } from './collections'
@@ -115,15 +123,18 @@ import { dataFlows } from './data-flows'
 import { recordReportIssue } from './effects/issues'
 import { FIRST_DAY } from './report-sources'
 import { siblingCommands, siblingsView, siblingArtifact } from './estimates/siblings'
-import { assertDoor, projectAccess, financialSourceAllowed } from './access-policy/doors'
+import { assertDoor, projectAccess, financialSourceAllowed, limitedBanks } from './access-policy/doors'
 import { accessPolicyCommands } from './access-policy/settings'
 import { timeCommands, timeView } from './time/commands'
 import { estimateCommands, estimatesView, estimate, registerEstimateRoutes } from './estimates'
 import { customerDepositCommands, customerDepositsView } from './customer-deposits'
+import { statementCommands } from './statements/commands'
+import { statement } from './statements/store'
 
 const commands: Record<string, Command> = {
-  ...currencyCommands,...archiveCommands,...collectionCommands, ...standingCommands, ...learningCommands, ...assetCommands, ...dimensionCommands, ...siblingCommands,
-  ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...statementCommands,
+  ...taxReminderCommands,...taxReadinessCommands,...w9Commands, ...currencyCommands,...archiveCommands,...collectionCommands, ...standingCommands, ...learningCommands, ...assetCommands, ...dimensionCommands, ...siblingCommands,
+  ...customerCreditCommands, ...lateDiscountCommands, ...approvedWriteOffCommands, ...lateFeeCommands, ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...reportDeliveryCommands, ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -141,6 +152,7 @@ api.use('*', async (c, next) => {
 })
 api.get('/health', c => c.json({ status: 'ok', ...deploymentHealth(c.env) }))
 api.route('/', customer)
+api.route('/', w9Public)
 api.use('/api/pantry/*', async (c, next) => { await next(); c.header('cache-control', 'no-store'); c.header('x-content-type-options', 'nosniff') })
 // Feed syncs that have come due run after an ordinary read answers, as well as on the Cron trigger.
 api.use('/api/pantry/*', async (c, next) => { await next(); if (c.req.method === 'GET' && await anyDue(c.env)) c.executionCtx.waitUntil(runDue(c.env, 2).catch(e => console.error(e))) })
@@ -163,6 +175,11 @@ async function reader(c: C): Promise<Context> {
 }
 
 const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => { const ctx = await reader(c); return c.json(await projectAccess(ctx, await build(ctx, c))) })
+view('tax-reminders',async(ctx,c)=>taxRemindersView(ctx,year(c)))
+view('tax-readiness',async(ctx,c)=>taxReadiness(ctx,year(c)))
+view('tax-readiness/:year/package',async(ctx,c)=>taxYearPackage(ctx,Number(c.req.param('year'))))
+view('vendor-w9/:id',async(ctx,c)=>w9Status(ctx.db,c.req.param('id')!))
+view('missing-w9',async(ctx,c)=>({vendors:await missingW9(ctx.db,year(c))}))
 view('currency',async ctx=>currencyView(ctx))
 view('document-archives',async ctx=>archivesView(ctx))
 view('collections',async ctx=>collectionsView(ctx))
@@ -178,6 +195,7 @@ api.route('/api/pantry/integration/v1', integrations)
 view('webhooks', async ctx => webhookSettings(ctx))
 view('data-flows', async ctx => dataFlows(ctx))
 view('erasure', async ctx => { await ownerSession(ctx); return erasureSettings(ctx.db) })
+view('ask', async (ctx, c) => askBooks(ctx, c.req.query('question'), c.req.query('basis')))
 view('integrations', async (ctx, c) => { must(ctx.actor, 'owner'); return integrationSettings(ctx, c.req.query('cursor')) })
 const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10)) => date(c.req.query(name) ?? fallback, name)
 
@@ -201,8 +219,16 @@ registerInvoiceDocumentRoutes(api, reader)
 view('invoice-documents', async ctx => invoiceDocumentsView(ctx.db))
 registerCustomReportRoutes(api, reader)
 view('/vendors/:id/history'.slice(1), async (ctx, c) => vendorHistory(ctx.db, c.req.param('id')!, c.req.query('from'), c.req.query('to')))
-view('customers/:id', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to')))
-view('customers/:id/history', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to')))
+view('customers/:id', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to'), !limitedBanks(ctx.actor)))
+view('customers/:id/history', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to'), !limitedBanks(ctx.actor)))
+view('late-fees', async ctx => lateFeesView(ctx))
+view('statements/:id', async (ctx, c) => statement(ctx, c.req.param('id')!))
+api.get('/api/pantry/statements/:id/document', async c => {
+  const saved = await statement(await reader(c), c.req.param('id'))
+  return new Response(saved.html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
+    'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'", 'x-content-type-options': 'nosniff',
+    'referrer-policy': 'same-origin', 'x-robots-tag': 'noindex, nofollow' } })
+})
 view('dashboard', async (ctx, c) => dashboard(ctx.db, day(c, 'to'), c.req.query('basis') ? basisOf(c.req.query('basis')) : undefined))
 view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await lookups(ctx.db)), dimensionHistory: financialSourceAllowed(ctx.actor,'profit-and-loss')?await dimensionHistory(ctx.db):[], overview: await overview(ctx.db), settings: await settingsView(ctx) }))
 view('close-board', async (ctx, c) => closeBoard(ctx.db, c.req.query('year') ?? new Date().getUTCFullYear().toString()))

@@ -1,5 +1,5 @@
 // The production auth and API handlers, without the document renderer.
-import { fixtureTime } from '../clock'
+import { fixtureTime, fixtureScheduled } from '../clock'
 import { authResponse } from '../../src/auth.server'
 import { api } from '../../src/pantry/api'
 import { emailHandler } from '../../src/pantry/receipts/mail'
@@ -14,6 +14,6 @@ export default {
       request=new Request(request,{headers})
     }
     return fixtureTime(request, async request => (await authResponse(request, env)) ?? await api.fetch(request, env, ctx)) },
-  async scheduled(controller: ScheduledController, env: any) { await runScheduled(controller,env) },
+  async scheduled(controller: ScheduledController, env: any) { await fixtureScheduled(controller.scheduledTime, () => runScheduled(controller,env)) },
   async email(message: ForwardableEmailMessage, env: any) { await emailHandler(message, env) },
 }

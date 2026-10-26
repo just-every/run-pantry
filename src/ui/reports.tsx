@@ -1,3 +1,4 @@
+import { AskBooks } from './ask-books'
 import { ReportDelivery } from './report-delivery'
 import { AdjustingReport } from './adjusting-report'
 import { DimensionSplits, DimensionSplitPicker } from './dimension-splits'
@@ -141,6 +142,7 @@ export function Reports() {
     <PageHead title="Reports" lead="Every report is calculated from the same posted ledger, on the cash or the accrual basis."
       actions={!customOnly && <><a className="btn btn-secondary" href={`/api/pantry/package/${period}/general-ledger.csv${q}`} download>General ledger CSV · {basis === 'cash' ? 'cash' : 'accrual'}</a><a className="btn btn-primary" href={`/api/pantry/package/${period}/accountant-package.zip${q}`} download title="A ZIP of CSV reports, the close checklist and a README">Accountant package · {monthName(period)}</a></>} />
     {!customOnly&&<details><summary>Accountant package formats · {monthName(period)}</summary><p className="row-actions">{['pdf','xlsx','csv'].map(format=><a className="btn btn-secondary" download key={format} href={`/api/pantry/package/${period}/export${q}&format=${format}`}>Close package {format==='xlsx'?'Excel':format.toUpperCase()} · {basis}</a>)}</p></details>}
+    {!customOnly && <AskBooks />}
     <Tabs tabs={kinds.map(k => k[0])} current={label} onChange={t => set({ report: kinds.find(k => k[0] === t)![1], line: undefined, record: undefined,dimension:undefined,dimensionValue:undefined,projectName:undefined,split:undefined })} pick="Report" />
     {customOnly ? <CustomReports /> : search.record ? <RecordView record={search.record} reportLabel={label} /> : detail && slug === 'cash-flow' ? <CashFlowDetail line={search.line!} from={from} to={to} />
       : detail ? <FigureDetail report={slug} line={search.line!} from={figureFrom} to={figureTo} basis={basis} reportLabel={label} />

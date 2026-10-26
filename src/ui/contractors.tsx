@@ -1,3 +1,4 @@
+import { MissingW9 } from './w9'
 import { DimensionSplitPicker,DimensionSplits } from './dimension-splits'
 import { DimensionReportPicker } from './dimensions'
 // 1099 contractors: vendors marked for a 1099-NEC, their payments in a calendar
@@ -85,6 +86,7 @@ export function Contractors({ year, onYear }: { year: number; onYear: (y: number
     {search.split&&<DimensionSplits slug="contractors" from={`${year}-01-01`} to={`${year}-12-31`} basis="cash" />}
     {r?.dimension&&<p className="hint">Dimension subset: {r.dimension.label}. Payment figures below use the selected bank-line coding. Threshold decisions and filing figures always use each vendor’s whole year of payments.</p>}
     {!r ? <Loading error={error} what="1099 contractors" /> : <>
+      <MissingW9 year={year} />
       <Metrics items={[{ label: 'Threshold', value: usd(r.threshold), note: r.thresholdNote }, { label: 'Contractors', value: String(r.contractors.length), note: 'marked for 1099 reporting' }, { label: `At or over ${usd(r.threshold)}`, value: String(r.forms.length), note: r.yearEnded ? <>file by {day(r.dueBy)}</> : 'so far this year' }]} />
       <Card title={<>1099 contractors · {year} <Chip tone="info">Payment basis</Chip></>}>
           <Table heads={['Contractor', 'TIN', r.dimension?'Selected eligible-method payments':'Eligible-method payments', 'Card and networks (left out)', 'Method not recorded', r.dimension?'Whole-year status':'Status']} figures={[2, 3, 4]} empty="No vendor is marked as a 1099 contractor yet.">

@@ -7,18 +7,20 @@ import { runtimeBindings, type Bindings } from '../auth.server'
 import { operatorMail } from '../mail.server.mjs'
 import { authority, ownerEmail, pantry, who } from './access'
 import { addDays, daysBetween, longDay, now, optionalText, requireThat, sha256, text, uid, usd, type Data } from './core'
-import { all, audit, changed, one, q, run, type AuditActor, type Sql } from './db'
+import { all, audit, changed, guard, one, q, run, type AuditActor, type Sql } from './db'
 import { invoice } from './invoices'
 import { customerRecipients } from './customer-profile'
 import { ensureLink, invoiceLinkCommands } from './invoice-links'
 export { ensureLink } from './invoice-links'
 import { buildInvoiceDocument, issuedDocument } from './invoice-documents'
+import { customerReminderDays, reminderDays, reminderWording, renderReminder } from './reminder-content'
+import { claimReminderBatch, reminderBatchClaim, reminderEligible, type ReminderBatch } from './reminder-claims'
 import type { Command } from './context'
 
 type MailResult = { status: 'accepted' | 'rejected' | 'rate_limited' | 'uncertain' | 'development'; provider: string; providerMessageId: string | null; code?: string }
 type InvoiceMailer = { send(message: Data): Promise<MailResult> }
 
-type Sending = { reminders_on: number; reminder_days: number[]; time_zone: string; reply_to: string; revision: string; updated_by: string | null; updated_at: string | null }
+type Sending = { reminder_subject: string; reminder_body: string; reminders_on: number; reminder_days: number[]; time_zone: string; reply_to: string; revision: string; updated_by: string | null; updated_at: string | null }
 
 export async function sendingSettings(db: D1Database): Promise<Sending> {
   const s = (await one(db, 'SELECT * FROM pt_sending WHERE id = 1'))!
@@ -49,7 +51,7 @@ const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<
  * Returns the delivery row. A reminder whose step (or day) is already claimed
  * returns null without sending.
  */
-export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, invoiceId: string, recipient: string, kind: 'invoice' | 'reminder', step: number | null = null, approved?:{subject:string;body:string;claim:Sql[];onClaim:(id:string)=>Sql[]}): Promise<Data | null> {
+export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, invoiceId: string, recipient: string, kind: 'invoice' | 'reminder', step: number | null = null, approved?:{subject:string;body:string;claim:Sql[];onClaim:(id:string)=>Sql[]}, batch?: ReminderBatch): Promise<Data | null> {
   recipient = recipient.trim().toLowerCase()
   const mailer = operatorMail(runtimeBindings(env)) as unknown as InvoiceMailer | undefined
   requireThat(mailer, 'No mail provider is set up for this installation, so Pantry cannot send email. Set MAIL_PROVIDER and MAIL_API_KEY when you deploy.', 409)
@@ -57,17 +59,19 @@ export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, 
   requireThat(inv.kind === 'invoice' && inv.status === 'issued', 'Issue the invoice before sending it', 409)
   const token = await ensureLink(db, inv.id), link = customerLink(env, token)
   const retained = await issuedDocument(db, inv.id), doc = retained.document, pdf = retained.pdf, settings = await sendingSettings(db)
-  const subject = approved?.subject ?? (kind === 'invoice' ? `Invoice ${inv.number} from ${doc.business}: ${usd(inv.open_cents)} due ${longDay(inv.due_date)}` : reminderSubject(inv.number, step!, doc.business))
-  const id = uid()
+  const customer = (await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', inv.customer_id))!
+  const merge = (value: string) => renderReminder(value, inv, doc.business, customer.name, link)
+  const subject = approved?.subject ?? (kind === 'reminder' && settings.reminder_subject ? merge(settings.reminder_subject) : null) ?? (kind === 'invoice' ? `Invoice ${inv.number} from ${doc.business}: ${usd(inv.open_cents)} due ${longDay(inv.due_date)}` : reminderSubject(inv.number, step!, doc.business))
+  const id = uid(), reminderBatch = batch ?? { id: uid(), day: businessDay(settings.time_zone) }
   try {
-    const claim=q("INSERT INTO pt_deliveries (id, invoice_id, kind, step, recipient, subject, status, attachment_sha256, sent_by, at,reminder_day) VALUES (?, ?, ?, ?, ?, ?, 'sending', ?, ?, ?,?)",id,inv.id,kind,step,recipient,subject,retained.sha256,actor.email,now(),kind==='reminder'?businessDay(settings.time_zone):null)
-    if(approved)await run(db,[...approved.claim,claim,...approved.onClaim(id)])
-    else await db.prepare(claim.sql).bind(...claim.params).run()
+    const claim=q("INSERT INTO pt_deliveries (id, invoice_id, kind, step, recipient, subject, status, attachment_sha256, sent_by, at,reminder_day) VALUES (?, ?, ?, ?, ?, ?, 'sending', ?, ?, ?,?)",id,inv.id,kind,step,recipient,subject,retained.sha256,actor.email,now(),kind==='reminder'?reminderBatch.day:null)
+    const fence = kind === 'reminder' ? [guard(reminderEligible, inv.id), ...(batch ? [guard('EXISTS(SELECT 1 FROM pt_reminder_batches WHERE invoice_id=? AND day=? AND id=?) AND EXISTS(SELECT 1 FROM pt_invoices WHERE id=? AND reminders_paused=0)', inv.id, batch.day, batch.id, inv.id)] : [reminderBatchClaim(inv.id, reminderBatch), changed()])] : []
+    await run(db, [...(approved?.claim ?? []), ...fence, claim, ...(approved?.onClaim(id) ?? [])])
   } catch (error) {
-    if (kind === 'reminder' && (/UNIQUE/i.test(String((error as Error).message)) || String((error as Error).message).startsWith('That record already exists: pt_deliveries'))) return null
+    if (kind === 'reminder' && (/UNIQUE/i.test(String((error as Error).message)) || String((error as Error).message).startsWith('That record already exists: '))) return null
     throw error
   }
-  const lead = approved?.body ?? (kind === 'invoice' ? `${doc.business} has sent you invoice ${inv.number} for ${usd(inv.total_cents)}, due ${longDay(inv.due_date)}.` : `This is a reminder that invoice ${inv.number} from ${doc.business} ${step! < 0 ? `is due on ${longDay(inv.due_date)}` : step === 0 ? 'is due today' : `was due on ${longDay(inv.due_date)}`}. ${usd(inv.open_cents)} is still open.`)
+  const lead = approved?.body ?? (kind === 'reminder' && settings.reminder_body ? merge(settings.reminder_body) : null) ?? (kind === 'invoice' ? `${doc.business} has sent you invoice ${inv.number} for ${usd(inv.total_cents)}, due ${longDay(inv.due_date)}.` : `This is a reminder that invoice ${inv.number} from ${doc.business} ${step! < 0 ? `is due on ${longDay(inv.due_date)}` : step === 0 ? 'is due today' : `was due on ${longDay(inv.due_date)}`}. ${usd(inv.open_cents)} is still open.`)
   const textBody = `${lead}\n\nView the invoice and pay: ${link}\n\nThe invoice is attached as a PDF. Reply to this email to reach ${doc.business}.\n`
   const html = `<p>${escapeHtml(lead)}</p><p><a href="${escapeHtml(link)}">View invoice ${escapeHtml(inv.number)}</a></p><p>The invoice is attached as a PDF. Reply to this email to reach ${escapeHtml(doc.business)}.</p>`
   const fromName = doc.business.replace(/[<>"\\,;:@()[\]]/g, '').trim()
@@ -129,8 +133,9 @@ const ZONES = ['America/New_York', 'America/Chicago', 'America/Denver', 'America
 const saveSending: Command = { need: 'owner', async run(c, b) {
   const current = await sendingSettings(c.db)
   requireThat(b.revision === current.revision, 'Sending settings changed; reload', 409)
-  const days = (typeof b.reminderDays === 'string' ? b.reminderDays.split(/[,\s]+/).filter(Boolean) : Array.isArray(b.reminderDays) ? b.reminderDays : []).map(Number)
-  requireThat(days.length <= 8 && days.every(d => Number.isInteger(d) && d >= -60 && d <= 120), 'Reminder days are whole numbers from -60 (before the due date) to 120 (after it), at most eight')
+  const days = reminderDays(b.reminderDays)
+  const subject = reminderWording(b.reminderSubject, 'Reminder subject', 200, current.reminder_subject)
+  const body = reminderWording(b.reminderBody, 'Reminder body', 5000, current.reminder_body)
   const zone = text(b.timeZone, 'Time zone')
   requireThat(ZONES.includes(zone), 'Choose a US time zone')
   const replyTo = optionalText(b.replyTo, 'Reply-to address', 254).toLowerCase()
@@ -138,8 +143,8 @@ const saveSending: Command = { need: 'owner', async run(c, b) {
   const on = b.remindersOn === true || b.remindersOn === 'true' || b.remindersOn === 'on'
   const sorted = [...new Set(days)].sort((x, y) => x - y)
   await run(c.db, [authority(c.actor, 'owner'),
-    q('UPDATE pt_sending SET reminders_on = ?, reminder_days = ?, time_zone = ?, reply_to = ?, revision = ?, updated_by = ?, updated_at = ? WHERE id = 1 AND revision = ?', on ? 1 : 0, JSON.stringify(sorted), zone, replyTo, uid(), c.actor.email, now(), current.revision), changed(),
-    audit(who(c.actor), 'sending.update', 'sending', '1', { remindersOn: on, reminderDays: sorted, timeZone: zone })])
+    q('UPDATE pt_sending SET reminders_on = ?, reminder_days = ?, time_zone = ?, reply_to = ?, reminder_subject = ?, reminder_body = ?, revision = ?, updated_by = ?, updated_at = ? WHERE id = 1 AND revision = ?', on ? 1 : 0, JSON.stringify(sorted), zone, replyTo, subject, body, uid(), c.actor.email, now(), current.revision), changed(),
+    audit(who(c.actor), 'sending.update', 'sending', '1', { remindersOn: on, reminderDays: sorted, timeZone: zone, reminderSubject: subject, reminderBody: body })])
   return sendingView(c.env, c.db)
 } }
 
@@ -175,10 +180,13 @@ export async function reminderPlans(db: D1Database) {
   const sent = await all<{ invoice_id: string; step: number; recipient: string }>(db, "SELECT invoice_id, step, recipient FROM pt_deliveries WHERE kind = 'reminder' AND step IS NOT NULL")
   for (const inv of await all(db, "SELECT id, customer_id, due_date FROM pt_invoices WHERE kind = 'invoice' AND status = 'issued' AND sent_at IS NOT NULL AND reminders_paused = 0")) {
     const customer = (await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', inv.customer_id))!
+    if (!await one(db, `SELECT 1 WHERE ${reminderEligible}`, inv.id)) { plans[inv.id] = null; continue }
+    const batch = await one(db, 'SELECT 1 FROM pt_reminder_batches WHERE invoice_id=? AND day=?', inv.id, today)
+    const schedule = customerReminderDays(customer, settings.reminder_days)
     const dates = customerRecipients(customer).flatMap(recipient => {
       const steps = sent.filter(r => r.invoice_id === inv.id && r.recipient.toLowerCase() === recipient.toLowerCase()).map(r => r.step)
-      if (dueStep(inv.due_date, today, settings.reminder_days, steps) !== null) return [today]
-      return settings.reminder_days.filter(d => !steps.some(x => x >= d)).map(d => addDays(inv.due_date, d)).filter(d => d > today)
+      if (dueStep(inv.due_date, today, schedule, steps) !== null) return [batch ? addDays(today, 1) : today]
+      return schedule.filter(d => !steps.some(x => x >= d)).map(d => addDays(inv.due_date, d)).filter(d => d > today)
     })
     plans[inv.id] = dates.sort()[0] ?? null
   }
@@ -188,7 +196,7 @@ export async function reminderPlans(db: D1Database) {
 /** Send every reminder due today. Paid, paused and never-sent invoices get none; an ACH payment in flight pauses them. */
 export async function sendDueReminders(env: Bindings, db: D1Database, today: string) {
   const settings = await sendingSettings(db)
-  if (!settings.reminders_on || !settings.reminder_days.length || !operatorMail(runtimeBindings(env))) return []
+  if (!settings.reminders_on || !operatorMail(runtimeBindings(env))) return []
   const open = await all(db, `SELECT i.id, i.due_date, i.customer_id FROM pt_invoices i
     WHERE i.kind = 'invoice' AND i.status = 'issued' AND i.sent_at IS NOT NULL AND i.reminders_paused = 0
       AND NOT EXISTS (SELECT 1 FROM pt_stripe_payments sp WHERE sp.invoice_id = i.id AND sp.status = 'processing')`)
@@ -197,14 +205,29 @@ export async function sendDueReminders(env: Bindings, db: D1Database, today: str
     const inv = await invoice(db, row.id)
     if (inv.open_cents <= 0) continue
     const customer = (await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', row.customer_id))!
+    const schedule = customerReminderDays(customer, settings.reminder_days)
     const prior = await all<{ step: number; recipient: string }>(db, "SELECT step, recipient FROM pt_deliveries WHERE invoice_id = ? AND kind = 'reminder' AND step IS NOT NULL", inv.id)
-    for (const recipient of customerRecipients(customer)) {
+    const recipients = customerRecipients(customer)
+    const due = recipients.map(recipient => {
       const steps = prior.filter(r => r.recipient.toLowerCase() === recipient.toLowerCase()).map(r => r.step)
-      const step = dueStep(inv.due_date, today, settings.reminder_days, steps)
-      if (step === null || daysBetween(inv.due_date, today) - step > 30) continue
-      const d = await deliver(env, db, pantry('reminders'), inv.id, recipient, 'reminder', step)
+      const step = dueStep(inv.due_date, today, schedule, steps)
+      return {recipient, step}
+    }).filter(d => d.step !== null && daysBetween(inv.due_date, today) - d.step <= 30)
+    if (!due.length) continue
+    const batch = await claimReminderBatch(db, inv.id, today)
+    if (!batch) continue
+    for (const {recipient, step} of due) {
+      const d = await deliver(env, db, pantry('reminders'), inv.id, recipient, 'reminder', step, undefined, batch)
       if (d) sent.push(d)
     }
   }
   return sent
+}
+
+/** The installation mail route for an explicitly reviewed tax batch. */
+export async function sendReviewedTaxMail(env: Bindings, recipient: string, subject: string, body: string, deliveryId: string) {
+  const mailer = operatorMail(runtimeBindings(env)) as unknown as InvoiceMailer | undefined
+  requireThat(mailer, 'No mail route is configured', 409)
+  const result = await mailer.send({deliveryId, from: String(env.MAIL_FROM ?? ''), to:[recipient], subject, text:body})
+  return {status:result.status === 'development' ? 'suppressed' : result.status, provider:result.provider, providerMessageId:result.providerMessageId, detail:result.status === 'development' ? 'Development mail suppressed; no email sent.' : result.code ?? ''}
 }

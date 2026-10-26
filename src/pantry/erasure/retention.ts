@@ -48,7 +48,7 @@ async function expiryStatements(db: D1Database, item: RetentionItem, erasureId: 
       q('UPDATE pt_invoices SET issued_pdf_sha256=? WHERE id=?', item.sha256, item.id)]
   }
   return [scoped,
-    q('UPDATE pt_contractor_tax SET tin=NULL,tin_last4=NULL,tin_hash=NULL,erased_at=?,revision=? WHERE contact_id=? AND erased_at IS NULL', at, uid(), item.id), changed(),
+    q("UPDATE pt_contractor_tax SET tin=NULL,tin_last4=NULL,tin_hash=NULL,w9_evidence_sealed=NULL,w9_evidence_history='[]',w9_completed_at=NULL,erased_at=?,revision=? WHERE contact_id=? AND erased_at IS NULL", at, uid(), item.id), changed(),
   ]
 }
 

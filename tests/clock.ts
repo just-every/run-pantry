@@ -18,3 +18,7 @@ export async function fixtureTime(request: Request, action: (request: Request) =
   if (!Number.isFinite(time)) throw new Error('Invalid fixture clock')
   return clocks.run(time, () => action(clean))
 }
+
+export async function fixtureScheduled(at: number, action: () => Promise<void>) {
+  return clocks.run(at, action)
+}

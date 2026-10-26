@@ -1,6 +1,7 @@
 // Settings for invoices out: how reminders follow up, and connecting the
 // business's own Stripe account so customers can pay by card or ACH from the
 // invoice link. Each card says plainly what works on this install.
+import { LateFeeSettings } from './late-fees'
 import { SetupSteps } from './provider-guides'
 import { Action, Card, Chip, command, day, Details, Field, Form, Loading, placeholderEmail, useShared, useView, type D } from './kit'
 
@@ -17,6 +18,8 @@ function Sending({ s, onDone }: { s: D; onDone: () => Promise<void> }) {
     {owner && <Form label="Save reminders" submit={b => command('sending.save', { ...b, remindersOn: b.remindersOn === 'on', revision: s.revision })} onDone={onDone} className="grid-form">
       <label className="check"><input type="checkbox" name="remindersOn" defaultChecked={!!s.reminders_on} /> Send reminders for unpaid invoices</label>
       <Field label="Reminder days" name="reminderDays" defaultValue={(s.reminder_days as number[]).join(', ')} hint="Days from the due date: -3 is three days before, 0 the due date, 7 a week after" />
+      <Field label="Reminder subject" name="reminderSubject" defaultValue={s.reminder_subject ?? ''} hint="Leave blank to use Pantry's built-in subject." wide />
+      <Field label="Reminder message" name="reminderBody" type="textarea" defaultValue={s.reminder_body ?? ''} rows={6} hint="Plain text. Leave blank to use Pantry's built-in message. Merge fields: {{customer}}, {{business}}, {{invoice}}, {{due_date}}, {{balance}}, {{link}}." wide />
       <Field label="Time zone" name="timeZone" defaultValue={s.time_zone} required options={(s.zones as string[]).map(z => ({ value: z, label: ZONE_LABEL[z] ?? z }))} />
       <Field label="Replies go to" name="replyTo" type="email" defaultValue={s.reply_to} hint={placeholderEmail(s.ownerEmail) ? 'Blank uses the owner\'s sign-in email' : `Blank uses the owner's address, ${s.ownerEmail}`} />
     </Form>}
@@ -59,5 +62,5 @@ function Stripe({ st, onDone }: { st: D; onDone: () => Promise<void> }) {
 export function InvoicingSettings() {
   const { data, error, reload } = useView<D>('invoicing')
   if (!data) return <Loading error={error} what="invoice settings" />
-  return <><Sending s={data.sending} onDone={reload} /><Stripe st={data.stripe} onDone={reload} /></>
+  return <><Sending s={data.sending} onDone={reload} /><LateFeeSettings /><Stripe st={data.stripe} onDone={reload} /></>
 }

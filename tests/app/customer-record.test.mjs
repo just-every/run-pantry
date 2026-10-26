@@ -1,3 +1,7 @@
+import { approvedAdjustmentsBrowser } from './approved-adjustments-journey.mjs'
+import { lateFeeBrowser } from './late-fee-journey.mjs'
+import { statementsBrowser } from './statements-journey.mjs'
+import { remindersJourney } from './reminders-journey.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
@@ -19,7 +23,7 @@ test('INVOICE-009 customer records edit contacts and defaults, show every curren
   const view = async path => { const r = await owner.request.get(`${app.origin}/api/pantry/${path}`); assert.equal(r.status(), 200, await r.text()); return r.json() }
   await command('entity.save', { legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2026-01-01', policies: '' })
   await command('chart.start', {})
-  await command('stripe.connect', { secretKey: 'sk_test_' + crypto.randomUUID().replaceAll('-', '') })
+  await command('stripe.connect', { secretKey: 'synthetic-pantry-1003' })
   const state = await view('state'), acct = Object.fromEntries(state.accounts.map(a => [a.code, a.id]))
   const bank = await command('bank-account.save', { name: 'Operating checking', institution: 'Chase', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-01-01', openingBalance: '0.00' })
   const storageState = await owner.storageState()
@@ -114,9 +118,14 @@ test('INVOICE-009 customer records edit contacts and defaults, show every curren
       await page.goto(`${app.origin}/app/sales?tab=contacts&customer=${customer.id}`)
       await page.getByRole('heading', { name: `${name} · customer history`, exact: true }).waitFor()
     }
+    await statementsBrowser({ page, context, customer, width, origin: app.origin, history })
+    await lateFeeBrowser({ page, context, invoice: inv, width, origin: app.origin, accountId: acct['4000'] })
+    await approvedAdjustmentsBrowser({ page, context, width, origin: app.origin, command, view, customer, acct, bank })
     await page.getByRole('link', { name: 'Reconcile with receivables aging', exact: true }).click()
     await page.getByRole('heading', { name: /^Receivables aging/ }).waitFor()
     assert.deepEqual(errors, [], `no page errors at ${width}`)
     await context.close()
   }
+  await browser.close()
+  await remindersJourney(t)
 })

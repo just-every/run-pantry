@@ -1,3 +1,5 @@
+import { statementsJourney } from './statements-journey.mjs'
+import { remindersJourney } from './reminders-journey.mjs'
 import { fakePlaid } from './plaid.mjs'
 // Invoices out: sending with a PDF and customer link, viewed, reminders on the
 // business's schedule, recurring invoices, deposits that match themselves, and
@@ -29,8 +31,8 @@ const invoiceOf = async (h, id) => at((await h.view('sales')).invoices, i => i.i
 const linkIn = message => new URL(message.text.match(/http:\/\/[^\s]+\/i\/[A-Za-z0-9_-]{32}/)[0]).pathname
 
 test('INVOICE-009 the private customer record preserves preferences and follows invoices, credits, payments, mail and certificates down to their records', async t => {
-  const h = await harness(); t.after(() => h.close())
-  const { acct, bank, c, issue } = await setup(h), day = today(), original = c['Cedar Studio']
+  const h = await harness({ clock: '2026-10-20T12:00:00Z' }); t.after(() => h.close())
+  const { acct, bank, c, issue } = await setup(h), day = '2026-10-20', original = c['Cedar Studio']
   const privateNote = 'Internal collection arrangement: call Olivia before escalating.'
   let customer = await h.command('contact.save', { id: original.id, revision: original.revision, kind: 'customer',
     termsDays: 45, billingAddress: '12 Cedar Street, New York NY 10001', serviceAddress: '90 Studio Road, Albany NY 12207',
@@ -90,12 +92,13 @@ test('INVOICE-009 the private customer record preserves preferences and follows 
   const cert = at(history.certificates, e => e.id === certificate.id)
   assert.equal(cert.status, 'Valid')
   assert.equal((await h.send(cert.href, undefined, { cookie: h.owner })).value, 'Cedar resale certificate evidence')
-  assert.deepEqual(history.sections, { estimates: { available: true, rows: [] }, statements: { available: false, rows: [] } })
+  assert.deepEqual(history.sections, { estimates: { available: true, rows: [] }, statements: { available: true, rows: [] } })
   await h.view(`customers/${customer.id}`, '', 401)
   await h.view(`customers/missing`, h.owner, 404)
   const viewer = await h.member('customer-reader@example.test', 'viewer')
   assert.equal((await h.view(`customers/${customer.id}/history`, viewer)).customer.id, customer.id)
   await h.command('contact.save', { id: customer.id, revision: customer.revision, kind: 'customer', internalNotes: 'Cannot save' }, viewer, 403)
+  await statementsJourney({ h, customer, day, acct, bank, privateNote })
   customer = await h.command('contact.save', { id: customer.id, revision: customer.revision, kind: 'customer', contacts: [], payMethods: null, internalNotes: '' })
   const cleared = (await h.view(`customers/${customer.id}`)).customer
   assert.deepEqual([cleared.contacts, cleared.pay_methods, cleared.internal_notes, cleared.default_recipients], [[], null, '', ['ap@cedar.example']])
@@ -154,6 +157,7 @@ test('INVOICE-002/003/004 an issued invoice is emailed with its PDF and customer
   assert.equal(sales.deliveries.filter(d => d.kind === 'invoice').length, 3)
   assert.equal(sales.reminders.plans[soon.id], addDays(day, 3), 'the next reminder is on the due date')
   assert.equal(sales.reminders.plans[late.id], null, 'no steps left after the last')
+  await remindersJourney(t)
 })
 
 test('INVOICE-003 customer links show payment history, expire after settlement, and revoke every public door', async t => {
@@ -370,7 +374,7 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
     }
     throw new Error(`unexpected Stripe call ${request.method} ${url.pathname}`)
   }
-  const h = await harness({ outbound }); t.after(() => h.close())
+  const h = await harness({ outbound, clock: '2026-10-31T12:00:00Z' }); t.after(() => h.close())
   const { issue } = await setup(h)
   const card = await issue('Cedar Studio', '2026-10-01', '2026-10-31', '2400.00'), ach = await issue('Willow Services', '2026-10-01', '2026-10-31', '900.00')
   await h.command('invoice.send', { id: card.id }); const cardPage = linkIn(h.mail.at(-1))
@@ -407,6 +411,11 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
   const erasure = await h.command('erasure.preview', { kind: 'contact', id: ach.customer_id })
   assert.ok(erasure.blockers.some(b => b.kind === 'provider-payment' && b.reason === 'pending provider payment'))
   await h.command('erasure.execute', { kind: 'contact', id: ach.customer_id, fingerprint: erasure.fingerprint, requester: 'Customer', channel: 'email', reason: 'Privacy request', confirm: 'ERASE' }, h.owner, 409)
+  const {sending: reminderSettings}=await h.view('invoicing')
+  await h.command('sending.save',{revision:reminderSettings.revision,remindersOn:true,reminderDays:'0',timeZone:'America/New_York'})
+  const remindersBefore=h.mail.filter(m=>m.subject.startsWith('Reminder:')).length
+  await h.cron()
+  assert.equal(h.mail.filter(m=>m.subject.startsWith('Reminder:')).length,remindersBefore,'Processing ACH and paid card invoices receive no reminders')
   s2.pi = { id: 'pi_ach', status: 'succeeded', amount_received: 90000, latest_charge: { id: 'ch_2', balance_transaction: { id: 'txn_2', amount: 90000, currency: 'usd', fee: 500, exchange_rate: null } } }
   await h.cron()
   assert.equal((await invoiceOf(h, ach.id)).open_cents, 0)
@@ -415,7 +424,7 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
   assert.deepEqual(sales.onlinePayments.map(p => [p.method, p.status, p.amount_cents, p.fee_cents]).sort(), [['card', 'succeeded', 240000, 6990], ['us_bank_account', 'succeeded', 90000, 500]].sort())
   const payments = sales.payments.filter(p => p.bank_name === 'Stripe balance')
   assert.deepEqual(payments.map(p => [p.contact_name, p.amount_cents, p.unallocated_cents]).sort(), [['Cedar Studio', 240000, 0], ['Willow Services', 90000, 0]])
-  const tb = await h.view(`reports/trial-balance?to=${today()}&basis=accrual`)
+  const tb = await h.view(`reports/trial-balance?to=2026-10-31&basis=accrual`)
   assert.ok(tb.balanced)
   const balance = name => at(tb.rows, a => a.name === name).net
   assert.equal(balance('Stripe balance'), 240000 + 90000 - 6990 - 500)

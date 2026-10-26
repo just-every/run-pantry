@@ -41,7 +41,7 @@ const writeOff: Command = { need: 'post', async run(c, b) {
   const kind = b.kind === 'bill' ? 'bill' : b.kind === 'invoice' ? 'invoice' : null
   requireThat(kind, 'Choose receivables (invoices) or payables (bills) to write off')
   const ceiling = cents(b.ceiling, 'Write off balances up to'), day = date(b.date, 'Write-off date'), limit = await writeOffLimit(c.db)
-  requireThat(ceiling <= limit, `The owner's write-off limit is $${(limit / 100).toFixed(2)} per item; a larger write-off needs approval under INVOICE-008, which Pantry does not have yet`, 403)
+  requireThat(ceiling <= limit, `The owner's write-off limit is $${(limit / 100).toFixed(2)} per item; a larger write-off needs approval under INVOICE-008, prepare a single approved write-off from the invoice instead`, 403)
   const account = await one(c.db, "SELECT * FROM pt_accounts WHERE id = ? AND active = 1 AND subtype = 'other' AND type IN ('income', 'expense')", text(b.accountId, 'Write-off account'))
   requireThat(account, 'Write off to an active ordinary income or expense account, such as bad debts')
   const tags=dimensionTags(b),refusal=await dimensionRefusal(c.db,[account.id],tags)

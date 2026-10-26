@@ -12,7 +12,7 @@ async function downloadedBytes(page, link) {
 export async function taxformJourney({ page, context, app, command, vendor, width }) {
   await command('contractor.save', { contactId: vendor.id, is1099: true, legalName: 'Brightline Software', tinKind: 'ein', tin: '000000123', address: '1 Example Street', city: 'Albany', state: 'NY', zip: '12207', backupWithholding: true })
   await page.goto(`${app.origin}/app/reports?report=contractors&year=2026`)
-  await page.getByRole('row').filter({ hasText: 'Brightline Software' }).first().click()
+  await page.locator('tr[tabindex]').filter({ hasText: 'Brightline Software' }).click()
   await page.getByRole('button', { name: 'Reveal TIN', exact: true }).click()
   await page.getByText('Confirm your sign-in before revealing tax identity', { exact: true }).waitFor()
   await page.getByLabel('Backup withholding requires review', { exact: true }).waitFor()

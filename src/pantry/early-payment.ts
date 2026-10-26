@@ -163,7 +163,7 @@ export async function reverseEarlyDiscounts(db: D1Database, actor: AuditActor, p
   const targets = await all(db, "SELECT target_id, SUM(amount_cents) AS n FROM pt_allocations WHERE source_kind = 'payment' AND source_id = ? AND target_kind = 'invoice' AND early_counted = 1 AND voided_by IS NULL GROUP BY target_id", paymentId)
   for (const t of targets) {
     const credit = await standingDiscount(db, t.target_id)
-    if (!credit) continue
+    if (!credit || JSON.parse(credit.early_detail ?? '{}').honoredAfterWindow) continue
     const inv = (await one(db, 'SELECT number, early_offer FROM pt_invoices WHERE id = ?', t.target_id))!, offer = parse<Offer>(inv.early_offer)!
     if (await countedSettlements(db, t.target_id) - Number(t.n) >= offer.settle) continue
     statements.push(...await discountReversal(db, actor, credit, inv.number, day, reason))
