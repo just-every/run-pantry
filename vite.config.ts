@@ -7,6 +7,7 @@ import { watchFile, unwatchFile } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import { archiveOutputGuard } from '@runeditrun/rer/archive-output'
+// @ts-expect-error The installer reader is plain JavaScript, loaded only by Vite in Node.
 import { readBusinessCarry } from './scripts/installer/business-carry.mjs'
 
 // Only `vite dev` loads the local-only entry and the checkout's dev key; a build
