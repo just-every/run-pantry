@@ -30,7 +30,7 @@ export async function refundsBrowser({page,width,origin,command,view,customer,ac
   if(proof)await page.screenshot({path:`${proof}/refund-entry-${width}.png`,fullPage:true})
   await page.goto(`${origin}/app/sales?tab=contacts&customer=${customer.id}`)
   await page.getByRole('heading',{name:`${customer.name} · customer history`,exact:true}).waitFor()
-  await page.getByRole('link',{name:'refund Customer refund',exact:true}).first().waitFor()
+  await page.getByRole('link',{name:'Refund Customer refund',exact:true}).first().waitFor()
   if(proof)await page.screenshot({path:`${proof}/refund-history-${width}.png`,fullPage:true})
 }
 

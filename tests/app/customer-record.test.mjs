@@ -1,3 +1,4 @@
+import { paymentStatusBrowser } from './payment-status-journey.mjs'
 import { refundsBrowser,voidBrowser } from './refunds-journey.mjs'
 import { approvedAdjustmentsBrowser } from './approved-adjustments-journey.mjs'
 import { lateFeeBrowser } from './late-fee-journey.mjs'
@@ -131,4 +132,5 @@ test('INVOICE-009 customer records edit contacts and defaults, show every curren
   }
   await browser.close()
   await remindersJourney(t)
+  await paymentStatusBrowser(t)
 })

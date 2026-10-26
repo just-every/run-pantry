@@ -1,9 +1,10 @@
+import { PaymentReceiptPreference } from './payment-notices'
 import { Action, Card, Chip, FileLink, Loading, Metrics, Table, day, usd, useShared, useView, type D } from './kit'
 import { CustomerStatements } from './customer-statements'
 import { ExemptionCertificates } from './exemption-certificates'
 import { invoiceHref } from './estimate-progress'
 
-const KIND: Record<string, string> = { invoice: 'Invoice', credit: 'Credit', payment: 'Payment', estimate: 'Estimate' }
+const KIND: Record<string, string> = { invoice: 'Invoice', credit: 'Credit', payment: 'Payment', refund: 'Refund', estimate: 'Estimate' }
 const METHOD: Record<string, string> = { card: 'Card', us_bank_account: 'Bank account (ACH)', offline: 'Offline payment instructions' }
 
 export function CustomerHistory({ customerId }: { customerId: string }) {
@@ -25,6 +26,7 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
         <div><dt>Payment methods offered</dt><dd>{c.pay_methods === null ? 'All available methods' : c.pay_methods.length ? c.pay_methods.map((m: string) => METHOD[m]).join(', ') : 'No payment methods offered'}</dd></div>
         <div><dt>Internal notes</dt><dd>{c.internal_notes || 'No notes recorded'}</dd></div>
       </dl>
+      {state.actor.role === 'owner' && <details className="details"><summary>Payment receipt preference</summary><PaymentReceiptPreference enabled={!!c.payment_receipts_on} customerId={c.id} onChange={reload} /></details>}
       <Table heads={['Contact', 'Email', 'Phone', 'Roles']} empty="No contact people recorded.">
         {c.contacts.map((p: D, i: number) => <tr key={i}><td>{p.name}</td><td>{p.email || '—'}</td><td>{p.phone || '—'}</td><td>{p.roles.join(', ') || 'No billing role'}</td></tr>)}
       </Table>
@@ -49,7 +51,7 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
     <Card title="Customer email history">
       <p className="hint">Accepted means the provider accepted the message. It does not confirm delivery or reading. Local messages are suppressed.</p>
       <Table heads={['When', 'Record', 'Recipient', 'Message', 'Outcome']} empty="No customer email recorded.">
-        {data.deliveries.map((d: D) => <tr id={`delivery-${d.id}`} key={d.id}><td>{day(d.at)}</td><td><a href={d.kind === 'statement' ? d.href : d.kind === 'estimate' ? d.href || `/app/sales?tab=estimates&estimate=${encodeURIComponent(d.estimate_id)}` : `/app/reports?record=${encodeURIComponent(`invoice:${d.invoice_id}`)}`}>{d.number}</a></td><td>{d.recipient}</td><td><details className="details"><summary>{d.subject}</summary><p>{d.kind === 'statement' ? 'Statement' : d.kind === 'estimate' ? 'Estimate' : d.kind === 'reminder' ? 'Reminder' : 'Invoice'} · {d.provider || 'No provider'}{d.provider_message_id ? ` · ${d.provider_message_id}` : ''}</p><p>{d.detail || 'No additional outcome detail.'}</p></details></td><td><Chip>{d.status}</Chip></td></tr>)}
+        {data.deliveries.map((d: D) => <tr id={`delivery-${d.id}`} key={d.id}><td>{day(d.at)}</td><td><a href={d.kind === 'statement' ? d.href : d.kind === 'estimate' ? d.href || `/app/sales?tab=estimates&estimate=${encodeURIComponent(d.estimate_id)}` : `/app/reports?record=${encodeURIComponent(`invoice:${d.invoice_id}`)}`}>{d.number}</a></td><td>{d.recipient}</td><td><details className="details"><summary>{d.subject}</summary><p>{d.kind === 'statement' ? 'Statement' : d.kind === 'estimate' ? 'Estimate' : d.kind === 'reminder' ? 'Reminder' : d.kind === 'receipt' ? 'Payment receipt' : d.kind === 'processing' ? 'Bank payment processing' : d.kind === 'returned' ? 'Payment returned' : 'Invoice'} · {d.provider || 'No provider'}{d.provider_message_id ? ` · ${d.provider_message_id}` : ''}</p><p>{d.detail || 'No additional outcome detail.'}</p></details></td><td><Chip>{d.status}</Chip></td></tr>)}
       </Table>
     </Card>
     {state.actor.role !== 'sales' && <ExemptionCertificates customerId={customerId} />}

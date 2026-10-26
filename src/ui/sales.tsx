@@ -1,3 +1,5 @@
+import { ProviderPaymentStatus } from './provider-payment-status'
+import { PaymentNoticeHistory,SendPaymentReceipt } from './payment-notices'
 import { RefundCustomerBalance } from './customer-refunds'
 // Sales & bills: invoices and credits (sent, viewed, reminded, paid online),
 // recurring invoices, bills with their evidence, payments recorded from outside
@@ -21,6 +23,7 @@ import { mayRecordDeposits } from './estimate-economics'
 
 function invoiceStatus(i: D): [string, 'good' | 'warn' | 'info' | 'neutral'] {
   if (i.status === 'void') return ['Voided','neutral']
+  if (i.disputed_cents > 0) return ['Disputed','warn']
   if (i.status === 'draft') return ['Draft', 'neutral']
   if (i.status === 'approved') return ['Approved', 'info']
   if (i.kind === 'credit') return [i.open_cents ? 'Unapplied credit' : 'Applied', 'good']
@@ -50,6 +53,8 @@ function InvoicePanel({ i, data, onChange, onEdit, onCredit }: { i: D; data: D; 
       {i.status === 'approved' && state.actor.can.record && (!(i.write_off || i.early_detail?.honoredAfterWindow) || state.actor.can.post) && <Action tone="primary" run={async () => { await command('invoice.issue', { id: i.id }); await onChange() }}>Issue</Action>}
       {i.kind === 'invoice' && i.status === 'issued' && !i.opening && state.actor.can.record && <button type="button" className="btn btn-secondary" onClick={onCredit}>Issue a credit</button>}
     </div>
+    {i.kind === 'invoice' && <ProviderPaymentStatus payments={data.onlinePayments.filter((p:D)=>p.invoice_id===i.id)} />}
+    {i.kind === 'invoice' && i.status === 'issued' && state.actor.can.record && <details className="details"><summary>Payment receipts and notices</summary><PaymentNoticeHistory notices={(data.paymentNotices??[]).filter((n:D)=>n.invoice_id===i.id)} />{data.payments.filter((p:D)=>!p.reversal_id&&p.direction==='received'&&p.allocations.some((a:D)=>a.target_id===i.id&&!a.voided_by)).map((p:D)=><SendPaymentReceipt key={p.id} paymentId={p.id} invoiceId={i.id} onChange={onChange} />)}</details>}
     {i.kind === 'invoice' && i.status === 'issued' && <SendPanel i={i} data={data} onChange={onChange} />}
     {i.kind === 'invoice' && i.status === 'issued' && i.open_cents > 0 && state.actor.can.record && ['owner', 'accountant', 'bookkeeper'].includes(state.actor.role) && state.actor.policy?.bankAccounts == null && <details className="details"><summary>Prepare a write-off</summary>
       <p>Prepare a marked bad-debt credit for {usd(i.open_cents)}. Review and approve the exact credit before issuing it. Bulk write-offs keep their separate ceiling.</p>

@@ -1,3 +1,4 @@
+import { paymentNoticesView } from './payment-notices'
 import { refundsView } from './refunds/store'
 import { estimate } from './estimates/store'
 import { customerDeposit } from './customer-deposits/store'
@@ -50,6 +51,8 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
       LEFT JOIN pt_exemption_reminders r ON r.certificate_id = e.id WHERE e.customer_id = ? ORDER BY e.created_at DESC, e.id`, id),
   ])
   const refunds = await refundsView(db, id)
+  const notices = await all(db, 'SELECT n.*,i.number FROM pt_payment_notices n JOIN pt_invoices i ON i.id=n.invoice_id WHERE i.customer_id=? ORDER BY n.at,n.id',id)
+  deliveries.push(...notices)
   const refundedAt = (kind: string, source: string) => refunds.filter(r => r.source_kind === kind && r.source_id === source && r.status === 'succeeded' && r.refund_date <= asOf).reduce((n,r) => n+r.amount_cents,0)
   const recordHref = (kind: string, recordId: string) => `/app/reports?record=${encodeURIComponent(`${kind}:${recordId}`)}`
   const documentHref = (documentId: string) => `/api/pantry/documents/${encodeURIComponent(documentId)}`

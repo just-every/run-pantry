@@ -1,3 +1,4 @@
+import { processStripeEvent } from './stripe-events'
 // The customer's side of a sent invoice: /i/<token> shows the invoice, its PDF
 // and how to pay it, without signing in. The first opening by someone who is
 // not signed in to these books is recorded as "viewed". Paying sends the
@@ -28,7 +29,7 @@ const STYLE = '.invoice-pdf{width:100%;height:640px;border:0}' + '.rer-themed ma
   + '.invoice .status{display:inline-block;margin:0 0 20px;padding:4px 12px;border-radius:999px;background:var(--row);color:var(--ink);font-size:14px;font-weight:600}'
   + '.invoice .status.paid{background:var(--green-tint);color:var(--green-ink)}.invoice .status.due{background:var(--apricot-tint);color:var(--apricot-text)}'
   + '.invoice table{width:100%;border-collapse:collapse;margin:0 0 16px}.invoice th,.invoice td{padding:10px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;color:var(--ink)}'
-  + '.invoice th{color:var(--lavender-ink);font-size:11.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}.invoice .fig{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}'
+  + '.invoice th{color:var(--lavender-ink);font-size:13px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}.invoice .fig{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}'
   + '.invoice .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 24px;margin:0 0 24px}.invoice .facts span,.invoice .totals span{display:block;font-size:14px;color:var(--soft)}.invoice .facts strong{font-weight:600;color:var(--ink)}'
   + '.invoice .totals{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:6px 24px;max-width:320px;margin:0 0 24px auto;font-variant-numeric:tabular-nums}.invoice .totals strong{text-align:right;font-weight:500;color:var(--ink)}.invoice .totals .due{font-weight:700;color:var(--ink)}'
   + '.invoice .history{list-style:none;padding:0;margin:0 0 20px}.invoice .history li{padding:8px 0;border-bottom:1px solid var(--line);color:var(--ink)}'
@@ -76,7 +77,7 @@ customer.get('/i/:token', async c => {
   const doc = await invoiceDocument(db, inv), paid = inv.open_cents <= 0
   const processing = await one(db, "SELECT 1 FROM pt_stripe_payments WHERE invoice_id = ? AND status = 'processing'", inv.id)
   const overdue = !paid && inv.due_date < new Date().toISOString().slice(0, 10)
-  const chip = paid ? '<p class="status paid">Paid</p>' : processing ? '<p class="status due">Payment processing</p>' : `<p class="status due">${overdue ? 'Overdue · was due' : 'Due'} ${escape(longDay(inv.due_date))}</p>`
+  const chip = inv.disputed_cents > 0 ? '<p class="status due">Payment disputed</p>' : paid ? '<p class="status paid">Paid</p>' : processing ? '<p class="status due">Payment processing</p>' : `<p class="status due">${overdue ? 'Overdue · was due' : 'Due'} ${escape(longDay(inv.due_date))}</p>`
   const offered = paid || processing ? [] : await offeredMethods(c.env, db, inv.customer_id)
   const methods = offered.filter(m => m !== 'offline')
   // INVOICE-010: a live early-payment offer is charged at the amount still due for its discount; afterwards the page says how it ended.
@@ -132,7 +133,6 @@ customer.post('/api/pantry/stripe/webhook', async c => {
   const body = await c.req.text()
   if (!s?.webhook_secret_sealed || !await verifySignature(await unseal(c.env, s.webhook_secret_sealed), c.req.header('stripe-signature') ?? '', body)) return c.json({ error: 'Signature not valid' }, 400)
   const event = JSON.parse(body)
-  const id = event?.data?.object?.object === 'checkout.session' ? String(event.data.object.id) : ''
-  if (id) await syncCheckout(c.env, c.env.DB, id)
+  await processStripeEvent(c.env,c.env.DB,event)
   return c.json({ received: true })
 })

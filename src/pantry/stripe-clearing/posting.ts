@@ -1,3 +1,4 @@
+import { adoptStripeEventMovement } from '../stripe-events'
 import { processorDimensions } from '../dimensions/processor'
 import type { Bindings } from '../../auth.server'
 import { pantry } from '../access'
@@ -23,11 +24,14 @@ export async function confirmInvoices(env: Bindings, db: D1Database) {
 
 export async function postItem(db: D1Database, s: Data, bt: Data, balanceLedger: string, bankLedger: string, invoiceErrors: string[]) {
   const item = await one(db, 'SELECT * FROM pt_stripe_clearing_items WHERE id = ?', bt.id)
-  if (!item || item.entry_id || item.reason) return false
+  if (!item || item.entry_id) return false
   const defer = async (reason: string) => { await hold(db, bt.id, reason); return false }
   if (item.currency !== 'usd') return defer(`Stripe item is in ${item.currency.toUpperCase()}; Pantry keeps US-dollar books.`)
   if (!item.event_date) return defer('Stripe item has no event creation time.')
   if (item.amount_cents - item.fee_cents !== item.net_cents) return defer('Stripe amount less fees does not equal its net amount.')
+  const owned=await adoptStripeEventMovement(db,s,item,balanceLedger)
+  if(owned!==null)return owned
+  if(item.reason)return false
   const dimensions = await processorDimensions(db)
   const category = categoryOf(bt), source = sourceOf(bt), intent = intentOf(bt)
   const isCharge = category === 'charge' || bt.type === 'charge' || bt.type === 'payment'
@@ -37,8 +41,8 @@ export async function postItem(db: D1Database, s: Data, bt: Data, balanceLedger:
     payment = intent ? await one(db, `SELECT s.*, p.journal_id, p.amount_cents AS received_cents, p.reversal_id, e.reversed_by_id, e.status AS entry_status
       FROM pt_stripe_payments s LEFT JOIN pt_payments p ON p.id = s.payment_id LEFT JOIN pt_journal_entries e ON e.id = p.journal_id WHERE s.payment_intent = ?`, intent) : null
     if (payment) {
-      if (payment.status !== 'succeeded' || !payment.journal_id) return defer(`Waiting for invoice payment ${payment.id} to be confirmed.`)
-      if (payment.reversal_id || payment.reversed_by_id || payment.entry_status !== 'posted') return defer('The invoice receipt was reversed or is not posted; review this Stripe item.')
+      if (!['succeeded','returned','disputed','refunded'].includes(payment.status) || !payment.journal_id) return defer(`Waiting for invoice payment ${payment.id} to be confirmed.`)
+      if (((payment.reversal_id || payment.reversed_by_id) && (payment.status !== 'returned' || payment.return_entry_id !== payment.reversal_id)) || payment.entry_status !== 'posted') return defer('The invoice receipt was reversed or is not posted; review this Stripe item.')
       if (payment.received_cents !== item.amount_cents) return defer('Stripe charge differs from the existing invoice receipt.')
       return adoptInvoice(db, s, item, payment, balanceLedger)
     }
@@ -60,6 +64,8 @@ export async function postItem(db: D1Database, s: Data, bt: Data, balanceLedger:
   if (lines.length < 2) return defer('Stripe item has no nonzero balanced movement to post.')
   const entryId = uid(), by = pantry('stripe')
   const statements = [...dimensions.guards,guard('EXISTS (SELECT 1 FROM pt_stripe_clearing_items WHERE id = ? AND entry_id IS NULL)', bt.id),
+    guard('NOT EXISTS(SELECT 1 FROM pt_stripe_event_movements WHERE account_id=? AND balance_transaction=?)',s.account_id,bt.id),
+    guard("NOT EXISTS(SELECT 1 FROM pt_customer_refunds WHERE provider_account=? AND provider_id=? AND status='succeeded')",s.account_id,item.source_id),
     ...(isCharge && intent ? [guard('NOT EXISTS (SELECT 1 FROM pt_stripe_payments WHERE payment_intent = ?)', intent)] : []),
     ...entryStatements({ id: entryId, date: item.event_date, memo, sourceKind: 'bank', sourceId: isPayout(bt) && bt.type === 'payout' ? item.payout_id ?? bt.id : bt.id, preparedBy: by.email, preparedKind: 'import', lines }, by.email),
     q("UPDATE pt_stripe_clearing_items SET status = 'posted', reason = '', entry_id = ? WHERE id = ? AND entry_id IS NULL", entryId, bt.id), changed(),

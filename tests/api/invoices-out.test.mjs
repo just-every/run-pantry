@@ -1,3 +1,5 @@
+import { paymentEventsJourney } from './payment-events-journey.mjs'
+import { paymentNoticesJourney } from './payment-notices-journey.mjs'
 import { voidJourney } from './void-journey.mjs'
 import { statementsJourney } from './statements-journey.mjs'
 import { remindersJourney } from './reminders-journey.mjs'
@@ -443,6 +445,8 @@ test('PAY-001 customers pay by card or ACH from the invoice link through the bus
   assert.match(managedPage.value, /How to pay/); assert.doesNotMatch(managedPage.value, /Pay by card|RER Managed|Stripe/)
   assert.equal((await m.view('invoicing')).stripe.managed, true)
   await m.command('stripe.connect', { secretKey: KEY }, m.owner, 409)
+  await paymentNoticesJourney(t)
+  await paymentEventsJourney(t)
 })
 
 test('INVOICE-010 discounts, delivery charges and deposits on the invoice: tax on the discounted base, the discount and deposit posted, the balance due on the PDF and the hosted page', async t => {

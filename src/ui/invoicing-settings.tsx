@@ -1,3 +1,5 @@
+import { PaymentComparison } from './provider-payment-status'
+import { PaymentReceiptPreference } from './payment-notices'
 // Settings for invoices out: how reminders follow up, and connecting the
 // business's own Stripe account so customers can pay by card or ACH from the
 // invoice link. Each card says plainly what works on this install.
@@ -15,6 +17,7 @@ function Sending({ s, onDone }: { s: D; onDone: () => Promise<void> }) {
       : <><div className="callout callout-warn" role="status"><strong>{s.mail === 'local' ? 'This computer sends no email' : 'No mail provider is set up'}</strong><span>{s.mail === 'local' ? 'Pantry on your own computer records each send as "Not sent: local run". Invoices, reminders and sign-in links are emailed once Pantry is online with a mail provider account of your own.' : 'Invoices and reminders are recorded but not emailed until this Pantry has a mail provider account of its own.'}</span></div>
         <SetupSteps provider="mail" reason="" summary="Set up email for a hosted Pantry" owner={owner} /></>}
     <p>{s.reminders_on ? <>Reminders go {days || 'never (no days set)'}, and stop as soon as the invoice is paid.</> : 'Reminders are off.'} Days follow {ZONE_LABEL[s.time_zone] ?? s.time_zone} time.</p>
+    {owner && <details className="details"><summary>Payment receipt preference</summary><PaymentReceiptPreference enabled={!!s.payment_receipts_on} onChange={onDone} /></details>}
     {owner && <Form label="Save reminders" submit={b => command('sending.save', { ...b, remindersOn: b.remindersOn === 'on', revision: s.revision })} onDone={onDone} className="grid-form">
       <label className="check"><input type="checkbox" name="remindersOn" defaultChecked={!!s.reminders_on} /> Send reminders for unpaid invoices</label>
       <Field label="Reminder days" name="reminderDays" defaultValue={(s.reminder_days as number[]).join(', ')} hint="Days from the due date: -3 is three days before, 0 the due date, 7 a week after" />
@@ -60,7 +63,8 @@ function Stripe({ st, onDone }: { st: D; onDone: () => Promise<void> }) {
 }
 
 export function InvoicingSettings() {
+  const owner=useShared().state.actor.can.owner
   const { data, error, reload } = useView<D>('invoicing')
   if (!data) return <Loading error={error} what="invoice settings" />
-  return <><Sending s={data.sending} onDone={reload} /><LateFeeSettings /><Stripe st={data.stripe} onDone={reload} /></>
+  return <><Sending s={data.sending} onDone={reload} /><LateFeeSettings /><Stripe st={data.stripe} onDone={reload} />{data.stripe.connected && owner && <PaymentComparison />}</>
 }

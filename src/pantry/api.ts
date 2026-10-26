@@ -1,3 +1,5 @@
+import { paymentNoticeCommands,paymentNoticesView } from './payment-notices'
+import { compareStripeEvents,stripeEventsView } from './stripe-events'
 import { invoiceVoidCommands } from './invoice-void'
 import { refundCommands } from './refunds/commands'
 import { refundsView } from './refunds/store'
@@ -37,9 +39,9 @@ import { figureExport, recordExport } from './detail-export'
 import { Hono, type Context as HonoContext } from 'hono'
 import type { Bindings } from '../auth.server'
 import { deploymentHealth } from '../base/deployment-health'
-import { agent, must, person, who, type Actor } from './access'
+import { authority, agent, must, person, who, type Actor } from './access'
 import { cents, date, Fault, monthBounds, requireThat, type Data } from './core'
-import { all, one } from './db'
+import { all, one, run } from './db'
 import type { Command, Context } from './context'
 import { settingsCommands, settingsView } from './settings'
 import { accountCommands } from './accounts'
@@ -137,7 +139,7 @@ import { statement } from './statements/store'
 const commands: Record<string, Command> = {
   ...statementCommands,
   ...taxReminderCommands,...taxReadinessCommands,...w9Commands, ...currencyCommands,...archiveCommands,...collectionCommands, ...standingCommands, ...learningCommands, ...assetCommands, ...dimensionCommands, ...siblingCommands,
-  ...invoiceVoidCommands, ...refundCommands, ...customerCreditCommands, ...lateDiscountCommands, ...approvedWriteOffCommands, ...lateFeeCommands, ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  'stripe.events-compare': { need:'owner', async run(c) { await run(c.db,[authority(c.actor,'owner')]); return compareStripeEvents(c.env,c.db,true) } }, ...paymentNoticeCommands, ...invoiceVoidCommands, ...refundCommands, ...customerCreditCommands, ...lateDiscountCommands, ...approvedWriteOffCommands, ...lateFeeCommands, ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...reportDeliveryCommands, ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -239,8 +241,9 @@ view('recurring-journals', async ctx => recurringJournalsView(ctx.db))
 view('journal', async ctx => ({ entries: await journalView(ctx.db) }))
 view('review', async ctx => reviewView(ctx.db, ctx.actor.email))
 view('write-offs/candidates', async (ctx, c) => ({ items: await smallBalances(ctx.db, c.req.query('kind') === 'bill' ? 'bill' : 'invoice', cents(c.req.query('ceiling'), 'Write off balances up to')) }))
-view('sales', async ctx => ({ refunds: await refundsView(ctx.db), capturedBills: await capturedBillInbox(ctx.db), recurringBills: await recurringBillsView(ctx.db), approvalRules: await all(ctx.db, 'SELECT * FROM pt_capture_approval_rules ORDER BY minimum_cents'), vendorCredits: await vendorCreditsView(ctx.db), invoices: await invoicesView(ctx.db), bills: await billsView(ctx.db), payments: await paymentsView(ctx.db), deliveries: await deliveriesView(ctx.db), reminders: await reminderPlans(ctx.db), recurring: await recurringView(ctx.db), onlinePayments: await all(ctx.db, 'SELECT id, invoice_id, method, amount_cents, status, fee_cents, created_at, updated_at FROM pt_stripe_payments ORDER BY created_at DESC LIMIT 500') }))
+view('sales', async ctx => ({ refunds: await refundsView(ctx.db), paymentNotices: await paymentNoticesView(ctx.db), capturedBills: await capturedBillInbox(ctx.db), recurringBills: await recurringBillsView(ctx.db), approvalRules: await all(ctx.db, 'SELECT * FROM pt_capture_approval_rules ORDER BY minimum_cents'), vendorCredits: await vendorCreditsView(ctx.db), invoices: await invoicesView(ctx.db), bills: await billsView(ctx.db), payments: await paymentsView(ctx.db), deliveries: await deliveriesView(ctx.db), reminders: await reminderPlans(ctx.db), recurring: await recurringView(ctx.db), onlinePayments: await all(ctx.db, 'SELECT id, invoice_id, method, amount_cents, status, fee_cents, created_at, updated_at, refunded_cents, disputed_cents, evidence_due_by, return_entry_id, return_code, return_reason FROM pt_stripe_payments ORDER BY created_at DESC LIMIT 500') }))
 view('invoicing', async ctx => ({ sending: await sendingView(ctx.env, ctx.db), stripe: await stripeView(ctx.env, ctx.db), discounts: { settings: await discountSettings(ctx.db), accounts: await discountAccounts(ctx.db) }, earlyPayment: await treatmentsView(ctx.db) }))
+view('stripe/events', async ctx => { must(ctx.actor,'owner'); return stripeEventsView(ctx.db) })
 view('stripe/clearing', async ctx => clearingState(ctx.db))
 view('connected', async ctx => ({ clearing: await clearingState(ctx.db), payouts: await payoutsView(ctx.env, ctx.db), gusto: await gustoView(ctx) }))
 view('bank', async ctx => bankView(ctx.db))

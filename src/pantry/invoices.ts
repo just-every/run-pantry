@@ -33,6 +33,7 @@ export async function invoice(db: D1Database, id: string) {
   row.discounts = parsed(row.discounts, []); row.deposit = parsed(row.deposit, null)
   row.early_terms = parsed(row.early_terms, null); row.early_offer = parsed(row.early_offer, null); row.early_detail = parsed(row.early_detail, null)
   row.lines = await all(db, 'SELECT * FROM pt_invoice_lines WHERE invoice_id = ? ORDER BY line_no', id)
+  row.disputed_cents=Number((await one(db,'SELECT COALESCE(SUM(disputed_cents),0) AS n FROM pt_stripe_payments WHERE invoice_id=?',id))?.n??0)
   if (row.void_date) row.status = 'void'
   row.open_cents = row.status === 'void' ? 0 : row.kind === 'credit' && row.status === 'issued' ? (row.early_reversal_id ? 0 : row.total_cents - Number((await one(db, "SELECT COALESCE(SUM(amount_cents),0) AS n FROM pt_allocations WHERE source_kind='credit' AND source_id=? AND voided_by IS NULL", id))?.n ?? 0) - await refunded(db, 'credit', id)) : await openBalance(db, 'invoice', id, row.total_cents)
   return row
@@ -282,6 +283,7 @@ export async function invoicesView(db: D1Database) {
     r.exemption = r.exemption_evidence ? JSON.parse(r.exemption_evidence) : null
     r.discounts = parsed(r.discounts, []); r.deposit = parsed(r.deposit, null); r.early_offer = parsed(r.early_offer, null); r.early_detail = parsed(r.early_detail, null)
     r.lines = lines.filter(l => l.invoice_id === r.id)
+    r.disputed_cents=Number((await one(db,'SELECT COALESCE(SUM(disputed_cents),0) AS n FROM pt_stripe_payments WHERE invoice_id=?',r.id))?.n??0)
     if (r.void_date) r.status = 'void'
     r.open_cents = r.status === 'void' ? 0 : r.kind === 'invoice' && r.status === 'issued' ? await openBalance(db, 'invoice', r.id, r.total_cents) : r.kind === 'credit' && r.status === 'issued' ? (r.early_reversal_id ? 0 : r.total_cents - await refunded(db, 'credit', r.id) - Number((await one(db, "SELECT COALESCE(SUM(amount_cents),0) AS n FROM pt_allocations WHERE source_kind = 'credit' AND source_id = ?", r.id))?.n ?? 0)) : r.total_cents
   }

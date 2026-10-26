@@ -17,7 +17,7 @@ export async function unappliedRows(db: D1Database, kind: Kind, asOf: string): P
   const payments = (await all(db, `SELECT p.id, p.payment_date AS date, p.amount_cents, p.reference FROM pt_payments p WHERE p.direction = ? AND p.payment_date <= ? AND ${live()} ORDER BY p.payment_date, p.id`, direction, asOf, asOf))
     .map(p => ({ part: 'payment', id: p.id, date: p.date, amount: p.amount_cents, record: { kind: 'payment', id: p.id }, note: p.reference }))
   const applied = (await all(db, `SELECT a.id, a.source_id, a.target_id, a.allocation_date AS date, a.amount_cents FROM pt_allocations a JOIN pt_payments p ON p.id = a.source_id
-    WHERE a.source_kind = 'payment' AND p.direction = ? AND a.allocation_date <= ? AND ${live()} ORDER BY a.allocation_date, a.id`, direction, asOf, asOf))
+    WHERE a.source_kind = 'payment' AND p.direction = ? AND a.allocation_date <= ? AND ${live()} AND (a.voided_on IS NULL OR a.voided_on>?) ORDER BY a.allocation_date, a.id`, direction, asOf, asOf, asOf))
     .map(a => ({ part: 'payment-applied', id: a.id, date: a.date, amount: -a.amount_cents, record: { kind: 'payment', id: a.source_id }, target: a.target_id }))
   const credits = kind === 'receivable'
     ? (await all(db, `SELECT i.id, i.issue_date AS date, i.total_cents FROM pt_invoices i WHERE i.kind = 'credit' AND i.status = 'issued' AND i.issue_date <= ? AND (i.early_reversal_id IS NULL OR (SELECT r.entry_date FROM pt_journal_entries r WHERE r.id = i.early_reversal_id) > ?) ORDER BY i.issue_date, i.id`, asOf, asOf))

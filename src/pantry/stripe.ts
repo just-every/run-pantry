@@ -1,3 +1,6 @@
+import { notifyPayment } from './payment-notices'
+import { STRIPE_PAYMENT_EVENTS } from './stripe-events'
+import { methodDetail } from './stripe-events/provider'
 import { processorDimensions } from './dimensions/processor'
 // Card and ACH payment from the invoice link, through the business's own Stripe
 // account. The owner connects a key in Settings; Pantry creates its webhook and
@@ -73,7 +76,7 @@ const connect: Command = { need: 'owner', async run(c, b) {
   // Stripe calls back only to a public https address; a computer-local install reads outcomes on return and in due work.
   const hook = origin.startsWith('https://') ? await stripeCall(key, 'POST', '/webhook_endpoints', {
     url: `${origin}/api/pantry/stripe/webhook`, description: 'Pantry invoice payments', api_version: STRIPE_VERSION,
-    enabled_events: ['checkout.session.completed', 'checkout.session.async_payment_succeeded', 'checkout.session.async_payment_failed', 'checkout.session.expired'],
+    enabled_events: STRIPE_PAYMENT_EVENTS,
   }) : null
   const statements: Sql[] = [authority(c.actor, 'owner')]
   let bankId = existing?.bank_account_id, feeId = existing?.fee_account_id
@@ -168,7 +171,7 @@ const dollars = (c: number) => (c / 100).toFixed(2)
 /** Read a Checkout Session back from Stripe and record what it says; safe to repeat. */
 export async function syncCheckout(env: Bindings, db: D1Database, sessionId: string) {
   const row = await one(db, 'SELECT * FROM pt_stripe_payments WHERE id = ?', sessionId)
-  if (!row || (row.status === 'succeeded' && row.fee_entry_id) || ['failed', 'expired'].includes(row.status)) return row
+  if (!row || (row.status === 'succeeded' && row.fee_entry_id) || ['failed', 'expired', 'returned', 'disputed', 'refunded'].includes(row.status)) return row
   const s = await stripeSettings(db)
   if (!s) return row
   const key = await unseal(env, s.key_sealed)
@@ -180,7 +183,9 @@ export async function syncCheckout(env: Bindings, db: D1Database, sessionId: str
   if (pi.status === 'processing') await set('processing')
   else if (session.status === 'complete' && ['requires_payment_method', 'canceled'].includes(pi.status)) await set('failed')
   else if (pi.status === 'succeeded') await recordSucceeded(env, db, row, pi, key, s)
-  return one(db, 'SELECT * FROM pt_stripe_payments WHERE id = ?', sessionId)
+  const current = await one(db, 'SELECT * FROM pt_stripe_payments WHERE id = ?', sessionId)
+  if (current && ['processing','succeeded'].includes(current.status)) await notifyPayment(env,db,sessionId,current.status === 'processing' ? 'processing' : 'receipt',methodDetail(pi.latest_charge ?? {},session.customer_details?.email ?? session.customer_email ?? pi.receipt_email))
+  return current
 }
 
 async function recordSucceeded(env: Bindings, db: D1Database, row: Data, pi: Data, key: string, s: Data) {
@@ -230,5 +235,5 @@ export async function syncPendingCheckouts(env: Bindings, db: D1Database) {
 }
 
 export async function invoicePayments(db: D1Database, invoiceId: string) {
-  return all(db, 'SELECT id, method, amount_cents, status, fee_cents, created_at, updated_at FROM pt_stripe_payments WHERE invoice_id = ? ORDER BY created_at DESC', invoiceId)
+  return all(db, 'SELECT id, method, amount_cents, status, fee_cents, created_at, updated_at, refunded_cents, disputed_cents, evidence_due_by, return_entry_id, return_code, return_reason FROM pt_stripe_payments WHERE invoice_id = ? ORDER BY created_at DESC', invoiceId)
 }

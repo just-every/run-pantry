@@ -160,7 +160,7 @@ const recordPayment: Command = { need: 'record', async run(c, b) {
 const allocate: Command = { need: 'record', async run(c, b) {
   const payment = await one(c.db, 'SELECT * FROM pt_payments WHERE id = ? AND reversal_id IS NULL', text(b.paymentId, 'Payment'))
   requireThat(payment, 'Payment not found or reversed', 404)
-  const used = Number((await one(c.db, "SELECT COALESCE(SUM(amount_cents), 0) AS n FROM pt_allocations WHERE source_kind = 'payment' AND source_id = ?", payment.id))?.n ?? 0)
+  const used = Number((await one(c.db, "SELECT COALESCE(SUM(amount_cents), 0) AS n FROM pt_allocations WHERE source_kind = 'payment' AND source_id = ? AND voided_by IS NULL", payment.id))?.n ?? 0)
   const day = date(b.date ?? payment.payment_date, 'Allocation date')
   requireThat(day >= payment.payment_date, 'Allocate on or after the payment date')
   await assertOpen(c.db, day)

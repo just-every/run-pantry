@@ -1,3 +1,4 @@
+import { compareStripeEvents } from './stripe-events'
 // Due work: the daily CLOSE-004 checks, recurring invoices that have come due, Stripe payments still in
 // flight, reminders, economic-nexus alerts, and Stripe payouts and Gusto payrolls to book. Cron runs
 // it, and so does any ordinary request once a couple of minutes have passed
@@ -31,7 +32,7 @@ export async function runDueWork(env: Bindings, { scheduled = false, reportAt = 
   } else await db.prepare('UPDATE pt_due_work SET started_at = ? WHERE id = 1').bind(now()).run()
   if (!await one(db, 'SELECT 1 FROM pt_entity WHERE id = 1')) return
   const today = businessDay((await sendingSettings(db)).time_zone)
-  for (const [name, job] of [['scheduled reports', () => runDueReports(env, reportAt)], ['recurring bills', () => runDueBills(db, today)], ['recognition schedules', () => runDueRecognition(db, today)], ['recurring journals', () => runDueRecurringJournals(db, today)], ['transfers', () => matchTransfers(db)], ['continuous checks', () => runContinuousChecks(db, today)], ['exemption certificates', () => runExemptionReminders(env, db, today)], ['economic nexus', () => runNexusAlerts(env, db)], ['captured draft approvals', () => sendDueApprovalReminders(env, db)], ['recurring invoices', () => runDueRecurring(env, db, today)], ['Stripe payments', () => syncPendingCheckouts(env, db)], ['reminders', () => sendDueReminders(env, db, today)], ['Stripe payouts', () => syncDuePayouts(env, db)], ['Gusto payrolls', () => syncDuePayrolls(env, db)]] as const) {
+  for (const [name, job] of [['scheduled reports', () => runDueReports(env, reportAt)], ['recurring bills', () => runDueBills(db, today)], ['recognition schedules', () => runDueRecognition(db, today)], ['recurring journals', () => runDueRecurringJournals(db, today)], ['transfers', () => matchTransfers(db)], ['continuous checks', () => runContinuousChecks(db, today)], ['exemption certificates', () => runExemptionReminders(env, db, today)], ['economic nexus', () => runNexusAlerts(env, db)], ['captured draft approvals', () => sendDueApprovalReminders(env, db)], ['recurring invoices', () => runDueRecurring(env, db, today)], ['Stripe payments', () => syncPendingCheckouts(env, db)], ['Stripe event comparison', () => compareStripeEvents(env, db)], ['reminders', () => sendDueReminders(env, db, today)], ['Stripe payouts', () => syncDuePayouts(env, db)], ['Gusto payrolls', () => syncDuePayrolls(env, db)]] as const) {
     try { await job() } catch (error) { console.error(`Pantry due work (${name}) failed:`, error) }
   }
 }

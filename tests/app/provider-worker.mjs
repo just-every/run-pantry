@@ -13,7 +13,7 @@ export async function providerWorker({ bindings, outbound, clock = false }) {
   const dir = await mkdtemp(join(tmpdir(), 'pantry-provider-app-'))
   let mf
   const options = unstable_getMiniflareWorkerOptions('dist/server/wrangler.json')
-  const entry = clock ? { stdin: { contents: `import worker from ${JSON.stringify(options.main)}; import { fixtureTime } from './tests/clock.ts'; export default {...worker, fetch(request, env, ctx) { return fixtureTime(request, request => worker.fetch(request, env, ctx)) }};`, resolveDir: process.cwd(), sourcefile: 'fixture-clock-worker.ts' } } : { entryPoints: [options.main] }
+  const entry = clock ? { stdin: { contents: `import worker from ${JSON.stringify(options.main)}; import { fixtureTime, fixtureScheduled } from './tests/clock.ts'; export default {...worker, fetch(request, env, ctx) { return fixtureTime(request, request => worker.fetch(request, env, ctx)) }, scheduled(controller,env,ctx) { return fixtureScheduled(controller.scheduledTime,()=>worker.scheduled(controller,env,ctx)) }};`, resolveDir: process.cwd(), sourcefile: 'fixture-clock-worker.ts' } } : { entryPoints: [options.main] }
   const bundle = await build({ ...entry, bundle: true, write: false, format: 'esm', platform: 'neutral', conditions: ['workerd', 'worker', 'browser'], external: ['node:*', 'cloudflare:*'], target: 'es2023', logLevel: 'error' })
   const optionsFor = origin => ({ ...convertV4MiniflareOptions({
     host: '127.0.0.1', port:0, modules: true, script: bundle.outputFiles[0].text,
@@ -29,6 +29,6 @@ export async function providerWorker({ bindings, outbound, clock = false }) {
     for (const file of (await readdir('migrations/core')).filter(f => f.endsWith('.sql')).sort())
       await db.batch(unstable_splitSqlQuery(await readFile('migrations/core/' + file, 'utf8')).map(sql => db.prepare(sql)))
     await mf.ready
-    return { origin, close, cron:async(scheduledTime=Date.now())=>(await mf.getWorker()).scheduled({cron:'*/30 * * * *',scheduledTime}) }
+    return { origin, close, db, cron:async(scheduledTime=Date.now())=>(await mf.getWorker()).scheduled({cron:'*/30 * * * *',scheduledTime}) }
   } catch (error) { await close(); throw error }
 }

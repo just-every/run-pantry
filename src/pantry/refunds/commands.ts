@@ -2,7 +2,7 @@ import { authority, must, who } from '../access'
 import { bankAuthority } from '../access-policy/banks'
 import { withinLimit } from '../issuing-limits'
 import { cents, date, now, requireThat, text, uid } from '../core'
-import { assertOpen, audit, changed, guard, one, periodOpen, q, run } from '../db'
+import { assertOpen, approval, audit, changed, guard, one, periodOpen, q, run } from '../db'
 import type { Command } from '../context'
 import { stripeCall, unseal } from '../stripe-api'
 import { stripeSettings } from '../stripe'
@@ -54,6 +54,7 @@ const approve: Command = { need: 'post', async run(c,b) {
   const self = row.prepared_by===c.actor.email && c.actor.role!=='owner' ? await withinLimit(c.db,c.actor,{...row,kind:'credit',total_cents:row.amount_cents,credit_for:row.source_kind==='credit'?source.row.credit_for:(await one(c.db,"SELECT target_id FROM pt_allocations WHERE source_kind='payment' AND source_id=? AND target_kind='invoice' LIMIT 1",row.source_id))?.target_id},b.limitRevision) : null
   await run(c.db,[authority(c.actor,'post'),...bankAuthority(c.actor,[row.bank_account_id],'post'),...(self?.fences??[]),...(self && row.source_kind==='payment' ? [guard("NOT EXISTS(SELECT 1 FROM pt_allocations a JOIN pt_invoices i ON i.id=a.target_id WHERE a.source_kind='payment' AND a.source_id=? AND json_extract(i.self_approval,'$.person')=?)",row.source_id,c.actor.email)] : []),periodOpen(row.refund_date),
     q("UPDATE pt_customer_refunds SET status='approved',approved_by=?,self_approval=?,revision=?,updated_at=? WHERE id=? AND status='draft' AND revision=?",c.actor.email,self?JSON.stringify(self.detail):null,uid(),now(),row.id,row.revision),changed(),
+    approval(who(c.actor),'customer-refund',row.id,row.revision,'approve','approved',self?.note??'Second-person refund approval'),
     audit(who(c.actor),'customer-refund.approve','customer-refund',row.id,{amount:row.amount_cents,selfApproval:self?.detail??null})])
   return refund(c.db,row.id)
 } }
@@ -63,7 +64,7 @@ const post: Command = { need:'post',async run(c,b) {
   requireThat(['approved','pending'].includes(row.status),'Approve this refund before posting',409)
   const fences=[authority(c.actor,'post'),...bankAuthority(c.actor,[row.bank_account_id],'post'),periodOpen(row.refund_date)]
   must(c.actor,'post'); await assertOpen(c.db,row.refund_date)
-  if(row.method==='recorded')return refundOutcome(c.db,row.id,{amount:row.amount_cents,currency:'usd',status:'succeeded'},fences)
+  if(row.method==='recorded')return refundOutcome(c.db,row.id,{amount:row.amount_cents,currency:'usd',status:'succeeded'},fences,who(c.actor))
   const stripe=await stripeSettings(c.db)
   requireThat(stripe && stripe.account_id===row.provider_account,'The connected Stripe account changed',409)
   requireThat(row.payment_intent,'Original Stripe payment unavailable',409)

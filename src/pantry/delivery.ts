@@ -64,7 +64,7 @@ export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, 
   const subject = approved?.subject ?? (kind === 'reminder' && settings.reminder_subject ? merge(settings.reminder_subject) : null) ?? (kind === 'invoice' ? `Invoice ${inv.number} from ${doc.business}: ${usd(inv.open_cents)} due ${longDay(inv.due_date)}` : reminderSubject(inv.number, step!, doc.business))
   const id = uid(), reminderBatch = batch ?? { id: uid(), day: businessDay(settings.time_zone) }
   try {
-    const claim=q("INSERT INTO pt_deliveries (id, invoice_id, kind, step, recipient, subject, status, attachment_sha256, sent_by, at,reminder_day) VALUES (?, ?, ?, ?, ?, ?, 'sending', ?, ?, ?,?)",id,inv.id,kind,step,recipient,subject,retained.sha256,actor.email,now(),kind==='reminder'?reminderBatch.day:null)
+    const claim=q("INSERT INTO pt_deliveries (id, invoice_id, kind, step, recipient, subject, status, attachment_sha256, sent_by, at,reminder_day,reminder_cycle) VALUES (?, ?, ?, ?, ?, ?, 'sending', ?, ?, ?,?,(SELECT reminder_cycle FROM pt_invoices WHERE id=?))",id,inv.id,kind,step,recipient,subject,retained.sha256,actor.email,now(),kind==='reminder'?reminderBatch.day:null,inv.id)
     const fence = kind === 'reminder' ? [guard(reminderEligible, inv.id), ...(batch ? [guard('EXISTS(SELECT 1 FROM pt_reminder_batches WHERE invoice_id=? AND day=? AND id=?) AND EXISTS(SELECT 1 FROM pt_invoices WHERE id=? AND reminders_paused=0)', inv.id, batch.day, batch.id, inv.id)] : [reminderBatchClaim(inv.id, reminderBatch), changed()])] : []
     await run(db, [...(approved?.claim ?? []), ...fence, claim, ...(approved?.onClaim(id) ?? [])])
   } catch (error) {
@@ -177,7 +177,7 @@ export function dueStep(dueDate: string, today: string, steps: number[], sent: n
 export async function reminderPlans(db: D1Database) {
   const settings = await sendingSettings(db), today = businessDay(settings.time_zone), plans: Record<string, string | null> = {}
   if (!settings.reminders_on) return { today, on: false, days: settings.reminder_days, plans }
-  const sent = await all<{ invoice_id: string; step: number; recipient: string }>(db, "SELECT invoice_id, step, recipient FROM pt_deliveries WHERE kind = 'reminder' AND step IS NOT NULL")
+  const sent = await all<{ invoice_id: string; step: number; recipient: string }>(db, "SELECT d.invoice_id, d.step, d.recipient FROM pt_deliveries d JOIN pt_invoices i ON i.id=d.invoice_id WHERE d.kind = 'reminder' AND d.step IS NOT NULL AND d.reminder_cycle=i.reminder_cycle")
   for (const inv of await all(db, "SELECT id, customer_id, due_date FROM pt_invoices WHERE kind = 'invoice' AND status = 'issued' AND void_date IS NULL AND sent_at IS NOT NULL AND reminders_paused = 0")) {
     const customer = (await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', inv.customer_id))!
     if (!await one(db, `SELECT 1 WHERE ${reminderEligible}`, inv.id)) { plans[inv.id] = null; continue }
@@ -199,14 +199,14 @@ export async function sendDueReminders(env: Bindings, db: D1Database, today: str
   if (!settings.reminders_on || !operatorMail(runtimeBindings(env))) return []
   const open = await all(db, `SELECT i.id, i.due_date, i.customer_id FROM pt_invoices i
     WHERE i.kind = 'invoice' AND i.status = 'issued' AND i.void_date IS NULL AND i.sent_at IS NOT NULL AND i.reminders_paused = 0
-      AND NOT EXISTS (SELECT 1 FROM pt_stripe_payments sp WHERE sp.invoice_id = i.id AND sp.status = 'processing')`)
+      AND NOT EXISTS (SELECT 1 FROM pt_stripe_payments sp WHERE sp.invoice_id = i.id AND (sp.status = 'processing' OR sp.disputed_cents>0))`)
   const sent: Data[] = []
   for (const row of open) {
     const inv = await invoice(db, row.id)
     if (inv.open_cents <= 0) continue
     const customer = (await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', row.customer_id))!
     const schedule = customerReminderDays(customer, settings.reminder_days)
-    const prior = await all<{ step: number; recipient: string }>(db, "SELECT step, recipient FROM pt_deliveries WHERE invoice_id = ? AND kind = 'reminder' AND step IS NOT NULL", inv.id)
+    const prior = await all<{ step: number; recipient: string }>(db, "SELECT step, recipient FROM pt_deliveries WHERE invoice_id = ? AND kind = 'reminder' AND step IS NOT NULL AND reminder_cycle=(SELECT reminder_cycle FROM pt_invoices WHERE id=?)", inv.id, inv.id)
     const recipients = customerRecipients(customer)
     const due = recipients.map(recipient => {
       const steps = prior.filter(r => r.recipient.toLowerCase() === recipient.toLowerCase()).map(r => r.step)

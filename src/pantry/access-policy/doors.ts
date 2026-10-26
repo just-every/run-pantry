@@ -98,10 +98,10 @@ export async function projectAccess(c: Context, value: unknown, path = new URL(c
   if (door === 'exemptions' && actor.role === 'sales') out = { today: v.today, certificates: v.certificates.map((e: Data) => ({ id: e.id, customer_id: e.customer_id, states: e.states, valid_from: e.valid_from, expires_on: e.expires_on, active: e.active })) }
   if (door === 'sales' && narrow(actor)) {
     const sales = actor.role === 'sales'
-    out = { ...v, invoices: sales ? v.invoices : [], recurring: sales ? v.recurring : [], deliveries: sales ? v.deliveries : [], reminders: sales ? v.reminders : [], onlinePayments: [], bills: sales ? [] : v.bills, capturedBills: sales ? [] : v.capturedBills, recurringBills: sales ? [] : v.recurringBills, approvalRules: [], vendorCredits: sales ? [] : v.vendorCredits, payments: [] }
+    out = { ...v, refunds: [], paymentNotices: [], invoices: sales ? v.invoices : [], recurring: sales ? v.recurring : [], deliveries: sales ? v.deliveries : [], reminders: sales ? v.reminders : [], onlinePayments: [], bills: sales ? [] : v.bills, capturedBills: sales ? [] : v.capturedBills, recurringBills: sales ? [] : v.recurringBills, approvalRules: [], vendorCredits: sales ? [] : v.vendorCredits, payments: [] }
   }
   if (narrow(actor) && /^(customers|vendors)\//.test(door)) out = { ...v, rows: v.rows?.filter((r: Data) => actor.role === 'sales' ? ['invoice', 'credit', 'estimate'].includes(r.kind) : r.kind === 'bill') }
-  if (limitedBanks(actor) && !narrow(actor) && door === 'sales') out = { ...v, payments: v.payments?.filter((p: Data) => actor.policy!.bankAccounts!.includes(p.bank_account_id)) }
+  if (limitedBanks(actor) && !narrow(actor) && door === 'sales') out = { ...v, payments: v.payments?.filter((p: Data) => actor.policy!.bankAccounts!.includes(p.bank_account_id)), refunds: v.refunds?.filter((r:Data)=>actor.policy!.bankAccounts!.includes(r.bank_account_id)), paymentNotices: [], onlinePayments: [] }
   if (limitedBanks(actor) && !narrow(actor) && door === 'state') {
     const ids = actor.policy!.bankAccounts!, banks = v.bankAccounts?.filter((b: Data) => ids.includes(b.id)) ?? [], bankLedger = new Set(banks.map((b: Data) => b.account_id))
     out = { ...v, bankAccounts: banks, accounts: v.accounts?.filter((a: Data) => a.subtype !== 'bank' || bankLedger.has(a.id)), overview: null }
