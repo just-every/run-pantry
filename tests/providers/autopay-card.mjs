@@ -63,9 +63,18 @@ export async function declinedCard({ app, browser, headers, command, view, acct,
     await page.goto(`${app.origin}/i/${invoice.link_token}`)
     await page.getByRole('button', { name: 'Revoke autopay', exact: true }).click()
     await page.getByText(/Autopay is off/).waitFor()
+    const submissions = receipt.paymentSubmissions
     await app.cron(Date.parse(invoice.due_date + 'T16:00:00Z') + 8 * 86400000)
+    const nextPeriod = new Date(day + 'T16:00:00Z')
+    nextPeriod.setUTCMonth(nextPeriod.getUTCMonth() + 1)
+    await app.cron(nextPeriod.getTime())
+    const nextInvoice = (await view('sales')).invoices.find(i => i.recurring_id === template.id && i.id !== invoice.id)
+    assert.ok(nextInvoice?.link_token, 'The following recurring invoice exists after revocation')
+    await app.cron(Date.parse(nextInvoice.due_date + 'T16:00:00Z'))
     assert.equal((await state()).attempts.length, 4)
     assert.equal((await state()).saved.active, false)
+    assert.equal(receipt.paymentSubmissions, submissions, 'Revocation prevents a real provider submission on the following invoice due date')
+    receipt.card.nextInvoiceDue = nextInvoice.due_date
     receipt.card.revoked = true
     await stage('decline-card-revoked', page)
   } catch (error) {
