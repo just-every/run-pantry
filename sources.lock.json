@@ -6,7 +6,7 @@
   "toolchain": {
     "id": "runeditrun/edition-authoring",
     "version": "1.1.0",
-    "sha256": "3ce2f4bc6357b80a2a744ab7572160ca73eea08c5c627402957bce492f22b6a5"
+    "sha256": "f8cc00a4d2ee27019cfe55492f22b08abebe4d81c24f9a5e2d5304deecf3eaed"
   },
   "components": [
     {
@@ -167,7 +167,7 @@
       "executable": false
     },
     "docs/getting-started.md": {
-      "sha256": "1d9b5809b7c8fc5fe40e3c3ca237296f3af60fc35ca9fb399bdf85f1577c3994",
+      "sha256": "82fc50eb614bfd4cb8b273992537a1926fea80bf5dbe5b23e7ae87772f0810ac",
       "executable": false
     },
     "docs/hosting.md": {
@@ -1464,6 +1464,10 @@
     },
     "src/base/run-chooser-style.ts": {
       "sha256": "62cd0b43762dbe406958d929ee6d27440658ffaead40bb51229eca7c4aea0756",
+      "executable": false
+    },
+    "src/base/run-pricing.ts": {
+      "sha256": "f95bdf9b5e62c7d302e97a57ae4dcb580846197fa4cf2222e17a5e1b2c0a02fd",
       "executable": false
     },
     "src/base/run-site.ts": {
@@ -4811,7 +4815,7 @@
       "executable": false
     },
     "src/site/docs/DocsArticle.tsx": {
-      "sha256": "02d4ae07b0df3d7c54f257baac14d67aca401143726efb30488e259933880d56",
+      "sha256": "0923705e9a19c203c7424597b47fb535c68a18b097867836c082d71212c56666",
       "executable": false
     },
     "src/site/docs/DocsIndex.tsx": {
@@ -4914,6 +4918,10 @@
       "sha256": "387317e9920b1a45650d38956eb27f8db48d970df43e1ce91e3309c135d66a55",
       "executable": false
     },
+    "src/site/run.ts": {
+      "sha256": "109af7c25f4227a6ff9ed61402de6009e9199d39aa975693e8a6d94143fe639f",
+      "executable": false
+    },
     "src/site/shell/Actions.tsx": {
       "sha256": "970ac3c0c99aebaebe74a2dfc21c32f9036683ea6656a945ee6526babf45297e",
       "executable": false
@@ -4935,7 +4943,7 @@
       "executable": false
     },
     "src/site/styles/docs.css": {
-      "sha256": "6622b75839008cc62805feac3d7ea9c31ad3efff4c945b532ab9bd50140df763",
+      "sha256": "6bc298cb139589d9fc6dc46bad9ffb3969b24593d237f7c5e8fdb7de63f27fe9",
       "executable": false
     },
     "src/site/styles/landing.css": {

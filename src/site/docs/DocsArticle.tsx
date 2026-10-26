@@ -27,7 +27,7 @@ export function DocsArticle({ slug }: { slug: string }) {
             <TitleDots />
             <p className="docs-summary">{page.summary}</p>
           </header>
-          <div className="docs-prose" dangerouslySetInnerHTML={{ __html: page.html }} />
+          <div className="docs-prose" data-page={slug} dangerouslySetInnerHTML={{ __html: page.html }} />
         </article>
         {(previous || next) && <nav className="docs-pager" aria-label="Previous and next">
           {previous ? <a className="card docs-pager-link" href={docsPath(previous.slug)} rel="prev"><span>Previous</span>{previous.title}</a> : <span />}
