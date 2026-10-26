@@ -1371,7 +1371,7 @@
       "executable": false
     },
     "scripts/installer/business-carry.mjs": {
-      "sha256": "caf51c878431df84a3cb14cc5f662b829d52ab2061865a7192c69c78467575f8",
+      "sha256": "e2c759f3e362576ba19239af37a0ef24b2e3d985857c97bb6d19910b54febf52",
       "executable": false
     },
     "scripts/installer/erasure-history.mjs": {
@@ -6008,6 +6008,10 @@
     },
     "tests/app/budgets.test.mjs": {
       "sha256": "0173ca929698a5413008604f510717890c9f5ad666d3da8e069b9fdb005e640d",
+      "executable": false
+    },
+    "tests/app/business-carry-journey.mjs": {
+      "sha256": "57a081033e9457dfbc735417443ce365efb1d019723b7c9e6a02899bf5f6a4b6",
       "executable": false
     },
     "tests/app/capture-fixtures.mjs": {
