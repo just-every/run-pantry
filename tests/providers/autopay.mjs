@@ -62,7 +62,7 @@ try {
     if (new URL(request.url).pathname === '/v1/events') return Response.json({ data: [], has_more: false })
     if (request.method === 'POST' && new URL(request.url).pathname === '/v1/payment_intents') receipt.paymentSubmissions = (receipt.paymentSubmissions ?? 0) + 1
     const response = await fetch(request.url, { method: request.method, headers: Object.fromEntries(['authorization', 'content-type', 'stripe-version', 'idempotency-key'].filter(n => request.headers.has(n)).map(n => [n, request.headers.get(n)])), ...(!['GET', 'HEAD'].includes(request.method) ? { body: await request.text() } : {}),signal:AbortSignal.timeout(20000) })
-    if(response.status>=400){const failure=await response.clone().json().catch(()=>({}));const parameter=failure.error?.param;receipt.providerFailure={http:response.status,code:failure.error?.code??null,parameter:typeof parameter==='string'&&/^[a-zA-Z0-9_\[\].]+$/.test(parameter)?parameter:null};await retain()}
+    if(response.status>=400){const failure=await response.clone().json().catch(()=>({}));const parameter=failure.error?.param;receipt.providerErrors??=[];receipt.providerErrors.push({http:response.status,code:failure.error?.code??null,confirmedDecline:response.status===402&&failure.error?.payment_intent?.status==='requires_payment_method',parameter:typeof parameter==='string'&&/^[a-zA-Z0-9_\[\].]+$/.test(parameter)?parameter:null});await retain()}
     return new Response(await response.arrayBuffer(), { status: response.status, headers: Object.fromEntries([...response.headers].filter(([name])=>!['content-encoding','content-length','transfer-encoding'].includes(name))) })
   } })
   browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
@@ -138,11 +138,13 @@ try {
   session = await stripe(`/checkout/sessions/${setups.session_id}?expand[]=setup_intent`)
   assert.equal(intent?.status, 'succeeded', 'Hosted ACH setup has not completed')
   assert.equal(session.status, 'complete', 'Checkout has not completed')
+  receipt.setupStatus = intent.status
   await page.goto(`${app.origin}/i/${invoice.link_token}?autopay_setup=${session.id}`)
   await page.getByText(/Saved ACH bank account.*Autopay authorized/).waitFor()
   await stage('saved-ach-mandate')
   const saved = await view(`autopay/${customer.id}`)
   assert.equal(saved.saved.active, true); assert.ok(saved.saved.acceptedAt); assert.ok(saved.saved.acceptedIP); assert.match(saved.saved.mandateText, /electronic debits/)
+  receipt.authorization = { active: saved.saved.active, textRetained: !!saved.saved.mandateText, acceptedAt: saved.saved.acceptedAt, trustedIpRetained: !!saved.saved.acceptedIP }
   const due = invoice.due_date
   await app.cron(Date.parse(due + 'T16:00:00Z'))
   let state = await view(`autopay/${customer.id}`)
