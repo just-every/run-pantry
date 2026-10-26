@@ -29,10 +29,21 @@ const stripe = async (path, params) => {
   assert.equal(response.status, 200, `Stripe HTTP ${response.status}`)
   return response.json()
 }
+async function hostedFrames() {
+  const frames = page.frames()
+  const bank = frames.find(frame => frame.url().includes('/linked-accounts-inner-'))
+  if (bank && await (await bank.frameElement()).isVisible().catch(() => false)) {
+    return frames.filter(frame => {
+      for (let current = frame; current; current = current.parentFrame()) if (current === bank) return true
+      return false
+    })
+  }
+  return frames
+}
 async function findInFrames(build, timeout = 15000) {
   const end = Date.now() + timeout
   while (Date.now() < end) {
-    for (const frame of page.frames()) {
+    for (const frame of await hostedFrames()) {
       const locator = build(frame).first()
       if (await locator.isVisible().catch(() => false)) return locator
     }
@@ -41,7 +52,7 @@ async function findInFrames(build, timeout = 15000) {
   throw new Error('The expected hosted Stripe control was not available')
 }
 async function visible(build) {
-  for (const frame of page.frames()) { const locator = build(frame).first(); if (await locator.isVisible().catch(() => false)) return locator }
+  for (const frame of await hostedFrames()) { const locator = build(frame).first(); if (await locator.isVisible().catch(() => false)) return locator }
   return null
 }
 try {
