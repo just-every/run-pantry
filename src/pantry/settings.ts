@@ -157,7 +157,7 @@ export const settingsCommands: Record<string, Command> = {
 
 export async function settingsView(c: Context): Promise<Data> {
   const owner = c.actor.kind === 'person' && c.actor.role === 'owner'
-  let business = null
+  let business: { name: string; legalName: string | null; origin: string; url: string } | null = null
   try {
     const carried = JSON.parse(c.env.RER_BUSINESS ?? 'null')
     const origin = carried && new URL(carried.origin)
