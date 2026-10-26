@@ -11,14 +11,14 @@ import { TOKEN } from './worker.mjs'
 import { providerWorker } from './provider-worker.mjs'
 
 test('INVOICE-009 customer records edit contacts and defaults, show every current record and email outcome, and drill through at 1440 and 390', async t => {
-  const app = await providerWorker({ bindings: {}, outbound: async request => {
+  const app = await providerWorker({ clock: true, bindings: {}, outbound: async request => {
     const url = new URL(request.url)
     assert.equal(url.hostname, 'api.stripe.com')
     assert.equal(url.pathname, '/v1/account')
     return Response.json({ id: 'acct_customer_record', country: 'US', default_currency: 'usd', business_profile: { name: 'Juniper Lane Design' } })
   } }); t.after(() => app.close())
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
-  const owner = await browser.newContext()
+  const owner = await browser.newContext({extraHTTPHeaders:{'x-synthetic-pantry-clock':'2026-10-30T12:00:00Z'}})
   assert.equal((await owner.request.post(`${app.origin}/auth/bootstrap`, { headers: { origin: app.origin }, data: { token: TOKEN, displayName: 'Rosa Rivera' }, maxRedirects: 0 })).status(), 303)
   await owner.request.post(`${app.origin}/setup`, { headers: { origin: app.origin }, form: { confirm: 'yes' }, maxRedirects: 0 })
   const command = async (op, data) => { const r = await owner.request.post(`${app.origin}/api/pantry/command/${op}`, { headers: { origin: app.origin }, data }); assert.equal(r.status(), 200, `${op}: ${await r.text()}`); return r.json() }
@@ -30,7 +30,7 @@ test('INVOICE-009 customer records edit contacts and defaults, show every curren
   const bank = await command('bank-account.save', { name: 'Operating checking', institution: 'Chase', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-01-01', openingBalance: '0.00' })
   const storageState = await owner.storageState()
   for (const width of [1440, 390]) {
-    const context = await browser.newContext({ storageState, viewport: { width, height: width === 390 ? 844 : 1000 } })
+    const context = await browser.newContext({ storageState, extraHTTPHeaders:{'x-synthetic-pantry-clock':'2026-10-30T12:00:00Z'}, viewport: { width, height: width === 390 ? 844 : 1000 } })
     const page = await context.newPage(), errors = []; page.on('pageerror', e => errors.push(String(e)))
     const name = `Cedar Studio ${width}`, notes = `Internal purchasing review ${width}`
     await page.goto(`${app.origin}/app/sales?tab=contacts`)
@@ -79,7 +79,7 @@ test('INVOICE-009 customer records edit contacts and defaults, show every curren
     await page.getByText('Not sent: local run', { exact: true }).first().waitFor()
     await page.screenshot({ path: `/tmp/sx-pantry-r12-invoice-send-${width}.png`, fullPage: true })
     const sales = await view('sales'), sent = { deliveries: sales.deliveries.filter(d => d.invoice_id === inv.id) }
-    const customerContext = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 1000 } }), hosted = await customerContext.newPage()
+    const customerContext = await browser.newContext({ extraHTTPHeaders:{'x-synthetic-pantry-clock':'2026-10-30T12:00:00Z'}, viewport: { width, height: width === 390 ? 844 : 1000 } }), hosted = await customerContext.newPage()
     await hosted.goto(`${app.origin}/i/${sales.invoices.find(i => i.id === inv.id).link_token}`)
     await hosted.getByRole('button', { name: 'Pay by card', exact: true }).waitFor()
     assert.equal(await hosted.getByRole('button', { name: 'Pay by bank account (ACH)', exact: true }).count(), 0)
