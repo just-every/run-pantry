@@ -6206,8 +6206,12 @@
       "sha256": "ef6dc3efe8e4a75e8d47d9aefc87339dfeec6507be7516368422530102302b4c",
       "executable": false
     },
+    "tests/providers/autopay-card-schedule.mjs": {
+      "sha256": "f6b2e2ddf789fc79982e8a65deb1773836d3790a349d4cd9e5a381913bd7f42a",
+      "executable": false
+    },
     "tests/providers/autopay-card.mjs": {
-      "sha256": "c56d31bbed90fada57135b95d82ee127bd62547da007fc8afa4b4cf1415450b8",
+      "sha256": "43d449478ebcf44de1d9a2b76379a45d0756cdc04de5f408e3edf7ddaf3be385",
       "executable": false
     },
     "tests/providers/autopay.mjs": {
