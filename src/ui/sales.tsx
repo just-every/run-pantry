@@ -38,7 +38,7 @@ function InvoicePanel({ i, data, onChange, onEdit, onCredit }: { i: D; data: D; 
   const selfAllowed = canSelfApprove(state, i) && !(i.kind === 'credit' && data.invoices.some((target: D) => target.id === i.credit_for && target.self_approval && JSON.parse(target.self_approval).person === state.actor.email))
   const untaxed = i.lines.filter((l: D) => !l.tax_code).length
   return <Card title={<>{i.customer_name} — {i.number}</>} actions={<Chip tone={tone}>{label}</Chip>}>
-    <p>{i.kind === 'credit' ? 'Credit' : 'Invoice'} for {usd(i.total_cents)}{i.kind === 'invoice' && i.status === 'issued' ? `, ${usd(i.open_cents)} open, due ` : ', due '}{day(i.due_date)}.</p>
+    <p>{i.kind === 'credit' ? 'Credit' : 'Invoice'} for {usd(i.total_cents)}{i.kind === 'invoice' && ['issued','void'].includes(i.status) ? `, ${usd(i.open_cents)} open, due ` : ', due '}{day(i.due_date)}.</p>
     {i.estimate_id && <div className="callout"><strong><a href={`/app/sales?tab=estimates&estimate=${encodeURIComponent(i.estimate_id)}`}>View accepted estimate</a></strong><span>Previously billed: {usd(i.estimate_billed_before_cents)} · This invoice: {usd(i.total_cents)} · Remaining: {usd(i.estimate_remaining_cents)}</span><span>This invoice keeps the accepted estimate's pricing.</span></div>}
     <ExemptionCitation invoice={i} />
     {!!i.write_off && <p>Bad-debt write-off · {i.memo}</p>}
@@ -115,7 +115,7 @@ function Invoices({ data, reload }: { data: D; reload: () => Promise<void> }) {
       <Card title="Invoices" actions={state.actor.can.record && <button type="button" className="btn btn-primary" onClick={() => setEditing({})}>Create invoice</button>}>
         <Table heads={['Customer', 'Number', 'Issue date', 'Due date', 'Amount', 'Open balance', 'Status']} figures={[4, 5]} empty={state.contacts.some((c: D) => c.kind === 'customer') ? 'No invoices yet.' : 'Add a customer first, then create an invoice.'}>
           {invoices.map(i => { const [label, tone] = invoiceStatus(i); return <tr key={i.id} className={selected === i.id ? 'selected' : ''} tabIndex={0} onClick={() => setSelected(i.id)} onKeyDown={k => { if (k.key === 'Enter') setSelected(i.id) }}>
-            <td>{i.customer_name}</td><td className="nowrap">{i.number}</td><td>{day(i.issue_date)}</td><td>{day(i.due_date)}</td><td className="fig">{i.kind === 'credit' ? '−' : ''}{usd(i.total_cents)}</td><td className="fig">{i.status === 'issued' ? usd(i.open_cents) : '—'}</td><td><Chip tone={tone}>{label}</Chip>{i.viewed_at ? <small className="sub"> · Viewed</small> : i.sent_at ? <small className="sub"> · Sent</small> : null}</td></tr> })}
+            <td>{i.customer_name}</td><td className="nowrap">{i.number}</td><td>{day(i.issue_date)}</td><td>{day(i.due_date)}</td><td className="fig">{i.kind === 'credit' ? '−' : ''}{usd(i.total_cents)}</td><td className="fig">{['issued','void'].includes(i.status) ? usd(i.open_cents) : '—'}</td><td><Chip tone={tone}>{label}</Chip>{i.viewed_at ? <small className="sub"> · Viewed</small> : i.sent_at ? <small className="sub"> · Sent</small> : null}</td></tr> })}
         </Table>
       </Card>
       {current ? <InvoicePanel key={current.id + current.revision} i={current} data={data} onChange={reload} onEdit={() => setEditing({ invoice: current })} onCredit={() => setEditing({ creditFor: current })} /> : <Card title="Invoice"><p>Choose an invoice to review, approve or issue it.</p></Card>}
@@ -229,7 +229,7 @@ export function Sales({ billId }: { billId?: string } = {}) {
   const location=useLocation()
   const initialTab=(()=>{
     const requested = new URLSearchParams(location.searchStr).get('tab')
-    return ({ templates: 'Invoice templates', contacts: 'Customers & vendors', bills: 'Bills', estimates: 'Estimates', deposits: 'Customer deposits' } as Record<string, string>)[requested ?? ''] ?? (billId || /^#?bill-/.test(location.hash) ? 'Bills' : 'Invoices')
+    return ({ templates: 'Invoice templates', contacts: 'Customers & vendors', bills: 'Bills', payments: 'Payments', estimates: 'Estimates', deposits: 'Customer deposits' } as Record<string, string>)[requested ?? ''] ?? (billId || /^#?bill-/.test(location.hash) ? 'Bills' : 'Invoices')
   })()
   const [requestedTab,setTab]=useState(initialTab)
   useEffect(()=>{setTab(initialTab)},[initialTab])
