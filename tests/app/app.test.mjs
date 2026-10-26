@@ -23,6 +23,7 @@ import { books } from './books.mjs'
 import { worker, TOKEN } from './worker.mjs'
 import { vendorCreditJourney } from './vendor-credit-journey.mjs'
 import { taxformJourney } from './taxform-journey.mjs'
+import { businessCarryJourney } from './business-carry-journey.mjs'
 
 test('MIGRATE-006 closed-year destination packages and open-year refusals at 1440 and 390',async t=>{await (await import('./migration-destinations.mjs')).destinationExportsBrowser(t)})
 
@@ -368,7 +369,8 @@ test('CAPTURE-004 phone and desktop receipt suggestions wait for their line, att
 })
 
 
-test('API-001 financial-report and vendor-credit credentials are explained, created, used and revoked at 1440 and 390', async t => {
+test('Settings carry the Business and API-001 financial-report and vendor-credit credentials are explained, created, used and revoked at 1440 and 390', async t => {
+  await businessCarryJourney()
   const app = await worker(); t.after(() => app.close())
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
   const owner = await browser.newContext(); t.after(() => owner.close())
