@@ -114,7 +114,7 @@ try {
         const connect = await visible(f => f.getByRole('button', { name: /connect bank account|add bank account|link bank account|choose bank/i }))
         if (connect) await connect.click()
         else {
-          const final = await visible(f => f.getByRole('button', { name: /^(save|set up|set up bank account|agree and save|continue|done)$/i }))
+          const final = await visible(f => f.getByRole('button', { name: /^(save|set up|set up bank account|agree and save|continue(?: to .+)?|done)$/i }))
           if (final) await final.click()
           else await page.waitForTimeout(1000)
         }
