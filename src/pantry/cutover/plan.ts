@@ -9,6 +9,11 @@ import { idsFor, type Package, type Parsed, type Rec, type Source } from './sour
 
 export function readPackage(source: Source, b: Data): Package {
   requireThat(b.files && typeof b.files === 'object', `Upload the ${source.name} export files`)
+  if (source.key === 'quickbooks-online' && b.files.apiSnapshot) {
+    const f = b.files.apiSnapshot
+    requireThat(typeof f.content === 'string' && f.content.length > 0 && f.content.length <= 8_000_000, 'Choose the complete QuickBooks API snapshot (up to 8 MB)')
+    return { files: { apiSnapshot: { name: 'quickbooks-api-snapshot.json', content: f.content } }, banks: Array.isArray(b.banks) ? b.banks : [], cutoverDate: b.cutoverDate }
+  }
   const files: Package['files'] = {}
   for (const f of source.files) {
     const file = b.files[f]

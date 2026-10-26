@@ -9,6 +9,8 @@ import { ageing } from '../reports'
 import { requireEntity } from '../settings'
 import { bundle, checks, mapping, mappingVersion, readPackage } from './plan'
 import { quickbooks } from './qbo'
+import { qboCommands, qboView } from './qbo-api'
+import { archiveOrphanStatements } from './archive-sources'
 import { targetsFor } from './target'
 import { xero } from './xero'
 import { xeroAvailability } from './xero-api'
@@ -128,7 +130,7 @@ const undo: Command = { need: 'post', async run(c, b) {
   requireThat(!accepted, 'The opening balances are posted; correct them with a reversal or adjusting entry instead of undoing the import', 409)
   try {
     const result = await undoD1Import(job.id, context(c, byNamespace(job.namespace), job.mapping_version, 'post'))
-    if (result.state === 'undone') await run(c.db, [authority(c.actor, 'post'), ...forgetCarried(), q('DELETE FROM pt_move_in_reports WHERE job_id = ?', job.id), audit(who(c.actor), 'move-in.undo', 'import', job.id, { state: result.state })])
+    if (result.state === 'undone') await run(c.db, [authority(c.actor, 'post'), ...forgetCarried(), ...archiveOrphanStatements(), q('DELETE FROM pt_move_in_reports WHERE job_id = ?', job.id), audit(who(c.actor), 'move-in.undo', 'import', job.id, { state: result.state })])
     return { job: result }
   } catch (e) {
     const message = String((e as Error).message)
@@ -146,6 +148,7 @@ export const moveInCommands: Record<string, Command> = {
   'move-in.accept': accept,
   'move-in.undo': undo,
   ...xeroCommands,
+  ...qboCommands,
   ...spreadsheetCommands,
 }
 
@@ -153,5 +156,5 @@ export async function moveInView(c: Context) {
   const jobs = (await all(c.db, `SELECT id, namespace, state, checkpoint, total, fingerprint, mapping_version, error FROM ik_jobs WHERE destination = 'books' AND namespace IN (${NAMESPACES.map(() => '?').join(', ')}) ORDER BY rowid DESC`, ...NAMESPACES))
     .map(j => ({ ...j, source: byNamespace(j.namespace).key }))
   const reports = (await all(c.db, 'SELECT * FROM pt_move_in_reports')).map(r => ({ jobId: r.job_id, source: r.source, cutoverDate: r.cutover_date, cameIn: JSON.parse(r.came_in), leftOut: JSON.parse(r.left_out) }))
-  return { jobs, reports, cutovers: await all(c.db, 'SELECT * FROM pt_cutovers ORDER BY cutover_date DESC, id'), history: Number((await one(c.db, 'SELECT COUNT(*) AS n FROM pt_history_lines'))?.n ?? 0), xero: await xeroView(c), spreadsheetMappings: await savedSpreadsheetMappings(c.db) }
+  return { jobs, reports, cutovers: await all(c.db, 'SELECT * FROM pt_cutovers ORDER BY cutover_date DESC, id'), history: Number((await one(c.db, 'SELECT COUNT(*) AS n FROM pt_history_lines'))?.n ?? 0), xero: await xeroView(c), qbo: c.actor.kind === 'person' && c.actor.role === 'owner' ? await qboView(c) : null, spreadsheetMappings: await savedSpreadsheetMappings(c.db) }
 }

@@ -1,6 +1,5 @@
 import { askJourney } from './ask-books-journey.mjs'
 import { managedMailJourney } from './managed-mail-journey.mjs'
-import { currencyJourney } from './currency-journey.mjs'
 import { archiveJourney } from './archive-journey.mjs'
 import { collectionsJourney } from './collections-journey.mjs'
 import { standingJourney } from './standing-journey.mjs'
@@ -25,7 +24,7 @@ import { worker, TOKEN } from './worker.mjs'
 import { vendorCreditJourney } from './vendor-credit-journey.mjs'
 import { taxformJourney } from './taxform-journey.mjs'
 
-test('CURRENCY-001 foreign amount worksheets at 1440 and 390',currencyJourney)
+test('MIGRATE-006 closed-year destination packages and open-year refusals at 1440 and 390',async t=>{await (await import('./migration-destinations.mjs')).destinationExportsBrowser(t)})
 
 test('MIGRATE-005 reviewed archive upload, placement and journal at 1440 and 390',archiveJourney)
 

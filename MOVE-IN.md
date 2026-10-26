@@ -66,7 +66,7 @@ The synthetic files in [`fixtures/xero`](fixtures/xero) are written in these lay
 3. **Undo** (post grant). Removes everything the import wrote, while nothing has been posted or edited. Records entered afterwards that use imported accounts or contacts block undo.
 4. **Accountant sign-off** (post grant). Re-checks that open invoices still equal opening receivables, unpaid bills equal payables and each bank's opening statement balance equals its opening book balance, records the approval of that exact cutover version, and posts the opening entry. From then on, corrections are reversing or adjusting entries; undo is refused.
 
-Keep the old system and its full archive available until a real close in Pantry is accepted by the accountant. The QuickBooks Online kit does not read QBO's separate attachments .zip: upload the source documents for open items in Documents.
+Keep the old system and its full archive available until a real close in Pantry is accepted by the accountant. The owner can review a separate attachment ZIP in Document archive originals. Exact source identities link originals; unmatched files wait for placement.
 
 ## Spreadsheets (CSV and Excel)
 

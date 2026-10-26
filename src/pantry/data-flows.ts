@@ -13,7 +13,7 @@ import { SERVICES, UNAVAILABLE } from './data-services'
 /** Owner-only, explicit projections: credential storage is never serialised. */
 export async function dataFlows(c: Context) {
   await ownerSession(c)
-  const [feeds, stripe, gusto, xero, model, inbox, hooks, integrations, agents] = await Promise.all([
+  const [feeds, stripe, gusto, xero, model, inbox, hooks, integrations, agents, qbo] = await Promise.all([
     all(c.db, 'SELECT institution_name,status FROM pt_feed_items ORDER BY institution_name'),
     one(c.db, 'SELECT account_name,country,settlement_currency FROM pt_stripe WHERE id=1'),
     one(c.db, 'SELECT company_name FROM pt_gusto WHERE id=1'),
@@ -21,9 +21,11 @@ export async function dataFlows(c: Context) {
     readerState(c.db,c.env), inboxView(c), webhookSettings(c),
     all(c.db,'SELECT id,name,scopes,revoked_at FROM pt_integrations ORDER BY name,id'),
     all(c.db,'SELECT id,name,active FROM pt_agents ORDER BY name,id'),
+    one(c.db,'SELECT realm_id,environment FROM pt_qbo_connection WHERE id=1 AND verified=1'),
   ])
   const mailProvider=String(c.env.MAIL_PROVIDER??'development')
   const states: Record<string, { connected: boolean; detail: string; unavailable?: string }> = {
+    qbo: {connected:!!qbo,detail:qbo?`Company ending ${String(qbo.realm_id).slice(-4)} · ${qbo.environment}`:'No QuickBooks company connected'},
     inkwell: { connected: false, detail: 'Owner-requested previews only; no saved credential or ongoing connection' },
     platter: { connected: false, detail: 'Owner-requested previews only; no saved credential or ongoing connection' },
     hosting: {connected:c.env.AUTH_LOCAL!=='true',detail:c.env.AUTH_LOCAL==='true'?'Local Worker and database; no Cloudflare deployment connection':'Deployed Worker and database in the installation’s configured hosting account'},

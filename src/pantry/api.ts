@@ -377,6 +377,12 @@ api.get('/api/pantry/package/:period', async c => {
   return new Response(body, { headers: { 'content-type': 'application/json', 'content-disposition': `attachment; filename="pantry-close-${period}${suffix(basis)}.json"`, 'cache-control': 'no-store' } })
 })
 
+api.get('/api/pantry/portability/export', async c => {
+  const ctx = await reader(c)
+  const { destinationExport } = await import('./portability')
+  return destinationExport(ctx, { destination: c.req.query('destination') as 'qbo' | 'xero', year: Number(c.req.query('year')) }, c.req.query('format') as 'zip' | 'json' || 'zip')
+})
+
 // The same package as an accountant opens it: a ZIP of CSV reports, the checklist, a README and the JSON.
 api.get('/api/pantry/package/:period/export', async c => {
   const ctx=await reader(c),period=c.req.param('period'),basis=await reportBasis(ctx.db,c.req.query('basis')),scope=await dimensionScope(ctx.db,c.req.query('dimension'),c.req.query('dimensionValue'))

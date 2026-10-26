@@ -4,6 +4,7 @@ import { date, requireThat, text } from '../core'
 import { usDate } from '../statement-files'
 import { amount, asOf, report as readReport } from './report'
 import { bankRecords, collector, type Account, type Package, type Parsed, type Source, type TbRow } from './source'
+import { parseQboSnapshot } from './qbo-snapshot'
 
 const FILES = ['accounts', 'customers', 'vendors', 'trialBalance', 'openInvoices', 'unpaidBills', 'generalLedger'] as const
 const LABELS: Record<string, string> = { accounts: 'Account List', customers: 'Customer Contact List', vendors: 'Vendor Contact List', trialBalance: 'Trial Balance', openInvoices: 'Open Invoices', unpaidBills: 'Unpaid Bills', generalLedger: 'General Ledger' }
@@ -29,6 +30,7 @@ const ACCOUNT_TYPES: Record<string, [string, string]> = {
 }
 
 function parse(p: Package): Parsed {
+  if (p.files.apiSnapshot) return parseQboSnapshot(p)
   const c = collector(), { attempt, refuse } = c
 
   const accounts = report(p.files.accounts.content, ['type', 'detail type'], 'Account List')
@@ -106,11 +108,11 @@ function parse(p: Package): Parsed {
   c.out.push({ kind: 'cutover', sourceId: cutoverDate, payload: { date: cutoverDate, rows: tbRows }, artifact: 'trialBalance', row: 0 })
   return { list: c.out, cutoverDate, tbRows, accountNames, extraChecks: [], notImported: [
     { what: 'General ledger transactions as ledger entries', count: history, why: 'They come in as read-only history lines for reference; the trial balance carries their effect, so posting them again would count them twice.' },
-    { what: 'Attachments', count: 0, why: 'QuickBooks Online exports attachments in a separate .zip that Pantry does not read; upload source documents in Documents.' },
+    { what: 'Attachments', count: 0, why: 'Review the separate attachment archive in Document archive originals; files without exact source matches wait for owner placement.' },
   ] }
 }
 
 export const quickbooks: Source = {
   key: 'quickbooks-online', name: 'QuickBooks Online', prefix: 'qbo', namespace: 'qbo-cutover', files: FILES, labels: LABELS, parse,
-  missingDocuments: n => `QuickBooks Online exports attachments separately and this import does not read them: ${n} open invoices and bills will have no source document in Pantry until you upload them.`,
+  missingDocuments: n => `${n} open invoices and bills need their source originals. Review a separate attachment archive in Document archive originals, or upload files in Documents.`,
 }

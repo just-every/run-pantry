@@ -94,7 +94,7 @@ When every tie-out shows **All match** and no row is refused, choose **Import as
 
 The import writes the accounts, contacts, bank accounts, open items and the opening balances as a draft entry, and keeps the history read-only. Nothing posts yet. The page keeps what came in and what did not.
 
-While nothing has been posted or edited, someone with the post grant can choose **Undo import** to remove all of it, attachments included.
+While nothing has been posted or edited, someone with the post grant can choose **Undo import** to remove staged records and attachments carried directly from Xero. Independently reviewed archive originals remain in Pantry and return to the placement queue when their transaction is removed.
 
 ## Attachments from Xero
 
@@ -111,10 +111,33 @@ Carrying attachments needs a Xero app of your own, made with your Xero login. Un
 
 On RER Managed, carrying attachments over from Xero is not available yet: a managed installation cannot reach Xero until RER adds a provider relay, and the page says so. Upload the files in **Documents** instead.
 
-QuickBooks Online exports attachments in a separate download that this kit does not read: upload the source documents for your open items in **Documents**.
+Review a separate attachment download in **Document archive originals**. Files with exact moved source identities can be linked; the rest wait for owner placement.
 
 ## Accountant sign-off
 
 Sign-off is by someone with the post grant who did not run the import, or by the owner. They choose **Accountant sign-off**. Pantry re-checks the tie-outs, records the approval and posts the opening balances, so Pantry's trial balance at the cutover date is the old system's, account by account. From then on, corrections are entries, never undo.
 
 Keep your old system and its archive until your accountant accepts your first close in Pantry.
+
+
+## Read a company from QuickBooks Online
+
+On a self-hosted installation, the owner can use the advanced authenticated HTTP commands `move-in.qbo.connect` and `move-in.qbo.read` through the native command route. Set the installation’s own `QBO_CLIENT_ID` and `QBO_CLIENT_SECRET`; connect takes the authorized company ID, environment and Intuit refresh grant. Pantry verifies the selected company before permitting reads. The encrypted grant is excluded from book archives. `move-in.qbo.disconnect` forgets it; revoke the app in Intuit to invalidate authorization. A connection form, Pantry Connect and the browser OAuth callback remain unimplemented. The grant can permit writes, but these Pantry commands only read the company.
+
+The reader pages through accounts, customers, vendors, invoices, bills and attachment inventory, and requests the accrual trial balance and general ledger. Its complete JSON snapshot enters `move-in.preview` as `files.apiSnapshot`, with a chosen history start, cutover date and independently reconciled bank details. The existing staged import, undo and sign-off apply. Current open balances must agree with the chosen trial balance; historical balances affected by later settlements are refused rather than guessed.
+
+This remains a partial migration: history is reference data rather than replayed postings. Monthly comparisons, parallel-run detection, original downloads, reconciliation state, items, classes, locations, terms and tax-code replay are not implemented by this reader.
+
+## Document archive originals
+
+The owner can select a vendor ZIP or a JSON or CSV manifest with extracted originals. ZIPs support stored and deflated files, nested relative paths, and one embedded `manifest.json`, `attachments.json`, `documents.json` or CSV equivalent. Multiple embedded manifests require an explicit selection. Encrypted, corrupt or unsafe archives are refused. Each batch accepts at most 100 originals and 8 MB of original bytes.
+
+A manifest can declare `provider`, `archiveKey` and `files`. Each file names its exact `path`, `sourceId` and optional `sourceSystem`, `transactionSourceId`, `kind` and `sha256`. Explicit QuickBooks attachment references and Xero invoice identities are also recognized. A path only locates bytes; filenames and party names never infer transaction links. Exact IDs are resolved against confirmed owner mappings and published moved history. Ambiguous and unknown identities stay visible for placement.
+
+Preview the hashes and placement, then import the reviewed originals. The private journal preserves source IDs, original hashes, byte counts and mapping evidence. Owner placement can record the exact external source identity for subsequent archives. Originals are kept until owner deletion; undo detaches them from removed imported transactions. Restoring a book archive preserves these originals, mappings and the unplaced queue. Source-contact erasure retains original financial evidence until the owner confirms expiry. An original whose bytes were erased cannot be imported again under a new export identity.
+
+## Export a closed year to another accounting system
+
+Open **Export a closed year to another accounting system** under Move in. The owner or an accountant with unmasked access to all books can choose QuickBooks Online or Xero and a closed fiscal year. Review the manifest and download its ZIP. It includes provider CSV resources, native request templates, exact source records, posted history, trial balances, open balances and original documents with hashes. Source history needed for the closing balance is retained; draft entries are excluded.
+
+The package names destination mappings and unsupported records explicitly. It sends nothing to either destination. Resolve every issue using actual destination accounts and IDs, use one import method for each resource, and compare the destination trial balance, open items and document hashes afterward. Generation of a package does not prove that either provider has accepted it.

@@ -78,6 +78,7 @@ test('PAN-13 a period closes through its checklist and lock; locked dates refuse
 })
 
 test('PAN-14 the accountant package holds the period\'s reports, reconciliations, approvals and reversal history', async t => {
+  await (await import('./portability-journey.mjs')).destinationPortability(t)
   const h = await harness(); t.after(() => h.close())
   const { s, st } = await reconciledSeptember(h)
   const fix = await h.command('journal.save-draft', { date: '2026-09-29', memo: 'Equipment', lines: [{ accountId: s.acct['1500'], debit: '300.00' }, { accountId: s.acct['3000'], credit: '300.00' }] })

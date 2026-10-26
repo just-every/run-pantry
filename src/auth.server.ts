@@ -50,6 +50,9 @@ export interface Bindings {
  /** Attachments carried over from Xero at move-in: this installation's own Xero app (self-hosted installs). */
  XERO_CLIENT_ID?: string
  XERO_CLIENT_SECRET?: string
+ /** This installation's own Intuit app, used only for an owner-authorized move-in. */
+ QBO_CLIENT_ID?: string
+ QBO_CLIENT_SECRET?: string
  /** Payroll from Gusto: this installation's own Gusto app (self-hosted installs). */
  GUSTO_CLIENT_ID?: string
  GUSTO_CLIENT_SECRET?: string

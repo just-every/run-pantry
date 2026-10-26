@@ -14,6 +14,7 @@ async function cutoverPackage(overrides = {}) {
 const count = async (h, table) => Number((await h.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first()).n)
 
 test('PAN-16 a QuickBooks Online cutover is previewed, imported as staged records, undone or signed off by the accountant', async t => {
+  await (await import('./qbo-journey.mjs')).qboApiJourney(t)
   const h = await harness(); t.after(() => h.close())
   await h.command('entity.save', { legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2026-09-01' })
   const bea = await h.member('bea@example.test', 'bookkeeper'), ann = await h.member('ann@example.test', 'accountant', { canPost: true })
@@ -257,7 +258,8 @@ import {dimensionOpening} from './dimension-opening.mjs'
 test('DIM-001 staged spreadsheet opening dimensions validate, sign off and split without losing account tie-outs',dimensionOpening)
 
 test('MIGRATE-005 reviewed archive originals retain exact bytes, source-ID mappings, unlinked placement and journal hashes',async t=>{
- const h=await harness();t.after(()=>h.close());const {archiveScenario,hash}=await import('./archive-journey.mjs'),{invoice,bill,batch,file}=await archiveScenario(h)
+ await (await import('./archive-erasure.mjs')).archiveErasureJourney(t)
+ const h=await harness();t.after(()=>h.close());const {archiveScenario,archiveFormatsJourney,hash}=await import('./archive-journey.mjs'),scenario=await archiveScenario(h),{invoice,bill,batch,file}=scenario
  const preview=await h.command('archive.preview',batch);assert.equal(preview.files[0].linkedId,invoice.id);assert.equal(preview.files[1].linkedId,null)
  await h.command('archive.import',{...batch,fingerprint:'stale'},undefined,409)
  let result=await h.command('archive.import',{...batch,fingerprint:preview.fingerprint});assert.equal(result.archives[0].file_count,2);assert.equal(result.unlinked.length,1);assert.equal(result.files[0].sha256,hash(batch.files[0]))
@@ -268,5 +270,6 @@ test('MIGRATE-005 reviewed archive originals retain exact bytes, source-ID mappi
  for(const provider of ['quickbooks-online','freshbooks','dext','xero']){const p={provider,archiveKey:'synthetic-pantry-40',files:[file(41,{sourceSystem:'xero',transactionSourceId:'synthetic-pantry-30',kind:'invoice'})]},v=await h.command('archive.preview',p);assert.equal(v.files[0].linkedId,invoice.id);await h.command('archive.import',{...p,fingerprint:v.fingerprint})}
  const bad={...batch,archiveKey:'synthetic-pantry-50',files:[file(51,{sha256:'bad'})]};await h.command('archive.preview',bad,undefined,400)
  const viewer=await h.member('synthetic-pantry-52@example.test','viewer');await h.view('document-archives',viewer,403);await h.command('archive.preview',batch,viewer,403)
- const event=await h.db.prepare("SELECT detail FROM pt_audit WHERE action='move-in.archive' AND subject_id=?").bind(result.id).first(),detail=JSON.parse(event.detail);assert.equal(detail.count,2);assert.deepEqual(detail.files.map(f=>f.sha256).sort(),batch.files.map(hash).sort())
+ const event=await h.db.prepare("SELECT detail FROM pt_audit WHERE action='move-in.archive' AND subject_id=?").bind(result.id).first(),detail=JSON.parse(event.detail);assert.equal(detail.count,2);assert.deepEqual(detail.files.map(f=>f.sha256).sort(),batch.files.map(hash).sort());await archiveFormatsJourney(h,scenario)
+ const retained=await h.view('document-archives'),staged=(await h.view('move-in')).jobs.find(j=>j.state==='completed');await h.command('move-in.undo',{jobId:staged.id});const detached=await h.view('document-archives');assert.equal(detached.files.length,retained.files.length);assert.equal(detached.unlinked.length,retained.files.length);assert.deepEqual(detached.links,[]);for(const f of detached.files)assert.equal((await h.send('/api/pantry/documents/'+f.document_id,undefined,{cookie:h.owner})).status,200)
 })

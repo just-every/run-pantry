@@ -5,7 +5,7 @@ export type SourceUi = { key: SourceKey; name: string; files: [string, string, s
 
 export const SOURCES: SourceUi[] = [
   { key: 'quickbooks-online', name: 'QuickBooks Online', bankName: 'QuickBooks account name',
-    intro: 'Run each report in QuickBooks Online for the cutover date, export it unchanged and save it as CSV. Attachments export separately; upload source documents in Documents afterwards.',
+    intro: 'Run each report in QuickBooks Online for the cutover date, export it unchanged and save it as CSV. Attachments export separately; review their originals below.',
     files: [
       ['accounts', 'Account List', 'Reports → Account List'],
       ['customers', 'Customer Contact List', 'Reports → Customer Contact List'],

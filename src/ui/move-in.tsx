@@ -9,6 +9,7 @@ import { Icon } from './icons'
 import { COUNT_LABEL, SOURCES, sourceName, type SourceKey } from './move-in-sources'
 import { MoveInSpreadsheets } from './move-in-spreadsheets'
 import { XeroAttachments } from './move-in-xero'
+import { Portability } from './portability'
 
 type Bank = { account: string; institution: string; last4: string; statementBalance: string }
 const moveInName = (key: string) => key === 'spreadsheet' ? 'Spreadsheet' : sourceName(key)
@@ -104,6 +105,7 @@ export function MoveIn() {
       {error && <p role="alert" className="error">{error}</p>}
     </>}
     {shared.state.actor.role === 'owner' && <DocumentArchives />}
+    {['owner', 'accountant'].includes(shared.state.actor.role) && <details><summary>Export a closed year to another accounting system</summary><Portability /></details>}
     {status.data && status.data.jobs.length > 0 && <Card title="Import journal">
       <Table heads={['Import', 'From', 'State', 'Records', 'Error']} figures={[3]}>{status.data.jobs.map((j: D) => <tr key={j.id}><td><code>{j.id.slice(0, 8)}</code></td><td>{moveInName(j.source)}</td><td>{j.state === 'completed' ? <Chip tone="good">Imported</Chip> : j.state === 'undone' ? <Chip>Undone</Chip> : <Chip tone="warn">{j.state}</Chip>}</td><td className="fig">{j.checkpoint} of {j.total}</td><td>{j.error ?? '—'}</td></tr>)}</Table>
     </Card>}

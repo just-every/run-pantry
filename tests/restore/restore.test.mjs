@@ -18,6 +18,7 @@ import { books } from '../app/books.mjs'
 import {dimensionsForRestore,assertDimensionsRestored} from './dimensions.mjs'
 import { estimatesForRestore, assertEstimatesRestored } from './estimates.mjs'
 import { captureForRestore, assertCaptureRestored } from './capture.mjs'
+import { archivesForRestore, assertArchivesRestored } from './archives.mjs'
 
 const source = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const entry = join(source, 'node_modules/@runeditrun/rer/global/rer.mjs')
@@ -147,6 +148,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   await command('customer.invoice-template', { customerId: customer.id, revision: customer.revision, templateId: branded.id })
   const brandedDraft = await command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-09-20', customFields: { po: 'PO-RESTORE' }, lines: [{ description: 'Retained engagement', quantity: '1', rate: '100.00', accountId: income, taxCode: 'exempt' }] })
   await command('invoice.approve', { id: brandedDraft.id, revision: brandedDraft.revision }); await command('invoice.issue', { id: brandedDraft.id })
+  const archiveOriginals=await archivesForRestore(context,server.origin,brandedDraft.id)
   await command('bill.schedule', { id: bill.id, revision: bill.revision, date: '2026-09-24', note: 'Bank transfer outside Pantry' })
   await command('recurring-bill.save', { name: 'Archived rent', vendorId: vendor.id, startDate: '2026-06-30', endDate: '2026-08-30', every: 1, unit: 'month', termsDays: 15, lines: [{ description: 'Monthly rent', amount: '1200.00', accountId: rent }] })
   await command('recurring-bill.generate', { through: '2026-09-30' })
@@ -232,6 +234,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   assert.deepEqual(restored.view, before.view, 'the fresh install holds the same books')
   assert.deepEqual(restored.bytes, pdf, 'the document comes back byte for byte')
   await assertCaptureRestored(context, server.origin, captured)
+  await assertArchivesRestored(context,server.origin,archiveOriginals)
   await assertEstimatesRestored(context, server.origin, estimates)
   await assertDimensionsRestored(context,server.origin,dimensionEvidence)
   const dataFlows=await (await context.request.get(`${server.origin}/api/pantry/data-flows`)).json()
