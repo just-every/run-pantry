@@ -25,9 +25,9 @@ async function linked(db: D1Database, token: string) {
 
 export async function publicAutopay(env: Bindings, db: D1Database, token: string) {
   const inv = await linked(db, token), state = await policyState(env, db, inv.customer_id), view = await autopayView(env, db, inv.customer_id)
-  const { acceptedIP: _privateIP, ...saved } = view.saved ?? {}
+  const saved = view.saved ? {method:view.saved.method,active:view.saved.active,revoked:!!view.saved.revokedAt} : null
   return { invoiceId: inv.id, customerName: inv.customer_name, policy: view.policy ? { revision: view.policy.revision, purpose: view.policy.purpose, enabled: view.policy.enabled, valid: view.policy.valid, retryDays: view.policy.retryDays, schedule: view.policy.schedule, recurringId: view.policy.recurring_id } : null,
-    mandateText: await mandateText(db, state), methods: view.methods, saved: view.saved ? saved : null }
+    mandateText: await mandateText(db, state), methods: view.methods, saved }
 }
 
 export async function startAutopaySetup(env: Bindings, db: D1Database, token: string, body: Data, request: Request) {

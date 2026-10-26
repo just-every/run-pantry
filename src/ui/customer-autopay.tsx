@@ -18,7 +18,7 @@ export function CustomerAutopay({ customerId }: { customerId: string }) {
       <Form label="Approve autopay schedule" submit={b => command('autopay.policy', { customerId, recurringId: b.recurringId, purpose: b.purpose, retryDays: String(b.retryDays).split(',').filter(Boolean).map(Number), consent: b.consent === 'on', enabled: true })} onDone={reload}>
         <Field label="Recurring template" name="recurringId" required defaultValue={p?.recurring_id} options={templates.map((r: D) => ({ value: r.id, label: `${r.number} · ${r.customer_name}` }))} />
         <Field label="Charge purpose" name="purpose" required defaultValue={p?.purpose} />
-        <Field label="Retry days after due date" name="retryDays" required defaultValue={p?.retryDays.join(', ') ?? '1, 3, 7'} />
+        <Field label="Retry days after first attempt" name="retryDays" required defaultValue={p?.retryDays.join(', ') ?? '1, 3, 7'} />
         <label className="check"><input type="checkbox" name="consent" required /> I approve this schedule and the retry email template above for this customer.</label>
       </Form>
     </details>

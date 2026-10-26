@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "83e0ebc3c8bb35c676693e7db3270be4f1428409ab981141be9650967ff68487",
+      "sha256": "d944c604b0124ae0741512c5e03515a044dcb858f5d74f832b085201189207af",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "bf69fa70cf675229c0baa39953cc3689427eaf654e8177dee4b9a021fbed56d1",
+      "sha256": "abcd4561738bade78dd10ae175f0bbc726d0553e2b418693c3919d7575677d96",
       "executable": false
     },
     "DEMO.md": {
@@ -403,7 +403,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "38b656ce293f99e75084a2e9f43ba13c0c26e3d919798ae3717d5052b79c1b4a",
+      "sha256": "118cc3d4e9fafe23fc49d93ce456aca43aef437cfe292f3bbaaf3f1a3deca7c3",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -3339,7 +3339,7 @@
       "executable": false
     },
     "src/pantry/autopay-page.ts": {
-      "sha256": "062e5a262cf210a0155ac15950bab311f1aa40418188d23726712f4a486d19d7",
+      "sha256": "567a5ea24a927ddb3375d9179d7d69b9293f7997da8ca37ce71ce2b378f5cd2b",
       "executable": false
     },
     "src/pantry/autopay/index.ts": {
@@ -3371,7 +3371,7 @@
       "executable": false
     },
     "src/pantry/autopay/setup.ts": {
-      "sha256": "5fd05d42d39087658e7c25d56780d5fa426783e415e83a9803b3b4f1d21b5c8b",
+      "sha256": "5be1bf6077c64f72e38c1925dd7ac611e6f6a94a2644a225a18827b2ab0e486d",
       "executable": false
     },
     "src/pantry/bank-lines.ts": {
@@ -3683,7 +3683,7 @@
       "executable": false
     },
     "src/pantry/data-services.ts": {
-      "sha256": "eecfb7eba0da27d41bb089d63dd7992537d6a470eb79caa3d976ea106c6f90e7",
+      "sha256": "e30bbf14f8fd01ac54468b5d285d0d8b552d6a819c243b5577c1f5e4a17f3933",
       "executable": false
     },
     "src/pantry/db.ts": {
@@ -5283,7 +5283,7 @@
       "executable": false
     },
     "src/ui/customer-autopay.tsx": {
-      "sha256": "6a2f5a764e805c4db900c0c3bad979689794429871603c4b2387c295bd758840",
+      "sha256": "fd26dff662e40be4217bceb9b837892016a746ee3f51940d6f5c7cc1147d9d49",
       "executable": false
     },
     "src/ui/customer-deposits.tsx": {
@@ -5659,7 +5659,7 @@
       "executable": false
     },
     "tests/api/autopay-journey.mjs": {
-      "sha256": "76d900d3284c49c50dc47f7f9ee349992c2b579f9cfa9ce8ecae303e05aac228",
+      "sha256": "d98259aa040f86bbedecca96eeba4642faa35e692d9353e85eb9eae3ed3b9787",
       "executable": false
     },
     "tests/api/bank.test.mjs": {
@@ -5971,7 +5971,7 @@
       "executable": false
     },
     "tests/app/autopay-journey.mjs": {
-      "sha256": "ac5808b1596e03e538501e9a07f7249690e92a1a141490239c5481d21ba28852",
+      "sha256": "cb519763431dd9772aa6cce4738d863220b0b4778d00b00fcfb9c0f51cc41dcf",
       "executable": false
     },
     "tests/app/bank-rules.test.mjs": {
@@ -6195,7 +6195,7 @@
       "executable": false
     },
     "tests/providers/autopay.mjs": {
-      "sha256": "410cdd5d7321cc53daa35f4688b5985c520592b568f16c3e7bed0c3978a7f644",
+      "sha256": "8d0cbe45b77f3bac5dea70faa23166ec4aa2d9666d12e3e293315ff084c71410",
       "executable": false
     },
     "tests/providers/customer-refund.mjs": {

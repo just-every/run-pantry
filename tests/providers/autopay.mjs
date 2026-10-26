@@ -49,7 +49,7 @@ try {
     return new Response(await response.arrayBuffer(), { status: response.status, headers: Object.fromEntries([...response.headers].filter(([name])=>!['content-encoding','content-length','transfer-encoding'].includes(name))) })
   } })
   browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
-  const clock = new Date().toISOString(), day = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()), headers = { 'x-synthetic-pantry-clock': clock }
+  const instant = new Date(), clock = instant.toISOString(), day = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(instant), headers = { 'x-synthetic-pantry-clock': clock }
   const owner = await browser.newContext({ extraHTTPHeaders: headers })
   assert.equal((await owner.request.post(app.origin + '/auth/bootstrap', { headers: { origin: app.origin }, data: { token: TOKEN, displayName: 'Synthetic Pantry' }, maxRedirects: 0 })).status(), 303)
   await owner.request.post(app.origin + '/setup', { headers: { origin: app.origin }, form: { confirm: 'yes' }, maxRedirects: 0 })
@@ -79,18 +79,18 @@ try {
   // All account details below are Stripe's documented sandbox bank values.
   for (let step = 0; step < 18; step++) {
     if (new URL(page.url()).origin === app.origin) break
-    const routing = await visible(f => f.getByLabel(/routing number/i))
+    const routing = await visible(f => f.getByPlaceholder(/routing number/i))
     if (routing) {
       await routing.fill('110000000')
-      await (await findInFrames(f => f.getByLabel(/^account number$/i))).fill('000123456789')
-      const confirm = await visible(f => f.getByLabel(/confirm account number/i)); if (confirm) await confirm.fill('000123456789')
+      await (await findInFrames(f => f.getByPlaceholder(/^account number$/i))).fill('000123456789')
+      const confirm = await visible(f => f.getByPlaceholder(/confirm account number/i)); if (confirm) await confirm.fill('000123456789')
       const checking = await visible(f => f.getByRole('radio', { name: /checking/i })); if (checking) await checking.check()
       const individual = await visible(f => f.getByRole('radio', { name: /individual/i })); if (individual) await individual.check()
       const name = await visible(f => f.getByLabel(/account holder|full name|name on account/i)); if (name) await name.fill('Synthetic Pantry')
       const email = await visible(f => f.getByLabel(/^email$/i)); if (email) await email.fill('synthetic-pantry@example.test')
       const agree = await visible(f => f.getByRole('checkbox')); if (agree) await agree.check()
       await stage(`bank-details-${step}`)
-      await (await findInFrames(f => f.getByRole('button', { name: /^(save|continue|add account|agree and continue|agree and save|set up)$/i }))).click()
+      await (await findInFrames(f => f.getByRole('button', { name: /^(save|continue|add account|agree and continue|agree and save|set up|submit)$/i }))).click()
     } else {
       const manual = await visible(f => f.getByText(/enter bank details manually|manually enter bank details|enter bank details instead/i))
       if (manual) await manual.click()
@@ -98,7 +98,7 @@ try {
         const connect = await visible(f => f.getByRole('button', { name: /connect bank account|add bank account|link bank account|choose bank/i }))
         if (connect) await connect.click()
         else {
-          const final = await visible(f => f.getByRole('button', { name: /^(save|set up|agree and save|continue|done)$/i }))
+          const final = await visible(f => f.getByRole('button', { name: /^(save|set up|set up bank account|agree and save|continue|done)$/i }))
           if (final) await final.click()
           else await page.waitForTimeout(1000)
         }
@@ -117,7 +117,7 @@ try {
   assert.equal(intent?.status, 'succeeded', 'Hosted ACH setup has not completed')
   assert.equal(session.status, 'complete', 'Checkout has not completed')
   await page.goto(`${app.origin}/i/${invoice.link_token}?autopay_setup=${session.id}`)
-  await page.getByText(/ACH bank account ending.*Autopay authorized/).waitFor()
+  await page.getByText(/Saved ACH bank account.*Autopay authorized/).waitFor()
   await stage('saved-ach-mandate')
   const saved = await view(`autopay/${customer.id}`)
   assert.equal(saved.saved.active, true); assert.ok(saved.saved.acceptedAt); assert.ok(saved.saved.acceptedIP); assert.match(saved.saved.mandateText, /electronic debits/)

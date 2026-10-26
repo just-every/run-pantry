@@ -55,6 +55,8 @@ export async function autopayJourney(t, factory = harness) {
   t.after(() => h.close())
   const { acct } = await books(h)
   await h.command('stripe.connect', { secretKey: 'synthetic-pantry-101' })
+  const sending=(await h.view('invoicing')).sending
+  await h.command('sending.save',{revision:sending.revision,remindersOn:true,reminderDays:'0,1,3,7,8',timeZone:'America/New_York'})
   const discount = await h.command('account.save', { code: '4952', name: 'Autopay early discounts', type: 'expense' })
   await h.command('discount-settings.save', { discountAccountId: discount.id, earlyAccountId: discount.id })
   const accountant = await memberAt(h,clock,'autopay-accountant@example.test', 'accountant', { canPost: true })
@@ -102,6 +104,8 @@ export async function autopayJourney(t, factory = harness) {
   }
   assert.equal((await h.view('cash-planner?asOf=2026-10-20')).weeks.flatMap(w=>w.items).find(i=>i.id===ach.invoice.id).date,'2026-10-29','without saved authorization the customer’s nine-day median predicts payment')
   await setup(ach)
+  const publicSaved=(await h.send(ach.page+'/autopay')).value.saved
+  assert.equal(publicSaved.last4,undefined);assert.equal(publicSaved.acceptedIP,undefined);assert.equal(publicSaved.mandateText,undefined)
   const authorized = await state(ach)
   assert.equal(authorized.saved.acceptedIP, '192.0.2.10'); assert.ok(authorized.saved.acceptedAt); assert.match(authorized.saved.mandateText, /electronic debits/)
   assert.equal(authorized.attempts.length, 0, 'saving a method does not submit a charge')
@@ -124,8 +128,13 @@ export async function autopayJourney(t, factory = harness) {
 
   const card = await approve(await scene('Autopay declined card'))
   await setup(card, 'card'); provider.outcome('requires_payment_method')
-  for (const date of ['2026-10-21', '2026-10-22', '2026-10-24', '2026-10-28']) await due(date)
+  for (const date of ['2026-10-21', '2026-10-22', '2026-10-24', '2026-10-28']) {
+    await due(date)
+    if(date<'2026-10-28')assert.equal((await h.view('sales')).deliveries.filter(d=>d.invoice_id===card.invoice.id&&d.kind==='reminder').length,0,'ordinary reminders wait until scheduled retries are exhausted')
+  }
   const failed = await state(card)
+  assert.deepEqual([...failed.attempts].sort((a,b)=>a.sequence-b.sequence).map(a=>a.scheduled_on),['2026-10-21','2026-10-22','2026-10-24','2026-10-28'])
+  assert.ok((await h.view('sales')).deliveries.some(d=>d.invoice_id===card.invoice.id&&d.kind==='reminder'&&d.status==='accepted'),'exhausted retries hand the balance to ordinary reminders')
   assert.equal(failed.attempts.length, 4); assert.ok(failed.attempts.every(a => a.status === 'failed'))
   assert.equal(failed.notices.length, 4); assert.ok(failed.notices.every(n => n.status === 'accepted'))
   const customerMail=(await h.view(`customers/${card.customer.id}`)).deliveries.filter(d=>d.kind==='autopay-failed')

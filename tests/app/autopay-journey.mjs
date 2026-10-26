@@ -63,7 +63,7 @@ export async function autopayBrowser(t) {
     const [setupResponse]=await Promise.all([hosted.waitForResponse(r=>r.url().endsWith('/autopay/start')),hosted.getByRole('button',{name:'Continue to Stripe to save method',exact:true}).click()])
     if(setupResponse.status()!==303&&proof)await hosted.screenshot({path:`${proof}/autopay-payer-refused-${width}.png`,fullPage:true})
     assert.equal(setupResponse.status(),303,setupResponse.status()===303?undefined:await setupResponse.text())
-    await hosted.getByText(/ACH bank account ending 6789. Autopay authorized/).waitFor({timeout:10000}).catch(async error=>{
+    await hosted.getByText(/Saved ACH bank account. Autopay authorized/).waitFor({timeout:10000}).catch(async error=>{
       if(proof)await hosted.screenshot({path:`${proof}/autopay-payer-return-${width}.png`,fullPage:true})
       throw new Error(`Autopay return at ${new URL(hosted.url()).hostname}: ${await hosted.locator('body').innerText()}`)
     })
