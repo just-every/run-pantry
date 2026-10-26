@@ -41,10 +41,11 @@ async function visible(build) {
   return null
 }
 try {
+  await stage('starting')
   app = await providerWorker({ clock: true, bindings: {}, outbound: async request => {
     assert.equal(new URL(request.url).hostname, 'api.stripe.com', 'Only the connected real Stripe account may receive upstream traffic')
-    const response = await fetch(request.url, { method: request.method, headers: Object.fromEntries(['authorization', 'content-type', 'stripe-version', 'idempotency-key'].filter(n => request.headers.has(n)).map(n => [n, request.headers.get(n)])), ...(!['GET', 'HEAD'].includes(request.method) ? { body: await request.text() } : {}) })
-    return new Response(await response.arrayBuffer(), { status: response.status, headers: Object.fromEntries(response.headers) })
+    const response = await fetch(request.url, { method: request.method, headers: Object.fromEntries(['authorization', 'content-type', 'stripe-version', 'idempotency-key'].filter(n => request.headers.has(n)).map(n => [n, request.headers.get(n)])), ...(!['GET', 'HEAD'].includes(request.method) ? { body: await request.text() } : {}),signal:AbortSignal.timeout(20000) })
+    return new Response(await response.arrayBuffer(), { status: response.status, headers: Object.fromEntries([...response.headers].filter(([name])=>!['content-encoding','content-length','transfer-encoding'].includes(name))) })
   } })
   browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
   const clock = new Date().toISOString(), day = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()), headers = { 'x-synthetic-pantry-clock': clock }
@@ -54,7 +55,7 @@ try {
   const command = async (op, data) => { const r = await owner.request.post(`${app.origin}/api/pantry/command/${op}`, { headers: { origin: app.origin }, data }); assert.equal(r.status(), 200, `Pantry command refused: ${op}`); return r.json() }
   const view = async path => { const r = await owner.request.get(`${app.origin}/api/pantry/${path}`); assert.equal(r.status(), 200, 'Pantry read refused'); return r.json() }
   await command('entity.save', { legalName: 'Synthetic Pantry test business', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: day, policies: '' })
-  await command('chart.start', {}); await command('stripe.connect', { secretKey: key })
+  await command('chart.start', {}); await stage('connecting-stripe'); await command('stripe.connect', { secretKey: key })
   const acct = (await view('state')).accounts.find(a => a.code === '4000').id
   const customer = await command('contact.save', { kind: 'customer', name: 'Synthetic Pantry', email: 'synthetic-pantry@example.test', billingAddress: '12 Cedar Street, New York NY 10001', termsDays: 1 })
   let recurring = await command('recurring.save', { customerId: customer.id, startDate: day, every: 1, unit: 'month', termsDays: 1, mode: 'send', lines: [{ description: 'Synthetic recurring test service', quantity: '1', rate: '1', accountId: acct, taxCode: 'exempt' }] })

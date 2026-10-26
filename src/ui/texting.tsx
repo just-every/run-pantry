@@ -69,9 +69,10 @@ export function InvoiceTexting({invoice,kind='invoice'}:{invoice:D;kind?:'invoic
   </>}
   {state.actor.can.owner&&data?.settings.enabled&&<Action run={async()=>{await command('texting.send',{id:invoice.id,kind,purpose:kind,phone:number||undefined,requestId:crypto.randomUUID()});await reload()}}>Send test text from Pantry</Action>}
   {error&&<p role="alert" className="error">{error}</p>}
-  <Table heads={['When','Channel','To','Outcome']} empty="No text activity recorded.">
-   {shares.map((s:D)=><tr key={s.id}><td>{day(s.at)}</td><td>Own phone<small className="sub block">{s.actor_email}</small></td><td>{s.phone}</td><td>Link shared; sending happens on the phone</td></tr>)}
-   {messages.map((m:D)=><tr key={m.id}><td>{day(m.at)}</td><td>Twilio test · {m.purpose}<small className="sub block">{m.actor_email}</small></td><td>{m.phone}</td><td><Chip tone={m.status==='delivered'?'good':['failed','undeliverable','uncertain'].includes(m.status)?'warn':'neutral'}>{m.status}</Chip><details><summary>Text outcomes</summary><p className="doc-link">{m.body}</p>{m.not_before&&<p>Held until {new Date(m.not_before).toLocaleString()}.</p>}<p>{m.detail}</p>{m.provider_message_id&&<p className="doc-link">{m.provider_message_id}</p>}{m.events.map((e:D)=><p key={e.id}>{e.status} · {new Date(e.at).toLocaleString()} · {e.detail}</p>)}</details></td></tr>)}
-  </Table>
+  {shares.length+messages.length===0&&<p>No text activity recorded.</p>}
+  <ul className="send-log">
+   {shares.map((s:D)=><li key={s.id}><span><strong>Own phone</strong> · {s.phone}</span><small>{day(s.at)} · {s.actor_email}</small><small>Link shared; sending happens on the phone</small></li>)}
+   {messages.map((m:D)=><li key={m.id}><span><strong>Twilio test · {m.purpose}</strong> · {m.phone}</span><Chip tone={m.status==='delivered'?'good':['failed','undeliverable','uncertain'].includes(m.status)?'warn':'neutral'}>{m.status}</Chip><small>{day(m.at)} · {m.actor_email}</small><details style={{gridColumn:'1 / -1',overflowWrap:'anywhere'}}><summary>Text outcomes</summary><p>{m.body}</p>{m.not_before&&<p>Held until {new Date(m.not_before).toLocaleString()}.</p>}<p>{m.detail}</p>{m.provider_message_id&&<p>{m.provider_message_id}</p>}{m.events.map((e:D)=><p key={e.id}>{e.status} · {new Date(e.at).toLocaleString()} · {e.detail}</p>)}</details></li>)}
+  </ul>
  </section>
 }
