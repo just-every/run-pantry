@@ -23,8 +23,10 @@ export async function dataFlows(c: Context) {
     all(c.db,'SELECT id,name,active FROM pt_agents ORDER BY name,id'),
     one(c.db,'SELECT realm_id,environment FROM pt_qbo_connection WHERE id=1 AND verified=1'),
   ])
+  const texting=await one(c.db,'SELECT enabled,account_sid_sealed FROM pt_texting WHERE id=1')
   const mailProvider=String(c.env.MAIL_PROVIDER??'development')
   const states: Record<string, { connected: boolean; detail: string; unavailable?: string }> = {
+    twilio: { connected:!!texting?.account_sid_sealed, detail:texting?.enabled?'Test messaging enabled':'Test messaging off' },
     qbo: {connected:!!qbo,detail:qbo?`Company ending ${String(qbo.realm_id).slice(-4)} · ${qbo.environment}`:'No QuickBooks company connected'},
     inkwell: { connected: false, detail: 'Owner-requested previews only; no saved credential or ongoing connection' },
     platter: { connected: false, detail: 'Owner-requested previews only; no saved credential or ongoing connection' },

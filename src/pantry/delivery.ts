@@ -1,3 +1,4 @@
+import { autopayHolding } from './autopay'
 // Sending invoices. An issued invoice goes to the customer by email with its
 // PDF attached and a link to its customer page; every message is a delivery
 // row written before the send and finished with the provider's answer, so a
@@ -202,6 +203,7 @@ export async function sendDueReminders(env: Bindings, db: D1Database, today: str
       AND NOT EXISTS (SELECT 1 FROM pt_stripe_payments sp WHERE sp.invoice_id = i.id AND (sp.status = 'processing' OR sp.disputed_cents>0))`)
   const sent: Data[] = []
   for (const row of open) {
+    if (await autopayHolding(env, db, row.id)) continue
     const inv = await invoice(db, row.id)
     if (inv.open_cents <= 0) continue
     const customer = (await one(db, 'SELECT * FROM pt_contacts WHERE id = ?', row.customer_id))!

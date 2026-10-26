@@ -1,3 +1,4 @@
+import { isAutopayPayment, syncAutopayPayment } from './autopay'
 import { notifyPayment } from './payment-notices'
 import { STRIPE_PAYMENT_EVENTS } from './stripe-events'
 import { methodDetail } from './stripe-events/provider'
@@ -170,6 +171,7 @@ const dollars = (c: number) => (c / 100).toFixed(2)
 
 /** Read a Checkout Session back from Stripe and record what it says; safe to repeat. */
 export async function syncCheckout(env: Bindings, db: D1Database, sessionId: string) {
+  if (await isAutopayPayment(db, sessionId)) return syncAutopayPayment(env, db, sessionId)
   const row = await one(db, 'SELECT * FROM pt_stripe_payments WHERE id = ?', sessionId)
   if (!row || (row.status === 'succeeded' && row.fee_entry_id) || ['failed', 'expired', 'returned', 'disputed', 'refunded'].includes(row.status)) return row
   const s = await stripeSettings(db)
@@ -188,7 +190,7 @@ export async function syncCheckout(env: Bindings, db: D1Database, sessionId: str
   return current
 }
 
-async function recordSucceeded(env: Bindings, db: D1Database, row: Data, pi: Data, key: string, s: Data) {
+export async function recordSucceeded(env: Bindings, db: D1Database, row: Data, pi: Data, key: string, s: Data) {
   const charge = typeof pi.latest_charge === 'object' ? pi.latest_charge : null
   let bt = charge && typeof charge.balance_transaction === 'object' ? charge.balance_transaction : null
   if (!bt && charge && typeof charge.balance_transaction === 'string') bt = await stripeCall(key, 'GET', `/balance_transactions/${charge.balance_transaction}`)

@@ -1,3 +1,5 @@
+import { CustomerAutopay } from './customer-autopay'
+import { CustomerTextConsent } from './texting'
 import { PaymentReceiptPreference } from './payment-notices'
 import { Action, Card, Chip, FileLink, Loading, Metrics, Table, day, usd, useShared, useView, type D } from './kit'
 import { CustomerStatements } from './customer-statements'
@@ -47,6 +49,8 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
         {data.sections.estimates.rows.map((e: D) => <tr key={e.id}><td><a href={e.href}>{e.reference}</a></td><td>{day(e.date)}</td><td><Chip>{e.status}</Chip></td><td className="fig">{usd(e.total_cents)}</td><td>{e.acceptance && <p>Accepted by {e.acceptance.name} · {day(e.acceptance.at)}</p>}{(e.conversions ?? []).map((c: D) => <p key={c.invoice_id}><a href={invoiceHref(c.invoice_id)}>{c.number}</a> · {usd(c.amount_cents)}</p>)}</td></tr>)}
       </Table>
     </Card>}
+    <CustomerAutopay customerId={customerId} />
+    {state.actor.can.owner && <CustomerTextConsent customer={c} />}
     <CustomerStatements data={data} reload={reload} />
     <Card title="Customer email history">
       <p className="hint">Accepted means the provider accepted the message. It does not confirm delivery or reading. Local messages are suppressed.</p>

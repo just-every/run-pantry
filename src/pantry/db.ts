@@ -68,6 +68,7 @@ export function audit(actor: AuditActor, action: string, subjectKind: string, su
 // This maps domain records to their storage, not actions to individual writers.
 // Unversioned records receive a stored history revision in the same batch.
 const AUDIT_RECORDS: Record<string, [string, string?]> = {
+  autopay: ['pt_autopay_policies', 'customer_id'],
   'customer-refund': ['pt_customer_refunds'], estimate: ['pt_estimates'], 'customer-deposit': ['pt_customer_deposits'], 'close-task': ['pt_close_tasks'], item: ['pt_items'], check: ['pt_checks'], 'check-batch': ['pt_check_batches'], budget: ['pt_budgets'], recognition: ['pt_recognition_schedules'],
   'recurring-journal': ['pt_recurring_journals'], journal: ['pt_journal_entries'], invoice: ['pt_invoices'], credit: ['pt_invoices'], bill: ['pt_bills'], payment: ['pt_payments'],
   account: ['pt_accounts'], customer: ['pt_contacts'], vendor: ['pt_contacts'], proposal: ['pt_proposals'], member: ['pt_members', 'email'],
@@ -105,15 +106,16 @@ async function snapshotExpression(db: D1Database, kind: string, id: string): Pro
 async function auditStatement(db: D1Database, e: AuditEvent): Promise<Sql> {
   const d = e.detail, rule = e.action === 'bank-rule.file' ? d.ruleId : e.action === 'receipt.attach-by-rule' ? d.rule : null
   const scheduledJournal = e.actor.email === 'pantry:recurring-journals' ? d.recurringJournal?.id : null
-  const authorityKind = rule ? e.action.startsWith('receipt.') ? 'receipt-rule' : 'bank-rule' : e.actor.email === 'pantry:recurring' && e.subjectKind === 'recurring' ? 'recurring' : scheduledJournal ? 'recurring-journal' : null
-  const authorityId = rule ?? (authorityKind === 'recurring' ? e.subjectId : scheduledJournal)
+  const autopayClaim = e.action === 'autopay.claim' && typeof d.customerId === 'string' && typeof d.policyRevision === 'string'
+  const authorityKind = autopayClaim ? 'autopay' : rule ? e.action.startsWith('receipt.') ? 'receipt-rule' : 'bank-rule' : e.actor.email === 'pantry:recurring' && e.subjectKind === 'recurring' ? 'recurring' : scheduledJournal ? 'recurring-journal' : null
+  const authorityId = autopayClaim ? d.customerId : rule ?? (authorityKind === 'recurring' ? e.subjectId : scheduledJournal)
   const [revision, authorityRevision] = await Promise.all([revisionExpression(db, e.subjectKind, e.subjectId), authorityId ? revisionExpression(db, authorityKind!, authorityId) : Promise.resolve(q('NULL'))])
   const approvedKind = d.proposal ? 'proposal' : e.subjectKind, approvedId = d.proposal ?? e.subjectId
   const reliesOnApproval = /\.(post|issue|approve|lock|reverse|reopen|run|price-approve)$/.test(e.action)
-  const approvalId = !reliesOnApproval ? q('NULL') : e.subjectKind === 'capture-draft'
+  const approvalId = autopayClaim ? q("(SELECT id FROM pt_approvals WHERE subject_kind='autopay' AND subject_id=? AND subject_revision=? AND decision='approved' ORDER BY at DESC,rowid DESC LIMIT 1)", d.customerId,d.policyRevision) : !reliesOnApproval ? q('NULL') : e.subjectKind === 'capture-draft'
     ? q("(SELECT a.id FROM pt_approvals a JOIN pt_capture_drafts d ON a.subject_kind = d.kind AND a.subject_id = COALESCE(d.bill_id, d.id) AND a.subject_revision = d.revision WHERE d.id = ? AND a.decision = 'approved' ORDER BY a.at DESC, a.rowid DESC LIMIT 1)", e.subjectId)
     : q("(SELECT id FROM pt_approvals WHERE subject_kind = ? AND subject_id = ? AND decision = 'approved' ORDER BY at DESC, rowid DESC LIMIT 1)", approvedKind, approvedId)
-  const origin = rule ? 'rule' : e.actor.email === 'pantry:recurring' || e.actor.email === 'pantry:recurring-journals' || e.actor.email === 'pantry:reminders' || e.actor.email === 'pantry:checks' ? 'schedule' : e.actor.kind === 'integration' || /^pantry:(stripe|gusto|auto-match)$/.test(e.actor.email) ? 'connection' : e.actor.kind
+  const origin = autopayClaim ? 'schedule' : rule ? 'rule' : e.actor.email === 'pantry:recurring' || e.actor.email === 'pantry:recurring-journals' || e.actor.email === 'pantry:reminders' || e.actor.email === 'pantry:checks' ? 'schedule' : e.actor.kind === 'integration' || /^pantry:(stripe|gusto|auto-match)$/.test(e.actor.email) ? 'connection' : e.actor.kind
   const snapshot = !('before' in d || 'after' in d) ? await snapshotExpression(db, e.subjectKind, e.subjectId) : null
   const detailSql = snapshot ? `json_set(?, '$.before', json((SELECT state FROM pt_audit_before WHERE event_id = ?)), '$.after', json(${snapshot.sql}))` : '?'
   const result = q(`INSERT INTO pt_audit (id, at, actor_email, actor_kind, action, subject_kind, subject_id, detail, subject_revision, approval_id, origin_kind, authority_kind, authority_id, authority_revision)

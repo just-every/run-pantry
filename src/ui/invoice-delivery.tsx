@@ -1,3 +1,4 @@
+import { InvoiceTexting } from './texting'
 // Sending an issued invoice: the customer link, sent and viewed, the next
 // reminder, online payments, and every delivery with the provider's answer.
 import { LateFeeCharge } from './late-fees'
@@ -27,6 +28,7 @@ export function SendPanel({ i, data, onChange }: { i: D; data: D; onChange: () =
   const reminder = i.open_cents === 0 ? 'None: the invoice is paid' : i.reminders_paused ? 'Paused for this invoice' : !i.sent_at ? 'After the invoice is sent' : !plan.on ? 'Reminders are off for the business' : next ? (next === plan.today ? 'Due now; it goes out with the next due-work run' : <>On {day(next)}</>) : 'None left in the schedule'
   return <div className="send-panel">
     <h3>Sending</h3>
+    <InvoiceTexting invoice={i} />
     <dl className="facts">
       <div><dt>Sent</dt><dd>{i.sent_at ? day(i.sent_at) : 'Not sent yet'}</dd></div>
       <div><dt>Viewed</dt><dd>{i.viewed_at ? <>Opened by the customer {day(i.viewed_at)}</> : i.sent_at ? 'Not opened yet' : '—'}</dd></div>

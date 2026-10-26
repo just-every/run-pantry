@@ -1,3 +1,5 @@
+import { autopayPanel } from './autopay-page'
+import { publicAutopay, startAutopaySetup, confirmAutopaySetup, revokeAutopay } from './autopay'
 import { processStripeEvent } from './stripe-events'
 // The customer's side of a sent invoice: /i/<token> shows the invoice, its PDF
 // and how to pay it, without signing in. The first opening by someone who is
@@ -57,6 +59,13 @@ customer.get('/i/:token', async c => {
   const db = c.env.DB, token = c.req.param('token')
   let inv = await invoiceByLink(db, token)
   if (!inv) return notFound()
+  const setupSession = c.req.query('autopay_setup')
+  if (setupSession) {
+    try { await confirmAutopaySetup(c.env, db, token, setupSession) } catch (error) {
+      if (!(error instanceof Fault)) throw error
+      return page(error.status, 'Autopay not confirmed', `<h1>Autopay not confirmed</h1><p>${escape(error.message)}</p><a href="/i/${escape(token)}">Back to invoice</a>`)
+    }
+  }
   const returned = c.req.query('checkout')
   let outcome = ''
   if (returned && /^cs_[A-Za-z0-9_]+$/.test(returned)) {
@@ -91,7 +100,7 @@ customer.get('/i/:token', async c => {
     ? `<h2>Pay ${escape(usd(charge?.amount ?? inv.open_cents))}${charge?.windowEnd ? ` by ${escape(longDay(charge.windowEnd))}` : ''}</h2><div class="pay">${methods.map(m => `<form method="post" action="/i/${escape(token)}/pay"><input type="hidden" name="method" value="${m}"><button type="submit">Pay by ${m === 'card' ? 'card' : 'bank account (ACH)'}</button></form>`).join('')}</div><p class="note">Payment is handled by Stripe. Your card or bank details go to Stripe, never to ${escape(doc.business)}'s books.</p>`
     : ''
   const offline = offered.includes('offline') ? `<h2>How to pay</h2><p class="note">This invoice can be paid to ${escape(doc.business)} directly. Pay with the details they gave you, such as their bank transfer or check details, or reply to the invoice email to ask for them.</p>` : ''
-  const pay = online + offline
+  const pay = online + offline + autopayPanel(token, await publicAutopay(c.env, db, token))
   const history = await all(db, `SELECT p.payment_date, a.amount_cents, p.memo FROM pt_allocations a JOIN pt_payments p ON p.id = a.source_id AND a.source_kind = 'payment'
     WHERE a.target_kind = 'invoice' AND a.target_id = ? AND p.reversal_id IS NULL
     UNION ALL SELECT a.allocation_date, -a.amount_cents, CASE WHEN cr.early_discount = 1 THEN 'Early-payment discount ' || cr.number || ' (sales tax -' || printf('$%.2f', cr.tax_cents / 100.0) || ')' ELSE 'Credit ' || cr.number END
@@ -135,4 +144,20 @@ customer.post('/api/pantry/stripe/webhook', async c => {
   const event = JSON.parse(body)
   await processStripeEvent(c.env,c.env.DB,event)
   return c.json({ received: true })
+})
+
+customer.post('/i/:token/autopay/start', async c => {
+  const token = c.req.param('token'), body = await c.req.parseBody()
+  try {
+    const setup = await startAutopaySetup(c.env, c.env.DB, token, { ...body, accepted: body.accepted === 'on' }, c.req.raw)
+    return new Response(null, { status: 303, headers: { location: setup.url, 'cache-control': 'no-store' } })
+  } catch (error) {
+    if (!(error instanceof Fault)) throw error
+    return page(error.status, 'Autopay not started', `<h1>Autopay not started</h1><p>${escape(error.message)}</p><a href="/i/${escape(token)}">Back to invoice</a>`)
+  }
+})
+customer.post('/i/:token/autopay/stop', async c => {
+  if (c.req.header('origin') !== runtimeBindings(c.env).AUTH_ORIGIN) return c.json({ error: 'Invalid origin' }, 403)
+  await revokeAutopay(c.env.DB, c.req.param('token'))
+  return new Response(null, { status: 303, headers: { location: `/i/${c.req.param('token')}`, 'cache-control': 'no-store' } })
 })

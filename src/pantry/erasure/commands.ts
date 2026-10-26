@@ -1,3 +1,4 @@
+import { erasePaymentMessaging } from './payment-messaging'
 import { who } from '../access'
 import type { Command } from '../context'
 import { now, requireThat, sha256, text, uid, type Data } from '../core'
@@ -43,6 +44,7 @@ const execute: Command = {need:'owner',async run(c,b) {
     const result = await memberStatements(c.db,p.subject,label)
     writes.push(...result.statements);Object.assign(counts,result.counts); counts.pt_members={...counts.pt_members,fieldsReplaced:(counts.pt_members?.fieldsReplaced??0)+2+(p.subject.time_people!=='[]'?1:0),delegationsRemoved:(counts.pt_members?.delegationsRemoved??0)+JSON.parse(p.subject.time_people).length}; counts.oa_operators={identitiesRemoved:result.operators}
   } else {
+    writes.push(...await erasePaymentMessaging(c.db,p.id,at))
     writes.push(guard('EXISTS (SELECT 1 FROM pt_contacts WHERE id=? AND revision=?)',p.id,p.subject.revision))
     if (p.posted) {
       writes.push(q(`UPDATE pt_contacts SET ${CONTACT_PERSONAL.map(k=>`${k}=?`).join(',')},contacts_json='[]',vendor_ein_hash='',active=0,erased_at=?,revision=? WHERE id=?`,...CONTACT_PERSONAL.map(()=>MARKER),at,uid(),p.id),changed())

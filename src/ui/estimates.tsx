@@ -1,3 +1,4 @@
+import { InvoiceTexting } from './texting'
 import { useEffect, useState } from 'react'
 import { useLocation } from '@tanstack/react-router'
 import { Action, Card, Chip, command, Details, Loading, Metrics, Table, day, usd, useShared, useView, useWho, type D } from './kit'
@@ -41,6 +42,7 @@ function EstimatePanel({ estimate: e, deposits, onEdit, onChange }: { estimate: 
     </Card></div>
     <EstimateProgress key={e.id + e.revision + e.billed_cents} estimate={e} deposits={deposits} onDone={onChange} />
     <EstimateSiblings estimate={e} onChange={onChange} />
+    {e.public_path && <Card title="Text estimate link"><InvoiceTexting invoice={e} kind="estimate" /></Card>}
     <Card title="Estimate email history">
       <p className="hint">Provider acceptance does not confirm delivery or reading. Local messages are suppressed.</p>
       <Table heads={['When', 'Recipient', 'Outcome', 'Details']} empty="This estimate has not been emailed.">

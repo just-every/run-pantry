@@ -1,3 +1,5 @@
+import { autopayCommands, registerAutopayRoutes } from './autopay'
+import { textingCommands, registerTextingRoutes, textingView } from './texting'
 import { paymentNoticeCommands,paymentNoticesView } from './payment-notices'
 import { compareStripeEvents,stripeEventsView } from './stripe-events'
 import { invoiceVoidCommands } from './invoice-void'
@@ -137,7 +139,7 @@ import { statementCommands } from './statements/commands'
 import { statement } from './statements/store'
 
 const commands: Record<string, Command> = {
-  ...statementCommands,
+  ...autopayCommands, ...textingCommands, ...statementCommands,
   ...taxReminderCommands,...taxReadinessCommands,...w9Commands, ...currencyCommands,...archiveCommands,...collectionCommands, ...standingCommands, ...learningCommands, ...assetCommands, ...dimensionCommands, ...siblingCommands,
   'stripe.events-compare': { need:'owner', async run(c) { await run(c.db,[authority(c.actor,'owner')]); return compareStripeEvents(c.env,c.db,true) } }, ...paymentNoticeCommands, ...invoiceVoidCommands, ...refundCommands, ...customerCreditCommands, ...lateDiscountCommands, ...approvedWriteOffCommands, ...lateFeeCommands, ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
@@ -156,6 +158,7 @@ api.use('*', async (c, next) => {
   c.executionCtx.waitUntil(runDueWork(c.env).catch(error => console.error('Pantry due work failed:', error)))
 })
 api.get('/health', c => c.json({ status: 'ok', ...deploymentHealth(c.env) }))
+registerTextingRoutes(api)
 api.route('/', customer)
 api.route('/', w9Public)
 api.use('/api/pantry/*', async (c, next) => { await next(); c.header('cache-control', 'no-store'); c.header('x-content-type-options', 'nosniff') })
@@ -204,6 +207,8 @@ view('ask', async (ctx, c) => askBooks(ctx, c.req.query('question'), c.req.query
 view('integrations', async (ctx, c) => { must(ctx.actor, 'owner'); return integrationSettings(ctx, c.req.query('cursor')) })
 const day = (c: C, name: string, fallback = new Date().toISOString().slice(0, 10)) => date(c.req.query(name) ?? fallback, name)
 
+registerAutopayRoutes(api, reader)
+view('texting', async ctx => textingView(ctx))
 registerEstimateRoutes(api, reader)
 view('estimates/:id/siblings', async (ctx, c) => siblingsView(ctx, c.req.param('id')!))
 api.get('/api/pantry/estimate-siblings/:id/document', async c => {

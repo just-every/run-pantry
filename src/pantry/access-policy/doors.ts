@@ -16,7 +16,7 @@ export function financialSourceAllowed(actor: Actor, source: string) {
   if (actor.role === 'payables-clerk') return source === 'expenses-by-vendor'
   return !limitedBanks(actor)
 }
-const saleCommands = new Set(['late-fee.prepare', 'statement.send', 'estimate.save-draft', 'estimate.send', 'estimate.convert', 'estimate.refresh-invoice', 'contact.save', 'invoice.save-draft', 'invoice.approve', 'invoice.approve-issue', 'invoice.issue', 'invoice.send', 'invoice.reminders', 'recurring.save', 'recurring.approve', 'recurring.price', 'recurring.approve-price', 'recurring.status', 'time.save', 'time-project.save'])
+const saleCommands = new Set(['texting.share', 'late-fee.prepare', 'statement.send', 'estimate.save-draft', 'estimate.send', 'estimate.convert', 'estimate.refresh-invoice', 'contact.save', 'invoice.save-draft', 'invoice.approve', 'invoice.approve-issue', 'invoice.issue', 'invoice.send', 'invoice.reminders', 'recurring.save', 'recurring.approve', 'recurring.price', 'recurring.approve-price', 'recurring.status', 'time.save', 'time-project.save'])
 const payableCommands = new Set(['contact.save', 'bill.save', 'bill.record', 'bill.approve', 'bill.post', 'bill.waive-evidence', 'bill.update', 'bill.submit', 'bill.schedule', 'recurring-bill.save', 'recurring-bill.generate', 'recurring-bill.status', 'document.upload', 'time.save'])
 
 export async function assertDoor(c: Context, path: string, body?: Data) {
@@ -115,7 +115,7 @@ export async function projectAccess(c: Context, value: unknown, path = new URL(c
 function redact(value: any, actor: Person): any {
   if (Array.isArray(value)) return value.map(v => redact(v, actor))
   if (!value || typeof value !== 'object') return value
-  return Object.fromEntries(Object.entries(value).map(([key, v]) => {
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !key.startsWith('autopay_')).map(([key, v]) => {
     if (actor.policy?.maskTin && /(^|_)(tin|ein|ssn)(_|$)|(tin|ein|ssn)(Last4|Kind|Hash)$|tax.?id|taxpayer/i.test(key)) return [key, v ? '••••' : v]
     if (actor.policy?.maskBank && /routing|(^|_)last4$|number_last4|account_number|bank_number/i.test(key)) return [key, v ? '••••' : v]
     if (typeof v === 'string' && /^[\[{]/.test(v)) { try { return [key, JSON.stringify(redact(JSON.parse(v), actor))] } catch {} }

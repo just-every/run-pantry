@@ -1,3 +1,4 @@
+import { policyState } from '../autopay/policy'
 // A read-only projection. What-if items never create postings or provider work.
 import type { Context } from '../context'
 import { addDays, cents, date, daysBetween, requireThat, type Data } from '../core'
@@ -33,6 +34,13 @@ export async function cashPlanner(c:Context,query:URLSearchParams) {
  const asOf=date(query.get('asOf')??new Date().toISOString().slice(0,10),'Projection starts'),end=addDays(asOf,90)
  const threshold=cents(query.get('threshold')??'0','Low-balance threshold',{signed:true,zero:true})
  const history=await paymentHistory(c.db,asOf)
+ const autopay=new Map<string,string>()
+ for(const row of await all(c.db,'SELECT customer_id,recurring_id FROM pt_autopay_policies WHERE enabled=1')){
+  const state=await policyState(c.env,c.db,row.customer_id)
+  if(state.consented)autopay.set(row.customer_id,row.recurring_id)
+ }
+ const recurringInvoices=new Map((await all(c.db,'SELECT id,recurring_id FROM pt_invoices WHERE recurring_id IS NOT NULL')).map(i=>[i.id,i.recurring_id]))
+ const automatic=(customer:string,recurring:string|undefined,due:string)=>recurring&&autopay.get(customer)===recurring?{date:due,reason:'Autopay: scheduled on the invoice due date',history:[]}:null
  const expected=(customer:string,issue:string,due:string)=>{const h=history.get(customer),median=h?.median;return {date:median==null?due:addDays(issue,Math.ceil(median)),reason:median==null?'Due date: fewer than three fully paid invoices in the preceding 12 months':`Issue date + median ${median} days from the latest ${h!.invoices.length} fully paid invoices (half days round later)`,history:h?.invoices??[]}}
  const banks=await all(c.db,`SELECT b.id,b.name,b.account_id,b.opening_date,b.opening_cents,
  COALESCE((SELECT SUM(l.debit_cents-l.credit_cents) FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id WHERE l.account_id=b.account_id AND e.status='posted' AND e.entry_date<=?),0) AS book_balance
@@ -49,7 +57,7 @@ export async function cashPlanner(c:Context,query:URLSearchParams) {
  }
  const items:Item[]=[],details:Data[]=[]
  const add=(item:Item)=>{if(item.date<asOf)item={...item,date:asOf,reason:item.reason+'; expected date has passed, included in current week'};if(item.date<=end)items.push(item)}
- for(const i of (await ageing(c.db,'receivable',asOf)).items as Data[]){const e=expected(i.contact_id,i.doc_date,i.due_date);add({id:i.id,date:e.date,amount:i.open,label:`Invoice ${i.ref} · ${i.contact}`,reason:e.reason,href:href('invoice',i.id),kind:'receivable'});details.push({invoiceId:i.id,...e})}
+ for(const i of (await ageing(c.db,'receivable',asOf)).items as Data[]){const e=automatic(i.contact_id,recurringInvoices.get(i.id),i.due_date)??expected(i.contact_id,i.doc_date,i.due_date);add({id:i.id,date:e.date,amount:i.open,label:`Invoice ${i.ref} · ${i.contact}`,reason:e.reason,href:href('invoice',i.id),kind:'receivable'});details.push({invoiceId:i.id,...e})}
  const bills=new Map((await all(c.db,'SELECT id,scheduled_date FROM pt_bills WHERE scheduled_date IS NOT NULL')).map(b=>[b.id,b.scheduled_date]))
  for(const b of (await ageing(c.db,'payable',asOf)).items as Data[])add({id:b.id,date:bills.get(b.id)??b.due_date,amount:-b.open,label:`Bill ${b.ref} · ${b.contact}`,reason:bills.has(b.id)?'Scheduled payment date':'Bill due date',href:href('bill',b.id),kind:'payable'})
  for(const row of await all(c.db,"SELECT id FROM pt_recurring WHERE status='active' AND next_date IS NOT NULL")){
@@ -61,7 +69,7 @@ export async function cashPlanner(c:Context,query:URLSearchParams) {
    // Projection is clearly forecast work, including draft-mode templates. It
    // never issues an invoice or treats a forecast as an approved posting.
    const parsed=await parseInvoice(c.db,{customerId:t.customer_id,issueDate:issue,dueDate:addDays(issue,t.terms_days),lines:price?.lines??t.lines,discounts:t.discounts,deposit:t.deposit,memo:t.memo})
-   const e=expected(t.customer_id,issue,addDays(issue,t.terms_days))
+   const e=automatic(t.customer_id,t.id,addDays(issue,t.terms_days))??expected(t.customer_id,issue,addDays(issue,t.terms_days))
    add({id:`recurring:${t.id}:${issue}`,date:e.date,amount:parsed.total,label:`Recurring invoice · ${t.customer_name} · ${issue}`,reason:`Forecast, not an issued invoice. ${e.reason}`,href:'/app/sales?tab=recurring',kind:'recurring-invoice'})
   }
  }
