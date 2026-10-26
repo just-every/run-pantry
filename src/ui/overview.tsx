@@ -31,7 +31,7 @@ export function Overview() {
           <span className="step-no">{i + 1}</span>
           <div className="step-text"><strong>{s.title}</strong><span>{s.detail}</span></div>
           {s.done ? <Chip tone="good">Complete</Chip> : <Chip tone="warn">To do</Chip>}
-          <Link className={`btn ${s.key === next ? 'btn-primary' : 'btn-secondary'}`} to={GO[s.go]} search={(s.go === 'contacts' ? { tab: 'contacts' } : undefined) as any}>{s.done ? 'View' : 'Start'}</Link>
+          <Link className={`btn ${s.key === next ? 'btn-primary' : 'btn-secondary'}`} to={GO[s.go]} search={(s.go === 'settings' ? { step: 'business' } : s.go === 'contacts' ? { tab: 'contacts' } : undefined) as any}>{s.done ? 'View' : 'Start'}</Link>
         </li>)}</ol>
       </Card>
       <div className="stack">

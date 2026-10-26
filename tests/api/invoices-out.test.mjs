@@ -1,3 +1,4 @@
+import { statementsJourney } from './statements-journey.mjs'
 import { remindersJourney } from './reminders-journey.mjs'
 import { fakePlaid } from './plaid.mjs'
 // Invoices out: sending with a PDF and customer link, viewed, reminders on the
@@ -30,8 +31,8 @@ const invoiceOf = async (h, id) => at((await h.view('sales')).invoices, i => i.i
 const linkIn = message => new URL(message.text.match(/http:\/\/[^\s]+\/i\/[A-Za-z0-9_-]{32}/)[0]).pathname
 
 test('INVOICE-009 the private customer record preserves preferences and follows invoices, credits, payments, mail and certificates down to their records', async t => {
-  const h = await harness(); t.after(() => h.close())
-  const { acct, bank, c, issue } = await setup(h), day = today(), original = c['Cedar Studio']
+  const h = await harness({ clock: '2026-10-20T12:00:00Z' }); t.after(() => h.close())
+  const { acct, bank, c, issue } = await setup(h), day = '2026-10-20', original = c['Cedar Studio']
   const privateNote = 'Internal collection arrangement: call Olivia before escalating.'
   let customer = await h.command('contact.save', { id: original.id, revision: original.revision, kind: 'customer',
     termsDays: 45, billingAddress: '12 Cedar Street, New York NY 10001', serviceAddress: '90 Studio Road, Albany NY 12207',
@@ -91,12 +92,13 @@ test('INVOICE-009 the private customer record preserves preferences and follows 
   const cert = at(history.certificates, e => e.id === certificate.id)
   assert.equal(cert.status, 'Valid')
   assert.equal((await h.send(cert.href, undefined, { cookie: h.owner })).value, 'Cedar resale certificate evidence')
-  assert.deepEqual(history.sections, { estimates: { available: true, rows: [] }, statements: { available: false, rows: [] } })
+  assert.deepEqual(history.sections, { estimates: { available: true, rows: [] }, statements: { available: true, rows: [] } })
   await h.view(`customers/${customer.id}`, '', 401)
   await h.view(`customers/missing`, h.owner, 404)
   const viewer = await h.member('customer-reader@example.test', 'viewer')
   assert.equal((await h.view(`customers/${customer.id}/history`, viewer)).customer.id, customer.id)
   await h.command('contact.save', { id: customer.id, revision: customer.revision, kind: 'customer', internalNotes: 'Cannot save' }, viewer, 403)
+  await statementsJourney({ h, customer, day, acct, bank, privateNote })
   customer = await h.command('contact.save', { id: customer.id, revision: customer.revision, kind: 'customer', contacts: [], payMethods: null, internalNotes: '' })
   const cleared = (await h.view(`customers/${customer.id}`)).customer
   assert.deepEqual([cleared.contacts, cleared.pay_methods, cleared.internal_notes, cleared.default_recipients], [[], null, '', ['ap@cedar.example']])

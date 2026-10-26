@@ -29,7 +29,7 @@ export async function remindersJourney(t) {
         assert.equal(await target.locator('button').evaluateAll(buttons => buttons.filter(button => !button.textContent.trim()).length), 0, 'all controls in the reminder panel have visible labels')
         if (process.env.PANTRY_PROOF_DIR) {
           await mkdir(process.env.PANTRY_PROOF_DIR, { recursive: true })
-          const anchor = name === 'reminders-customer' ? target.getByLabel('Customer reminder days', {exact:true}) : name === 'reminders-settings' ? target.getByLabel('Reminder subject', {exact:true}) : target.getByRole('button', {name:'Pause reminders',exact:true})
+          const anchor = name.startsWith('reminders-customer') ? target.getByLabel('Customer reminder days', {exact:true}) : name === 'reminders-settings' ? target.getByLabel('Reminder subject', {exact:true}) : target.getByRole('button', {name:'Pause reminders',exact:true})
           await anchor.evaluate(element => element.scrollIntoView({block:'center'}))
           await page.screenshot({ path: `${process.env.PANTRY_PROOF_DIR}/${name}-${width}.png` })
         }
@@ -70,6 +70,14 @@ export async function remindersJourney(t) {
       assert.equal(await editor.getByLabel('Customer reminder days', { exact: true }).inputValue(), '-2, 4, 10')
       assert.deepEqual(JSON.parse((await view('state')).contacts.find(contact => contact.id === customer.id).reminder_days), [-2, 4, 10])
       await proof('reminders-customer', editor)
+      // An empty override disables this customer's reminders and survives reload.
+      await editor.getByLabel('Customer reminder days', { exact: true }).fill('')
+      await submit('contact.save', editor.getByRole('button', { name: 'Save', exact: true }))
+      editor = await editCustomer()
+      assert.equal(await editor.getByRole('checkbox', { name: 'Use business reminder schedule', exact: true }).isChecked(), false)
+      assert.equal(await editor.getByLabel('Customer reminder days', { exact: true }).inputValue(), '')
+      assert.deepEqual(JSON.parse((await view('state')).contacts.find(contact => contact.id === customer.id).reminder_days), [])
+      await proof('reminders-customer-disabled', editor)
       // Returning to the default persists null rather than an empty override.
       await editor.getByRole('checkbox', { name: 'Use business reminder schedule', exact: true }).check()
       await submit('contact.save', editor.getByRole('button', { name: 'Save', exact: true }))

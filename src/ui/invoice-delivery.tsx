@@ -1,5 +1,6 @@
 // Sending an issued invoice: the customer link, sent and viewed, the next
 // reminder, online payments, and every delivery with the provider's answer.
+import { LateFeeCharge } from './late-fees'
 import { customerRecipients } from '../pantry/customer-profile'
 import { Action, Chip, command, Form, Field, Table, day, usd, useShared, useWho, type D } from './kit'
 
@@ -42,6 +43,7 @@ export function SendPanel({ i, data, onChange }: { i: D; data: D; onChange: () =
       <Field label="Send to" name="to" type="email" multiple defaultValue={defaultTo} required hint="The PDF is attached and the email links to the customer page. Separate several addresses with commas." />
     </Form>}
     {i.open_cents > 0 && state.actor.can.record && <Action run={async () => { await command('invoice.reminders', { id: i.id, paused: !i.reminders_paused }); await onChange() }}>{i.reminders_paused ? 'Resume reminders' : 'Pause reminders'}</Action>}
+    {i.open_cents > 0 && <LateFeeCharge invoice={i} onChange={onChange} />}
     {online.length > 0 && <><h3>Paid online</h3><ul className="send-log">
       {online.map(p => { const [label, tone] = PAYMENT[p.status]; return <li key={p.id}><span><strong>{usd(p.amount_cents)}</strong> {p.method === 'card' ? 'by card' : 'by ACH bank debit'}</span><Chip tone={tone}>{label}</Chip><small>Started {day(p.created_at)}{p.fee_cents === null ? '' : ` · Stripe fee ${usd(p.fee_cents)}`}</small></li> })}
     </ul></>}

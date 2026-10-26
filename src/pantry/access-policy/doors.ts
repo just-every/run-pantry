@@ -16,7 +16,7 @@ export function financialSourceAllowed(actor: Actor, source: string) {
   if (actor.role === 'payables-clerk') return source === 'expenses-by-vendor'
   return !limitedBanks(actor)
 }
-const saleCommands = new Set(['estimate.save-draft', 'estimate.send', 'estimate.convert', 'estimate.refresh-invoice', 'contact.save', 'invoice.save-draft', 'invoice.approve', 'invoice.approve-issue', 'invoice.issue', 'invoice.send', 'invoice.reminders', 'recurring.save', 'recurring.approve', 'recurring.price', 'recurring.approve-price', 'recurring.status', 'time.save', 'time-project.save'])
+const saleCommands = new Set(['late-fee.prepare', 'statement.send', 'estimate.save-draft', 'estimate.send', 'estimate.convert', 'estimate.refresh-invoice', 'contact.save', 'invoice.save-draft', 'invoice.approve', 'invoice.approve-issue', 'invoice.issue', 'invoice.send', 'invoice.reminders', 'recurring.save', 'recurring.approve', 'recurring.price', 'recurring.approve-price', 'recurring.status', 'time.save', 'time-project.save'])
 const payableCommands = new Set(['contact.save', 'bill.save', 'bill.record', 'bill.approve', 'bill.post', 'bill.waive-evidence', 'bill.update', 'bill.submit', 'bill.schedule', 'recurring-bill.save', 'recurring-bill.generate', 'recurring-bill.status', 'document.upload', 'time.save'])
 
 export async function assertDoor(c: Context, path: string, body?: Data) {
@@ -24,6 +24,8 @@ export async function assertDoor(c: Context, path: string, body?: Data) {
   if (actor.kind !== 'person' || actor.role === 'owner') return
   const url = new URL(path, c.request.url), door = url.pathname.replace(/^\/api\/pantry\//, '').replace(/^\//, '')
   const op = door.startsWith('command/') ? door.slice(8) : null
+  if (op === 'late-fee.prepare' || door === 'late-fees') requireThat(!limitedBanks(actor), 'Late fees require access to all bank accounts', 403)
+  if (op === 'statement.send' || /^statements\//.test(door)) requireThat(!limitedBanks(actor), 'Customer statements require access to all bank accounts', 403)
   // Original bytes and full accountant packages cannot be field-masked.
   if ((actor.policy?.maskTin || actor.policy?.maskBank) && /^(documents|package)\//.test(door)) requireThat(false, 'Original files and accountant packages require unmasked access; ask the owner', 403)
   if (narrow(actor)) {
@@ -36,7 +38,7 @@ export async function assertDoor(c: Context, path: string, body?: Data) {
     } else {
       const shared = ['state', 'time', 'sales', 'search'].includes(door)
       const custom = /^(custom-reports|management-packages)(\/|$)/.test(door)
-      const sale = actor.role === 'sales' && (/^(customers|estimates)\//.test(door) || door === 'estimates' || door === 'invoice-documents' || door === 'exemptions' || /^invoice-documents\/[^/]+\/(pdf|preview)$/.test(door))
+      const sale = actor.role === 'sales' && (/^(customers|estimates|statements)\//.test(door) || door === 'late-fees' || door === 'estimates' || door === 'invoice-documents' || door === 'exemptions' || /^invoice-documents\/[^/]+\/(pdf|preview)$/.test(door))
       const payable = actor.role === 'payables-clerk' && (/^vendors\/[^/]+\/history$/.test(door) || /^documents\/[^/]+$/.test(door) && !!await one(c.db, "SELECT id FROM pt_documents WHERE id = ? AND linked_kind = 'bill'", door.slice(10)))
       requireThat(actor.role === 'time-only' ? door === 'state' || door === 'time' : shared || custom || sale || payable, 'This screen is not part of your role', 403)
     }

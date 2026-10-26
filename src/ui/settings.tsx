@@ -3,6 +3,7 @@ import { DimensionSettings } from './dimensions'
 import { useState } from 'react'
 import { Action, Card, Chip, command, Details, Field, Form, PageHead, ROLE_LABEL, Table, day, placeholderEmail, useShared, type D } from './kit'
 import { Icon } from './icons'
+import { BusinessSummary } from './business-settings'
 import { IssuingLimits } from './issuing-limits'
 import { ReceiptSettings } from './receipt-settings'
 import { InvoicingSettings } from './invoicing-settings'
@@ -12,27 +13,6 @@ import { ErasureSettings } from './erasure-settings'
 import { IntegrationSettings } from './integration-settings'
 import { DataFlows } from './data-flows'
 import { People, RolePrivacy } from './people'
-
-const ENTITY_LABEL: Record<string, string> = { 'sole-proprietorship': 'Sole proprietorship', 'single-member-llc': 'Single-member LLC', 'multi-member-llc': 'Multi-member LLC', 's-corporation': 'S corporation', 'c-corporation': 'C corporation', partnership: 'Partnership' }
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-
-function Business() {
-  const { state, reload } = useShared(), e = state.settings.entity, owner = state.actor.can.owner, choices = state.settings.choices
-  // The date picker follows the browser's locale; the hint repeats the day in Pantry's own US format.
-  const [start, setStart] = useState<string | undefined>(e?.books_start)
-  return <Card title={<><Icon name="building" /> The business</>}>
-    {!owner && !e && <p>The owner sets up the business.</p>}
-    {owner ? <Form label={e ? 'Save business' : 'Set up the business'} submit={b => command('entity.save', { ...b, revision: e?.revision })} onDone={reload} className="grid-form">
-      <Field label="Legal name" name="legalName" defaultValue={e?.legal_name} required />
-      <Field label="Entity type" name="entityType" defaultValue={e?.entity_type} required options={choices.entityTypes.map((t: string) => ({ value: t, label: ENTITY_LABEL[t] }))} />
-      <Field label="State of organization" name="state" defaultValue={e?.state} required options={choices.states.map((s: string) => ({ value: s, label: s }))} />
-      <Field label="Fiscal year starts" name="fiscalYearStart" defaultValue={e?.fiscal_year_start ?? 1} required options={MONTHS.map((m, i) => ({ value: String(i + 1), label: m }))} />
-      <Field label="Books start" name="booksStart" type="date" defaultValue={e?.books_start} required onChange={(ev: any) => setStart(ev.target.value)} hint={start ? <>{day(start)} · the first day Pantry keeps the ledger</> : 'The first day Pantry keeps the ledger'} />
-      <Field label="Tax accounting method (declared with your accountant)" name="taxMethod" defaultValue={e?.tax_method ?? 'undeclared'} required options={[{ value: 'undeclared', label: 'Not yet declared' }, { value: 'cash', label: 'Cash' }, { value: 'accrual', label: 'Accrual' }]} hint="Pantry keeps accrual books in US dollars. This records your declared tax method; it does not change it." />
-      <Field label="Book and report policies" name="policies" type="textarea" defaultValue={e?.policies} wide hint="For example: capitalization threshold, revenue recognized when invoiced, accountant contact" />
-    </Form> : e && <dl className="facts"><div><dt>Legal name</dt><dd>{e.legal_name}</dd></div><div><dt>Entity</dt><dd>{ENTITY_LABEL[e.entity_type]}, {e.state}</dd></div><div><dt>Fiscal year</dt><dd>Starts in {MONTHS[e.fiscal_year_start - 1]}</dd></div><div><dt>Books</dt><dd>Accrual, USD, from {day(e.books_start)}; declared tax method {e.tax_method}</dd></div></dl>}
-  </Card>
-}
 
 /** The owner's own name and sign-in email, as people and invoices see them. */
 function Owner() {
@@ -97,7 +77,7 @@ export function Settings() {
   const { state } = useShared()
   return <>
     <PageHead title="People & settings" lead="The business these books belong to, invoice sending and online payments, Stripe payouts and Gusto payroll, who works in them, agent access, and how receipts are read and received." />
-    <Business /><DimensionSettings />
+    <BusinessSummary /><DimensionSettings />
     {state.settings.entity && <><InvoicingSettings /><ConnectedSettings /></>}
     {state.actor.can.owner && <><DataFlows /><Owner /><People /><RolePrivacy /><IssuingLimits /><Agents /><IntegrationSettings /><WebhookSettings /><ErasureSettings /><ReceiptSettings /><Hosting /></>}
   </>

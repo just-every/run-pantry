@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict'
+import { mkdir } from 'node:fs/promises'
+
+export async function lateFeeBrowser({ page, context, invoice, width, origin, accountId }) {
+  await page.goto(origin + '/app/settings')
+  const policy = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Late-fee policy', exact: true }) })
+  await policy.getByRole('checkbox', { name: 'Allow late-fee drafts', exact: true }).check()
+  await policy.getByLabel('Late-fee method', { exact: true }).selectOption('percentage')
+  await policy.getByLabel('Late-fee percentage', { exact: true }).fill('1.5')
+  await policy.getByLabel('Days overdue before a fee', { exact: true }).fill('30')
+  await policy.getByLabel('Late-fee income account', { exact: true }).selectOption(accountId)
+  await policy.getByLabel('Late-fee tax treatment', { exact: true }).selectOption('exempt')
+  const saving = page.waitForResponse(r => r.url().endsWith('/command/late-fee-policy.save'))
+  await policy.getByRole('button', { name: 'Save late-fee policy', exact: true }).click()
+  assert.equal((await saving).status(), 200)
+  await page.reload()
+  await policy.getByLabel('Late-fee percentage', { exact: true }).waitFor()
+  assert.equal(await policy.getByLabel('Late-fee percentage', { exact: true }).inputValue(), '1.5')
+  const proof = process.env.PANTRY_PROOF_DIR
+  if (proof) {
+    await mkdir(proof, { recursive: true })
+    await policy.getByLabel('Late-fee percentage', { exact: true }).scrollIntoViewIfNeeded()
+    await page.screenshot({ path: `${proof}/late-fee-policy-${width}.png` })
+  }
+  await page.goto(`${origin}/app/sales?invoice=${invoice.id}`)
+  const prepare = page.locator('details').filter({ has: page.locator('summary', { hasText: 'Prepare a late fee' }) })
+  await prepare.locator('summary').click()
+  await prepare.getByLabel('Late-fee date', { exact: true }).fill('2026-11-15')
+  const preparing = page.waitForResponse(r => r.url().endsWith('/command/late-fee.prepare'))
+  await prepare.getByRole('button', { name: 'Prepare late-fee draft', exact: true }).click()
+  const response = await preparing
+  assert.equal(response.status(), 200, await response.text())
+  const result = await response.json()
+  assert.equal(result.draft.total_cents, 2550)
+  assert.equal(result.draft.status, 'draft')
+  assert.equal(result.preparation.source.overdueDays, 30)
+  await page.waitForURL(url => url.searchParams.get('invoice') === result.invoiceId)
+  await page.getByText(`Late fee on invoice ${invoice.number}`, { exact: false }).first().waitFor()
+  const fresh = await context.request.get(origin + '/api/pantry/sales')
+  const sales = await fresh.json(), fee = sales.invoices.find(i => i.id === result.invoiceId)
+  assert.equal(fee.status, 'draft')
+  assert.equal(fee.journal_id, null)
+  assert.equal(sales.invoices.find(i => i.id === invoice.id).open_cents, 170000)
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+  const feeCard = page.locator('section.card').filter({ has: page.getByRole('heading', { name: new RegExp(result.draft.number) }) })
+  await feeCard.getByRole('button', { name: 'Approve', exact: true }).waitFor()
+  await feeCard.getByRole('heading').evaluate(el => window.scrollBy(0, el.getBoundingClientRect().top - 100))
+  if (proof) await page.screenshot({ path: `${proof}/late-fee-draft-${width}.png` })
+  await page.goto(origin + '/app/sales?tab=contacts&customer=' + invoice.customer_id)
+}

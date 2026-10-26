@@ -7,6 +7,7 @@ import { all, one } from './db'
 import { customerContacts, customerRecipients } from './customer-profile'
 import { businessDay, sendingSettings } from './delivery'
 import { ageing } from './reports'
+import { statementHistory } from './statements/store'
 
 const scope = `WITH customer_invoices AS (SELECT * FROM pt_invoices WHERE customer_id = ?),
   customer_payments AS (SELECT * FROM pt_payments WHERE contact_id = ? AND direction = 'received'),
@@ -14,7 +15,7 @@ const scope = `WITH customer_invoices AS (SELECT * FROM pt_invoices WHERE custom
     UNION SELECT reversal_id FROM customer_payments) `
 
 /** Call only through the native-session reader, as with the other private views. */
-export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: string) {
+export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: string, includeStatements = true) {
   const id = text(rawId, 'Customer')
   const customer = await one(db, "SELECT * FROM pt_contacts WHERE id = ? AND kind = 'customer'", id)
   requireThat(customer, 'Customer not found', 404)
@@ -97,6 +98,8 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
     return {...dep,kind:'customer-deposit',reference:dep.reference,total_cents:dep.amount_cents,balance_cents:null,included_in_balance:false,status:'Held customer deposit',href:`/app/sales?tab=estimates&deposit=${encodeURIComponent(dep.id)}`,allocations:[],documents:[],deliveries:[]}
   }))
   rows.push(...estimateRows,...depositRows)
+  const statements = includeStatements ? await statementHistory(db, id) : []
+  for (const s of statements) for (const d of s.deliveries) deliveries.push({ ...d, number: s.subject })
   rows.sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at) || `${a.kind}:${a.id}`.localeCompare(`${b.kind}:${b.id}`))
   const open = sum(openItems, 'open')
   const unallocatedPayment = sum(rows.filter(r => r.kind === 'payment' && r.included_in_balance), 'balance_cents')
@@ -108,7 +111,7 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
       open_balance_cents: open - unallocatedPayment - unallocatedCredit,
       ageing_href: `/app/reports?report=receivables&to=${asOf}`, ageing_items: openItems,
       ageing_totals: receivables.buckets.map(bucket => sum(openItems.filter(i => i.bucket === bucket), 'open')) },
-    sections: { estimates: { available: true, rows: estimateRows }, statements: { available: false, rows: [] } } }
+    sections: { estimates: { available: true, rows: estimateRows }, statements: { available: includeStatements, rows: statements } } }
 }
 
 export type CustomerHistoryData = Awaited<ReturnType<typeof customerHistory>>

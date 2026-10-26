@@ -13,12 +13,12 @@ export async function remindersJourney(t) {
   await saving({ reminderSubject: '{{business}}: {{invoice}} for {{customer}}', reminderBody: 'Hello {{customer}}, {{balance}} is due {{due_date}}. {{link}} <thank you>' })
   await saving({ reminderBody: '{{unsupported}}' }).then(() => assert.fail('unknown fields accepted'), e => assert.match(e.message, /400/))
   const make = async (name, override, extra = {}) => {
-    const customer = await call('contact.save', { kind: 'customer', name, email: 'synthetic-pantry-1@example.test', ...(override ? { reminderDays: override } : {}) })
+    const customer = await call('contact.save', { kind: 'customer', name, email: 'synthetic-pantry-1@example.test', ...(override !== undefined ? { reminderDays: override } : {}) })
     let inv = await call('invoice.save-draft', { customerId: customer.id, issueDate: '2026-10-01', dueDate: '2026-10-20', ...extra, lines: [{ description: 'Design work', quantity: '1', rate: '100', accountId: acct['4000'], taxCode: 'exempt' }] })
     inv = await call('invoice.approve', { id: inv.id, revision: inv.revision }); inv = await call('invoice.issue', { id: inv.id })
     await call('invoice.send', { id: inv.id }); return { customer, inv }
   }
-  const paid = await make('Paid on day five'), paused = await make('Paused customer'), open = await make('Open customer'), custom = await make('Custom customer', '2,8')
+  const paid = await make('Paid on day five'), paused = await make('Paused customer'), open = await make('Open customer'), custom = await make('Custom customer', '2,8'), disabled = await make('No reminders customer', '')
   await call('invoice.reminders', { id: paused.inv.id, paused: true })
   const discounts = await call('account.save', {code:'4950', name:'Sales discounts', type:'income'})
   await call('discount-settings.save', {discountAccountId: discounts.id})
@@ -42,6 +42,7 @@ export async function remindersJourney(t) {
   for (const day of ['2026-10-27','2026-10-28','2026-11-03','2026-11-19']) await tick(day)
   assert.deepEqual((await count(paid.inv.id)).map(d => d.step).sort((a,b)=>a-b), [-3,0])
   assert.equal((await count(paused.inv.id)).length, 0)
+  assert.equal((await count(disabled.inv.id)).length, 0, 'empty customer override disables every business reminder date')
   assert.equal((await count(credited.inv.id)).length, 0)
   assert.equal((await count(discounted.inv.id)).length, 0)
   assert.deepEqual((await count(short.inv.id)).map(d=>d.step).sort((a,b)=>a-b), [0,7])

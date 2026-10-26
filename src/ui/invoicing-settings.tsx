@@ -1,6 +1,7 @@
 // Settings for invoices out: how reminders follow up, and connecting the
 // business's own Stripe account so customers can pay by card or ACH from the
 // invoice link. Each card says plainly what works on this install.
+import { LateFeeSettings } from './late-fees'
 import { SetupSteps } from './provider-guides'
 import { Action, Card, Chip, command, day, Details, Field, Form, Loading, placeholderEmail, useShared, useView, type D } from './kit'
 
@@ -61,5 +62,5 @@ function Stripe({ st, onDone }: { st: D; onDone: () => Promise<void> }) {
 export function InvoicingSettings() {
   const { data, error, reload } = useView<D>('invoicing')
   if (!data) return <Loading error={error} what="invoice settings" />
-  return <><Sending s={data.sending} onDone={reload} /><Stripe st={data.stripe} onDone={reload} /></>
+  return <><Sending s={data.sending} onDone={reload} /><LateFeeSettings /><Stripe st={data.stripe} onDone={reload} /></>
 }

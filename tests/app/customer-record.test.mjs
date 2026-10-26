@@ -1,3 +1,5 @@
+import { lateFeeBrowser } from './late-fee-journey.mjs'
+import { statementsBrowser } from './statements-journey.mjs'
 import { remindersJourney } from './reminders-journey.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -115,6 +117,8 @@ test('INVOICE-009 customer records edit contacts and defaults, show every curren
       await page.goto(`${app.origin}/app/sales?tab=contacts&customer=${customer.id}`)
       await page.getByRole('heading', { name: `${name} · customer history`, exact: true }).waitFor()
     }
+    await statementsBrowser({ page, context, customer, width, origin: app.origin, history })
+    await lateFeeBrowser({ page, context, invoice: inv, width, origin: app.origin, accountId: acct['4000'] })
     await page.getByRole('link', { name: 'Reconcile with receivables aging', exact: true }).click()
     await page.getByRole('heading', { name: /^Receivables aging/ }).waitFor()
     assert.deepEqual(errors, [], `no page errors at ${width}`)

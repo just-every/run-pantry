@@ -1,3 +1,4 @@
+import { lateFeeCommands, lateFeesView } from './late-fees'
 import { taxReminderCommands, taxRemindersView } from './tax-reminders'
 import { taxReadinessCommands, taxReadiness, taxYearPackage } from './tax-readiness'
 import { w9Commands, w9Public, w9Status, missingW9 } from './w9'
@@ -119,15 +120,18 @@ import { dataFlows } from './data-flows'
 import { recordReportIssue } from './effects/issues'
 import { FIRST_DAY } from './report-sources'
 import { siblingCommands, siblingsView, siblingArtifact } from './estimates/siblings'
-import { assertDoor, projectAccess, financialSourceAllowed } from './access-policy/doors'
+import { assertDoor, projectAccess, financialSourceAllowed, limitedBanks } from './access-policy/doors'
 import { accessPolicyCommands } from './access-policy/settings'
 import { timeCommands, timeView } from './time/commands'
 import { estimateCommands, estimatesView, estimate, registerEstimateRoutes } from './estimates'
 import { customerDepositCommands, customerDepositsView } from './customer-deposits'
+import { statementCommands } from './statements/commands'
+import { statement } from './statements/store'
 
 const commands: Record<string, Command> = {
+  ...statementCommands,
   ...taxReminderCommands,...taxReadinessCommands,...w9Commands, ...currencyCommands,...archiveCommands,...collectionCommands, ...standingCommands, ...learningCommands, ...assetCommands, ...dimensionCommands, ...siblingCommands,
-  ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
+  ...lateFeeCommands, ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...reportDeliveryCommands, ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
@@ -212,8 +216,16 @@ registerInvoiceDocumentRoutes(api, reader)
 view('invoice-documents', async ctx => invoiceDocumentsView(ctx.db))
 registerCustomReportRoutes(api, reader)
 view('/vendors/:id/history'.slice(1), async (ctx, c) => vendorHistory(ctx.db, c.req.param('id')!, c.req.query('from'), c.req.query('to')))
-view('customers/:id', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to')))
-view('customers/:id/history', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to')))
+view('customers/:id', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to'), !limitedBanks(ctx.actor)))
+view('customers/:id/history', async (ctx, c) => customerHistory(ctx.db, c.req.param('id')!, c.req.query('to'), !limitedBanks(ctx.actor)))
+view('late-fees', async ctx => lateFeesView(ctx))
+view('statements/:id', async (ctx, c) => statement(ctx, c.req.param('id')!))
+api.get('/api/pantry/statements/:id/document', async c => {
+  const saved = await statement(await reader(c), c.req.param('id'))
+  return new Response(saved.html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
+    'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'", 'x-content-type-options': 'nosniff',
+    'referrer-policy': 'same-origin', 'x-robots-tag': 'noindex, nofollow' } })
+})
 view('dashboard', async (ctx, c) => dashboard(ctx.db, day(c, 'to'), c.req.query('basis') ? basisOf(c.req.query('basis')) : undefined))
 view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await lookups(ctx.db)), dimensionHistory: financialSourceAllowed(ctx.actor,'profit-and-loss')?await dimensionHistory(ctx.db):[], overview: await overview(ctx.db), settings: await settingsView(ctx) }))
 view('close-board', async (ctx, c) => closeBoard(ctx.db, c.req.query('year') ?? new Date().getUTCFullYear().toString()))

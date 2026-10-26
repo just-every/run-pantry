@@ -1,3 +1,4 @@
+import { lateFeeJourney } from './late-fee-journey.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { at, books, harness } from './harness.mjs'
@@ -109,6 +110,7 @@ test('PAN-04 invoices are drafted, approved and issued; unknown tax stops approv
   second = await h.command('invoice.save-draft', { id: second.id, revision: second.revision, customerId: customer.id, issueDate: '2026-09-25', lines: [{ description: 'Retainer', quantity: '1', rate: '9000.00', accountId: acct['4000'], taxCode: 'exempt' }] }, ann)
   assert.equal(second.prepared_by, 'ann@example.test')
   await h.command('invoice.approve', { id: second.id, revision: second.revision }, ann, 403)
+  await lateFeeJourney({ h, acct, customer, bea, ann })
 })
 
 test('PAN-05 bills post to payables with their evidence; a bill without evidence is a close exception until resolved', async t => {
