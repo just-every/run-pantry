@@ -16,7 +16,7 @@ export function messageLabel(d: D) {
   return `Reminder · ${d.step < 0 ? `${-d.step} day${d.step === -1 ? '' : 's'} before due` : d.step === 0 ? 'due date' : `${d.step} day${d.step === 1 ? '' : 's'} after due`}`
 }
 
-const PAYMENT: Record<string, [string, Tone]> = { open: ['Started, not paid', 'neutral'], processing: ['Processing (ACH)', 'info'], succeeded: ['Paid', 'good'], failed: ['Failed', 'bad'], expired: ['Not completed', 'neutral'] }
+const PAYMENT: Record<string, [string, Tone]> = { open: ['Started, not paid', 'neutral'], processing: ['Processing (ACH)', 'info'], succeeded: ['Paid', 'good'], failed: ['Failed', 'bad'], expired: ['Not completed', 'neutral'], returned: ['Returned (ACH)', 'warn'], disputed: ['Disputed', 'warn'], refunded: ['Refunded', 'neutral'] }
 
 export function SendPanel({ i, data, onChange }: { i: D; data: D; onChange: () => Promise<void> }) {
   const { state } = useShared(), who = useWho()

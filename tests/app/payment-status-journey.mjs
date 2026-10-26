@@ -42,11 +42,11 @@ export async function paymentStatusBrowser(t) {
         await cardPanel.getByText('Payment returned — invoice open again',{exact:true}).first().waitFor()
       }
       if(name==='disputed'){
-        await cardPanel.getByText('Disputed',{exact:true}).waitFor()
+        await cardPanel.getByText('Disputed',{exact:true}).first().waitFor()
         await cardPanel.getByText(/Evidence due/).waitFor()
       }
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${name} fits ${width}`)
-      if(proof)await page.screenshot({path:`${proof}/provider-${name}-${width}.png`,fullPage:true})
+      if(proof){await page.screenshot({path:`${proof}/provider-${name}-${width}.png`,fullPage:true});await cardPanel.screenshot({path:`${proof}/provider-card-${name}-${width}.png`})}
       if(name==='disputed') {
         const payer=await browser.newContext({viewport:{width,height:width===390?844:1000},extraHTTPHeaders:{'x-synthetic-pantry-clock':'2026-10-20T12:00:00Z'}})
         const hosted=await payer.newPage()
