@@ -6211,7 +6211,7 @@
       "executable": false
     },
     "tests/providers/autopay.mjs": {
-      "sha256": "fff8feaa1180199cd8684c0e800cdbf5246acc9ff62f09a4787d2c5dab30d2ae",
+      "sha256": "66a49d817dc16d23064478e9536d3fa4a03171a9e6deb84fc245c2171c6ad8b3",
       "executable": false
     },
     "tests/providers/customer-refund.mjs": {

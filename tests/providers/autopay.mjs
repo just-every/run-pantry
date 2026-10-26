@@ -70,7 +70,7 @@ try {
     if(response.status>=400){const failure=await response.clone().json().catch(()=>({}));const parameter=failure.error?.param;receipt.providerErrors??=[];receipt.providerErrors.push({http:response.status,code:failure.error?.code??null,confirmedDecline:response.status===402&&failure.error?.payment_intent?.status==='requires_payment_method',parameter:typeof parameter==='string'&&/^[a-zA-Z0-9_\[\].]+$/.test(parameter)?parameter:null});await retain()}
     return new Response(await response.arrayBuffer(), { status: response.status, headers: Object.fromEntries([...response.headers].filter(([name])=>!['content-encoding','content-length','transfer-encoding'].includes(name))) })
   } })
-  browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
+  browser = await chromium.launch({ headless: true, executablePath: process.env.PANTRY_CHROMIUM_PATH, args: ['--use-mock-keychain', '--password-store=basic'] })
   const clock = '2026-10-26T16:00:00Z', day = '2026-10-26', headers = { 'x-synthetic-pantry-clock': clock, 'cf-connecting-ip': '192.0.2.10' }
   const owner = await browser.newContext({ extraHTTPHeaders: headers })
   assert.equal((await owner.request.post(app.origin + '/auth/bootstrap', { headers: { origin: app.origin }, data: { token: TOKEN, displayName: 'Synthetic Pantry' }, maxRedirects: 0 })).status(), 303)
