@@ -11,6 +11,7 @@ const pause = (seconds: number) => new Promise(r => setTimeout(r, seconds * 1000
 export function XeroAttachments({ xero, reload }: { xero: D; reload: () => Promise<void> }) {
   const who = useWho(), owner = useShared().state.actor.can.owner
   const [notice, setNotice] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null), [status, setStatus] = useState('')
+  const [organization, setOrganization] = useState('')
   useEffect(() => {
     const q = new URLSearchParams(window.location.search)
     if (q.get('xero') === 'connected') setNotice({ tone: 'good', text: 'Xero is connected. Carry the attachments over below.' })
@@ -28,7 +29,10 @@ export function XeroAttachments({ xero, reload }: { xero: D; reload: () => Promi
   const chip = !xero.available ? <Chip>Not available here</Chip> : !xero.connection ? <Chip tone="warn">Not connected</Chip> : xero.done ? <Chip tone="good">Carried over</Chip> : <Chip tone="info">Connected</Chip>
   return <Card title="Attachments from Xero" actions={chip}>
     {notice && <p role={notice.tone === 'bad' ? 'alert' : 'status'} className={notice.tone === 'bad' ? 'error' : 'hint'}>{notice.text}</p>}
-    {!xero.available ? xero.needsKeys ? <SetupSteps provider="xero" reason={xero.reason} summary="Set up a Xero app for attachments" owner={owner} /> : <p>{xero.reason}</p> : !xero.connection ? <>
+    {!xero.available ? xero.needsKeys ? <SetupSteps provider="xero" reason={xero.reason} summary="Set up a Xero app for attachments" owner={owner} /> : <p>{xero.reason}</p> : xero.choices?.length > 0 ? <>
+      <fieldset className="choices provider-choices"><legend>Xero organization</legend>{xero.choices.map((org: D) => <label key={org.id} className={`choice${organization === org.id ? ' picked' : ''}`}><input type="radio" name="xero-organization" value={org.id} checked={organization === org.id} onChange={() => setOrganization(org.id)} /><strong>{org.tenantName}</strong></label>)}</fieldset>
+      <div className="row-actions"><Action tone="primary" disabled={!xero.choices.some((org: D) => org.id === organization)} run={async () => { await command('move-in.xero.choose', { connectionId: organization }); await reload(); setNotice({ tone: 'good', text: 'Xero is connected. Carry the attachments over below.' }) }}>Connect Xero</Action></div>
+    </> : !xero.connection ? <>
       <p>Xero’s exports carry no files. Connect Xero to bring over the files attached to the {xero.items} open invoices and bills you imported. Pantry asks Xero only to read invoices and their attachments.</p>
       <div className="row-actions"><Action tone="primary" run={async () => { const { url } = await command('move-in.xero.connect', {}); window.location.assign(url) }}>Connect Xero</Action></div>
     </> : <>

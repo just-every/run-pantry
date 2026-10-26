@@ -55,6 +55,40 @@ test('XERO-001 connecting Xero from local dev returns the owner signed in with X
   assert.equal(await signedIn(), 'owner@example.test', 'the owner is still signed in')
   const kept = await h.db.prepare('SELECT status, tenant_name, connected_by FROM pt_xero_connection').first()
   assert.deepEqual({ ...kept }, { status: 'connected', tenant_name: 'Juniper Lane Design LLC', connected_by: 'owner@example.test' })
+
+  // Re-consent creates no new connection for this authentication event. Exercise
+  // the same callback with one, several, and genuinely no existing tenants.
+  const existing = xero.state.connections.map(org => ({ ...org, authEventId: 'synthetic-pantry-1' }))
+  const other = await h.member('synthetic-pantry-2@example.test', 'bookkeeper')
+  for (const connections of [existing.slice(1), existing, []]) {
+    await h.command('move-in.xero.disconnect', {})
+    xero.state.connections = connections
+    xero.state.codes.add('recorded-authorization-code')
+    const start = new URL((await h.command('move-in.xero.connect', {})).url)
+    const back = await returnFromXero({ code: 'recorded-authorization-code', state: start.searchParams.get('state') })
+    let view = (await h.view('move-in')).xero
+    if (!connections.length) {
+      assert.ok(new URL(back, h.origin).searchParams.has('xero_error'))
+      assert.equal(view.connection, null)
+      assert.deepEqual(view.choices, [])
+      continue
+    }
+    assert.ok(!new URL(back, h.origin).searchParams.has('xero_error'))
+    if (connections.length > 1) {
+      assert.equal(view.connection, null, 'several existing tenants require the person to choose')
+      assert.deepEqual(view.choices, connections.map(({ id, tenantName }) => ({ id, tenantName })))
+      assert.deepEqual((await h.view('move-in', other)).xero.choices, [], 'only the person who started this connection can choose')
+      await h.command('move-in.xero.choose', { connectionId: connections[1].id }, other, 409)
+      await h.command('move-in.xero.choose', { connectionId: 'synthetic-pantry-3' }, h.owner, 409)
+      await h.command('move-in.xero.choose', { connectionId: connections[1].id })
+      view = (await h.view('move-in')).xero
+      await h.command('move-in.xero.choose', { connectionId: connections[0].id }, h.owner, 409)
+    }
+    assert.equal(view.connection.tenantName, connections.at(-1).tenantName)
+    assert.deepEqual(view.choices, [])
+    assert.ok(!JSON.stringify(view).includes(xero.token.access_token), 'the page never receives the Xero credential')
+    assert.equal(await signedIn(), 'owner@example.test')
+  }
 })
 
 // The provider's own site (localhost, while Pantry is on 127.0.0.1): an Allow link

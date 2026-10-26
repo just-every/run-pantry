@@ -3575,7 +3575,11 @@
       "executable": false
     },
     "src/pantry/cutover/xero-attachments.ts": {
-      "sha256": "7c025589b7aba8b459e6cd4f496a771c9179b0d064635bcd2556571c0604a1d4",
+      "sha256": "8912e6393bf41d17654aa85299aa804e8613a72f9d2841de786f1a7783f321af",
+      "executable": false
+    },
+    "src/pantry/cutover/xero-selection.ts": {
+      "sha256": "091a506a4695828da58ed34c2f52533a4f4eee971b369c61da6789adef112cac",
       "executable": false
     },
     "src/pantry/cutover/xero.ts": {
@@ -5211,7 +5215,7 @@
       "executable": false
     },
     "src/ui/move-in-xero.tsx": {
-      "sha256": "a902410cb9925a5bcdb6ee61b932889845ec8cfe2975021d6073041bacd4578c",
+      "sha256": "fb273c90483be132c5123c64a86fd63372c17df849dbde4ca86cb7a7aeb00f57",
       "executable": false
     },
     "src/ui/move-in.tsx": {
@@ -5551,7 +5555,7 @@
       "executable": false
     },
     "tests/api/oauth-return.test.mjs": {
-      "sha256": "68b4002ddcaf438273379cf2fa374b196bfc03520d2df7100d2c07dc2adb5c52",
+      "sha256": "67d423922679367836140de6a64709d6fae49d48f46b68ccbe794a6e5b065971",
       "executable": false
     },
     "tests/api/plaid.mjs": {
@@ -5655,7 +5659,7 @@
       "executable": false
     },
     "tests/api/xero.mjs": {
-      "sha256": "6a82c3d089bd43eb9d42b159cccb6211ff2894a6dfd05aa57174f445648edc52",
+      "sha256": "fdd2b95d8ea930e184025d6b3279ced3d33211c8ee59b59cf41f0dc00e2530f9",
       "executable": false
     },
     "tests/app/access001-journey.mjs": {
