@@ -20,6 +20,8 @@ jobs:
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
+      PLAYWRIGHT_SKIP_BROWSER_GC: '1'
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
       VERIFY_SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
@@ -37,7 +39,12 @@ jobs:
       - run: npm install --global pnpm@10.12.4
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Install Chromium with bounded system dependencies
+        run: |
+          set -euo pipefail
+          mkdir -p "$PLAYWRIGHT_BROWSERS_PATH" "$RUNNER_TEMP/rer-apt/archives"
+          sudo env "PATH=$PATH" "APT_ARCHIVES=$RUNNER_TEMP/rer-apt/archives" python3 scripts/install-chromium-deps.py
+          pnpm exec playwright install chromium
       # rer verify adds hosted-output and hydration checks after verify:app.
       - name: Verify source, emitted runtime, site and hosted hydration
         if: ${{ matrix.shard == 'source' }}
@@ -52,6 +59,8 @@ jobs:
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
+      PLAYWRIGHT_SKIP_BROWSER_GC: '1'
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
         with:
@@ -63,7 +72,12 @@ jobs:
       - run: npm install --global pnpm@10.12.4
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Install Chromium with bounded system dependencies
+        run: |
+          set -euo pipefail
+          mkdir -p "$PLAYWRIGHT_BROWSERS_PATH" "$RUNNER_TEMP/rer-apt/archives"
+          sudo env "PATH=$PATH" "APT_ARCHIVES=$RUNNER_TEMP/rer-apt/archives" python3 scripts/install-chromium-deps.py
+          pnpm exec playwright install chromium
       - run: pnpm run test:restore
   # Preserve the required check name and reject failed, cancelled or skipped work.
   verify:

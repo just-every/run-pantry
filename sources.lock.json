@@ -71,7 +71,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "64793c01e79faf6e96b5e384adab967d1c4aa87b327d18d6d1db274d3a8e0c18",
+      "sha256": "a2a86ed1ddae3dae794ab6dc2546db13c8faeee5db277391378afb3776172f5a",
       "executable": false
     },
     ".gitignore": {
@@ -103,7 +103,7 @@
       "executable": false
     },
     "base-copies.json": {
-      "sha256": "d806934a247b38c12d71a207da7b15f3bb8e5f1e3b56009978e0fd9b4786f2a7",
+      "sha256": "6f16fdfaa675d28bb24d52aa5c8bd3d167ebf6d546e7951a6991d79d89f3fcfd",
       "executable": false
     },
     "CHANGELOG.md": {
@@ -1340,6 +1340,10 @@
     },
     "scripts/hosted-backup.mjs": {
       "sha256": "7bedbfafebc88810bbe491b637be1b536ed63bc8d751c2456c25d051e95c24e5",
+      "executable": false
+    },
+    "scripts/install-chromium-deps.py": {
+      "sha256": "d3027108ad8e08ceeddb0ed477d967b1207e40bb6bf5ae941854c534c2cf4004",
       "executable": false
     },
     "scripts/install.mjs": {
