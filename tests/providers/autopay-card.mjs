@@ -81,6 +81,10 @@ export async function declinedCard({ app, browser, headers, command, view, acct,
     receipt.card.revoked = true
     await stage('decline-card-revoked', page)
   } catch (error) {
+    const body = await page.locator('body').innerText().catch(() => '')
+    const current = await view(`autopay/${customer.id}`).catch(() => null)
+    receipt.cardReturn = { origin: new URL(page.url()).origin, text: body.replace(/https?:\/\/\S+/g, '[redacted URL]').slice(0, 700), policyValid: current?.policy?.valid ?? false, saved: current?.saved?.active ?? false }
+    await retain()
     await stage('decline-card-blocked', page)
     throw error
   } finally { await payer.close() }

@@ -16,7 +16,9 @@ assert.ok(key && key.includes('_test_'), 'Injected Stripe test access is require
 const proof = process.env.PANTRY_PROOF_DIR
 assert.ok(proof, 'PANTRY_PROOF_DIR is required for private stage evidence')
 await mkdir(proof, { recursive: true, mode: 0o700 })
-const receipt = { head: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), ranAt: new Date().toISOString(), testMode: true, isolatedEdges: ['account-wide event listing'], stage: 'starting', status: 'running' }
+const scenario = process.env.PANTRY_AUTOPAY_SCENARIO ?? 'all'
+assert.ok(['all', 'card'].includes(scenario), 'Choose the full journey or its independent card scenario')
+const receipt = { head: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), ranAt: new Date().toISOString(), testMode: true, scenario, isolatedEdges: ['account-wide event listing'], stage: 'starting', status: 'running' }
 let app, browser, page
 const retain = async () => writeFile(join(proof, 'autopay-provider.json'), JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 })
 const stage = async (name, screen = page, capture = true) => {
@@ -78,6 +80,11 @@ try {
   await command('entity.save', { legalName: 'Synthetic Pantry test business', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: day, policies: '' })
   await command('chart.start', {}); await stage('connecting-stripe'); await command('stripe.connect', { secretKey: key }); await stage('stripe-connected')
   const acct = (await view('state')).accounts.find(a => a.code === '4000').id
+  if (scenario === 'card') {
+    await declinedCard({ app, browser, headers, command, view, acct, day, stripe, receipt, retain, stage })
+    receipt.status = 'completed'; receipt.stage = 'retained-provider-outcome'
+    await retain(); console.log(JSON.stringify(receipt))
+  } else {
   const customer = await command('contact.save', { kind: 'customer', name: 'Synthetic Pantry', email: 'synthetic-pantry@example.test', billingAddress: '12 Cedar Street, New York NY 10001', termsDays: 1 })
   let recurring = await command('recurring.save', { customerId: customer.id, startDate: day, every: 1, unit: 'month', termsDays: 1, mode: 'send', lines: [{ description: 'Synthetic recurring test service', quantity: '1', rate: '1', accountId: acct, taxCode: 'exempt' }] })
   recurring = await command('recurring.approve', { id: recurring.id, revision: recurring.revision })
@@ -165,6 +172,7 @@ try {
   receipt.revoked = true; receipt.status = providerIntent.status === 'succeeded' ? 'completed' : 'processing'; receipt.stage = 'retained-provider-outcome'
   await retain()
   console.log(JSON.stringify(receipt))
+  }
 } catch (error) {
   receipt.status = 'blocked'
   receipt.reason = 'The live hosted setup or provider outcome did not complete; inspect the retained private stage screenshots.'

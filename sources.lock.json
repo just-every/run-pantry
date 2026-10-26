@@ -6207,11 +6207,11 @@
       "executable": false
     },
     "tests/providers/autopay-card.mjs": {
-      "sha256": "d45ed9d81f1ddb971f4157412fcadb50093d84aa029efe1dbf3ce8dfe7d4fe37",
+      "sha256": "1c0306a32443578fe1607b59cba9a2cc08e98510cc7df42943a81c01688fd4b2",
       "executable": false
     },
     "tests/providers/autopay.mjs": {
-      "sha256": "4f4feb9ecbf9a0ebecfb8145f9e78412958489698f073b832a9e1841e392d67b",
+      "sha256": "fff8feaa1180199cd8684c0e800cdbf5246acc9ff62f09a4787d2c5dab30d2ae",
       "executable": false
     },
     "tests/providers/customer-refund.mjs": {
