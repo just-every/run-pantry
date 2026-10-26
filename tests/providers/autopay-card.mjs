@@ -12,6 +12,13 @@ export async function declinedCard({ app, browser, headers, command, view, acct,
   await command('autopay.policy', { customerId: customer.id, recurringId: template.id, enabled: true, consent: true, purpose: 'Synthetic recurring card service at the billing address', noticeRecipients: [{ recipient: customer.email, timeZone: 'America/New_York' }] })
   const payer = await browser.newContext({ extraHTTPHeaders: headers, viewport: { width: 390, height: 844 } })
   const page = await payer.newPage()
+  const returnedDocuments = []
+  page.on('response', response => {
+    if (!response.request().isNavigationRequest() || new URL(response.url()).origin !== app.origin) return
+    const entry = { status: response.status(), mainFrame: response.frame() === page.mainFrame() }
+    returnedDocuments.push(entry)
+    void response.text().then(body => { entry.bytes = body.length; entry.savedCardText = /Saved card.*Autopay authorized/.test(body); entry.pdfFrame = body.includes('invoice.pdf') }).catch(() => { entry.readFailed = true })
+  })
   try {
     page.setDefaultTimeout(20000)
     await page.goto(`${app.origin}/i/${invoice.link_token}`)
@@ -83,7 +90,21 @@ export async function declinedCard({ app, browser, headers, command, view, acct,
   } catch (error) {
     const body = await page.locator('body').innerText().catch(() => '')
     const current = await view(`autopay/${customer.id}`).catch(() => null)
-    receipt.cardReturn = { origin: new URL(page.url()).origin, text: body.replace(/https?:\/\/\S+/g, '[redacted URL]').slice(0, 700), policyValid: current?.policy?.valid ?? false, saved: current?.saved?.active ?? false }
+    receipt.cardReturn = { origin: new URL(page.url()).origin, text: body.replace(/https?:\/\/\S+/g, '[redacted URL]').slice(0, 700), policyValid: current?.policy?.valid ?? false, saved: current?.saved?.active ?? false, returnedDocuments }
+    const response = await payer.request.get(`${app.origin}/i/${invoice.link_token}`)
+    const html = await response.text()
+    receipt.cardReturn.directResponse = { status: response.status(), bytes: html.length, savedCardText: /Saved card.*Autopay authorized/.test(html) }
+    receipt.cardReturn.freshTabs = []
+    for (const width of [390, 1440]) {
+      const fresh = await payer.newPage()
+      await fresh.setViewportSize({ width, height: 900 })
+      try {
+        await fresh.goto(`${app.origin}/i/${invoice.link_token}`, { timeout: 15000 })
+        await fresh.getByText(/Saved card.*Autopay authorized/).waitFor({ timeout: 10000 })
+        receipt.cardReturn.freshTabs.push({ width, savedCardVisible: true })
+      } catch { receipt.cardReturn.freshTabs.push({ width, savedCardVisible: false }) }
+      finally { await fresh.close() }
+    }
     await retain()
     await stage('decline-card-blocked', page)
     throw error
