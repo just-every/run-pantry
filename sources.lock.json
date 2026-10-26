@@ -1375,7 +1375,7 @@
       "executable": false
     },
     "scripts/installer/portability.mjs": {
-      "sha256": "4c328a21536d226e03ed0fe61dcfad77b87606700d97f590a8610fe58e20de1b",
+      "sha256": "b0e62893eaa335260af49ad1c369b0946bf44bd5a21b46f07de0570f5299c7cc",
       "executable": false
     },
     "scripts/installer/seed.mjs": {
@@ -6195,7 +6195,7 @@
       "executable": false
     },
     "tests/providers/autopay.mjs": {
-      "sha256": "8d0cbe45b77f3bac5dea70faa23166ec4aa2d9666d12e3e293315ff084c71410",
+      "sha256": "e23f292b0fd33abef9444fc9ffda2bb9cf96f6b8544a601a0d8ffd7e7afdf342",
       "executable": false
     },
     "tests/providers/customer-refund.mjs": {

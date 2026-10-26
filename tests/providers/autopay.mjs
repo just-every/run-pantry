@@ -76,21 +76,14 @@ try {
   await page.getByRole('button', { name: 'Continue to Stripe to save method', exact: true }).click()
   await page.waitForURL(url => url.hostname === 'checkout.stripe.com')
   await stage('stripe-checkout')
-  // All account details below are Stripe's documented sandbox bank values.
+  // Use Stripe’s own sandbox bank Autofill control on its hosted form.
   for (let step = 0; step < 18; step++) {
     if (new URL(page.url()).origin === app.origin) break
-    const routing = await visible(f => f.getByPlaceholder(/routing number/i))
-    if (routing) {
-      await routing.fill('110000000')
-      await (await findInFrames(f => f.getByPlaceholder(/^account number$/i))).fill('000123456789')
-      const confirm = await visible(f => f.getByPlaceholder(/confirm account number/i)); if (confirm) await confirm.fill('000123456789')
-      const checking = await visible(f => f.getByRole('radio', { name: /checking/i })); if (checking) await checking.check()
-      const individual = await visible(f => f.getByRole('radio', { name: /individual/i })); if (individual) await individual.check()
-      const name = await visible(f => f.getByLabel(/account holder|full name|name on account/i)); if (name) await name.fill('Synthetic Pantry')
-      const email = await visible(f => f.getByLabel(/^email$/i)); if (email) await email.fill('synthetic-pantry@example.test')
-      const agree = await visible(f => f.getByRole('checkbox')); if (agree) await agree.check()
+    const autofill = await visible(f => f.getByRole('button', { name: 'Autofill', exact: true }))
+    if (autofill) {
+      await autofill.click()
       await stage(`bank-details-${step}`)
-      await (await findInFrames(f => f.getByRole('button', { name: /^(save|continue|add account|agree and continue|agree and save|set up|submit)$/i }))).click()
+      await (await findInFrames(f => f.getByRole('button', { name: 'Submit', exact: true }))).click()
     } else {
       const manual = await visible(f => f.getByText(/enter bank details manually|manually enter bank details|enter bank details instead/i))
       if (manual) await manual.click()

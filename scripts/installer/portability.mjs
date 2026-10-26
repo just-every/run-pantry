@@ -5,7 +5,7 @@
 // Migrations seed one settings row each in the replaceable tables; the
 // archive's rows take their place. Connections never travel with the books.
 const disabled = (table,row) => {
- if(table==='pt_contacts')return {...row,autopay_payment_method:null,autopay_stripe_customer:null,autopay_mandate_id:null,autopay_revoked_at:'restored'}
+ if(table==='pt_contacts')return {...row,autopay_payment_method:null,autopay_stripe_customer:null,autopay_mandate_id:null,autopay_revoked_at:row.autopay_revoked_at||'restored'}
  if(table==='pt_autopay_policies')return {...row,enabled:0,owner_id:''}
  if(table==='pt_autopay_setups')return {...row,status:'revoked',stripe_customer:''}
  if(table==='pt_text_consents')return {...row,revoked_at:'restored'}
