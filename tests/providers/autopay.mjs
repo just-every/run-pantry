@@ -97,6 +97,8 @@ try {
   // Use Stripe’s own sandbox bank Autofill control on its hosted form.
   for (let step = 0; step < 18; step++) {
     if (new URL(page.url()).origin === app.origin) break
+    const fullName = await visible(f => f.getByRole('textbox', { name: 'Full name', exact: true }))
+    if (fullName && !await fullName.inputValue()) await fullName.fill('Synthetic Pantry')
     const autofill = await visible(f => f.getByRole('button', { name: 'Autofill', exact: true }))
     if (autofill) {
       await autofill.click()
@@ -114,7 +116,7 @@ try {
         const connect = await visible(f => f.getByRole('button', { name: /connect bank account|add bank account|link bank account|choose bank/i }))
         if (connect) await connect.click()
         else {
-          const final = await visible(f => f.getByRole('button', { name: /^(save|set up|set up bank account|agree and save|continue(?: to .+)?|done)$/i }))
+          const final = await visible(f => f.getByRole('button', { name: /^(save|set up|set up bank account|start setup|agree and save|continue(?: to .+)?|done)$/i }))
           if (final) await final.click()
           else await page.waitForTimeout(1000)
         }
