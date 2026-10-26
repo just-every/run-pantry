@@ -14,8 +14,8 @@ export function readBusinessCarry(root = process.cwd(), log = console.warn) {
     for (const key of ['legal_name', 'accent', 'logo_url']) {
       if (value[key] !== null && typeof value[key] !== 'string') throw new Error(key)
     }
-    return JSON.stringify({ version: 1, origin: value.origin, business_url: value.business_url,
-      name: value.name, legal_name: value.legal_name, accent: value.accent, logo_url: value.logo_url })
+    return JSON.stringify({ version: 1, origin: value.origin, business_id: value.business_id, business_url: value.business_url,
+      name: value.name, legal_name: value.legal_name, accent: value.accent, logo_url: value.logo_url, refreshed_at: value.refreshed_at })
   } catch {
     log('[pantry] No Business carry: local file is unreadable or invalid.')
     return null
