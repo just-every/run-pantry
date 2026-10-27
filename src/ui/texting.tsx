@@ -62,7 +62,7 @@ export function InvoiceTexting({invoice,kind='invoice'}:{invoice:D;kind?:'invoic
    <Field label="Text link to mobile number" name="textPhone" type="tel" value={number} onChange={(e:any)=>setPhone(e.target.value)} />
    <a className="btn btn-secondary" href={href} aria-disabled={busy} onClick={async e=>{
     e.preventDefault();if(busy)return;setBusy(true);setShareError('')
-    try{const shared=await command('texting.share',{id:invoice.id,kind,phone:number});await reload();window.location.href=shared.smsUri}catch(error){setShareError((error as Error).message)}finally{setBusy(false)}
+    try{const shared=await command('texting.share',{id:invoice.id,kind,phone:number});await reload();window.open(shared.smsUri,'_blank','noopener,noreferrer')}catch(error){setShareError((error as Error).message)}finally{setBusy(false)}
    }}>{busy?'Recording share…':'Text the link'}</a>
    {shareError&&<p className="error" role="alert">{shareError}</p>}
    <p className="hint">Opens your phone’s messaging app. Pantry records who shared the link and when; your phone sends the message.</p>

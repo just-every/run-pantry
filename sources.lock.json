@@ -5643,7 +5643,7 @@
       "executable": false
     },
     "src/ui/texting.tsx": {
-      "sha256": "a00dd77d64cdf3eb2f24da1f540758d442b10e3d6622472ecf70e9ba2d02f433",
+      "sha256": "97b66b66f0471bfb601069baf06bfc49cba0cb945e3e348acffa67a8f6e64cf5",
       "executable": false
     },
     "src/ui/time.tsx": {
@@ -6211,7 +6211,7 @@
       "executable": false
     },
     "tests/app/texting-journey.mjs": {
-      "sha256": "c9fcf7d23ef848ccbddb8ae617ff537df0d10228f19192a31dd25a38adaa73e8",
+      "sha256": "d6f0596422253c76042010ddc8a30a31d276d604fae4a5280719891c40e0d657",
       "executable": false
     },
     "tests/app/transfers.test.mjs": {

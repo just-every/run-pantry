@@ -72,6 +72,7 @@ export async function textingBrowser(t) {
     assert.match(href,/^sms:\+15005550006\?body=/);assert.ok(decodeURIComponent(href).includes('/i/'))
     await submit('texting.share',()=>anchor.click())
     await panel.getByText('Link shared; sending happens on the phone',{exact:true}).first().waitFor()
+    if(width===1440)assert.equal(new URL(page.url()).pathname, '/app/sales', 'the native phone handoff keeps the books and recorded outcome open')
     await submit('texting.send',()=>panel.getByRole('button',{name:'Send test text from Pantry',exact:true}).click())
     await panel.getByText('queued',{exact:true}).first().waitFor()
     const message=(await view('texting')).messages.find(m=>m.invoice_id===inv.id&&m.status==='queued')
