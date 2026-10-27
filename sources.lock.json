@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "fbf51ba0b00581de2bbc7652e53a1d80526d63f8409cd4742b1e3de2b7c84360",
+      "sha256": "7cf049a33083b322e14e03cae6a63dd3d2dec1e8fcdffc30cd70adac3c11cdc5",
       "executable": false
     },
     "DEMO.md": {
@@ -6215,7 +6215,7 @@
       "executable": false
     },
     "tests/app/texting-journey.mjs": {
-      "sha256": "d6f0596422253c76042010ddc8a30a31d276d604fae4a5280719891c40e0d657",
+      "sha256": "8d9770e4ee875f216bae6354b7ae385e3ffee720f0fef705541128e6b6d19fad",
       "executable": false
     },
     "tests/app/transfers.test.mjs": {
