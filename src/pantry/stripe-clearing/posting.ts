@@ -38,6 +38,16 @@ export async function postItem(db: D1Database, s: Data, bt: Data, balanceLedger:
   let payment: Data | null = null
   if (isCharge) {
     if (!source || !Object.hasOwn(source, 'payment_intent')) return defer('Stripe charge has no expanded payment intent; invoice overlap cannot be checked.')
+    const terminal = intent ? await one(db,'SELECT * FROM pt_terminal_payments WHERE payment_intent=?',intent) : null
+    if(terminal && !terminal.invoice_id) {
+      if(terminal.status!=='succeeded' || !terminal.journal_id) return defer('Waiting for the Terminal receipt to be confirmed.')
+      if(terminal.amount_cents!==item.amount_cents || terminal.fee_cents!==item.fee_cents)return defer('Stripe activity differs from the Terminal receipt.')
+      const entry=await one(db,"SELECT 1 FROM pt_journal_entries WHERE id=? AND status='posted' AND reversed_by_id IS NULL",terminal.journal_id)
+      if(!entry)return defer('The Terminal receipt was reversed; review its Stripe activity.')
+      await run(db,[q("UPDATE pt_stripe_clearing_items SET status='adopted',reason='',entry_id=? WHERE id=? AND entry_id IS NULL",terminal.journal_id,item.id),changed(),audit(pantry('stripe'),'stripe.terminal-adopt','stripe-item',item.id,{terminalId:terminal.id})])
+      return true
+    }
+    if(!terminal && source.metadata?.pantry_terminal)return defer('Waiting for the Terminal record; this charge will not also be booked as sales.')
     payment = intent ? await one(db, `SELECT s.*, p.journal_id, p.amount_cents AS received_cents, p.reversal_id, e.reversed_by_id, e.status AS entry_status
       FROM pt_stripe_payments s LEFT JOIN pt_payments p ON p.id = s.payment_id LEFT JOIN pt_journal_entries e ON e.id = p.journal_id WHERE s.payment_intent = ?`, intent) : null
     if (payment) {
@@ -66,7 +76,7 @@ export async function postItem(db: D1Database, s: Data, bt: Data, balanceLedger:
   const statements = [...dimensions.guards,guard('EXISTS (SELECT 1 FROM pt_stripe_clearing_items WHERE id = ? AND entry_id IS NULL)', bt.id),
     guard('NOT EXISTS(SELECT 1 FROM pt_stripe_event_movements WHERE account_id=? AND balance_transaction=?)',s.account_id,bt.id),
     guard("NOT EXISTS(SELECT 1 FROM pt_customer_refunds WHERE provider_account=? AND provider_id=? AND status='succeeded')",s.account_id,item.source_id),
-    ...(isCharge && intent ? [guard('NOT EXISTS (SELECT 1 FROM pt_stripe_payments WHERE payment_intent = ?)', intent)] : []),
+    ...(isCharge && intent ? [guard('NOT EXISTS (SELECT 1 FROM pt_stripe_payments WHERE payment_intent = ?)', intent), guard('NOT EXISTS(SELECT 1 FROM pt_terminal_payments WHERE payment_intent=?)',intent)] : []),
     ...entryStatements({ id: entryId, date: item.event_date, memo, sourceKind: 'bank', sourceId: isPayout(bt) && bt.type === 'payout' ? item.payout_id ?? bt.id : bt.id, preparedBy: by.email, preparedKind: 'import', lines }, by.email),
     q("UPDATE pt_stripe_clearing_items SET status = 'posted', reason = '', entry_id = ? WHERE id = ? AND entry_id IS NULL", entryId, bt.id), changed(),
     audit(by, 'stripe.clearing', 'stripe-item', bt.id, { type: category, net: item.net_cents, entryId })]

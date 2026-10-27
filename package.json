@@ -35,8 +35,8 @@
     "hosted-backup": "node scripts/hosted-backup.mjs",
     "delivery:spec": "node scripts/build-deployment-spec.mjs",
     "check:deployment-spec": "node scripts/build-deployment-spec.mjs --check",
-    "contract:write": "node src/base/contract-docs.mjs write",
-    "contract:check": "node src/base/contract-docs.mjs check"
+    "contract:write": "node scripts/contract-docs.mjs write",
+    "contract:check": "node scripts/contract-docs.mjs check"
   },
   "dependencies": {
     "@tanstack/react-router": "1.170.41",

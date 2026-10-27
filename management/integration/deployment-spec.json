@@ -727,6 +727,12 @@
     },
     {
       "binding": "DB",
+      "name": "0119_terminal.sql",
+      "sha256": "2aee8ee8b8f1aa6b1faac7efbd4b0cba0eab86c68eacc5ae5413b196fa5f43a3",
+      "sql": "CREATE TABLE pt_terminal_settings (\n  id INTEGER PRIMARY KEY CHECK(id = 1),\n  tip_account_id TEXT NOT NULL REFERENCES pt_accounts(id),\n  revision TEXT NOT NULL\n);\nCREATE TABLE pt_terminal_payments (\n  id TEXT PRIMARY KEY,\n  provider_account TEXT NOT NULL,\n  reader_id TEXT NOT NULL,\n  invoice_id TEXT REFERENCES pt_invoices(id),\n  customer_id TEXT REFERENCES pt_contacts(id),\n  sale_date TEXT NOT NULL,\n  description TEXT NOT NULL,\n  amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),\n  tip_cents INTEGER NOT NULL CHECK(tip_cents >= 0),\n  income_account_id TEXT REFERENCES pt_accounts(id),\n  tip_account_id TEXT REFERENCES pt_accounts(id),\n  tax_reason TEXT NOT NULL,\n  early_window_end TEXT,\n  payment_intent TEXT UNIQUE,\n  status TEXT NOT NULL DEFAULT 'prepared' CHECK(status IN ('prepared','processing','succeeded')),\n  brand TEXT NOT NULL DEFAULT '',\n  last4 TEXT NOT NULL DEFAULT '',\n  journal_id TEXT REFERENCES pt_journal_entries(id),\n  fee_entry_id TEXT REFERENCES pt_journal_entries(id),\n  fee_cents INTEGER NOT NULL DEFAULT 0,\n  created_by TEXT NOT NULL,\n  created_at TEXT NOT NULL\n);\n"
+    },
+    {
+      "binding": "DB",
       "name": "0120_document_objects.sql",
       "sha256": "6c77e739d174b285cc16915ef9fbb7f03cb13450bf3227a2ec5ad7a54a3474b8",
       "sql": "-- Object receipts are installation-local. Archives keep the exact recovery copy.\nCREATE TABLE pt_document_objects (\n  document_id TEXT PRIMARY KEY REFERENCES pt_documents(id) ON DELETE CASCADE,\n  object_key TEXT NOT NULL UNIQUE,\n  ready INTEGER NOT NULL DEFAULT 0 CHECK(ready IN (0,1))\n);\n"

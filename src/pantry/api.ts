@@ -1,3 +1,4 @@
+import { terminalCommands } from './terminal'
 import { monthCloseCommands, prepareMonthClose } from './month-close'
 import { autopayCommands, registerAutopayRoutes } from './autopay'
 import { textingCommands, registerTextingRoutes, textingView } from './texting'
@@ -146,7 +147,7 @@ const commands: Record<string, Command> = {
   'stripe.events-compare': { need:'owner', async run(c) { await run(c.db,[authority(c.actor,'owner')]); return compareStripeEvents(c.env,c.db,true) } }, ...paymentNoticeCommands, ...invoiceVoidCommands, ...refundCommands, ...customerCreditCommands, ...lateDiscountCommands, ...approvedWriteOffCommands, ...lateFeeCommands, ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...monthCloseCommands, ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...reportDeliveryCommands, ...ruleCommands, ...feedCommands,
-  ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
+  ...terminalCommands, ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
 }
 
 type C = HonoContext<{ Bindings: Bindings }>

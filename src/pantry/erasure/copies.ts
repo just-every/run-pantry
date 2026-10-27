@@ -25,6 +25,7 @@ const FIELDS: Record<string, string[]> = {
   pt_deliveries: ['recipient', 'subject', 'detail'],
   pt_payment_notices: ['recipient','subject','detail'],
   pt_stripe_payments: ['payer_email','method_brand','method_bank','return_reason'],
+  pt_terminal_payments: ['description','tax_reason'],
   pt_customer_refunds: ['reason'],
   pt_estimate_deliveries: ['recipient','detail'],
   pt_customer_deposits: ['reference','memo'],
@@ -112,7 +113,7 @@ export async function eraseCopies(db: D1Database, input: Input) {
     const identity = input.member ? columns.filter(c => !c.pk && /(_by$|^(author|reviewer|assignee|actor_email)$)/.test(c.name) && !foreign.some(f => f.from === c.name && !['pt_members', 'oa_operators'].includes(f.table))).map(c => c.name) : []
     const fields = [...new Set([...(FIELDS[table] ?? []).filter(c => names.has(c)), ...identity])]
     if (!fields.length || !keys.length) continue
-    const selected = [...new Set([...keys, ...fields, ...(names.has('revision') ? ['revision'] : []), ...(table==='pt_tax_reminder_batches' ? ['status'] : []), ...(table === 'pt_receipts' ? ['document_id', 'file_document_id', 'vendor_id'] : []), ...(names.has('erased_at') ? ['erased_at'] : [])])]
+    const selected = [...new Set([...keys, ...fields, ...(names.has('revision') ? ['revision'] : []), ...(table==='pt_tax_reminder_batches' ? ['status'] : []), ...(table === 'pt_receipts' ? ['document_id', 'file_document_id', 'vendor_id'] : []), ...(table === 'pt_terminal_payments' ? ['customer_id'] : []), ...(names.has('erased_at') ? ['erased_at'] : [])])]
     for (const row of await all(db, `SELECT ${selected.map(quote).join(',')} FROM ${quote(table)}`)) {
       if (row.erased_at) continue
       const set: Data = {}
@@ -127,6 +128,9 @@ export async function eraseCopies(db: D1Database, input: Input) {
           removed.push({ table, key: { customer_id: row.customer_id, recipient: row.recipient } }); note(table, 'rowsRemoved', 1)
           continue
         }
+      }
+      if (table === 'pt_terminal_payments' && !input.member && row.customer_id === input.id) {
+        set.description = input.marker; set.tax_reason = input.marker
       }
       if (table === 'pt_contractor_tax' && !input.member && row.contact_id === input.id) for (const field of ['address', 'city', 'state', 'zip']) set[field] = input.marker
       if (['pt_deliveries','pt_payment_notices','pt_autopay_notices'].includes(table) && set.recipient !== row.recipient) set.recipient = `${input.marker}:${row.id}`

@@ -22,6 +22,7 @@ export const voidInvoice: Command = { need: 'owner', async run(c, b) {
   requireThat(!latest?.day || day>=latest.day,'Void on or after the settlement corrections',409)
   requireThat(!await one(c.db,`SELECT 1 FROM pt_reclassifications r JOIN pt_journal_lines l ON l.id=r.document_line_id WHERE l.entry_id=?`,inv.journal_id),'Undo document dimension corrections before voiding this invoice',409)
   requireThat(!await one(c.db,"SELECT 1 FROM pt_stripe_payments WHERE invoice_id=? AND status='processing'",inv.id),'A payment is processing; resolve it before voiding',409)
+  requireThat(!await one(c.db,"SELECT 1 FROM pt_terminal_payments WHERE invoice_id=? AND status IN ('prepared','processing')",inv.id),'A Terminal payment is pending; resolve it before voiding',409)
   const original=await entry(c.db,inv.journal_id), reversal=await reversalStatements(c.db,c.actor,original,day,`Void invoice ${inv.number}: ${reason}`)
   // Expiring a hosted checkout is the only provider side effect authorized by
   // this command. A completed or uncertain checkout leaves the invoice intact.
@@ -47,6 +48,7 @@ export const voidInvoice: Command = { need: 'owner', async run(c, b) {
     guard("NOT EXISTS(SELECT 1 FROM pt_reclassifications r JOIN pt_journal_lines l ON l.id=r.document_line_id WHERE l.entry_id=?)",original.id),
     ...expired,
     guard("NOT EXISTS(SELECT 1 FROM pt_stripe_payments WHERE invoice_id=? AND status IN ('open','processing'))",inv.id),
+    guard("NOT EXISTS(SELECT 1 FROM pt_terminal_payments WHERE invoice_id=? AND status IN ('prepared','processing'))",inv.id),
     ...reversal.statements,
     q('UPDATE pt_invoices SET void_date=?,void_reason=?,void_reversal_id=?,voided_by=?,link_token=NULL,reminders_paused=1,revision=? WHERE id=? AND revision=? AND void_date IS NULL',day,reason,reversal.id,c.actor.email,uid(),inv.id,b.revision),changed(),
     q("UPDATE pt_collection_cases SET status='stopped',approved_by=NULL,approved_revision=NULL,revision=?,updated_at=? WHERE invoice_id=?",uid(),now(),inv.id),

@@ -1,3 +1,4 @@
+import { terminalJourney, terminalVoidJourney, terminalErasureJourney } from './terminal-journey.mjs'
 // Connected: a Stripe payout split into gross sales, Stripe fees and refunds
 // and matched to its bank deposit; a Gusto payroll posted as one balanced entry
 // and matched to its bank debits. Stripe and Gusto are faked only at their HTTP
@@ -16,7 +17,11 @@ const net = (tb, name) => tb.rows.find(r => r.name === name)?.net ?? 0
 const entriesFor = async (h, sourceId) => (await h.view('journal')).entries.filter(e => e.source_id === sourceId && e.status === 'posted')
 const lines = e => e.lines.map(l => [l.account_name, l.debit_cents, l.credit_cents]).sort((a, b) => a[0].localeCompare(b[0]) || a[1] - b[1] || a[2] - b[2])
 
+test('Terminal collection refuses invoice voids without changing the reader or books', terminalVoidJourney)
+test('Terminal erasure removes personal receipt copies and keeps financial records', terminalErasureJourney)
+
 test('REPORT-005 / PROC-003 / PAYOUT-001 Stripe activity posts gross sales, fees and refunds through clearing, transfers the payout, matches the deposit and never books twice', async t => {
+  await terminalJourney()
   for (const invoiceFirst of [true, false]) {
   const KEY = 'synthetic-pantry-34'
   const payouts = await json('stripe/payouts.json'), items = await json('stripe/balance-transactions-po_1TestAutomatic.json')

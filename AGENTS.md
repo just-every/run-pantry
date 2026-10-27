@@ -137,8 +137,8 @@ Native-session/runtime evidence: https://github.com/runeditrun/base/tree/79f61fa
 
 ## Lander-Regenerate
 
-CONTRACT.md owns acceptance text and Status rows. After a source edit, run
-`node src/base/contract-docs.mjs write`, then `node src/base/contract-docs.mjs check`.
-Commit the generated ACCEPTANCE.md and docs/CLAIMS.md with CONTRACT.md.
-Regenerate the edition source lock last with `node scripts/edition-authoring/cli.mjs lock`
-and check it with `node scripts/edition-authoring/cli.mjs check`.
+`CONTRACT.md` owns acceptance text, status, evidence and gaps. After changing it,
+run `node scripts/contract-docs.mjs write`, then `node scripts/contract-docs.mjs check`.
+This regenerates the acceptance record, the homepage claim register and status
+summary counts. Regenerate the edition source lock last with
+`node scripts/edition-authoring/cli.mjs lock`, then run its `check` command.

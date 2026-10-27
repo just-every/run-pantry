@@ -139,3 +139,39 @@ node tests/api/search-scale.mjs --receipt /outside/repository/search-scale.json
 The journey loads at least 250,000 synthetic posted lines and 20,000 documents into D1, then uses the authenticated native HTTP search door for each usual amount spelling, range, check number, memo, confirmed alias and document name. It asserts the real scenario records and a response below one second for each query, and records the exact unchanged commit SHA. Evidence stays outside the checkout. A local VM receipt does not claim hosted Cloudflare OPS-001 deployment acceptance.
 
 The owner command `POST /api/pantry/command/month-close.schedule` accepts `{agentId, period, enabled}`. It explicitly enables or disables accounting-tick preparation for one agent and month; the agent token cannot call this person command. An inactive agent or locked period is never prepared by the scheduler. No automatic proposal decision or period lock is introduced.
+
+### In-person card payments
+
+The authenticated owner can use these commands on a direct installation with
+its own connected US-dollar Stripe card account:
+
+- `terminal.readers` lists paired readers and their current online state.
+- `terminal.settings` chooses `tipAccountId`, an active income or liability account.
+- `terminal.prepare` saves an immutable request before contacting the reader.
+  Send a unique `requestId`, `readerId`, `date`, `description`, decimal `amount`
+  and `tip`, `incomeAccountId`, optional `customerId`, and the owner's explicit
+  `taxTreatment: "exempt"` with `taxReason`. For an issued open invoice, send
+  `invoiceId` instead of the sale fields. The server computes the amount due.
+- `terminal.process` takes the saved `id` and starts collection on that reader.
+  Retrying the same request reuses its Stripe intent and reader action.
+- `terminal.sync` takes the saved `id`, reads Stripe's charge and fee back,
+  and posts only a successful, matching card-present payment. Repeat this after
+  a network interruption; it never asks the customer to pay again.
+- `terminal.list` returns receipts and pending attempts. A successful service
+  receipt has one journal entry and no receivable. Tips credit the account
+  chosen before collection, and the card summary contains only brand and last
+  four. Stripe clearing adopts these entries without posting them again.
+
+Card details must go directly to the Stripe reader; these commands refuse card
+payload fields. An uncertain collection remains pending until Stripe confirms
+it. Pending reader attempts also refuse invoice voiding and customer erasure,
+including an uncertain reader response. Resolve the payment before retrying
+either action. Completed erasure removes personal receipt descriptions and
+exemption notes from Terminal records while keeping amounts and card summaries.
+New journal memos contain the receipt reference only; historical posted-entry
+free text follows the retention boundary in ERASURE-001. Erased customers cannot
+start another Terminal sale.
+
+There is no automatic retry of collection, no Instant Payout instruction,
+and no general taxable receipt or native Tap to Pay door in this slice. The
+remaining requirements are recorded in SALES-001 and SALES-003 in CONTRACT.md.
