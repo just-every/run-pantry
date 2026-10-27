@@ -3826,12 +3826,16 @@
       "sha256": "1bfb71784331375f3f1e53f4cbeb91b128a88e77669f34af7112980ebb107f0c",
       "executable": false
     },
+    "src/pantry/document-objects.d.mts": {
+      "sha256": "2c6475a8e135f730a5d915bc1517bf4e4a5c6ec6835f598b44b557225275e1a2",
+      "executable": false
+    },
     "src/pantry/document-objects.mjs": {
       "sha256": "acfce2f21073e59e878a2a6c2cf802fb8713b1eb121e7f28c37601efc6014ae1",
       "executable": false
     },
     "src/pantry/documents.ts": {
-      "sha256": "2e483f57fd7c0b5e937c00933531326d4eb75b5abc9bdc1bf0ee5078e2b2ab1f",
+      "sha256": "cfe7803ece306ed88746f00aadd8c060c039582509bf3801ce44488839aac487",
       "executable": false
     },
     "src/pantry/drilldown.ts": {

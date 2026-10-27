@@ -24,7 +24,7 @@ export async function documentFile(db: D1Database, id: string, bucket?: R2Bucket
   const doc = await one<{ id: string; name: string; media_type: string; size: number; sha256: string; content: ArrayBuffer; erased_at: string|null; object_key: string; state: string }>(db, 'SELECT d.*,o.object_key,o.state FROM pt_documents d JOIN pt_document_objects o ON o.document_id=d.id WHERE d.id=?', id)
   if (!doc) return null
   requireThat(!doc.erased_at, 'This document’s bytes were erased after retention expiry', 410)
-  let bytes: Uint8Array
+  let bytes: Uint8Array<ArrayBuffer>
   if (doc.state === 'ready') {
     requireThat(bucket, 'Private document storage is unavailable', 503)
     const object = await bucket.get(doc.object_key)
