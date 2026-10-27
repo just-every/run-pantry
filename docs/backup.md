@@ -19,7 +19,25 @@ The archive is saved in the `exports` folder, with its checksums inside it: `rer
 rer run hosted-backup --env-file .env.pantry
 ```
 
-Add `--environment NAME` if you deployed with one. It saves the hosted database, every table plus every receipt, bill PDF and statement file stored in it, as one SQL file such as `exports/pantry-production-db-2026-10-17.sql`, and prints its size, fingerprint and how many journal entries, invoices, bills, bank lines and stored files it holds. It uses the Cloudflare account ID and token in `.env.pantry`; the hosted Pantry pauses for the few seconds the export takes. The file is readable only by you, since it holds the whole book. Pantry keeps receipts and documents inside the database, not in separate file storage, so this one file is the complete backup. Underneath, it runs Cloudflare's own export, `npx wrangler d1 export pantry-production-db --remote --output exports/pantry-production-db.sql`, with that account ID and token. Keep the file somewhere safe; it is a complete copy you can open with any SQLite tool (`sqlite3 books.db < exports/pantry-production-db-2026-10-17.sql`). `rer import` does not read it yet.
+Add `--environment NAME` if you deployed with one. The command establishes the database's stable erasure-journal identity if this is its first backup, then takes Cloudflare's SQL snapshot and converts it to a private, checksum-verified `.rer` archive. The receipt lists table counts, exclusions, archive hash and content hash. The same Pantry policy as local export removes credentials and disables restored connections and standing consent. Documents currently stored in D1 travel byte for byte.
+
+Restore the resulting archive with the ordinary `rer import` command below. Supply the latest post-erasure archive with `--journal` when restoring an older backup. This uses ERASURE-001's existing journal fence; a fresh destination without that later journal cannot discover erasures made after its backup.
+
+The command accepts a mode-0600 deploy file or injected `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`. It never prints provider diagnostics or credentials. Each default filename contains the full timestamp, and an existing output is refused. A failed conversion retains its private SQL snapshot and names its location. To retry conversion without another provider call:
+
+```sh
+node scripts/hosted-archive.mjs --input-sql /path/to/snapshot.sql --output exports/recovered.rer
+```
+
+Only use a snapshot produced after the source installation established its erasure identity. A legacy SQL file without that identity is refused: retain it and take a new backup from the source rather than assigning an unrelated identity.
+
+For an owner-controlled scheduler, run the same command from the exact deployed checkout, with its private deploy file, once per day. Keep the archive directory on encrypted storage outside the deployed database, monitor the command's exit status, and copy successful archives to a separate failure domain. The command returns nonzero on provider or conversion failure and never replaces an earlier archive. Example scheduler command:
+
+```sh
+cd /path/to/run-pantry && node scripts/hosted-backup.mjs --env-file /private/pantry-deploy.env --environment production
+```
+
+This command does not install a scheduler, expire old backups or switch traffic. In-Worker scheduled backups, separate object storage, a fresh hosted deployment drill and the large-business report timing proof remain OPS-001 work.
 
 ## Restore into a fresh install
 

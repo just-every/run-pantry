@@ -139,7 +139,7 @@
       "executable": false
     },
     "docs/backup.md": {
-      "sha256": "666b9d6e240452f7c3dc65d0f3c90c723106d7f941bb4bef58cca2af3a325b5e",
+      "sha256": "293d397637fb069bbebf4e6deda7a0147b1aca6dd679ed1928cdaf42f26d16c1",
       "executable": false
     },
     "docs/bank-feeds-and-rules.md": {
@@ -1370,8 +1370,12 @@
       "sha256": "54e7246025a618ed16ee042c22dc9a8dc27b06175c30f81c4c6568992ed04799",
       "executable": false
     },
+    "scripts/hosted-archive.mjs": {
+      "sha256": "386c503deeac85a4b32fbdf82241614f0fb92108037af3645c27e2195ec0957a",
+      "executable": false
+    },
     "scripts/hosted-backup.mjs": {
-      "sha256": "7bedbfafebc88810bbe491b637be1b536ed63bc8d751c2456c25d051e95c24e5",
+      "sha256": "f4ac739885291bb93abbf44a95e67939ffbe4ae6e4fd839d580f6f07e2a14896",
       "executable": false
     },
     "scripts/install.mjs": {
@@ -6311,7 +6315,7 @@
       "executable": false
     },
     "tests/restore/restore.test.mjs": {
-      "sha256": "5deb70055019801897f4324e11358ec6f98dd6befebdc49487bda72e7d81aeb0",
+      "sha256": "a302a27de2d9f4e6f3a383551048d6f9a6c3e48411938ce21cd331b6651598fb",
       "executable": false
     },
     "tests/runtime.mjs": {
