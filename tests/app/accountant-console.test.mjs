@@ -47,7 +47,12 @@ test('accountant connects three clients with distinct status and grants, and own
     assert.equal(enabled.status(),200,await enabled.text())
     const signIn=await shared.newPage();await signIn.goto(app.origin+'/signin?returnTo=%2Fapp%2Fsettings')
     await signIn.getByRole('button',{name:'Continue with Practice identity',exact:true}).click()
-    if(i===0)await signIn.getByRole('button',{name:'Sign in to practice',exact:true}).click()
+    if(i===0) {
+      await signIn.waitForURL(url=>url.origin===idp.issuer || url.searchParams.has('notice'))
+      const destination=new URL(signIn.url())
+      assert.equal(destination.origin,idp.issuer,`OIDC start refused: ${destination.searchParams.get('notice')}`)
+      await signIn.getByRole('button',{name:'Sign in to practice',exact:true}).click()
+    }
     await signIn.waitForURL(app.origin+'/app/settings')
     await signIn.close()
     await command(accountant,i,'accountant.status-share',{email,consent:'SHARE STATUS'},403)
