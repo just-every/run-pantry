@@ -56,6 +56,7 @@ export async function erasurePreview(c: Context, input: Data) {
     blockers.push(...(await all(c.db,"SELECT id FROM pt_customer_refunds WHERE customer_id=? AND status IN ('draft','approved','pending')",id)).map(r=>({kind:'customer-refund',id:r.id,reason:'refund requires completion or cancellation'})))
     const pending = await all(c.db,"SELECT p.id FROM pt_stripe_payments p JOIN pt_invoices i ON i.id=p.invoice_id WHERE i.customer_id=? AND p.status IN ('creating','open','processing','pending')",id)
     blockers.push(...pending.map(p=>({kind:'provider-payment',id:p.id,reason:'pending provider payment'})))
+    blockers.push(...(await all(c.db,"SELECT id FROM pt_terminal_payments WHERE customer_id=? AND status IN ('prepared','processing')",id)).map(p=>({kind:'terminal-payment',id:p.id,reason:'pending reader payment'})))
     for (const [table,column] of [['pt_recurring','customer_id'],['pt_recurring_bills','vendor_id']] as const) {
       blockers.push(...(await all(c.db,`SELECT id FROM ${table} WHERE ${column}=? AND status IN ('active','awaiting-approval')`,id)).map(r=>({kind:'recurring',id:r.id,reason:'active recurring template'})))
     }

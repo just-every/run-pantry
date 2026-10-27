@@ -105,3 +105,81 @@ export async function terminalJourney() {
     return {sale:payment.id,invoice:inv.number,amount:13800,tip:1800,brand:payment.brand,last4:payment.last4}
   } finally {await h.close()}
 }
+
+export async function terminalVoidJourney() {
+  const edge=terminalProvider(),h=await harness({outbound:r=>edge.outbound(r),clock:'2026-10-27T12:00:00Z'})
+  try {
+    const {acct}=await books(h)
+    const customer=await h.command('contact.save',{kind:'customer',name:'synthetic-pantry-70'})
+    await h.command('stripe.connect',{secretKey:'synthetic-pantry-71'})
+    const issue=async()=>{
+      let inv=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-10-27',lines:[{description:'synthetic-pantry-72',quantity:'1',rate:'75',accountId:acct['4000'],taxCode:'exempt'}]})
+      await h.command('invoice.approve',{id:inv.id,revision:inv.revision})
+      return h.command('invoice.issue',{id:inv.id})
+    }
+    const inv=await issue(),control=await issue()
+    const voidRequest=i=>({id:i.id,revision:i.revision,date:'2026-10-27',reason:'synthetic-pantry-73'})
+    assert.equal((await h.command('invoice.void',voidRequest(control))).status,'void','An invoice without a pending payment can still be voided')
+    let payment=await h.command('terminal.prepare',{requestId:'synthetic-pantry-74',readerId:edge.reader.id,invoiceId:inv.id,date:'2026-10-27'})
+    payment=await h.command('terminal.process',{id:payment.id})
+    const before=await h.view('journal'),action=structuredClone(edge.reader.action),calls=edge.calls.length
+    await h.command('invoice.void',voidRequest(inv),h.owner,409)
+    assert.deepEqual(await h.view('journal'),before,'Refused void never reverses the receivable')
+    assert.deepEqual(edge.reader.action,action,'Refused void leaves reader collection intact')
+    assert.equal(edge.calls.length,calls,'Voiding does not send a cancellation or collection instruction')
+    const stored=(await h.view('sales')).invoices.find(i=>i.id===inv.id)
+    assert.deepEqual([stored.status,stored.void_date,stored.open_cents],['issued',null,7500])
+    edge.complete(payment.payment_intent,200)
+    await h.command('terminal.sync',{id:payment.id})
+    await h.command('invoice.void',voidRequest(inv),h.owner,409)
+    assert.equal((await h.view('sales')).invoices.find(i=>i.id===inv.id).open_cents,0)
+    const prepared=await issue()
+    await h.command('terminal.prepare',{requestId:'synthetic-pantry-75',readerId:edge.reader.id,invoiceId:prepared.id,date:'2026-10-27'})
+    await h.command('invoice.void',voidRequest(prepared),h.owner,409)
+    edge.uncertainReader=true
+    await h.command('terminal.process',{id:'synthetic-pantry-75'},h.owner,502)
+    await h.command('invoice.void',voidRequest(prepared),h.owner,409)
+    const pending=await h.command('erasure.preview',{kind:'contact',id:customer.id})
+    assert.ok(pending.blockers.some(b=>b.kind==='terminal-payment' && b.id==='synthetic-pantry-75'))
+  } finally {await h.close()}
+}
+
+export async function terminalErasureJourney() {
+  const edge=terminalProvider(),h=await harness({outbound:r=>edge.outbound(r),clock:'2026-10-27T12:00:00Z'})
+  try {
+    const {acct}=await books(h)
+    const customer=await h.command('contact.save',{kind:'customer',name:'synthetic-pantry-80',internalNotes:'synthetic-pantry-82',contacts:[{name:'synthetic-pantry-81',phone:'555-0181',roles:['primary']}]})
+    const other=await h.command('contact.save',{kind:'customer',name:'synthetic-pantry-83'})
+    await h.command('stripe.connect',{secretKey:'synthetic-pantry-84'})
+    const collect=async(id,customerId,description,taxReason)=>{
+      let p=await h.command('terminal.prepare',{requestId:id,readerId:edge.reader.id,date:'2026-10-27',customerId,description,taxReason,amount:'120',incomeAccountId:acct['4000'],taxTreatment:'exempt'})
+      p=await h.command('terminal.process',{id:p.id});edge.complete(p.payment_intent)
+      return h.command('terminal.sync',{id:p.id})
+    }
+    const own=await collect('synthetic-pantry-85',customer.id,'Receipt for synthetic-pantry-81','synthetic-pantry-82')
+    const copy=await collect('synthetic-pantry-86',other.id,'Copied synthetic-pantry-81','Copied synthetic-pantry-82')
+    const untouched=await collect('synthetic-pantry-87',other.id,'synthetic-pantry-88','synthetic-pantry-89')
+    const before=await h.view('journal'),preview=await h.command('erasure.preview',{kind:'contact',id:customer.id})
+    assert.deepEqual(preview.blockers,[])
+    const receipt=await h.command('erasure.execute',{kind:'contact',id:customer.id,fingerprint:preview.fingerprint,requester:'synthetic-pantry-90',channel:'in-person',reason:'synthetic-pantry-91',confirm:'ERASE'})
+    const payments=(await h.command('terminal.list',{})).payments
+    for(const id of [own.id,copy.id]) {
+      const p=payments.find(p=>p.id===id)
+      assert.ok(p,'The financial Terminal record is retained')
+      assert.ok(!JSON.stringify(p).includes('synthetic-pantry-81')&&!JSON.stringify(p).includes('synthetic-pantry-82'),'Erasure removes personal receipt text and copied contact identity')
+      const original=id===own.id?own:copy
+      for(const field of ['amount_cents','tip_cents','fee_cents','brand','last4','journal_id','status','payment_intent'])assert.equal(p[field],original[field])
+    }
+    assert.deepEqual(payments.find(p=>p.id===untouched.id),untouched,'Unrelated receipts stay unchanged')
+    assert.equal(receipt.counts.pt_terminal_payments.rowsReplaced,2)
+    assert.ok(preview.classes.some(c=>c.table==='pt_terminal_payments'&&c.counts.rowsReplaced===2))
+    assert.deepEqual(await h.view('journal'),before,'Erasure keeps posted accounting unchanged')
+    const journal=JSON.stringify(before)
+    assert.ok(!journal.includes('synthetic-pantry-81')&&!journal.includes('synthetic-pantry-82'),'Terminal journal memos never copy private receipt text')
+    const contact=(await h.view('state')).contacts.find(c=>c.id===customer.id)
+    assert.deepEqual([contact.name,contact.internal_notes,JSON.parse(contact.contacts_json)],['synthetic-pantry-80','[erased]',[]])
+    assert.ok(!JSON.stringify(await h.view('activity')).includes('synthetic-pantry-81'))
+    assert.deepEqual(await h.command('terminal.sync',{id:own.id}),payments.find(p=>p.id===own.id),'Sync never restores erased text')
+    await h.command('terminal.prepare',{requestId:'synthetic-pantry-92',readerId:edge.reader.id,date:'2026-10-27',customerId:customer.id,description:'synthetic-pantry-93',taxReason:'synthetic-pantry-94',amount:'5',incomeAccountId:acct['4000'],taxTreatment:'exempt'},h.owner,409)
+  } finally {await h.close()}
+}

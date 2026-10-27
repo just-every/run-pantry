@@ -61,14 +61,15 @@ const prepare: Command = { need: 'owner', async run(c,b) {
     text(b.taxReason,'Reason this sale is exempt',500)
     amount=cents(b.amount,'Sale amount')+tip;income=text(b.incomeAccountId,'Income account')
     requireThat(await one(c.db,"SELECT 1 FROM pt_accounts WHERE id=? AND active=1 AND type='income'",income),'Choose an active income account')
-    if(b.customerId) {customer=text(b.customerId,'Customer');requireThat(await one(c.db,"SELECT 1 FROM pt_contacts WHERE id=? AND kind='customer'",customer),'Customer not found',404)}
+    if(b.customerId) {customer=text(b.customerId,'Customer');requireThat(await one(c.db,"SELECT 1 FROM pt_contacts WHERE id=? AND kind='customer' AND active=1 AND erased_at IS NULL",customer),'Choose an active customer who has not been erased',409)}
   }
+  if(customer)requireThat(await one(c.db,"SELECT 1 FROM pt_contacts WHERE id=? AND active=1 AND erased_at IS NULL",customer),'Choose an active customer who has not been erased',409)
   const config=await one(c.db,'SELECT * FROM pt_terminal_settings WHERE id=1')
   requireThat(!tip || config,'The owner must choose a tip account first',409)
   const reader=await stripeCall(key,'GET',`/terminal/readers/${readerId}`)
   requireThat(reader.id===readerId && reader.status==='online' && !['in_progress'].includes(reader.action?.status),'Choose an online idle Stripe reader',409)
   const description=inv?`Invoice ${inv.number}`:text(b.description,'Sale description',500)
-  await run(c.db,[authority(c.actor,'owner'),accountFence(s), ...(inv?[guard("EXISTS(SELECT 1 FROM pt_invoices WHERE id=? AND revision=? AND status='issued' AND void_date IS NULL)",inv.id,inv.revision)]:[]),
+  await run(c.db,[authority(c.actor,'owner'),accountFence(s), ...(customer?[guard("EXISTS(SELECT 1 FROM pt_contacts WHERE id=? AND active=1 AND erased_at IS NULL)",customer)]:[]), ...(inv?[guard("EXISTS(SELECT 1 FROM pt_invoices WHERE id=? AND revision=? AND status='issued' AND void_date IS NULL)",inv.id,inv.revision)]:[]),
     q('INSERT INTO pt_terminal_payments(id,provider_account,reader_id,invoice_id,customer_id,sale_date,description,amount_cents,tip_cents,income_account_id,tip_account_id,tax_reason,early_window_end,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',id,s.account_id,readerId,inv?.id??null,customer,day,description,amount,tip,income,config?.tip_account_id??null,inv?'':b.taxReason,early,c.actor.email,now()),
     audit(who(c.actor),'terminal.prepare','terminal-payment',id,{readerId,invoiceId:inv?.id??null,amount,tip})])
   return selected(c.db,id)
@@ -127,7 +128,7 @@ export async function syncTerminal(c:Context,id:string) {
     journalId=row.journal_id??uid();const by=who(c.actor)
     const bank=(await one(c.db,'SELECT account_id FROM pt_bank_accounts WHERE id=?',s.bank_account_id))!
     const lines=[{...dimensions.coding('clearing'),accountId:bank.account_id,debit:row.amount_cents-bt.fee,credit:0}, { ...dimensions.coding('sales'),accountId:row.income_account_id,debit:0,credit:row.amount_cents-row.tip_cents,contactId:row.customer_id},...(row.tip_cents?[{...dimensions.coding('sales'),accountId:row.tip_account_id,debit:0,credit:row.tip_cents,contactId:row.customer_id}]:[]),...(bt.fee?[{...dimensions.coding('fees'),accountId:s.fee_account_id,debit:bt.fee,credit:0}]:[])].filter(l=>l.debit||l.credit)
-    const statements:Sql[]=[...fences,guard('EXISTS(SELECT 1 FROM pt_terminal_payments WHERE id=? AND journal_id IS NULL)',row.id),guard("NOT EXISTS(SELECT 1 FROM pt_stripe_clearing_items WHERE payment_intent=? AND status IN ('posted','legacy-covered'))",pi.id),...entryStatements({id:journalId,date:row.sale_date,memo:`Terminal receipt SR-${row.id}: ${row.description}`,sourceKind:'bank',sourceId:row.id,preparedBy:row.created_by,preparedKind:'person',lines},by.email),q('UPDATE pt_terminal_payments SET journal_id=? WHERE id=? AND journal_id IS NULL',journalId,row.id),changed()]
+    const statements:Sql[]=[...fences,guard('EXISTS(SELECT 1 FROM pt_terminal_payments WHERE id=? AND journal_id IS NULL)',row.id),guard("NOT EXISTS(SELECT 1 FROM pt_stripe_clearing_items WHERE payment_intent=? AND status IN ('posted','legacy-covered'))",pi.id),...entryStatements({id:journalId,date:row.sale_date,memo:`Terminal receipt SR-${row.id}`,sourceKind:'bank',sourceId:row.id,preparedBy:row.created_by,preparedKind:'person',lines},by.email),q('UPDATE pt_terminal_payments SET journal_id=? WHERE id=? AND journal_id IS NULL',journalId,row.id),changed()]
     if(!row.journal_id)await run(c.db,statements)
   }
   await run(c.db,[...fences,q("UPDATE pt_terminal_payments SET status='succeeded',brand=?,last4=?,journal_id=?,fee_entry_id=?,fee_cents=? WHERE id=?",text(card.brand,'Card brand',30),card.last4,journalId,feeId,bt.fee,row.id),audit(who(c.actor),'terminal.received','terminal-payment',row.id,{paymentIntent:pi.id,amount:row.amount_cents,tip:row.tip_cents,fee:bt.fee,brand:card.brand,last4:card.last4})])
