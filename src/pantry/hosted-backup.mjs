@@ -44,6 +44,11 @@ export async function runHostedBackup(env, scheduledTime) {
   let job=claim.job_id
   try {
     const service=await createPortability({db,policy})
+    // Erasure deletes transfer jobs, so a saved id may no longer be resumable.
+    if (job) {
+      const saved=await db.prepare('SELECT phase FROM rer_portability_jobs WHERE id=?').bind(job).first()
+      if (!saved || !['building','complete'].includes(saved.phase)) job=null
+    }
     // Recover a crash between snapshot creation and saving its id.
     if (!job) job=(await db.prepare("SELECT id FROM rer_portability_jobs WHERE actor=? AND kind='export' AND phase IN ('building','complete') ORDER BY rowid DESC LIMIT 1").bind('pantry:backup:'+day).first())?.id
     if (!job) job=await service.exports.create('pantry:backup:'+day)
@@ -58,8 +63,9 @@ export async function runHostedBackup(env, scheduledTime) {
   } catch (error) {
     // Erasure invalidates in-progress snapshots. Retrying starts a new snapshot,
     // while a provider failure can retry the same immutable completed archive.
-    const aborted=job && await db.prepare('SELECT phase FROM rer_portability_jobs WHERE id=?').bind(job).first()
-    await db.prepare("UPDATE pt_hosted_backup_runs SET job_id=?,status=?,error_code='backup_failed' WHERE day=? AND lease_id=?").bind(aborted?.phase==='aborted'?null:job,aborted?.phase==='aborted'?'pending':'building',day,lease).run()
+    const saved=job && await db.prepare('SELECT phase FROM rer_portability_jobs WHERE id=?').bind(job).first()
+    const resumable=saved && ['building','complete'].includes(saved.phase)
+    await db.prepare("UPDATE pt_hosted_backup_runs SET job_id=?,status=?,error_code='backup_failed' WHERE day=? AND lease_id=?").bind(resumable?job:null,resumable?'building':'pending',day,lease).run()
     throw new Error('Hosted backup failed; inspect the installation backup receipt and retry the next scheduled tick')
   } finally {
     await db.prepare('UPDATE pt_hosted_backup_runs SET lease_id=NULL,lease_until=0 WHERE day=? AND lease_id=?').bind(day,lease).run()

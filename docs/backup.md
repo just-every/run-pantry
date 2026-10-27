@@ -39,6 +39,8 @@ cd ./run-pantry && node scripts/hosted-backup.mjs --env-file ./pantry-deploy.env
 
 New own-account hosted deploys provision a private `PANTRY_BACKUPS` R2 binding. The existing half-hour Cron starts one complete archive per UTC day and advances at most 32 archive parts per tick. A durable lease prevents overlapping ticks from publishing duplicates. Multipart uploads keep memory bounded; failed uploads are aborted. Failed work retries on a later tick, and erasure invalidates an unfinished snapshot before a fresh snapshot is taken. No archive is deleted automatically.
 
+A saved archive job can disappear when an owner erases personal data. The next scheduled tick replaces that missing job with a fresh snapshot through the same erasure fence, finishes the oldest incomplete day, then continues later days. A provider upload failure retains a valid completed snapshot for retry.
+
 The installation's `pt_hosted_backup_runs` table records completion, the object key, content hash and a value-free failure code. Download a completed archive using the owner's Cloudflare R2 tools, then restore it as below. Keep the bucket private. Existing deployments without the binding continue their accounting schedule and need redeployment to enable it. A backup remains in the same Cloudflare account; copy it elsewhere for independent disaster recovery.
 
 The active document store is still D1; R2 holds complete recovery archives containing those document bytes. A fresh hosted deployment drill and the large-business report timing proof remain OPS-001 work.

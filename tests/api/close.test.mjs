@@ -103,8 +103,21 @@ test('PAN-14 the accountant package holds the period\'s reports, reconciliations
 
   // The real scheduled door publishes the complete recovery archive to private
   // object storage. Concurrent or repeated ticks never create a second backup.
-  const backupTick=()=>h.cron(Date.parse('2026-10-01T12:00:00Z'))
-  await Promise.all([backupTick(),backupTick()])
+  const lead=await h.command('contact.save',{kind:'customer',name:'synthetic-pantry-984'})
+  const backupTick=(day='2026-10-01')=>h.cron(Date.parse(day+'T12:00:00Z'))
+  await backupTick()
+  const interrupted=await h.db.prepare('SELECT * FROM pt_hosted_backup_runs WHERE day=?').bind('2026-10-01').first()
+  assert.equal(interrupted.status,'building','The first tick leaves a resumable archive')
+  assert.ok(interrupted.job_id)
+  const preview=await h.command('erasure.preview',{kind:'contact',id:lead.id})
+  await h.command('erasure.execute',{kind:'contact',id:lead.id,fingerprint:preview.fingerprint,requester:'Synthetic requester',channel:'in-person',reason:'Remove obsolete enquiry',confirm:'ERASE'})
+  assert.equal(await h.db.prepare('SELECT id FROM rer_portability_jobs WHERE id=?').bind(interrupted.job_id).first(),null,'Erasure deletes the unfinished archive job')
+  await backupTick('2026-10-02')
+  const restarted=await h.db.prepare('SELECT * FROM pt_hosted_backup_runs WHERE day=?').bind('2026-10-01').first()
+  assert.notEqual(restarted.job_id,interrupted.job_id,'The next daily tick starts a fresh snapshot')
+  assert.ok(restarted.job_id)
+  assert.equal(restarted.error_code,null)
+  await backupTick('2026-10-03')
   for(let tick=0;tick<12;tick++) {
     const receipt=await h.db.prepare('SELECT * FROM pt_hosted_backup_runs WHERE day=?').bind('2026-10-01').first()
     if(receipt?.status==='complete')break
@@ -112,8 +125,18 @@ test('PAN-14 the accountant package holds the period\'s reports, reconciliations
   }
   const receipt=await h.db.prepare('SELECT * FROM pt_hosted_backup_runs WHERE day=?').bind('2026-10-01').first()
   assert.equal(receipt.status,'complete')
+  for(const day of ['2026-10-02','2026-10-03']) {
+    for(let tick=0;tick<12;tick++) {
+      const current=await h.db.prepare('SELECT status FROM pt_hosted_backup_runs WHERE day=?').bind(day).first()
+      if(current.status==='complete')break
+      await backupTick(day)
+    }
+  }
+  const completed=(await h.db.prepare('SELECT day,status FROM pt_hosted_backup_runs ORDER BY day').all()).results
+  assert.deepEqual(completed,[{day:'2026-10-01',status:'complete'},{day:'2026-10-02',status:'complete'},{day:'2026-10-03',status:'complete'}],'The erased job cannot block subsequent daily backups')
   const bucket=await h.bucket('PANTRY_BACKUPS'),inventory=await bucket.list()
-  assert.deepEqual(inventory.objects.map(o=>o.key),[receipt.object_key])
+  assert.equal(inventory.objects.length,3)
+  assert.ok(inventory.objects.some(o=>o.key===receipt.object_key))
   const archive=await bucket.get(receipt.object_key), rows=[]
   const {readArchive}=await import('@runeditrun/rer/modules/portability')
   let closing
@@ -127,8 +150,10 @@ test('PAN-14 the accountant package holds the period\'s reports, reconciliations
   assert.ok(document,'scheduled backups include supporting document bytes')
   assert.ok(document.row.content.blob.length>0)
   assert.equal(rows.some(i=>i.table==='pt_hosted_backup_runs'||i.table==='oa_sessions'||i.table==='pt_stripe'),false)
-  await backupTick()
-  assert.deepEqual((await bucket.list()).objects.map(o=>o.key),[receipt.object_key])
+  await Promise.all([backupTick(),backupTick()])
+  assert.deepEqual((await bucket.list()).objects.map(o=>o.key),inventory.objects.map(o=>o.key))
+  assert.equal(rows.find(i=>i.table==='pt_contacts'&&i.row.id===lead.id)?.row.name,undefined,'The replacement archive contains no erased lead')
+
 })
 
 const recurringToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())

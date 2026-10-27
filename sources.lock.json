@@ -139,7 +139,7 @@
       "executable": false
     },
     "docs/backup.md": {
-      "sha256": "14e197f8b2d3f24e446a02a595514f74ce416c5977c87abdedba0fac761d60e3",
+      "sha256": "e45fae32ba49a3ae11cd25e4a4f27cbc495d0a04d965555a3f96e6f4a7ac0803",
       "executable": false
     },
     "docs/bank-feeds-and-rules.md": {
@@ -3831,7 +3831,7 @@
       "executable": false
     },
     "src/pantry/erasure/commands.ts": {
-      "sha256": "a0633f4a9753c7181040edd2d5e6ed609f7f6c867da2bb4a723d05ef2ef837ef",
+      "sha256": "089d56913a96b989cd323f52781d228866a1836d83af8df5789832173eca959a",
       "executable": false
     },
     "src/pantry/erasure/copies.ts": {
@@ -3839,7 +3839,7 @@
       "executable": false
     },
     "src/pantry/erasure/custody.ts": {
-      "sha256": "e327c95c1fbf9146984e92c39bb6a9f903d4e4db1993481a9c25c064aed65db7",
+      "sha256": "d1e9ae1c0ae0ec96f825a65ca3a40c3fadb1b8b222ecbf3bd32367857c18c8c8",
       "executable": false
     },
     "src/pantry/erasure/fence.ts": {
@@ -4051,7 +4051,7 @@
       "executable": false
     },
     "src/pantry/hosted-backup.mjs": {
-      "sha256": "c65a31762c62e8f62350d1fcd241166427293d2cc3590e3e75d95a42be0f970d",
+      "sha256": "eb28b0f87b937b5e4b451bbc739fb25a39419486f2302468f60447f1cd2ce9ad",
       "executable": false
     },
     "src/pantry/integrations/credentials.ts": {
@@ -5751,7 +5751,7 @@
       "executable": false
     },
     "tests/api/close.test.mjs": {
-      "sha256": "f6b3deb29e9da57573a7680e8101a9ad61afb72234abf9e485138c5459abc538",
+      "sha256": "cc7daa0c5a2bb5a975479cc03a7a0388505a4cee13d80211749884ae085a2f89",
       "executable": false
     },
     "tests/api/collections-journey.mjs": {

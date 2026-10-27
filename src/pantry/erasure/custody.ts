@@ -4,11 +4,10 @@ import { targetsFor } from '../cutover/target'
 import { authorityCondition } from '../access'
 import type { Context } from '../context'
 import { all, batchStatements, faultFrom, run, type Sql } from '../db'
-import { fenceStatements } from './fence'
 
-export async function runErasure(c:Context,statements:Sql[],subject:{id:string;member:boolean;values:string[]}) {
+export async function runErasure(c:Context,statements:Sql[],subject:{id:string;member:boolean;values:string[]},checkpoint:Sql[]) {
   const jobs=await all(c.db,"SELECT id,namespace,operation_key,plan_json FROM ik_jobs WHERE destination='books'")
-  if (!jobs.length) return run(c.db,[...statements,...await fenceStatements(c.db)])
+  if (!jobs.length) return run(c.db,[...statements,...checkpoint])
   const values=[...subject.values]
   // Member identity inside an immutable import withdraws that job's original
   // custody, including its undo/resume capability; native bookkeeping stays.
@@ -17,6 +16,6 @@ export async function runErasure(c:Context,statements:Sql[],subject:{id:string;m
     return await retireD1ImportCustody({...(subject.member?{}:{target:{kind:'counterparty',id:subject.id}}),values},await batchStatements(c.db,statements),{
       destination:'books',namespace:jobs[0].namespace,mappingVersion:'erasure',storage:{database:c.db,targets:targetsFor('qbo')},
       authorization:{principalId:'pantry:move-in',predicate:()=>authorityCondition(c.actor,'owner')},batchSize:50,maxBatches:40,
-    },await fenceStatements(c.db))
+    },checkpoint)
   } catch(error) {throw faultFrom(error)??error}
 }
