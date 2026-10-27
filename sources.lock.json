@@ -139,7 +139,7 @@
       "executable": false
     },
     "docs/backup.md": {
-      "sha256": "c2fd98ace38db676ffa1b89a62d34740c799b72591c93b770d1b1f6dbba72596",
+      "sha256": "55f42ba1e6141bf9aa435c19608477a9a895d48c04bb06ac8a8f4d7f6e54ea6c",
       "executable": false
     },
     "docs/bank-feeds-and-rules.md": {
@@ -3363,7 +3363,7 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "c4b73272eb80e5b355f145f151716e175bc7f3e9e5415d519ea52506e683ea34",
+      "sha256": "15bd8b30f309d247bbbbbb35ceaedaa9ccd2eb6a1abae68f588cdab0093b81fc",
       "executable": false
     },
     "src/pantry/approved-write-offs.ts": {
@@ -3811,7 +3811,7 @@
       "executable": false
     },
     "src/pantry/document-objects.ts": {
-      "sha256": "6bdbf184b2fec6a7d4dfc2f3e06f174649cda3ad7c08a02d78f183755a176dbc",
+      "sha256": "57135c056b01a27eaf047d867fda3d83843cc2eb865973345ba9a797216998ac",
       "executable": false
     },
     "src/pantry/documents.ts": {
@@ -5883,7 +5883,7 @@
       "executable": false
     },
     "tests/api/ledger.test.mjs": {
-      "sha256": "b3bf0b009fc0187a44848e4db72dfcf2e5a7d62fddee9c0b8cc82e4b6dc2f97e",
+      "sha256": "ef5cec5b67b208362cb6e45ef997bc8541bf7e3590219abadeff952f58b1b23f",
       "executable": false
     },
     "tests/api/member-at.mjs": {

@@ -15,7 +15,9 @@ export async function syncDocumentObjects(env: Bindings, limit = 32) {
   const erased = await all<{document_id:string;object_key:string}>(db,
     'SELECT o.document_id,o.object_key FROM pt_document_objects o JOIN pt_documents d ON d.id=o.document_id WHERE d.erased_at IS NOT NULL')
   for (const object of erased) {
-    await bucket.delete(object.object_key)
+    // A zero-byte marker fences an upload already in flight. Deleting the key
+    // would let a killed uploader recreate untracked personal bytes afterwards.
+    await bucket.put(object.object_key,new Uint8Array(0),{customMetadata:{erased:'true'}})
     await db.prepare('DELETE FROM pt_document_objects WHERE document_id=?').bind(object.document_id).run()
   }
   const pending = await all<{id:string;sha256:string}>(db,
@@ -27,7 +29,10 @@ export async function syncDocumentObjects(env: Bindings, limit = 32) {
     if (!current || current.erased_at) continue
     const file = await documentFile(db,doc.id)
     requireThat(file && await sha256(file.bytes)===doc.sha256,'Document recovery bytes do not match their recorded hash',500)
-    await bucket.put(key,file.bytes,{sha256:doc.sha256,httpMetadata:{contentType:file.mediaType},customMetadata:{sha256:doc.sha256}})
+    const previous = await bucket.head(key)
+    if (previous?.customMetadata?.erased==='true') continue
+    const written = await bucket.put(key,file.bytes,{onlyIf:previous?{etagMatches:previous.etag}:{etagDoesNotMatch:'*'},sha256:doc.sha256,httpMetadata:{contentType:file.mediaType},customMetadata:{sha256:doc.sha256}})
+    if (!written) continue // Another writer, including erasure, changed the key.
     const stored = await bucket.head(key)
     const digest = stored?.checksums.sha256
     requireThat(stored && stored.size===file.bytes.length && digest && Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('')===doc.sha256,'Stored document does not match its recorded hash',500)
@@ -35,7 +40,7 @@ export async function syncDocumentObjects(env: Bindings, limit = 32) {
     // after this check, its own cleanup finds the reserved receipt above.
     const live = await one(db,'SELECT id FROM pt_documents WHERE id=? AND erased_at IS NULL AND sha256=?',doc.id,doc.sha256)
     if (!live) {
-      await bucket.delete(key)
+      await bucket.put(key,new Uint8Array(0),{customMetadata:{erased:'true'}})
       await db.prepare('DELETE FROM pt_document_objects WHERE document_id=?').bind(doc.id).run()
     } else await db.prepare('UPDATE pt_document_objects SET ready=1 WHERE document_id=?').bind(doc.id).run()
   }

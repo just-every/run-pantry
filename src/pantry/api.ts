@@ -157,7 +157,15 @@ export const api = new Hono<{ Bindings: Bindings }>()
 api.use('*', async (c, next) => {
   await upgradeTins(c.env)
   await next()
-  if(c.req.method!=='GET' && c.res.status<400)await syncDocumentObjects(c.env)
+  if(c.req.method!=='GET' && c.res.status<400) {
+    try { await syncDocumentObjects(c.env) }
+    catch (error) {
+      // Ordinary mutations already committed their durable recovery bytes.
+      // Erasure must additionally confirm that its provider copies withdrew.
+      if (/\/command\/(erasure.execute|retention.erase)$/.test(c.req.path)) throw error
+      console.error('Document object copy pending; the scheduled tick will retry')
+    }
+  }
   if(c.req.method!=='GET')c.executionCtx.waitUntil(runWebhooks(c.env).catch(()=>console.error('Webhook dispatch failed')))
   c.executionCtx.waitUntil(runDueWork(c.env).catch(error => console.error('Pantry due work failed:', error)))
 })

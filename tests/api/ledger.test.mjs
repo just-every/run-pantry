@@ -95,7 +95,12 @@ test('PAN-03 customers, vendors and source documents are kept, with document byt
   const preview=await h.command('erasure.preview',{kind:'contact',id:lead.id})
   await h.command('erasure.execute',{kind:'contact',id:lead.id,fingerprint:preview.fingerprint,requester:'Synthetic requester',channel:'in-person',reason:'Remove obsolete enquiry',confirm:'ERASE'})
   assert.equal((await h.send(`/api/pantry/documents/${source.id}`,undefined,{cookie:h.owner})).status,410)
-  assert.deepEqual((await bucket.list()).objects.map(o=>o.key),[key])
+  const withdrawn=(await bucket.list()).objects.find(o=>o.key!==key)
+  assert.ok(withdrawn)
+  assert.equal(withdrawn.size,0,'Erasure leaves no original bytes in object storage')
+  const late=await bucket.put(withdrawn.key,Buffer.from('synthetic-pantry-987'),{onlyIf:{etagDoesNotMatch:'*'}})
+  assert.equal(late,null,'An upload that began before erasure cannot recreate personal bytes')
+  assert.equal((await bucket.head(withdrawn.key)).size,0)
 
   await h.command('contact.save', { id: cedar.id, revision: cedar.revision, kind: 'customer', name: 'Cedar Studio', active: false })
   const acct = at((await h.view('state')).accounts, a => a.code === '4000')
