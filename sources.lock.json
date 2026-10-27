@@ -878,6 +878,10 @@
       "sha256": "03a864479e7fcfe617bfa7265338cae2878919b1077e97f4842de0f905fcfe7f",
       "executable": false
     },
+    "migrations/core/0119_accountant_console.sql": {
+      "sha256": "e0ad266ca6894982ffb1b29e12ed333e9d048a8c22cc33ed2f41f7d08868704e",
+      "executable": false
+    },
     "migrations/rewrites.json": {
       "sha256": "85daa9b69cfde96f1e5a82f736e59b0a98d544eea2ec518c01808b21408e2826",
       "executable": false
@@ -1391,7 +1395,7 @@
       "executable": false
     },
     "scripts/installer/portability.mjs": {
-      "sha256": "b0e62893eaa335260af49ad1c369b0946bf44bd5a21b46f07de0570f5299c7cc",
+      "sha256": "202bf135c230634793e77dd680e51144aa9cc21c099a87c9236d47a46efbe0b3",
       "executable": false
     },
     "scripts/installer/seed.mjs": {
@@ -1427,7 +1431,7 @@
       "executable": false
     },
     "src/auth.server.ts": {
-      "sha256": "77cf8e706bfc45e6790f308337bc774268ee23568a89b5dd2f8cab8d3a59f389",
+      "sha256": "7cf5734e256b4ec8a4ded1d241c5f441dee294dc0c1437fd46df4bba87f70467",
       "executable": false
     },
     "src/base/contract-filter.ts": {
@@ -3322,6 +3326,10 @@
       "sha256": "947bdb259f4155be84e82b4a957a829f6d0f641a8b4856a023245e5290259cc5",
       "executable": false
     },
+    "src/pantry/accountant-console.ts": {
+      "sha256": "1e052baeb3c33148634abeae23ed9a1567d2eb80066460a48c7659125421ac97",
+      "executable": false
+    },
     "src/pantry/accountant-export.ts": {
       "sha256": "04800c58da22aaa5832397e5c4e3522553adaf6a5810e42b5fde390a2227936f",
       "executable": false
@@ -3335,7 +3343,7 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "c0c4b6b19134a68fc118ff6299714f939e8cc77d85ea938df1434895de2238be",
+      "sha256": "384a9a3a631c7e2494691be8e713e6fb78367c0a47762fc69b19117b519d4245",
       "executable": false
     },
     "src/pantry/approved-write-offs.ts": {
@@ -5166,6 +5174,10 @@
       "sha256": "352f88e27fe858d3f98e188f89922e37e231077dff3c51bdb15a55c1311a4a05",
       "executable": false
     },
+    "src/ui/accountant-console.tsx": {
+      "sha256": "d2a96f94ce7e3e3345a4447b0223a36df11bea5196d001d9bf217989eda11312",
+      "executable": false
+    },
     "src/ui/activity-labels.ts": {
       "sha256": "89fe8c9af90954b6d4f4aace2d728b78676e7af0a816e5022fa37f08371a3f17",
       "executable": false
@@ -5619,7 +5631,7 @@
       "executable": false
     },
     "src/ui/settings.tsx": {
-      "sha256": "32e727604aa9bdd90ece884a816d20fd72be63b17d14fdcc8a6cf675af100c1c",
+      "sha256": "e99a0afc06711eb62266d85a5f8d7a767c9f1f01e9c0e8090834c67b895bb643",
       "executable": false
     },
     "src/ui/shell.tsx": {

@@ -28,7 +28,7 @@ export default {
  // Receipts travel with the books; Base's source-bound portability journal
  // carries the restore fence. Neither journal contains erased field values.
  includeTables: ['pt_erasure_journal'],
- excludeTables: ['pt_texting','pt_qbo_connection','pt_estimate_sibling_previews','pt_estimate_sibling_attempts','pt_webhook_secrets','pt_webhook_events','pt_webhook_deliveries','pt_webhook_attempts','pt_reader','pt_stripe','pt_gusto','pt_gusto_states','pt_xero_connection','pt_receipt_inbox'],
+ excludeTables: ['pt_accountant_status_grants','pt_accountant_clients','pt_texting','pt_qbo_connection','pt_estimate_sibling_previews','pt_estimate_sibling_attempts','pt_webhook_secrets','pt_webhook_events','pt_webhook_deliveries','pt_webhook_attempts','pt_reader','pt_stripe','pt_gusto','pt_gusto_states','pt_xero_connection','pt_receipt_inbox'],
  exportRow: (table,row) => disabled(table,['pt_agents','pt_integrations'].includes(table)?{...row,token_hash:`disabled:${row.id}`}:row),
  importSafety: {pt_autopay_policies:{enabled:[0],owner_id:['']},pt_autopay_setups:{status:['revoked'],stripe_customer:['']},pt_text_consents:{revoked_at:['restored']},pt_tax_reminder_preferences:{enabled:[0],owner_id:[''],owner_email:['']},pt_w9_requests:{token_hash:[null]},pt_collection_cases:{approved_by:[null],approved_revision:[null]},pt_agent_permissions:{active:[0],owner_id:[''],owner_email:['']},pt_estimates:{link_token:[null]},pt_webhook_subscriptions:{enabled:[0],owner_id:['']},pt_feed_items:{access_token:[''],status:['disconnected'],claim_id:[null],claim_until:[null]},pt_agents:{active:[0]},pt_integrations:{revoked_at:['restored']}},
  importRow: disabled,

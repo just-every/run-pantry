@@ -17,6 +17,8 @@ export interface Bindings {
  RER_DEPLOY_SOURCE?: string
  RER_DEPLOY_FINGERPRINT?: string
  RER_VERSION?: { id: string }
+ /** Exact client origins the owner permits this console to contact. */
+ PANTRY_ACCOUNTANT_CLIENTS?: string
  IDENTITY_PROVIDER?: string
  AUTH_ORIGIN: string
  AUTH_LOCAL?: string

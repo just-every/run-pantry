@@ -1,3 +1,4 @@
+import { AccountantConsole } from './accountant-console'
 import { TextingSettings } from './texting'
 // People & settings: the business, its declared policies, who has which role, and agent access.
 import { DimensionSettings } from './dimensions'
@@ -88,6 +89,7 @@ export function Settings() {
   return <>
     <PageHead title="People & settings" lead="The business these books belong to, invoice sending and online payments, Stripe payouts and Gusto payroll, who works in them, agent access, and how receipts are read and received." />
     <BusinessSummary /><DimensionSettings />
+    {['owner', 'accountant'].includes(state.actor.role) && <AccountantConsole />}
     {state.settings.entity && <><InvoicingSettings /><ConnectedSettings /></>}
     {state.actor.can.owner && <><TextingSettings /><DataFlows /><Owner /><People /><RolePrivacy /><IssuingLimits /><Agents /><IntegrationSettings /><WebhookSettings /><ErasureSettings /><ReceiptSettings /><Hosting /></>}
   </>

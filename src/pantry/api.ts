@@ -1,3 +1,4 @@
+import { accountantCommands, accountantConsole, accountantStatus } from './accountant-console'
 import { monthCloseCommands, prepareMonthClose } from './month-close'
 import { autopayCommands, registerAutopayRoutes } from './autopay'
 import { textingCommands, registerTextingRoutes, textingView } from './texting'
@@ -140,7 +141,7 @@ import { statementCommands } from './statements/commands'
 import { statement } from './statements/store'
 
 const commands: Record<string, Command> = {
-  ...autopayCommands, ...textingCommands, ...statementCommands,
+  ...accountantCommands, ...autopayCommands, ...textingCommands, ...statementCommands,
   ...taxReminderCommands,...taxReadinessCommands,...w9Commands, ...currencyCommands,...archiveCommands,...collectionCommands, ...standingCommands, ...learningCommands, ...assetCommands, ...dimensionCommands, ...siblingCommands,
   'stripe.events-compare': { need:'owner', async run(c) { await run(c.db,[authority(c.actor,'owner')]); return compareStripeEvents(c.env,c.db,true) } }, ...paymentNoticeCommands, ...invoiceVoidCommands, ...refundCommands, ...customerCreditCommands, ...lateDiscountCommands, ...approvedWriteOffCommands, ...lateFeeCommands, ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
   ...monthCloseCommands, ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
@@ -159,6 +160,7 @@ api.use('*', async (c, next) => {
   c.executionCtx.waitUntil(runDueWork(c.env).catch(error => console.error('Pantry due work failed:', error)))
 })
 api.get('/health', c => c.json({ status: 'ok', ...deploymentHealth(c.env) }))
+api.get('/accountant-status', async c => { c.header('cache-control','no-store'); return c.json(await accountantStatus(c.req.raw,c.env)) })
 registerTextingRoutes(api)
 api.route('/', customer)
 api.route('/', w9Public)
@@ -184,6 +186,7 @@ async function reader(c: C): Promise<Context> {
 }
 
 const view = (path: string, build: (ctx: Context, c: C) => Promise<unknown>) => api.get(`/api/pantry/${path}`, async c => { const ctx = await reader(c); return c.json(await projectAccess(ctx, await build(ctx, c))) })
+view('accountant-console',async ctx=>accountantConsole(ctx))
 view('tax-reminders',async(ctx,c)=>taxRemindersView(ctx,year(c)))
 view('tax-readiness',async(ctx,c)=>taxReadiness(ctx,year(c)))
 view('tax-readiness/:year/package',async(ctx,c)=>taxYearPackage(ctx,Number(c.req.param('year'))))
