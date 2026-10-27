@@ -6003,7 +6003,7 @@
       "executable": false
     },
     "tests/api/terminal-journey.mjs": {
-      "sha256": "9ea5d997c7c781a47bc18926b515b0345e4092928684106347bc33ba0872befa",
+      "sha256": "5f77cebf67b0a76bcc905d504f486253cb27455f53c705969744c4c454831346",
       "executable": false
     },
     "tests/api/texting-journey.mjs": {

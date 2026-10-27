@@ -141,6 +141,8 @@ export async function terminalVoidJourney() {
     await h.command('invoice.void',voidRequest(prepared),h.owner,409)
     const pending=await h.command('erasure.preview',{kind:'contact',id:customer.id})
     assert.ok(pending.blockers.some(b=>b.kind==='terminal-payment' && b.id==='synthetic-pantry-75'))
+    await h.command('erasure.execute',{kind:'contact',id:customer.id,fingerprint:pending.fingerprint,requester:'synthetic-pantry-76',channel:'in-person',reason:'synthetic-pantry-77',confirm:'ERASE'},h.owner,409)
+    assert.equal((await h.command('terminal.list',{})).payments.find(p=>p.id==='synthetic-pantry-75').payment_intent,edge.reader.action.process_payment_intent.payment_intent)
   } finally {await h.close()}
 }
 
