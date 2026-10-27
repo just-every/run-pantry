@@ -52,7 +52,7 @@ Reserve a new hosted environment at the same Pantry revision, apply its normal m
 Run from the deployed checkout with its mode-0600 Cloudflare deploy file and a mode-0600 archive:
 
 ```sh
-node scripts/hosted-restore.mjs --environment recovery --env-file .env.pantry --input /private/pantry-books.rer --journal /private/latest-pantry-books.rer --yes
+node scripts/hosted-restore.mjs --environment recovery --env-file .env.pantry --input exports/pantry-books.rer --journal exports/latest-pantry-books.rer --yes
 ```
 
 The command also accepts injected `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` instead of a file. It validates the full archive and the optional later journal before remote staging, then uses the same Pantry policy, migration replay and ERASURE-001 fence as local import. A missing later journal is reported explicitly: a fresh destination cannot discover erasures made after the backup on its own. A refused archive publishes no books. Provider diagnostics and document values never enter command errors.
