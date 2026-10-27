@@ -6307,7 +6307,7 @@
       "executable": false
     },
     "tests/ops/hosted-scale.mjs": {
-      "sha256": "9df02238d5306b2d3636f7b5fc9d841f48a8c94c6268b906362a73695873b4ac",
+      "sha256": "47de8ba3da8f5a15e723e02fcd5e6611c63967e34b3ca34de65917867b07c536",
       "executable": false
     },
     "tests/providers/autopay-card.mjs": {
