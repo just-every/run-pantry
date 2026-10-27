@@ -171,6 +171,7 @@ const dollars = (c: number) => (c / 100).toFixed(2)
 
 /** Read a Checkout Session back from Stripe and record what it says; safe to repeat. */
 export async function syncCheckout(env: Bindings, db: D1Database, sessionId: string) {
+  if (sessionId.startsWith('terminal:')) return one(db, 'SELECT * FROM pt_stripe_payments WHERE id = ?', sessionId)
   if (await isAutopayPayment(db, sessionId)) return syncAutopayPayment(env, db, sessionId)
   const row = await one(db, 'SELECT * FROM pt_stripe_payments WHERE id = ?', sessionId)
   if (!row || (row.status === 'succeeded' && row.fee_entry_id) || ['failed', 'expired', 'returned', 'disputed', 'refunded'].includes(row.status)) return row
@@ -190,7 +191,7 @@ export async function syncCheckout(env: Bindings, db: D1Database, sessionId: str
   return current
 }
 
-export async function recordSucceeded(env: Bindings, db: D1Database, row: Data, pi: Data, key: string, s: Data) {
+export async function recordSucceeded(env: Bindings, db: D1Database, row: Data, pi: Data, key: string, s: Data, extraGuards: Sql[] = []) {
   const charge = typeof pi.latest_charge === 'object' ? pi.latest_charge : null
   let bt = charge && typeof charge.balance_transaction === 'object' ? charge.balance_transaction : null
   if (!bt && charge && typeof charge.balance_transaction === 'string') bt = await stripeCall(key, 'GET', `/balance_transactions/${charge.balance_transaction}`)
@@ -219,7 +220,7 @@ export async function recordSucceeded(env: Bindings, db: D1Database, row: Data, 
       q('UPDATE pt_stripe_payments SET fee_cents = ?, fee_entry_id = ?, updated_at = ? WHERE id = ? AND fee_entry_id IS NULL', fee, feeEntry, now(), row.id), changed())
   }
   if (!statements.length) return
-  statements.unshift(...dimensions.guards)
+  statements.unshift(...dimensions.guards, ...extraGuards)
   statements.push(audit(pantry('stripe'), 'stripe.payment', 'invoice', inv.id, { session: row.id, paymentIntent: pi.id, method: row.method, amount: Number(pi.amount_received), fee: usdFee || null, feeCurrency: bt?.currency ?? null }))
   try { await run(db, statements) } catch (error) {
     // Another confirmation (return, webhook or due work) may have recorded it first.

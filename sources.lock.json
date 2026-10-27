@@ -878,6 +878,10 @@
       "sha256": "03a864479e7fcfe617bfa7265338cae2878919b1077e97f4842de0f905fcfe7f",
       "executable": false
     },
+    "migrations/core/0119_terminal.sql": {
+      "sha256": "2aee8ee8b8f1aa6b1faac7efbd4b0cba0eab86c68eacc5ae5413b196fa5f43a3",
+      "executable": false
+    },
     "migrations/rewrites.json": {
       "sha256": "85daa9b69cfde96f1e5a82f736e59b0a98d544eea2ec518c01808b21408e2826",
       "executable": false
@@ -3335,7 +3339,7 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "c0c4b6b19134a68fc118ff6299714f939e8cc77d85ea938df1434895de2238be",
+      "sha256": "f602a1f66fc70329759927087e4e9b0bfb7c7c69b571235e6080acf5781a6551",
       "executable": false
     },
     "src/pantry/approved-write-offs.ts": {
@@ -4695,7 +4699,7 @@
       "executable": false
     },
     "src/pantry/stripe-clearing/posting.ts": {
-      "sha256": "97559037099233f62ebd8c18317da5e314190862d20d0204be198eaa5ac6de9a",
+      "sha256": "b2a3c82398d4519cc15f09f97df6431ccf7d0461824bd19ada0f12fc944bedf5",
       "executable": false
     },
     "src/pantry/stripe-clearing/provider.ts": {
@@ -4735,7 +4739,7 @@
       "executable": false
     },
     "src/pantry/stripe.ts": {
-      "sha256": "856a1bb4161f3a6a6db32c9567494a76b14ad67198d88e356ed6fca6187e0179",
+      "sha256": "be26b8d396a82057a0642837b9b6b9be056c865ec7d6d5d58e9c798aac351a70",
       "executable": false
     },
     "src/pantry/tax-readiness.ts": {
@@ -4748,6 +4752,10 @@
     },
     "src/pantry/tax-reminders.ts": {
       "sha256": "3dfc7d59fcc401719b66fba4d3a7ee7775d2f5d164f8e35011c50314eab1d260",
+      "executable": false
+    },
+    "src/pantry/terminal.ts": {
+      "sha256": "7c2b74b43cb5b0eee549b54c85a3d3b473235965955a465145e574ef37f8225b",
       "executable": false
     },
     "src/pantry/texting/commands.ts": {
@@ -5731,7 +5739,7 @@
       "executable": false
     },
     "tests/api/connected.test.mjs": {
-      "sha256": "da5c84ffbeb475466a0b805299f89073c591d7ff452eae988d5fc3a70890574b",
+      "sha256": "4712d0eede991701ed469cbba151632c368707a758516924c25748e7fb5de3fa",
       "executable": false
     },
     "tests/api/currency-journey.mjs": {
@@ -5960,6 +5968,10 @@
     },
     "tests/api/tax-reminder-journey.mjs": {
       "sha256": "fcbb7f3986f91d81abd548d0e6e1a93b6cb0cdd21f96caa216ae42fb24dc4d40",
+      "executable": false
+    },
+    "tests/api/terminal-journey.mjs": {
+      "sha256": "f8df3975fa92a6c12fd75869567e45733d3838107cbf4b7e3db141c9c5443480",
       "executable": false
     },
     "tests/api/texting-journey.mjs": {
@@ -6272,6 +6284,10 @@
     },
     "tests/providers/stripe-clearing.mjs": {
       "sha256": "02228acac6cd32183062b048117064d43624f6da26b25d8181f203e7c2e50d55",
+      "executable": false
+    },
+    "tests/providers/terminal.mjs": {
+      "sha256": "e69b0db9948e89d19ee889ece962128ab8f3e6f65e8901b91d4dd44de473d11f",
       "executable": false
     },
     "tests/providers/texting.mjs": {
