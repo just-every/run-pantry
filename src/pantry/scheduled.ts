@@ -1,3 +1,4 @@
+import { runHostedBackup } from './hosted-backup.mjs'
 import { upgradeTins } from './contractor-tin'
 import type { Bindings } from '../auth.server'
 import { runDue } from './feeds/sync'
@@ -11,5 +12,5 @@ export async function runScheduled(controller:{cron:string;scheduledTime:number}
   const deliveries=runWebhooks(env,controller.scheduledTime)
   if(controller.cron!=='*/30 * * * *'){await deliveries;return}
   await runDue(env,10)
-  await Promise.all([deliveries,runDueWork(env,{scheduled:true,reportAt:new Date(controller.scheduledTime)}),runAgent(env,{scheduled:true})])
+  await Promise.all([runHostedBackup(env,controller.scheduledTime),deliveries,runDueWork(env,{scheduled:true,reportAt:new Date(controller.scheduledTime)}),runAgent(env,{scheduled:true})])
 }

@@ -18,14 +18,14 @@ const BOOTSTRAP = 'local-test-bootstrap-token-0123456789'
 export const fixture = (path) => readFile(new URL(`../../fixtures/${path}`, import.meta.url), 'utf8')
 
 /** `bindings` extend the Worker's; `outbound` answers any request not bound for the mail provider; `entry` swaps the Worker entry. */
-export async function harness({ bindings = {}, outbound, log, entry = 'tests/api/worker.ts', beforeMigration, clock, sessionClock } = {}) {
+export async function harness({ bindings = {}, outbound, log, entry = 'tests/api/worker.ts', beforeMigration, clock, sessionClock, r2Buckets = {} } = {}) {
   let mf,origin
   const dir = await mkdtemp(join(tmpdir(), 'pantry-test-'))
   const mail = []
   const bundle = await build({ entryPoints: [entry], bundle: true, write: false, format: 'esm', platform: 'neutral', conditions: ['workerd', 'worker', 'browser'], external: ['node:*', 'cloudflare:*'], target: 'es2023', logLevel: 'error' })
   const optionsFor = origin => ({ ...convertV4MiniflareOptions({
     host: '127.0.0.1', port:0, modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], ...(log ? { log } : {}),
-    d1Databases: { DB: 'pantry' }, unsafeTriggerHandlers: true,
+    d1Databases: { DB: 'pantry' }, r2Buckets, unsafeTriggerHandlers: true,
     bindings: { AUTH_ORIGIN: origin, AUTH_LOCAL: 'true', OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: 'local-test-secret-not-production-0123456789', SETUP_TOKEN: BOOTSTRAP, MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'test-resend-key', MAIL_FROM: 'Pantry <pantry@example.test>', ...bindings },
     async outboundService(request) {
       if (outbound && new URL(request.url).hostname !== 'api.resend.com') return outbound(request)
@@ -97,7 +97,7 @@ export async function harness({ bindings = {}, outbound, log, entry = 'tests/api
     /** Fire the Worker's Cron trigger. */
     const cron = async (scheduledTime=clock ? Date.parse(clock) : Date.now()) => (await mf.getWorker()).scheduled({ cron: '*/30 * * * *',scheduledTime })
     const close = async () => { await mf.dispose(); await rm(dir, { recursive: true, force: true }) }
-    return { db, origin, owner, mail, send, command, view, member, agent, confirmMail, email, cron, close }
+    return { db, bucket: name => mf.getR2Bucket(name), origin, owner, mail, send, command, view, member, agent, confirmMail, email, cron, close }
   } catch (error) {
     await mf?.dispose(); await rm(dir, { recursive: true, force: true })
     throw error

@@ -131,7 +131,7 @@
       "executable": false
     },
     "deploy.json": {
-      "sha256": "880a7d1331f99e27330ccbe9ce1d328369ea18698b0a7eaba9782a2e8da4ea29",
+      "sha256": "21f95b3335e0994d78fcdee83b2bc012c4d68580923e03c0ac544bb566818073",
       "executable": false
     },
     "docs/agent-work.md": {
@@ -139,7 +139,7 @@
       "executable": false
     },
     "docs/backup.md": {
-      "sha256": "293d397637fb069bbebf4e6deda7a0147b1aca6dd679ed1928cdaf42f26d16c1",
+      "sha256": "f7c803390c86ec6c0ebeb9c6636a09cd89c5aa4661c0da2c59467fdabfdc1c76",
       "executable": false
     },
     "docs/bank-feeds-and-rules.md": {
@@ -403,7 +403,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "6993243e571d6e5f081053aeebb47ced11cdb0c3324a9eb81fd3cf2d9e692dc0",
+      "sha256": "6506523f67dfd18fa14e0ca5b56505ba78e0811140f2a6a144ad09f94051e9bb",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -876,6 +876,10 @@
     },
     "migrations/core/0118_month_close.sql": {
       "sha256": "03a864479e7fcfe617bfa7265338cae2878919b1077e97f4842de0f905fcfe7f",
+      "executable": false
+    },
+    "migrations/core/0119_hosted_backups.sql": {
+      "sha256": "17629822c67f22763b1a0d3152a3cec42fb86b96620fcb3cbf107b840b756492",
       "executable": false
     },
     "migrations/rewrites.json": {
@@ -1395,7 +1399,7 @@
       "executable": false
     },
     "scripts/installer/portability.mjs": {
-      "sha256": "b0e62893eaa335260af49ad1c369b0946bf44bd5a21b46f07de0570f5299c7cc",
+      "sha256": "e07ed0e5190549cc0952e524a8206cb7d80c8d6fc583a6dda0c73725ad72f704",
       "executable": false
     },
     "scripts/installer/seed.mjs": {
@@ -1431,7 +1435,7 @@
       "executable": false
     },
     "src/auth.server.ts": {
-      "sha256": "77cf8e706bfc45e6790f308337bc774268ee23568a89b5dd2f8cab8d3a59f389",
+      "sha256": "a480d5406b14043149d794a9529dc09b1d75d524385d7ff18961b838e6e4d7d3",
       "executable": false
     },
     "src/base/contract-filter.ts": {
@@ -4034,6 +4038,14 @@
       "sha256": "8005adeeb8eeef0dec7f3ba8b4f14f7facebb8f2070d3218804b55cc40baeca8",
       "executable": false
     },
+    "src/pantry/hosted-backup.d.mts": {
+      "sha256": "cec227b9d12265e873590514b4485401a1096fc31cde5a191b77229813fcc07f",
+      "executable": false
+    },
+    "src/pantry/hosted-backup.mjs": {
+      "sha256": "8c56557d315d123fa34d097db32ce0a7a111a257a661186ada5cce14606e813b",
+      "executable": false
+    },
     "src/pantry/integrations/credentials.ts": {
       "sha256": "744f3853a6a4a3999fe63587c9e2bbf937f9d0bd0c1db7bffba55e7b3ee9ec73",
       "executable": false
@@ -4623,7 +4635,7 @@
       "executable": false
     },
     "src/pantry/scheduled.ts": {
-      "sha256": "283764537feb75983b0a5438e572eb91d4872459c59c5fb2d2ce35a76f0a8c52",
+      "sha256": "1f6ba22628aa20fa084a47efa668bf7dbe3ce324b911dc3b9e65b8f6d86fb18f",
       "executable": false
     },
     "src/pantry/seal.ts": {
@@ -5727,7 +5739,7 @@
       "executable": false
     },
     "tests/api/close.test.mjs": {
-      "sha256": "1b700cf4074422b5bba6227f4a75d3579eaf61291498f6e26e4ca31eb644757e",
+      "sha256": "f6b3deb29e9da57573a7680e8101a9ad61afb72234abf9e485138c5459abc538",
       "executable": false
     },
     "tests/api/collections-journey.mjs": {
@@ -5811,7 +5823,7 @@
       "executable": false
     },
     "tests/api/harness.mjs": {
-      "sha256": "971a5bfb5a7cc6e8179a49e510ecdd7f5790bcd1bba2040c2505629cb67e7b4f",
+      "sha256": "85e3a438695ba20b347456ea671466e116b5137493a448fb8bf2106d3fcfdc72",
       "executable": false
     },
     "tests/api/integrations.test.mjs": {
