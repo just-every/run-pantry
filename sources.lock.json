@@ -1387,7 +1387,7 @@
       "executable": false
     },
     "scripts/hosted-archive.mjs": {
-      "sha256": "2a599c373184bdf4d2221d04588b8681b27de1aede92ebba4890f8d12c1a1e0a",
+      "sha256": "6361be4318753e7261e25b142dc555711c9289bd4d5167199e25f67abcb8f537",
       "executable": false
     },
     "scripts/hosted-backup.mjs": {
@@ -1403,7 +1403,7 @@
       "executable": false
     },
     "scripts/hosted-restore.mjs": {
-      "sha256": "56653a7f5cd05a333720b7475549356b5da38e50636ac5658710308dd27be6df",
+      "sha256": "7d4fabc41bd6941cc95919f042bd916331a11ff795598123c7cfeceb33cab643",
       "executable": false
     },
     "scripts/hosted-s3.mjs": {

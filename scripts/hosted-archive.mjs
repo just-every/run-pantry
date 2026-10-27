@@ -2,6 +2,8 @@
 // The ordinary Pantry policy and Base archive writer retain the erasure fence,
 // scrub credentials and produce exactly the format consumed by rer import.
 import { readFile, mkdtemp, rm } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -56,7 +58,7 @@ export async function hostedArchive({ input, output, buckets }) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2), flag = name => args[args.indexOf(name) + 1]
   if (!args.includes('--input-sql') || !args.includes('--output') || args.length !== 6 || (!args.includes('--local-documents') && !args.includes('--bucket'))) {
     console.error('usage: node scripts/hosted-archive.mjs --input-sql FILE --output NEW.rer (--local-documents CHECKOUT | --bucket NAME)')

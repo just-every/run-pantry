@@ -1,6 +1,7 @@
 // Restore only into a reserved, fresh hosted destination. Keep its writers and
 // Cron paused until the owner has compared restored books and document bytes.
 import { readFile, lstat } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createPortability, PortabilityError } from '@runeditrun/rer/modules/portability'
@@ -92,7 +93,7 @@ export function hostedRestoreFailure(error) {
   return 'hosted_restore_failed'
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const receipt = await hostedRestoreCommand()
     console.log(receipt.help ?? JSON.stringify(receipt))
