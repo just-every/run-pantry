@@ -15,6 +15,8 @@ export async function monthCloseBrowser(browser) {
     }
     const h = { command: (op, data) => json('/api/pantry/command/' + op, data), view: path => json('/api/pantry/' + path), cron: () => owner.request.get(`${origin}/cdn-cgi/local/scheduled?cron=${encodeURIComponent('*/30 * * * *')}`) }
     const seeded = await monthCloseScenario(h)
+    const document = await h.command('document.upload', { name: 'synthetic-pantry-40.txt', mediaType: 'text/plain', base64: Buffer.from('Synthetic office allocation 17 dollars.').toString('base64') })
+    await h.command('journal.save-draft', { date: '2026-09-25', memo: 'synthetic-pantry-41 supported close draft', documentId: document.id, lines: [{ accountId: seeded.acct['6000'], debit: '17.00' }, { accountId: seeded.acct['3000'], credit: '17.00' }] })
     const { token } = await h.command('agent.create', { name: 'synthetic-pantry-11' })
     const response = await owner.request.post(`${origin}/api/pantry/agent/month-close`, { headers: { authorization: 'Bearer ' + token }, data: { period: '2026-09' } })
     assert.equal(response.status(), 200, await response.text())
@@ -49,6 +51,13 @@ export async function monthCloseBrowser(browser) {
         assert.equal(cited.status(), 200)
         assert.ok((await cited.json()).id)
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+        const correction = page.locator('section').filter({ has: page.getByText('Post supported draft: synthetic-pantry-41 supported close draft', { exact: true }) }).last()
+        await page.getByText('Post supported draft: synthetic-pantry-41 supported close draft', { exact: true }).waitFor()
+        if (width === 1440) {
+          await correction.getByRole('heading', { name: /Journal entry/ }).waitFor()
+          await correction.getByText('Net income before', { exact: false }).first().waitFor()
+          assert.equal(await correction.getByRole('button', { name: 'Approve and post', exact: true }).isEnabled(), true)
+        }
         if (proof) await page.screenshot({ path: `${proof}/month-close-agent-${width}.png`, fullPage: true })
         await page.goto(origin + '/app/close?period=2026-09')
         await page.getByRole('heading', { name: 'Period lock', exact: true }).waitFor()

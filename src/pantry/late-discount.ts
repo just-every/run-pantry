@@ -3,7 +3,7 @@ import { authority, who } from './access'
 import { date, now, requireThat, text, uid, type Data } from './core'
 import { assertOpen, audit, guard, one, periodOpen, q, run, type Sql } from './db'
 import { dimensionTags, dimensionValues } from './dimensions'
-import { invoice, nextNumber } from './invoices'
+import { invoice } from './invoices'
 import { standingDiscount, type Offer } from './early-payment'
 import { documentSelectionStatements } from './invoice-documents'
 import { selectedTemplate, customValues } from './invoice-templates'
@@ -31,10 +31,12 @@ const prepare: Command = { need: 'record', async run(c, b) {
     treatments: Object.fromEntries(offer.lines.filter(l => l.code).map(l => [l.code!.id, { treatment: l.code!.treatment, revision: l.code!.revision }])), lines: offer.lines.map(l => ({ line: l.lineNo, net: l.net, discount: l.discount, reduction: l.reduction, treatment: l.code?.treatment ?? 'exempt' })) }
   const credit = { credit_for: source.id, early_detail: detail, issue_date: day, total_cents: offer.discount + offer.reduction, write_off: 0 }
   const checks = await lateDiscountChecks(c.db, credit)
-  const id = uid(), revision = uid(), number = await nextNumber(c.db, 'credit'), customer = await contact(c.db, source.customer_id, 'customer'), template = await selectedTemplate(c.db, customer)
+  const id = uid(), revision = uid(), customer = await contact(c.db, source.customer_id, 'customer'), template = await selectedTemplate(c.db, customer)
   const memo = `Early-payment discount on ${source.number}, honored after window: ${reason}`
   await run(c.db, [authority(c.actor, 'record'), periodOpen(day), ...checks,
-    q("INSERT INTO pt_invoices(id,kind,number,customer_id,destination_state,issue_date,due_date,status,memo,credit_for,subtotal_cents,tax_cents,total_cents,opening,prepared_by,revision,created_at,early_detail) VALUES (?,'credit',?,?,?,?,?,'draft',?,?,?,?,?,0,?,?,?,?)", id, number, source.customer_id, source.destination_state, day, day, memo, source.id, offer.discount, offer.reduction, credit.total_cents, c.actor.email, revision, now(), JSON.stringify(detail)),
+    // Allocate inside the serialized write, so concurrent preparations keep
+    // separate draft numbers while the existing issue guards permit one honor.
+    q("INSERT INTO pt_invoices(id,kind,number,customer_id,destination_state,issue_date,due_date,status,memo,credit_for,subtotal_cents,tax_cents,total_cents,opening,prepared_by,revision,created_at,early_detail) VALUES (?,'credit',(SELECT 'CR-' || printf('%04d', COALESCE(MAX(CAST(substr(number,4) AS INTEGER)),0)+1) FROM pt_invoices WHERE number GLOB 'CR-[0-9]*' AND substr(number,4) NOT GLOB '*[^0-9]*'),?,?,?,?,'draft',?,?,?,?,?,0,?,?,?,?)", id, source.customer_id, source.destination_state, day, day, memo, source.id, offer.discount, offer.reduction, credit.total_cents, c.actor.email, revision, now(), JSON.stringify(detail)),
     ...offer.lines.filter(l => l.discount > 0).map((l, i) => {
       const original = source.lines.find((o: Data) => o.line_no === l.lineNo)!
       return q("INSERT INTO pt_invoice_lines(id,invoice_id,line_no,description,quantity_milli,unit_cents,amount_cents,account_id,tax_code,tax_cents,chosen_tax_code,early_treatment,early_line_ref,class_name,location_name,project_name) VALUES (?,?,?,?,1000,?,?,?,?,?,?,?,?,?,?,?)", uid(), id, i+1, `Discount honored after window · ${original.description}`, l.discount, l.discount, offer.accountId, original.tax_code, l.reduction, original.tax_code, l.code?.treatment ?? 'exempt', original.id, ...dimensionValues(dimensionTags(original)))

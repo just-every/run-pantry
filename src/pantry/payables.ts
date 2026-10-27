@@ -76,14 +76,18 @@ export function postBill(actor: Actor, b: { id: string; journalId: string; payab
     q("UPDATE pt_bills SET status = 'posted', journal_id = ?, revision = ? WHERE id = ? AND status = 'draft'", b.journalId, uid(), b.id), changed()]
 }
 
-const recordBill: Command = { need: 'record', async run(c, b) {
+export async function billPostingPlan(c: Pick<Context, 'db' | 'actor'>, b: Data) {
   const current = await bill(c.db, text(b.id, 'Bill'))
   requireThat(current.status === 'draft' && current.revision === b.revision, 'Bill changed or is already recorded; reload', 409)
   requireThat(!await one(c.db, 'SELECT 1 FROM pt_capture_drafts WHERE bill_id = ?', current.id), 'Review and approve this captured draft in Receipts before posting it', 409)
   await assertOpen(c.db, current.bill_date)
   const payable = await controlAccount(c.db, 'payable'), vendor = await contact(c.db, current.vendor_id)
-  await run(c.db, [authority(c.actor, 'record'), ...await manualBillPostingApproval(c.db, current), ...postBill(c.actor, { id: current.id, journalId: uid(), payable: payable.id, vendor, reference: current.reference, date: current.bill_date, lines: current.lines, total: current.total_cents }), audit(who(c.actor), 'bill.record', 'bill', current.id)])
-  return bill(c.db, current.id)
+  return { id: current.id, day: current.bill_date, dates: [current.bill_date], statements: [authority(c.actor, 'record'), ...await manualBillPostingApproval(c.db, current), ...postBill(c.actor, { id: current.id, journalId: uid(), payable: payable.id, vendor, reference: current.reference, date: current.bill_date, lines: current.lines, total: current.total_cents }), audit(who(c.actor), 'bill.record', 'bill', current.id)] }
+}
+const recordBill: Command = { need: 'record', async run(c, b) {
+  const plan = await billPostingPlan(c, b)
+  await run(c.db, plan.statements)
+  return bill(c.db, plan.id)
 } }
 
 /** A missing source document stays a close exception unless someone who can post records why. */
@@ -157,7 +161,7 @@ const recordPayment: Command = { need: 'record', async run(c, b) {
 } }
 
 /** Apply an unallocated part of an earlier payment. */
-const allocate: Command = { need: 'record', async run(c, b) {
+export async function paymentAllocationPlan(c: Pick<Context, 'db' | 'actor'>, b: Data) {
   const payment = await one(c.db, 'SELECT * FROM pt_payments WHERE id = ? AND reversal_id IS NULL', text(b.paymentId, 'Payment'))
   requireThat(payment, 'Payment not found or reversed', 404)
   const used = Number((await one(c.db, "SELECT COALESCE(SUM(amount_cents), 0) AS n FROM pt_allocations WHERE source_kind = 'payment' AND source_id = ? AND voided_by IS NULL", payment.id))?.n ?? 0)
@@ -167,10 +171,15 @@ const allocate: Command = { need: 'record', async run(c, b) {
   const allocated = await allocations(c.db, payment.direction, payment.contact_id, b.allocations, payment.amount_cents - used - await refunded(c.db, 'payment', payment.id))
   requireThat(allocated.list.length, 'Choose what to allocate')
   const early = payment.direction === 'received' ? await takeEarlyDiscounts(c.db, who(c.actor), allocated.list, day, { payments: payment.id }) : { allocations: allocated.list.map(a => ({ ...a, counted: false })), before: [], after: [] }
-  await run(c.db, [authority(c.actor, 'record'), ...nativeApprovalAuthority(c.actor, 'payment', payment.amount_cents), ...bankAuthority(c.actor, [payment.bank_account_id]), ...early.before, ...early.allocations.map(a => allocationInsert(c.actor, payment.id, payment.direction === 'received' ? 'invoice' : 'bill', a, day)), ...allocated.guards, ...early.after,
+  const statements = [authority(c.actor, 'record'), ...nativeApprovalAuthority(c.actor, 'payment', payment.amount_cents), ...bankAuthority(c.actor, [payment.bank_account_id]), ...early.before, ...early.allocations.map(a => allocationInsert(c.actor, payment.id, payment.direction === 'received' ? 'invoice' : 'bill', a, day)), ...allocated.guards, ...early.after,
     q(`INSERT INTO pt_guard SELECT CASE WHEN (SELECT COALESCE(SUM(amount_cents), 0) FROM pt_allocations WHERE source_kind = 'payment' AND source_id = ?) <= ? THEN 1 ELSE 0 END`, payment.id, payment.amount_cents),
-    audit(who(c.actor), 'payment.allocate', 'payment', payment.id, { allocations: allocated.list })])
-  return (await one(c.db, 'SELECT * FROM pt_payments WHERE id = ?', payment.id))!
+    audit(who(c.actor), 'payment.allocate', 'payment', payment.id, { allocations: allocated.list })]
+  return { id: payment.id, day, dates: [day], statements }
+}
+const allocate: Command = { need: 'record', async run(c, b) {
+  const plan = await paymentAllocationPlan(c, b)
+  await run(c.db, plan.statements)
+  return (await one(c.db, 'SELECT * FROM pt_payments WHERE id = ?', plan.id))!
 } }
 
 export const payableCommands: Record<string, Command> = {
