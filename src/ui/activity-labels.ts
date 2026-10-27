@@ -31,6 +31,7 @@ const ACTIONS: Record<string, string> = {
   'payment.record': 'Recorded a payment', 'payment.allocate': 'Applied a payment', 'payment.method': "Changed how a payment was made",
   'period.lock': 'Locked the month', 'period.reopen-requested': 'Asked to reopen the month', 'period.reopen': 'Reopened the month', 'period.reopen-declined': 'Declined reopening the month',
   'proposal.file': 'Filed a proposal', 'proposal.approve': "Approved an agent's proposal", 'proposal.reject': "Rejected an agent's proposal", 'proposal.stale': 'A proposal went out of date',
+  'question.ask': 'Asked a person', 'question.assign': 'Changed a question recipient',
   'question.read': 'Pantry read your answer', 'question.answer': 'Answered a question', 'question.dismiss': 'Set a question aside',
   'reader.save': 'Set up receipt reading', 'reader.remove': 'Turned off receipt reading',
   'receipt.receive': 'Received a receipt', 'receipt.read': 'Read a receipt', 'receipt.attach': 'Attached a receipt', 'receipt.attach-by-rule': 'Receipt attached by rule', 'receipt.dismiss': 'Set a receipt aside', 'receipt.not-needed': 'Marked a receipt not needed',
