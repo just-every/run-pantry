@@ -1,12 +1,13 @@
 // Customers, vendors and source documents. Documents are evidence: their bytes
 // are kept exactly and never interpreted as instructions.
 import { authority, who } from './access'
-import { now, optionalText, requireThat, sha256, text, uid } from './core'
+import { now, optionalText, requireThat, text, uid } from './core'
 import { audit, changed, one, q, run, type Sql } from './db'
 import type { Command, Context } from './context'
 import { vendorProfile } from './receipts/vendor-profile'
 import { customerProfile } from './customer-profile'
 import { selectedTemplate } from './invoice-templates'
+import { documentStatements as stageDocument, type NewDocument } from './documents'
 import { documentCaptureStatements, decideDocumentDuplicate } from './receipts/document-intake'
 
 export async function contact(db: D1Database, id: string, kind?: 'customer' | 'vendor') {
@@ -58,11 +59,9 @@ const saveContact: Command = { need: 'record', async run(c, b) {
 const LINKABLE = ['bill', 'invoice', 'journal', 'payment', 'statement', 'none']
 const MEDIA = /^(application\/pdf|image\/(png|jpeg|webp)|text\/(plain|csv)|application\/(x-ofx|ofx|vnd\.intu\.qbo))$/
 
-export async function documentInsert(c: { actor: any }, input: { name: string; mediaType: string; bytes: Uint8Array; linkedKind?: string | null; linkedId?: string | null; note?: string }) {
+export async function documentInsert(c: { actor: any }, input: NewDocument) {
   requireThat(input.bytes.length > 0 && input.bytes.length <= 1_500_000, 'Documents are 1 byte to 1.5 MB')
-  const id = uid(), hash = await sha256(input.bytes)
-  return { id, sha256: hash, statement: q('INSERT INTO pt_documents (id, name, media_type, size, sha256, content, linked_kind, linked_id, note, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    id, input.name, input.mediaType, input.bytes.length, hash, input.bytes, input.linkedKind ?? null, input.linkedId ?? null, input.note ?? '', c.actor.email, now()) }
+  return stageDocument(c.actor.email, input)
 }
 
 export async function documentStatements(c: Context, b: Record<string, any>) {
@@ -78,7 +77,7 @@ export async function documentStatements(c: Context, b: Record<string, any>) {
     requireThat(await one(c.db, `SELECT 1 FROM ${table} WHERE id = ?`, linkedId), 'Linked record not found', 404)
   }
   const doc = await documentInsert(c, { name, mediaType, bytes, linkedKind: linkedKind === 'none' ? null : linkedKind, linkedId, note: optionalText(b.note, 'Note', 500) })
-  return { id: doc.id, statements: [authority(c.actor, 'record'), doc.statement, ...await documentCaptureStatements(c, doc.id, { name, mediaType, bytes, linkedKind: linkedKind === 'none' ? null : linkedKind, linkedId }), audit(who(c.actor), 'document.upload', 'document', doc.id, { name, sha256: doc.sha256, linkedKind, linkedId })] }
+  return { id: doc.id, statements: [authority(c.actor, 'record'), ...doc.statements, ...await documentCaptureStatements(c, doc.id, { name, mediaType, bytes, linkedKind: linkedKind === 'none' ? null : linkedKind, linkedId }), audit(who(c.actor), 'document.upload', 'document', doc.id, { name, sha256: doc.sha256, linkedKind, linkedId })] }
 }
 
 const uploadDocument: Command = { need: 'record', async run(c, b) {

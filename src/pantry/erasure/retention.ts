@@ -65,7 +65,7 @@ const erase: Command = { need: 'owner', async run(c, b) {
     return matches[0]
   })
   requireThat(new Set(selected.map(itemKey)).size === selected.length, 'Choose each retained item once')
-  const id = uid(), at = now(), counts: Record<string, { itemsErased: number; bytesRemoved: number; fieldsReplaced: number }> = {}
+  const id = uid(), at = now(), counts: Record<string, { itemsErased: number; bytesRemoved: number; bytesRemovalQueued?: number; fieldsReplaced: number }> = {}
   const cancelled = await cancelErased(c.db, '', selected.map(i => i.id))
   const mutations = (await Promise.all(selected.map(i => expiryStatements(c.db, i, id, at)))).flat()
   for (const item of selected) {
@@ -75,7 +75,7 @@ const erase: Command = { need: 'owner', async run(c, b) {
     count.itemsErased++; count.fieldsReplaced += item.table === 'pt_contractor_tax' ? 1 : item.table === 'pt_invoice_documents' ? 2 : 0
     if (item.table === 'pt_documents') {
       const doc = await one(c.db, `SELECT size, 1+(name<>'[erased]')+(note<>'[erased]')+(capture_vendor IS NOT NULL)+(capture_invoice_number IS NOT NULL)+(duplicate_reason IS NOT NULL) AS fields FROM pt_documents WHERE id=?`, item.id)
-      count.bytesRemoved += Number(doc?.size ?? 0); count.fieldsReplaced += Number(doc?.fields ?? 0)
+      count.bytesRemovalQueued = (count.bytesRemovalQueued ?? 0) + Number(doc?.size ?? 0); count.fieldsReplaced += Number(doc?.fields ?? 0)
     }
     if (item.table === 'pt_invoice_documents') count.bytesRemoved += Number((await one(c.db, `SELECT length(pdf_base64)*3/4-CASE WHEN substr(pdf_base64,-2)='==' THEN 2 WHEN substr(pdf_base64,-1)='=' THEN 1 ELSE 0 END AS n FROM pt_invoice_documents WHERE invoice_id=?`, item.id))?.n ?? 0)
   }

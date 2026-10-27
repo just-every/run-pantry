@@ -1,4 +1,6 @@
 import { createPortability } from '@runeditrun/rer/modules/portability'
+import { checkedDocumentArchive } from './document-archive.mjs'
+import { drainDocumentObjects } from './document-objects.mjs'
 import policy from './archive-policy.mjs'
 
 // Stream bounded multipart pieces; an archive can exceed the Worker's memory.
@@ -33,6 +35,7 @@ async function storeArchive(bucket, key, source) {
  */
 export async function runHostedBackup(env, scheduledTime) {
   if (!env.PANTRY_BACKUPS) return
+  if (await drainDocumentObjects(env.DB,env.PANTRY_DOCUMENTS)) return
   const db=env.DB, today=new Date(scheduledTime).toISOString().slice(0,10)
   const lease=crypto.randomUUID(), stamp=Date.now()
   await db.prepare('INSERT OR IGNORE INTO pt_hosted_backup_runs(day) VALUES(?)').bind(today).run()
@@ -41,9 +44,9 @@ export async function runHostedBackup(env, scheduledTime) {
   const day=pending.day
   const claim=await db.prepare("UPDATE pt_hosted_backup_runs SET lease_id=?,lease_until=? WHERE day=? AND status<>'complete' AND lease_until<? RETURNING *").bind(lease,stamp+10*60_000,day,stamp).first()
   if (!claim) return
-  let job=claim.job_id
+  let job=claim.job_id, service
   try {
-    const service=await createPortability({db,policy})
+    service=await createPortability({db,policy,buckets:{PANTRY_DOCUMENTS:env.PANTRY_DOCUMENTS}})
     // Erasure deletes transfer jobs, so a saved id may no longer be resumable.
     if (job) {
       const saved=await db.prepare('SELECT phase FROM rer_portability_jobs WHERE id=?').bind(job).first()
@@ -56,13 +59,17 @@ export async function runHostedBackup(env, scheduledTime) {
     const status=await service.exports.advance(job,{maxParts:32})
     if (status.phase==='complete') {
       const key='archives/'+day+'-'+job+'.rer'
-      await storeArchive(env.PANTRY_BACKUPS,key,await service.exports.download(job))
+      await storeArchive(env.PANTRY_BACKUPS,key,await checkedDocumentArchive(db,service,job))
       await db.prepare("UPDATE pt_hosted_backup_runs SET status='complete',object_key=?,content_hash=?,completed_at=? WHERE day=? AND lease_id=?").bind(key,status.contentHash,new Date(scheduledTime).toISOString(),day,lease).run()
       await service.exports.abort(job)
     }
   } catch (error) {
     // Erasure invalidates in-progress snapshots. Retrying starts a new snapshot,
     // while a provider failure can retry the same immutable completed archive.
+    if (job && service && /document_(storage_pending|archive_integrity|archive_invalidated)/.test(error.message ?? '')) {
+      const exists=await db.prepare('SELECT id FROM rer_portability_jobs WHERE id=?').bind(job).first()
+      if (exists) await service.exports.abort(job)
+    }
     const saved=job && await db.prepare('SELECT phase FROM rer_portability_jobs WHERE id=?').bind(job).first()
     const resumable=saved && ['building','complete'].includes(saved.phase)
     await db.prepare("UPDATE pt_hosted_backup_runs SET job_id=?,status=?,error_code='backup_failed' WHERE day=? AND lease_id=?").bind(resumable?job:null,resumable?'building':'pending',day,lease).run()

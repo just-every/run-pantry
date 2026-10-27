@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdtempSync, lstatSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { hostedR2 } from './hosted-r2.mjs'
 import { hostedArchive } from './hosted-archive.mjs'
 
 const root = resolve(dirname(new URL(import.meta.url).pathname), '..')
@@ -47,7 +48,9 @@ try {
   })
   if (run.status !== 0) throw new Error('provider_export_failed')
   chmodSync(sql, 0o600)
-  const receipt = await hostedArchive({ input: sql, output })
+  const bucketName = `${declaration.project.split('/').at(-1)}-${environment}-pantry-documents`
+  const bucket = hostedR2({accountId:values.CLOUDFLARE_ACCOUNT_ID ?? process.env.CLOUDFLARE_ACCOUNT_ID,token:values.CLOUDFLARE_API_TOKEN ?? process.env.CLOUDFLARE_API_TOKEN,bucketName})
+  const receipt = await hostedArchive({ input: sql, output, buckets:{PANTRY_DOCUMENTS:bucket} })
   console.log(JSON.stringify({ format: 'pantry-hosted-backup/1', database, output, bytes: statSync(output).size, ...receipt }))
 } catch (error) {
   // Preserve a completed SQL export if conversion fails. Never echo provider

@@ -102,7 +102,7 @@ const importStatement: Command = { need: 'record', async run(c, b) {
   }
   const added = fresh.filter(l => !l.feedLineId), fromFeed = fresh.length - added.length
   const id = uid(), doc = await documentInsert(c, { name, mediaType: format === 'ofx' ? 'application/x-ofx' : 'text/csv', bytes: new TextEncoder().encode(content), linkedKind: 'statement', linkedId: id })
-  const statements: Sql[] = [authority(c.actor, 'record'), doc.statement,
+  const statements: Sql[] = [authority(c.actor, 'record'), ...doc.statements,
     q('INSERT INTO pt_statements (id, bank_account_id, format, source_name, source_sha256, start_date, end_date, opening_cents, closing_cents, line_count, duplicate_count, document_id, imported_by, imported_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       id, bank.id, format, name, hash, start, end, opening, closing, added.length, keyed.length - added.length, doc.id, c.actor.email, now()),
     ...added.map(l => q("INSERT INTO pt_bank_lines (id, statement_id, bank_account_id, posted_date, amount_cents, description, reference, fingerprint, source, arrived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'file', ?)", l.id, id, bank.id, l.date, l.amount, l.description, l.reference, l.fingerprint, now())),

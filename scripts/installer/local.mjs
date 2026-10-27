@@ -13,11 +13,23 @@ export { selectLocalState };
 
 // rer's refusal of a restore into a folder that already holds books names only its code; say what
 // it means for these books and the next step. Nothing is changed by a refused restore.
-const portability = localPortability({ database: 'foundation', policyModule: 'scripts/installer/portability.mjs', transient: ['local runtime caches and logs'] });
+const portability = localPortability({ database: 'foundation', buckets: { PANTRY_DOCUMENTS: 'PANTRY_DOCUMENTS' }, policyModule: 'scripts/installer/portability.mjs', transient: ['local runtime caches and logs'] });
 const NOT_EMPTY = 'Restore refused (target_not_empty): this folder already holds Pantry books, and a restore only goes into an empty installation. Nothing was changed.\n'
  + 'To replace these books with the archive, run: rer dev --stop; rer export --output exports/books-before-restore.rer (to keep a copy of them); rer reset --yes; rer import --input <your archive> --yes; rer setup --owner-email <you>.\n'
  + 'To keep both, restore into a fresh clone of Pantry instead. Steps: https://run-pantry.com/docs/backup';
-const explainedPortability = { ...portability, async import(context) {
+const explainedPortability = { ...portability, async export(context) {
+ const { lstat } = await import('node:fs/promises');
+ if (await lstat(context.path).catch(e => { if(e.code==='ENOENT')return null;throw e; })) throw new Error('Export requires a new archive path');
+ // The transfer runner also checks migrations; apply before object promotion so
+ // an older installation's existing originals have durable custody rows.
+ await context.store.run('Preparing original document custody', 'pnpm', ['exec','wrangler','d1','migrations','apply','foundation','--local','--persist-to','.wrangler/state','--config','wrangler.jsonc'], {cwd:context.root,signal:context.signal,env:{...process.env,RER_LOCAL_OPERATION:context.operationToken,WRANGLER_SEND_METRICS:'false',WRANGLER_LOG:'warn'}});
+ const { getPlatformProxy } = await import('wrangler');
+ const { drainDocumentObjects } = await import('../../src/pantry/document-objects.mjs');
+ const proxy = await getPlatformProxy({configPath:join(context.root,'wrangler.jsonc'),persist:{path:join(context.root,'.wrangler/state/v3')},remoteBindings:false});
+ try { while(await drainDocumentObjects(proxy.env.DB,proxy.env.PANTRY_DOCUMENTS)) {} }
+ finally { await proxy.dispose(); }
+ return portability.export(context);
+}, async import(context) {
  if (!context.journal) context.store.report('Before restoring, ask the source owner for their latest archive made after any erasures, and supply it with --journal. A fresh or reset destination cannot know about erasures made after this backup.');
  try {
   const receipt = await portability.import(context);

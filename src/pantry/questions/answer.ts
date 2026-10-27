@@ -152,7 +152,7 @@ export async function answer(env: Bindings, db: D1Database, id: string, a: Answe
   if (a.document) {
     requireThat(qn.kind === 'missing-receipt', 'Only a question about a receipt takes a file')
     const doc = await documentInsert({ actor: by.audit }, { ...a.document, linkedKind: qn.subject_kind, linkedId: qn.subject_id, note: `Sent in answer to Pantry's question${by.via === 'email' ? ' by email' : ''}` })
-    await run(db, [by.authority('record'), doc.statement, ...settle(qn, 'filed', by, `Sent the receipt (${a.document.name})${note ? `: ${note}` : ''}`, { kind: 'document', id: doc.id }),
+    await run(db, [by.authority('record'), ...doc.statements, ...settle(qn, 'filed', by, `Sent the receipt (${a.document.name})${note ? `: ${note}` : ''}`, { kind: 'document', id: doc.id }),
       say(qn.id, by.audit.email, by.via, `Sent ${a.document.name}${note ? ` — ${note}` : ''}`), say(qn.id, AGENT.email, 'agent', `Attached ${a.document.name} to the ${qn.subject_kind === 'bill' ? 'bill' : 'entry'}.`),
       audit(by.audit, 'question.answer', 'question', qn.id, { kind: qn.kind, via: by.via, document: doc.id, sha256: doc.sha256 })])
     return question(db, id)

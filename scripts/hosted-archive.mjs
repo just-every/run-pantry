@@ -10,8 +10,10 @@ import { unstable_splitSqlQuery } from 'wrangler'
 import { createPortability } from '@runeditrun/rer/modules/portability'
 import { exportArchive } from '@runeditrun/rer/modules/portability/files'
 import policy from './installer/portability.mjs'
+import { checkedDocumentArchive } from '../src/pantry/document-archive.mjs'
+import { hostedR2 } from './hosted-r2.mjs'
 
-export async function hostedArchive({ input, output }) {
+export async function hostedArchive({ input, output, buckets }) {
   const directory = await mkdtemp(join(tmpdir(), 'pantry-hosted-archive-'))
   let database
   try {
@@ -45,8 +47,9 @@ export async function hostedArchive({ input, output }) {
     // would make later erasure archives unable to fence this backup.
     const identity = await db.prepare('SELECT source_identity FROM rer_portability_state WHERE id=1').first()
     if (!identity?.source_identity) throw new Error('source_erasure_identity_missing')
-    const service = await createPortability({ db, policy })
-    return await exportArchive(service, output, ['local runtime caches and logs'])
+    const service = await createPortability({ db, policy, buckets })
+    const checked = {...service,exports:{...service.exports,download:id=>checkedDocumentArchive(db,service,id)}}
+    return await exportArchive(checked, output, ['local runtime caches and logs'])
   } finally {
     database?.close()
     await rm(directory, { recursive: true, force: true })
@@ -55,17 +58,24 @@ export async function hostedArchive({ input, output }) {
 
 if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
   const args = process.argv.slice(2), flag = name => args[args.indexOf(name) + 1]
-  if (!args.includes('--input-sql') || !args.includes('--output') || args.length !== 4) {
-    console.error('usage: node scripts/hosted-archive.mjs --input-sql FILE --output NEW.rer')
+  if (!args.includes('--input-sql') || !args.includes('--output') || args.length !== 6 || (!args.includes('--local-documents') && !args.includes('--bucket'))) {
+    console.error('usage: node scripts/hosted-archive.mjs --input-sql FILE --output NEW.rer (--local-documents CHECKOUT | --bucket NAME)')
     process.exitCode = 2
   } else {
+    let proxy
     try {
-      const receipt = await hostedArchive({ input: flag('--input-sql'), output: flag('--output') })
+      let bucket
+      if (args.includes('--local-documents')) {
+        const root = resolve(flag('--local-documents')), {getPlatformProxy} = await import('wrangler')
+        proxy = await getPlatformProxy({configPath:join(root,'wrangler.jsonc'),persist:{path:join(root,'.wrangler/state/v3')},remoteBindings:false})
+        bucket = proxy.env.PANTRY_DOCUMENTS
+      } else bucket = hostedR2({accountId:process.env.CLOUDFLARE_ACCOUNT_ID,token:process.env.CLOUDFLARE_API_TOKEN,bucketName:flag('--bucket')})
+      const receipt = await hostedArchive({ input: flag('--input-sql'), output: flag('--output'), buckets:{PANTRY_DOCUMENTS:bucket} })
       console.log(JSON.stringify({ format: 'pantry-hosted-backup/1', ...receipt }))
     } catch (error) {
       // Native SQL errors can include private row values; report only a code.
       console.error('Hosted archive failed (' + (error.code === 'EEXIST' ? 'output_exists' : ['unsupported_snapshot_statement','source_erasure_identity_missing','snapshot_foreign_keys'].includes(error.message) ? error.message : /^[A-Za-z_]+$/.test(error.code ?? '') ? error.code : 'snapshot_invalid') + '); original SQL was retained. No archive was published.')
       process.exitCode = 2
-    }
+    } finally { await proxy?.dispose() }
   }
 }

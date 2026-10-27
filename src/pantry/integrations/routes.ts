@@ -132,7 +132,7 @@ integrations.get('/documents', async c => {
   return c.json({ documents: p.rows.map(row => nativeRecord('documents', row)), nextCursor: p.nextCursor })
 })
 integrations.get('/documents/:id', async c => {
-  const ctx = context(c, readScope(c, 'documents')), doc = await documentFile(ctx.db, c.req.param('id'))
+  const ctx = context(c, readScope(c, 'documents')), doc = await documentFile(ctx.db, c.req.param('id'), c.env.PANTRY_DOCUMENTS)
   requireThat(doc, 'Document not found', 404)
   await run(ctx.db, [authority(ctx.actor, 'read')])
   return new Response(doc.bytes, { headers: { 'content-type': doc.mediaType, 'content-disposition': `attachment; filename="${doc.name.replace(/[^\w.-]+/g, '_')}"`, 'content-security-policy': "default-src 'none'; sandbox" } })

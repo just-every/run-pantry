@@ -67,7 +67,7 @@ const FIELDS: Record<string, string[]> = {
 const JSON_FIELDS = new Set(['customer_binding','items','outcomes','backtest','permission_snapshot','facts', 'choices', 'pending', 'read_vendor_details', 'read_draft_fields', 'read_match_fields', 'payload', 'refs', 'evidence', 'document_template', 'document_values', 'self_approval', 'lines', 'splits', 'feed_snapshot', 'details', 'candidates', 'snapshot', 'left_out', 'definition', 'settings', 'recipients', 'setting'])
 // Their scoped trigger exceptions and metadata are owned by the caller. Never
 // attempt a generic update through an immutable accounting/history door.
-const CALLER_OWNED = new Set(['pt_contacts', 'pt_members', 'pt_audit', 'pt_approvals', 'pt_journal_entries', 'pt_journal_lines', 'pt_invoice_documents', 'pt_documents', 'pt_document_parts', 'pt_voided_reconciliations', 'pt_reconciliation_undos', 'pt_line_suggestion_decisions', 'pt_time_entries', 'pt_time_projects','pt_estimates','pt_estimate_documents','pt_estimate_sibling_previews','pt_estimate_sibling_links','pt_estimate_sibling_attempts'])
+const CALLER_OWNED = new Set(['pt_contacts', 'pt_members', 'pt_audit', 'pt_approvals', 'pt_journal_entries', 'pt_journal_lines', 'pt_invoice_documents', 'pt_documents', 'pt_document_parts', 'pt_document_objects', 'pt_voided_reconciliations', 'pt_reconciliation_undos', 'pt_line_suggestion_decisions', 'pt_time_entries', 'pt_time_projects','pt_estimates','pt_estimate_documents','pt_estimate_sibling_previews','pt_estimate_sibling_links','pt_estimate_sibling_attempts'])
 
 function replacement(value: unknown, column: string, input: Input): unknown {
   if (typeof value !== 'string') return value
@@ -194,7 +194,7 @@ export async function eraseCopies(db: D1Database, input: Input) {
       q("INSERT INTO pt_erasure_scope VALUES (?,'pt_documents',?,'expire')", input.erasureId, row.id),
       q('DELETE FROM pt_document_parts WHERE document_id=?', row.id),
       q(`UPDATE pt_documents SET content=X'',name=?,note=?,capture_vendor=NULL,capture_invoice_number=NULL,duplicate_reason=?,erased_at=?,uploaded_by=? WHERE id=? AND sha256=? AND erased_at IS NULL`, input.marker, input.marker, `Erasure ${input.erasureId}`, input.at, input.member && row.uploaded_by === input.id ? input.marker : row.uploaded_by, row.id, row.sha256), changed())
-    note('pt_documents', 'rowsReplaced', 1); note('pt_documents', 'bytesRemoved', row.size)
+    note('pt_documents', 'rowsReplaced', 1); note('pt_documents', 'bytesRemovalQueued', row.size)
     note('pt_document_parts', 'rowsRemoved', parts.length)
     for (const part of parts) removed.push({ table: 'pt_document_parts', key: { document_id: row.id, seq: part.seq } })
   }

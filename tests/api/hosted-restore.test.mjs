@@ -30,18 +30,18 @@ test('OPS-001 owner hosted restore preserves posted books and binary originals, 
   assert.equal(expected.bytes, binary.toString('hex'))
   assert.equal(expected.report.balanced, true)
   assert.equal(expected.ledger.accounts.flatMap(account => account.rows).length, 2)
-  await saveHostedArchive(active.db, archive)
+  await saveHostedArchive(active.db, archive, await active.bucket('PANTRY_DOCUMENTS'))
   const preview = await active.command('erasure.preview', { kind: 'contact', id: lead.id })
   await active.command('erasure.execute', {
     kind: 'contact', id: lead.id, fingerprint: preview.fingerprint,
     requester: 'Synthetic requester', channel: 'in-person', reason: 'Remove obsolete enquiry', confirm: 'ERASE',
   })
-  await saveHostedArchive(active.db, journal)
+  await saveHostedArchive(active.db, journal, await active.bucket('PANTRY_DOCUMENTS'))
   await active.close(); active = undefined
 
   active = await harness()
   await recordHostedMigrations(active.db)
-  const edge = cloudflareEdge(active.db)
+  const edge = cloudflareEdge(active.db,await active.bucket('PANTRY_DOCUMENTS'))
   const options = { env: restoreEnvironment, fetch: edge.fetch }
   const args = ['--input', archive, '--environment', 'ops-i987', '--yes']
   await assert.rejects(hostedRestoreCommand(args.filter(value => value !== '--yes'), options), /restore_confirmation_required/)
@@ -58,7 +58,7 @@ test('OPS-001 owner hosted restore preserves posted books and binary originals, 
   active = await harness()
   await recordHostedMigrations(active.db)
   const fresh = await domainImage(active.db)
-  const fenced = cloudflareEdge(active.db)
+  const fenced = cloudflareEdge(active.db,await active.bucket('PANTRY_DOCUMENTS'))
   await assert.rejects(hostedRestoreCommand([...args, '--journal', journal], { env: restoreEnvironment, fetch: fenced.fetch }), error => ['erased_row', 'erasure_epoch', 'later_journal'].includes(hostedRestoreFailure(error)))
   assert.deepEqual(await domainImage(active.db), fresh, 'A later erasure journal prevents all product-row publication')
 })

@@ -12,6 +12,8 @@ const theme = { href: '/rer-theme.css', productName: branding.name, accentColor:
 
 export interface Bindings {
  DB: D1Database
+ /** Private original evidence; served only through authorized document routes. */
+ PANTRY_DOCUMENTS?: R2Bucket
  /** Private daily recovery archives; no public bucket access. */
  PANTRY_BACKUPS?: R2Bucket
  /** Built browser files; hosted deploys run the Worker first (staticAssetResponse). */

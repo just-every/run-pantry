@@ -25,16 +25,30 @@ const disabled = (table,row) => {
 }
 export default {
  product: 'just-every/pantry',
+ buckets: { PANTRY_DOCUMENTS: { prefix: 'documents/', objectReferences: { table: 'pt_document_objects', keyColumn: 'object_key' } } },
  // Receipts travel with the books; Base's source-bound portability journal
  // carries the restore fence. Neither journal contains erased field values.
  includeTables: ['pt_erasure_journal'],
  excludeTables: ['pt_hosted_backup_runs','pt_texting','pt_qbo_connection','pt_estimate_sibling_previews','pt_estimate_sibling_attempts','pt_webhook_secrets','pt_webhook_events','pt_webhook_deliveries','pt_webhook_attempts','pt_reader','pt_stripe','pt_gusto','pt_gusto_states','pt_xero_connection','pt_receipt_inbox'],
- exportRow: (table,row) => disabled(table,['pt_agents','pt_integrations'].includes(table)?{...row,token_hash:`disabled:${row.id}`}:row),
+ exportRow: (table,row) => {
+  if (table === 'pt_document_objects' && !['ready','erased'].includes(row.state)) throw new Error('document_storage_pending')
+  return disabled(table,['pt_agents','pt_integrations'].includes(table)?{...row,token_hash:`disabled:${row.id}`}:row)
+ },
  importSafety: {pt_autopay_policies:{enabled:[0],owner_id:['']},pt_autopay_setups:{status:['revoked'],stripe_customer:['']},pt_text_consents:{revoked_at:['restored']},pt_tax_reminder_preferences:{enabled:[0],owner_id:[''],owner_email:['']},pt_w9_requests:{token_hash:[null]},pt_collection_cases:{approved_by:[null],approved_revision:[null]},pt_agent_permissions:{active:[0],owner_id:[''],owner_email:['']},pt_estimates:{link_token:[null]},pt_webhook_subscriptions:{enabled:[0],owner_id:['']},pt_feed_items:{access_token:[''],status:['disconnected'],claim_id:[null],claim_until:[null]},pt_agents:{active:[0]},pt_integrations:{revoked_at:['restored']}},
  importRow: disabled,
  replaceableTables: ['pt_tax_reminder_preferences', 'pt_asset_settings', 'pt_dimension_settings', 'pt_retention_settings', 'pt_sending', 'pt_due_work', 'pt_books_agent', 'pt_invoice_document_settings', 'pt_invoice_templates'],
  requiredConfiguration: ['OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN', 'AUTH_ORIGIN', 'MAIL_PROVIDER', 'MAIL_FROM'],
- validateStaged: async ({ read }) => {
+ validateStaged: async ({ read, manifest }) => {
+  const objects = await read('pt_document_objects')
+  if (objects.some(o => !['ready','erased'].includes(o.state))) return false
+  const originals = new Map((await read('pt_documents')).map(d => [d.id,d]))
+  const binaries = new Map(manifest.objects.filter(o => o.bucket === 'PANTRY_DOCUMENTS').map(o => [o.key,o]))
+  for (const object of objects) {
+   const binary = binaries.get(object.object_key), doc = originals.get(object.document_id)
+   if (!binary) return false
+   if (object.state === 'erased') { if (binary.size !== 0 || doc && !doc.erased_at) return false }
+   else if (!doc || doc.erased_at || binary.size !== doc.size || binary.sha256 !== doc.sha256) return false
+  }
   const entries = await read('pt_journal_entries'), lines = await read('pt_journal_lines')
   const byEntry = new Map()
   for (const l of lines) { const t = byEntry.get(l.entry_id) ?? { debit: 0, credit: 0 }; t.debit += Number(l.debit_cents); t.credit += Number(l.credit_cents); byEntry.set(l.entry_id, t) }

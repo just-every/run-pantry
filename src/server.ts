@@ -9,6 +9,7 @@ import { authResponse, runtimeBindings, type Bindings } from './auth.server'
 import { identity } from './identity'
 import { api } from './pantry/api'
 import { emailHandler } from './pantry/receipts/mail'
+import { drainDocumentObjects } from './pantry/document-objects.mjs'
 import { runScheduled } from './pantry/scheduled'
 
 // Start documents keep their own cache policy and add no-transform, so no proxy
@@ -45,5 +46,6 @@ export default withDemo({
   // Cloudflare Email Routing delivers mail for the Pantry address here: forwarded receipts, and replies to Pantry's questions.
   async email(message, env) {
     await emailHandler(message, runtimeBindings(env))
+    await drainDocumentObjects(env.DB, env.PANTRY_DOCUMENTS)
   },
 } satisfies ExportedHandler<Bindings>, { seed: seedDemo })

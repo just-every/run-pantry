@@ -112,7 +112,7 @@ const carry: Command = { need: 'record', async run(c) {
       const bytes = new Uint8Array(await r.arrayBuffer())
       if (bytes.length > MAX_BYTES || bytes.length === 0) { await run(c.db, [q("UPDATE pt_xero_attachments SET status = 'too-large', size = ? WHERE id = ?", bytes.length, f.id)]); continue }
       const doc = await documentInsert(c, { name: text(f.file_name, 'File name', 200), mediaType: f.media_type, bytes, linkedKind: f.item_kind, linkedId: f.item_id, note: 'Carried over from Xero' })
-      await run(c.db, [authority(c.actor, 'record'), doc.statement,
+      await run(c.db, [authority(c.actor, 'record'), ...doc.statements,
         q("UPDATE pt_xero_attachments SET status = 'carried', size = ?, document_id = ? WHERE id = ? AND status = 'pending'", bytes.length, doc.id, f.id),
         audit(who(c.actor), 'move-in.xero-attachment', 'document', doc.id, { file: f.file_name, sha256: doc.sha256, linkedKind: f.item_kind, linkedId: f.item_id })])
     }

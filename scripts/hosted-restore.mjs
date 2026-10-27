@@ -10,6 +10,7 @@ import { appliedMigrations } from '@runeditrun/rer/portability-migrations'
 import { unstable_splitSqlQuery } from 'wrangler'
 import policy from '../src/pantry/archive-policy.mjs'
 import { hostedProvider, hostedDatabaseId, hostedD1 } from './hosted-d1.mjs'
+import {hostedR2} from './hosted-r2.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const fail = code => { throw new Error(code) }
@@ -50,7 +51,9 @@ export async function hostedRestore({ input, journal, yes = false, environment =
   // grants permission to replace arbitrary populated destination tables.
   const plan = await appliedMigrations(root, db, binding, {}, unstable_splitSqlQuery)
   const migrations = async () => migrationReplay(plan, policy)
-  const service = await createPortability({ db, policy, migrations })
+  const bucketName=`${declaration.project.split('/').at(-1)}-${environment}-pantry-documents`
+  const bucket=hostedR2({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,bucketName,fetcher:request})
+  const service = await createPortability({ db, policy, migrations, buckets:{PANTRY_DOCUMENTS:bucket} })
   const receipt = await importArchive(service, archive, ['local runtime caches and logs'], later)
   return { format: 'pantry-hosted-restore/1', database: name, ...receipt, erasureHistory: later ? 'later-journal-checked' : 'later-journal-not-supplied' }
 }

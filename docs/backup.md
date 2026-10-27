@@ -19,14 +19,14 @@ The archive is saved in the `exports` folder, with its checksums inside it: `rer
 rer run hosted-backup --env-file .env.pantry
 ```
 
-Add `--environment NAME` if you deployed with one. The command establishes the database's stable erasure-journal identity if this is its first backup, then takes Cloudflare's SQL snapshot and converts it to a private, checksum-verified `.rer` archive. The receipt lists table counts, exclusions, archive hash and content hash. The same Pantry policy as local export removes credentials and disables restored connections and standing consent. Documents currently stored in D1 travel byte for byte.
+Add `--environment NAME` if you deployed with one. The command establishes the database's stable erasure-journal identity if this is its first backup, then takes Cloudflare's SQL snapshot and converts it to a private, checksum-verified `.rer` archive. The receipt lists table counts, exclusions, archive hash and content hash. The same Pantry policy as local export removes credentials and disables restored connections and standing consent. Original document bytes travel from the private document bucket, with their D1 custody records and hashes.
 
 Restore the resulting archive with the ordinary `rer import` command below. Supply the latest post-erasure archive with `--journal` when restoring an older backup. This uses ERASURE-001's existing journal fence; a fresh destination without that later journal cannot discover erasures made after its backup.
 
 The command accepts a mode-0600 deploy file or injected `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`. It never prints provider diagnostics or credentials. Each default filename contains the full timestamp, and an existing output is refused. A failed conversion retains its private SQL snapshot and names its location. To retry conversion without another provider call:
 
 ```sh
-node scripts/hosted-archive.mjs --input-sql /path/to/snapshot.sql --output exports/recovered.rer
+node scripts/hosted-archive.mjs --input-sql /path/to/snapshot.sql --output exports/recovered.rer --bucket pantry-production-pantry-documents
 ```
 
 Only use a snapshot produced after the source installation established its erasure identity. A legacy SQL file without that identity is refused: retain it and take a new backup from the source rather than assigning an unrelated identity.
@@ -43,7 +43,7 @@ A saved archive job can disappear when an owner erases personal data. The next s
 
 The installation's `pt_hosted_backup_runs` table records completion, the object key, content hash and a value-free failure code. Download a completed archive using the owner's Cloudflare R2 tools, then restore it as below. Keep the bucket private. Existing deployments without the binding continue their accounting schedule and need redeployment to enable it. A backup remains in the same Cloudflare account; copy it elsewhere for independent disaster recovery.
 
-The active document store is still D1; R2 holds complete recovery archives containing those document bytes. A fresh hosted deployment drill and the large-business report timing proof remain OPS-001 work.
+Uploaded originals move from transactional D1 staging into verified private R2 objects. Reads retain the existing document permissions and verify stored hashes; erasure queues an empty tombstone so a delayed upload cannot recreate erased bytes. Complete recovery archives contain the objects, custody rows and erasure fence. Retained issued invoice and estimate snapshots remain in D1. A fresh hosted deployment drill and the large-business report timing proof remain OPS-001 work.
 
 ## Restore into a fresh hosted deployment
 
@@ -57,7 +57,7 @@ node scripts/hosted-restore.mjs --environment recovery --env-file .env.pantry --
 
 The command also accepts injected `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` instead of a file. It validates the full archive and the optional later journal before remote staging, then uses the same Pantry policy, migration replay and ERASURE-001 fence as local import. A missing later journal is reported explicitly: a fresh destination cannot discover erasures made after the backup on its own. A refused archive publishes no books. Provider diagnostics and document values never enter command errors.
 
-Compare the restored report snapshots, document inventory and original bytes with the source before resuming writers and Cron. Owner sign-ins and provider keys are configured separately. This command currently restores the D1-backed documents in Pantry archives; active document object storage remains OPS-001 work.
+Compare the restored report snapshots, document inventory and original bytes with the source before resuming writers and Cron. Owner sign-ins and provider keys are configured separately. The archive restores the private document objects and their D1 custody records together. It refuses incomplete object inventories and hash mismatches.
 
 ## Restore into a fresh install
 
