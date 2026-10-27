@@ -255,7 +255,6 @@ export async function invoiceIssuingPlan(c: Pick<Context, 'db' | 'actor'>, b: Da
   requireThat(current.status === 'approved' && current.approved_revision === current.revision, 'Approve the current version before issuing', 409)
   await assertOpen(c.db, current.issue_date)
   const issued = await issueStatements(c.db, current as Issuable, c.actor)
-  requireThat(!b.revision || current.revision === b.revision, 'Invoice changed; reload', 409)
   return { id: current.id, day: current.issue_date, dates: [current.issue_date], statements: [authority(c.actor, 'record'), ...(current.write_off || current.early_detail?.honoredAfterWindow ? [authority(c.actor, 'post')] : []), ...issued.statements] }
 }
 const issue: Command = { need: 'record', async run(c, b) {

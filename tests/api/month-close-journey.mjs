@@ -90,6 +90,7 @@ export async function monthCloseJourney(h) {
   assert.equal((await h.view('close/2026-09')).status, 'open')
   const readyReport = await agent.call('month-close', { period: '2026-09' })
   assert.deepEqual(readyReport.mechanical.filter(c => c.status !== 'done'), [])
+  assert.equal((await h.view('close/2026-09')).status, 'open', 'agent completion leaves the lock to the accountant')
   const pendingPackets = (await agent.call('context')).proposals.filter(p => p.status === 'proposed' && p.payload.monthClose && p.payload.period === '2026-09')
   assert.deepEqual(pendingPackets.map(p => p.id), [readyReport.packet.id], 'refresh replaces the obsolete mechanical work list')
 
@@ -175,10 +176,19 @@ export async function typedMonthCorrections(h, s, agent, member, ann) {
   assert.equal((await h.view('journal')).entries.find(e => e.id === draft.id).status, 'draft')
   const keeper = await member('synthetic-pantry-29@example.test', 'bookkeeper')
   const restricted = await member('synthetic-pantry-30@example.test', 'accountant', { canPost: true, bankAccounts: [] })
+  const viewer = await member('synthetic-pantry-33@example.test', 'viewer')
   const proposal = id => agent.call('proposals/' + id)
   const decide = async p => {
+    await h.command('proposal.preview', { id: p.id, revision: p.revision }, viewer, 403)
+    await h.command('proposal.decide', { id: p.id, revision: p.revision }, viewer, 403)
     const effects = (await h.command('proposal.preview', { id: p.id, revision: p.revision })).effects
     await h.command('proposal.decide', { id: p.id, revision: p.revision, previewToken: effects.token })
+    const action = { 'post-draft': 'journal.post', 'post-bill': 'bill.record', 'approve-invoice': 'invoice.approve', 'issue-invoice': 'invoice.issue', 'allocate-payment': 'payment.allocate' }[p.payload.action]
+    if (action) {
+      const activity = await h.view('activity')
+      assert.ok(activity.audit.some(a => a.action === action && a.subject_id === p.payload.id && a.actor_email === 'owner@example.test'), 'the native correction audit names its record and human approver')
+      assert.ok(activity.approvals.some(a => a.subject_kind === 'proposal' && a.subject_id === p.id), 'the exact proposal approval is retained')
+    }
     return effects
   }
   const posting = await proposal(actions.find(c => c.kind === 'post-draft').proposalId)

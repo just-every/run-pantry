@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "7fcbe4df33d25726e74ccf19e6c5a44cd3d636b9fcc430aa4d9d0799ec8ed81f",
+      "sha256": "84b8adf104e37be99cc956ec1a6f415875d3a512d327d0a9c4c4f61754e2bd12",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "3da572d98ff768e8341314fbf7d7ed6295aaf2bc016616e657ec8280dab3d5cc",
+      "sha256": "fbf51ba0b00581de2bbc7652e53a1d80526d63f8409cd4742b1e3de2b7c84360",
       "executable": false
     },
     "DEMO.md": {
@@ -4135,7 +4135,7 @@
       "executable": false
     },
     "src/pantry/invoices.ts": {
-      "sha256": "48c940ce5f45d33211903ef5e100bba1d6d4afbd9e7f0fbb2fddf93b33e35fe1",
+      "sha256": "bbcc5fb0e9f581b21c8f5ca55a38bfc405233caf9db68c2bedc788e28c65b801",
       "executable": false
     },
     "src/pantry/issuing-limits.ts": {
@@ -5843,7 +5843,7 @@
       "executable": false
     },
     "tests/api/month-close-journey.mjs": {
-      "sha256": "549eeb8aac67f741876370f75d6ab26b3a1ddb0dedcb3ec2d21e38f4c019a3a1",
+      "sha256": "5c97832fae7dff965781c75bb18ab3381399962a9a75829e65297ba5ab303d80",
       "executable": false
     },
     "tests/api/move-in.test.mjs": {
