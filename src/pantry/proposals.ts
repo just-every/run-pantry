@@ -10,6 +10,7 @@ import { all, approval, assertOpen, audit, changed, one, q, run, type Sql } from
 import { entryStatements, parseLines } from './journal'
 import { matchInput, matchPlan } from './matching'
 import { closeState } from './close'
+import { completion, reconciliationState, reconciliationFingerprint } from './reconcile'
 import type { Command, Context } from './context'
 import { projectedBooks } from './effects/projection'
 import { effectsGuard, previewEffects } from './effects/preview'
@@ -40,7 +41,7 @@ async function citedRefs(db: D1Database, refs: Ref[]) {
   return out
 }
 
-async function stillCurrent(db: D1Database, refs: Ref[]) {
+export async function stillCurrent(db: D1Database, refs: Ref[]) {
   for (const r of refs) {
     const t = REF_TABLES[r.kind]
     const row = await one(db, `SELECT ${t.revision ? 'revision' : "'' AS revision"} FROM ${t.table} WHERE id = ?`, r.id)
@@ -51,6 +52,12 @@ async function stillCurrent(db: D1Database, refs: Ref[]) {
 
 /** Validate a proposal's payload now, so a person never reviews an impossible one. */
 async function checkPayload(db: D1Database, actor: Actor, kind: string, payload: Data): Promise<{ refs: Ref[]; day?: string }> {
+  if (kind === 'close-packet' && payload.statementId) {
+    const state = await reconciliationState(db, text(payload.statementId, 'Statement'))
+    requireThat(state.ready && payload.fingerprint === await reconciliationFingerprint(state), 'Statement proof changed or is not ready; prepare it again', 409)
+    await assertOpen(db, state.statement.end_date)
+    return { refs: [{ kind: 'statement', id: state.statement.id }, { kind: 'account', id: state.bank.account_id }] }
+  }
   if (kind === 'match') {
     const input = matchInput(payload)
     requireThat(!input.create.some(x => x.type === 'receipt' || x.type === 'payment'), 'Propose receipts and payments as journal work; a match proposal may add only fees, bank income or transfers')
@@ -166,7 +173,13 @@ const decide: Command = { need: 'record', async run(c, b) {
     effectGuard = [effectsGuard(effects.auditCount)]
     correction = await correctionPlan(c.db, c.actor, p, effects.date)
   }
-  if (p.kind === 'match') {
+  if (p.kind === 'close-packet' && p.payload.statementId) {
+    const state = await reconciliationState(c.db, p.payload.statementId)
+    requireThat(state.ready && p.payload.fingerprint === await reconciliationFingerprint(state), 'Statement proof changed; prepare it again', 409)
+    const plan = await completion(c.db, c.actor, p.payload.statementId)
+    requireThat(p.payload.fingerprint === await reconciliationFingerprint(plan.state), 'Statement proof changed; prepare it again', 409)
+    await run(c.db, [authority(c.actor, 'record'), ...plan.statements, ...mark('approved', 'statement', p.payload.statementId)])
+  } else if (p.kind === 'match') {
     const plan = correction!
     await run(c.db, [authority(c.actor, 'record'), ...effectGuard, ...plan.statements, ...mark('approved', 'match', plan.id), audit(who(c.actor), 'proposal.approve', 'proposal', p.id, { kind: p.kind, match: plan.id, correctionDate: plan.day, previewToken: b.previewToken })])
   } else if (p.kind === 'journal') {

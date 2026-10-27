@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises'
 
 const USAGE = `pantry-agent <command> [options]
 
+  month-close --period YYYY-MM                    prepare coordinated monthly close proposals
   context [--period YYYY-MM]                      what the agent may read, as JSON
   propose-match --summary TEXT --bank-line ID... [--posting ID...] [--fee AMOUNT --account ID]
   propose-journal --file PROPOSAL.json            {summary, date, memo, documentId, passages[], lines[]}
@@ -37,6 +38,7 @@ async function call(path, body) {
 }
 
 const commands = {
+  'month-close': o => call('month-close', { period: one(o, 'period') }),
   context: o => call(`context${o.period ? `?period=${encodeURIComponent(one(o, 'period'))}` : ''}`),
   'propose-match': o => call('proposals', { kind: 'match', summary: one(o, 'summary'), payload: { bankLineIds: o['bank-line'] ?? [], journalLineIds: o.posting ?? [], create: o.fee ? [{ type: 'fee', amount: one(o, 'fee'), accountId: one(o, 'account'), direction: 'out' }] : [] } }),
   'propose-journal': async o => { const p = JSON.parse(await readFile(one(o, 'file'), 'utf8')); const { summary, ...payload } = p; return call('proposals', { kind: 'journal', summary, payload }) },

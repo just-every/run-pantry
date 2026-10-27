@@ -32,3 +32,13 @@ In **Reports**, use **Ask the books** for contractor spending or net income. For
 Generated answers calculate from posted native reports and their underlying lines. They show the exact date ranges and basis, the report links, the posted entry links and the account movements behind a comparison. “Last year” compares the same range in the previous year; otherwise the comparison uses the immediately preceding range of the same length, as native custom reports do. Missing records show **No records**; a missing comparison produces no inferred change. Unsupported or ambiguous questions are refused without calling a model.
 
 Choose **Save answer as custom report** to retain the current, prior and change columns in REPORT-006. Net income retains its income-less-expenses formula; contractor spending retains its account selection. The saved definition recalculates from the books when opened. Questions require full financial-report authority, and report links, entry links and saved reports check the reader's current grants again. A sales role or a person with restricted bank visibility cannot use this door to read the whole books.
+
+## Prepare the month
+
+Run `node scripts/pantry-agent.mjs month-close --period 2026-09` with the same agent connection. Repeat it through the month as records arrive. Unchanged pending proposals are reused. The result accounts for every native close check, completed or proposed statement reconciliations, blocked statement proofs and recognition or recurring-journal exceptions. Existing approved schedules keep their existing scheduler and approval rules.
+
+The close packet proposes four reviews: materiality, estimates, reclassification and reopening. Each carries the report, posted entries, schedule facts or period history behind its recommendation. Approving the packet creates the existing human review tasks; it does not complete them. The evidence stays in the proposal's Details. Variance proposals compare posted income and expense account totals with the preceding calendar month, name the entries behind the arithmetic and provide **Open cited entry** links. They do not infer a business cause or change a figure.
+
+A reconciliation packet is proposed only when the native statement proof is ready. Human approval checks that the statement, matches, books and dated provider balances still agree, then records the native reconciliation. Changed proof must be prepared again. Locking remains the existing person's command.
+
+This coordinator does not yet prepare every unresolved mechanical correction, automatically schedule its own monthly runs, or enforce accountant-only decisions for its four review tasks. Those checks remain unresolved rather than being silently waived.

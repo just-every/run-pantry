@@ -13,8 +13,9 @@ function ProposalBody({ p, accounts }: { p: D; accounts: D[] }) {
     <Table heads={['Account', 'Debit', 'Credit']} figures={[1, 2]}>{p.payload.lines.map((l: D, i: number) => <tr key={i}><td>{name(l.accountId)}</td><td className="fig">{l.debit ? usd(Math.round(Number(l.debit) * 100)) : ''}</td><td className="fig">{l.credit ? usd(Math.round(Number(l.credit) * 100)) : ''}</td></tr>)}</Table>
     <blockquote className="evidence">{p.payload.passages.map((x: string, i: number) => <p key={i}>“{x}”</p>)}<footer>Quoted from the cited document. <a href={`/api/pantry/documents/${p.payload.documentId}`}>Open document</a></footer></blockquote>
   </>
-  if (p.kind === 'close-packet') return <ul>{p.payload.exceptions.map((e: string, i: number) => <li key={i}>{e}</li>)}</ul>
-  if (p.kind === 'variance-note') return <><p>{p.payload.body}</p><p className="hint">Explanation only: it cites {p.payload.citations.length} posted entries and changes no figure.</p></>
+  if (p.kind === 'close-packet' && p.payload.statementId) return <p>Statement balances and matched postings agree. <a href={`/app/bank?statement=${p.payload.statementId}`}>Review statement proof</a>. Approval records the reconciliation; it does not lock the period.</p>
+  if (p.kind === 'close-packet') return <><p>{p.payload.notes}</p><ul>{p.payload.exceptions.map((e: string, i: number) => <li key={i}>{e}</li>)}</ul>{p.payload.monthClose && <Details facts={{ 'Mechanical work': JSON.stringify(p.payload.monthClose.mechanical), 'Statement work': JSON.stringify(p.payload.monthClose.reconciliations), 'Schedule exceptions': JSON.stringify(p.payload.monthClose.scheduleExceptions), 'Judgment evidence': JSON.stringify(p.payload.monthClose.judgments) }} />}</>
+  if (p.kind === 'variance-note') return <><p>{p.payload.body}</p><p className="hint">Explanation only: it cites {p.payload.citations.length} posted entries and changes no figure.</p><ul>{p.payload.citations.map((id: string) => <li key={id}><a href={`/api/pantry/reports/record/entry/${id}`}>Open cited entry</a></li>)}</ul></>
   return <p className="hint">{p.payload.bankLineIds.length} statement line(s) to {(p.payload.journalLineIds ?? []).length} posting(s). Review it on the statement in Bank.</p>
 }
 

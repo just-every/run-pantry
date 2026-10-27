@@ -3,7 +3,7 @@
 // its lines add up to its balances, every line is matched, and the ledger's
 // bank balance less items not yet on a statement equals the closing balance.
 import { authority, who, type Actor } from './access'
-import { addDays, now, requireThat, text, uid, usd, type Data } from './core'
+import { addDays, now, requireThat, sha256, text, uid, usd, type Data } from './core'
 import { all, audit, guard, one, q, run, assertOpen, type Sql } from './db'
 import type { Command } from './context'
 import { reconciliationHistory, reconciliationUndoPreview, reconciliationUndoCommands } from './reconciliation-undo'
@@ -87,3 +87,9 @@ const complete: Command = { need: 'record', async run(c, b) {
 } }
 
 export const reconcileCommands: Record<string, Command> = { 'reconciliation.complete': complete, ...reconciliationUndoCommands }
+
+/** A reconciliation proposal binds the exact statement and matched proof shown. */
+export async function reconciliationFingerprint(state: Data) {
+  return sha256(JSON.stringify([state.statement, state.opening, state.closing, state.book, state.outstanding,
+    state.lines.map((l: Data) => [l.id, l.amount_cents, l.match_id, l.removed_at]), state.feedBalances]))
+}

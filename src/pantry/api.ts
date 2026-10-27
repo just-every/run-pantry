@@ -1,3 +1,4 @@
+import { prepareMonthClose } from './month-close'
 import { autopayCommands, registerAutopayRoutes } from './autopay'
 import { textingCommands, registerTextingRoutes, textingView } from './texting'
 import { paymentNoticeCommands,paymentNoticesView } from './payment-notices'
@@ -42,7 +43,7 @@ import { Hono, type Context as HonoContext } from 'hono'
 import type { Bindings } from '../auth.server'
 import { deploymentHealth } from '../base/deployment-health'
 import { authority, agent, must, person, who, type Actor } from './access'
-import { cents, date, Fault, monthBounds, requireThat, type Data } from './core'
+import { cents, date, Fault, monthBounds, requireThat, text, type Data } from './core'
 import { all, one, run } from './db'
 import type { Command, Context } from './context'
 import { settingsCommands, settingsView } from './settings'
@@ -440,6 +441,11 @@ api.post('/api/pantry/feeds/plaid/webhook', async c => {
 api.get('/api/pantry/agent/context', async c => {
   const actor = await agent(c.req.raw, c.env)
   return c.json(await agentContext({ db: c.env.DB, env: c.env, request: c.req.raw, actor }, c.req.query('period') || undefined))
+})
+api.post('/api/pantry/agent/month-close', async c => {
+  const actor = await agent(c.req.raw, c.env)
+  const body = await c.req.json().catch(() => { throw new Fault(400, 'Send a JSON object') })
+  return c.json(await prepareMonthClose(c.env.DB, actor, text(body.period, 'Period')))
 })
 api.post('/api/pantry/agent/proposals', async c => {
   const actor = await agent(c.req.raw, c.env)
