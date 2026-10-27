@@ -41,7 +41,7 @@ The close packet proposes four reviews: materiality, estimates, reclassification
 
 A reconciliation packet is proposed only when the native statement proof is ready. Human approval checks that the statement, matches, books and dated provider balances still agree, then records the native reconciliation. Changed proof must be prepared again. Locking remains the existing person's command.
 
-This coordinator does not yet prepare every unresolved mechanical correction, automatically schedule its own monthly runs, or enforce accountant-only decisions for its four review tasks. Those checks remain unresolved rather than being silently waived.
+Supported manual drafts and bills with source documents get exact-record posting proposals. Draft invoices get approval proposals, then a separate issue proposal for the approved revision. An unapplied payment gets an allocation proposal only when one open item of the same contact has the exact remaining amount and there is no competing payment. Each correction uses the native approval rules and report-effects preview; changed records, missing authority and locked dates refuse approval. No correction changes a source date or sends a document. Missing evidence and ambiguous choices remain visible as unresolved checks.
 
 Monthly preparation can also be enabled by the owner under Settings → Agent access → Monthly close preparation. Choose an active agent and month and explicitly turn preparation on. Accounting ticks first run existing approved schedules, then refresh the close proposals. Turning preparation off, deactivating the agent or locking the period stops refreshes. This grants no posting or locking authority. Unchanged approved packets are retained rather than proposed again.
 

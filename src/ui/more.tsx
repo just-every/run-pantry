@@ -9,6 +9,7 @@ const KIND: Record<string, string> = { match: 'Bank match', journal: 'Journal en
 
 function ProposalBody({ p, accounts }: { p: D; accounts: D[] }) {
   const name = (id: string) => { const a = accounts.find(x => x.id === id); return a ? `${a.code} · ${a.name}` : id }
+  if (p.kind === 'journal' && p.payload.action) return <Details facts={{ Action: p.payload.action, Record: p.payload.id, Date: p.payload.date, ...(p.payload.allocations ? { Allocation: JSON.stringify(p.payload.allocations) } : {}) }} />
   if (p.kind === 'journal') return <>
     <Table heads={['Account', 'Debit', 'Credit']} figures={[1, 2]}>{p.payload.lines.map((l: D, i: number) => <tr key={i}><td>{name(l.accountId)}</td><td className="fig">{l.debit ? usd(Math.round(Number(l.debit) * 100)) : ''}</td><td className="fig">{l.credit ? usd(Math.round(Number(l.credit) * 100)) : ''}</td></tr>)}</Table>
     <blockquote className="evidence">{p.payload.passages.map((x: string, i: number) => <p key={i}>“{x}”</p>)}<footer>Quoted from the cited document. <a href={`/api/pantry/documents/${p.payload.documentId}`}>Open document</a></footer></blockquote>
@@ -30,7 +31,7 @@ export function Agents() {
     {waiting.map((p: D) => <Card key={p.id} title={<><Icon name="agent" /> {KIND[p.kind]} from {p.agent_name}</>} actions={<Chip tone="agent">Proposed</Chip>}>
       <p><strong>{p.summary}</strong></p>
       <ProposalBody p={p} accounts={shared.state.accounts} />
-      <ProposalApproval p={p} canApprove={shared.state.actor.can.record && (!p.payload.monthClose || ['owner', 'accountant'].includes(shared.state.actor.role))} onDone={async()=>{await reload();await shared.reload()}} />
+      <ProposalApproval p={p} approveLabel={p.payload.action === 'approve-invoice' ? 'Approve invoice' : p.payload.action === 'allocate-payment' ? 'Approve allocation' : undefined} canApprove={shared.state.actor.can.record && (!p.payload.monthClose || ['owner', 'accountant'].includes(shared.state.actor.role))} onDone={async()=>{await reload();await shared.reload()}} />
       <Details facts={{ id: p.id, filed: p.created_at, cited: p.refs.map((r: D) => `${r.kind}:${r.id}`).join(', ') }} />
     </Card>)}
     {decided.length > 0 && <Card title="Decided"><Table heads={['Filed', 'Kind', 'Summary', 'Decision', 'By']}>

@@ -1,3 +1,4 @@
+import { mechanicalActionPlan, mechanicalActionRefs } from './month-close-actions'
 import { approvalAuthority } from './access-policy/approvals'
 import { ledgerBankAuthority } from './access-policy/banks'
 // Agent work: an agent reads the books it is allowed to see and files typed
@@ -25,6 +26,7 @@ const REF_TABLES: Record<string, { table: string; revision: boolean }> = {
   bill: { table: 'pt_bills', revision: true },
   invoice: { table: 'pt_invoices', revision: true },
   statement: { table: 'pt_statements', revision: false },
+  payment: { table: 'pt_payments', revision: false },
   'recognition-schedule': { table: 'pt_recognition_schedules', revision: true },
   'recurring-journal': { table: 'pt_recurring_journals', revision: true },
 }
@@ -66,6 +68,7 @@ async function checkPayload(db: D1Database, actor: Actor, kind: string, payload:
     await matchPlan(await projectedBooks(db, [], { unlocked: true }), actor, input)
     return { refs: [...input.bankLineIds.map(id => ({ kind: 'bank-line', id })), ...input.journalLineIds.map(id => ({ kind: 'journal-line', id }))] }
   }
+  if (kind === 'journal' && payload.action) return { refs: await mechanicalActionRefs(db, payload) }
   if (kind === 'journal') {
     // No source document means a missing-evidence item in a close packet, never an invented entry.
     requireThat(typeof payload.documentId === 'string' && payload.documentId, 'A proposed entry cites its source document; with none, propose a close packet listing the missing evidence', 400)
@@ -119,6 +122,7 @@ export async function proposal(db: D1Database, id: string) {
  * and audit timestamps differ. The approver's date applies to every new entry. */
 async function correctionPlan(db: D1Database, actor: Actor, p: Data, selectedDate?: string, preview = false) {
   const reading = preview ? await projectedBooks(db, [], { unlocked: true }) : db
+  if (p.kind === 'journal' && p.payload.action) return mechanicalActionPlan(reading, actor, p.payload, selectedDate)
   if (p.kind === 'journal') {
     const day = date(selectedDate ?? p.payload.date, 'Correction date')
     if (!preview) await assertOpen(db, day)
@@ -169,7 +173,7 @@ const decide: Command = { need: 'record', async run(c, b) {
   let effectGuard: Sql[] = []
   let correction: Awaited<ReturnType<typeof correctionPlan>> | undefined
   if (p.kind === 'journal' || p.kind === 'match') {
-    if (p.kind === 'journal') requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || c.actor.grants.post), 'Posting is not part of your role', 403)
+    if (p.kind === 'journal' && !p.payload.action) requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || c.actor.grants.post), 'Posting is not part of your role', 403)
     const effects = await proposalEffects(c.db, c.actor, p, b.date ? date(b.date, 'Correction date') : undefined)
     requireThat(b.previewToken === effects.token, 'The books, locks, issued reports or correction date changed; review the effects again before approving', 409)
     requireThat(!effects.locks.length, `Reopen ${effects.locks.map(l => l.name).join(', ')} before approving this correction, or choose an open correction date`, 409)
@@ -185,6 +189,9 @@ const decide: Command = { need: 'record', async run(c, b) {
   } else if (p.kind === 'match') {
     const plan = correction!
     await run(c.db, [authority(c.actor, 'record'), ...effectGuard, ...plan.statements, ...mark('approved', 'match', plan.id), audit(who(c.actor), 'proposal.approve', 'proposal', p.id, { kind: p.kind, match: plan.id, correctionDate: plan.day, previewToken: b.previewToken })])
+  } else if (p.kind === 'journal' && p.payload.action) {
+    const plan = correction!
+    await run(c.db, [...effectGuard, ...plan.statements, ...mark('approved', p.payload.action === 'allocate-payment' ? 'payment' : p.payload.action === 'post-bill' ? 'bill' : p.payload.action.includes('invoice') ? 'invoice' : 'journal', plan.id), audit(who(c.actor), 'proposal.approve', 'proposal', p.id, { action: p.payload.action, result: plan.id, previewToken: b.previewToken })])
   } else if (p.kind === 'journal') {
     // Approving a proposed entry is posting it: it needs the posting grant.
     requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || c.actor.grants.post), 'Posting is not part of your role', 403)

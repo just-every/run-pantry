@@ -4,6 +4,9 @@ import { authority, who, type Agent } from './access'
 import type { Command } from './context'
 import { monthBounds, now, requireThat, text, usd, type Data } from './core'
 import { all, audit, one, q, run } from './db'
+import { openBalance } from './invoices'
+import { refunded } from './refunds/store'
+import { mechanicalActionRefs } from './month-close-actions'
 import { closeState } from './close'
 import { fileProposal, proposal, stillCurrent } from './proposals'
 import { reconciliationState, reconciliationFingerprint } from './reconcile'
@@ -49,9 +52,40 @@ export async function prepareMonthClose(db: D1Database, actor: Agent, period: st
       reconciliations.push({ statementId: s.id, status: 'proposed', proposalId: p.id, evidence: `/app/bank?statement=${s.id}` })
     } else reconciliations.push({ statementId: s.id, status: 'needs-evidence', blockers: r.blockers, evidence: `/app/bank?statement=${s.id}` })
   }
+  // Propose exact existing records, never an invented replacement posting.
+  // Evidence and competing allocations remain visible rather than guessed.
+  const proposeAction = async (payload: Data, summary: string, check: string) => {
+    const refs = await mechanicalActionRefs(db, payload)
+    const p = await prepare(db, actor, { kind: 'journal', summary, payload: { ...payload, period }, refs })
+    corrections.push({ kind: payload.action, check, recordId: payload.id, proposalId: p.id })
+  }
+  for (const draft of await all(db, "SELECT * FROM pt_journal_entries WHERE status = 'draft' AND source_kind = 'manual' AND document_id IS NOT NULL AND entry_date BETWEEN ? AND ? ORDER BY entry_date, id", start, end)) {
+    await proposeAction({ action: 'post-draft', id: draft.id, revision: draft.revision, date: draft.entry_date }, `Post supported draft: ${draft.memo}`, 'drafts')
+  }
+  const bills = await all(db, "SELECT b.*, (SELECT COUNT(*) FROM pt_documents d WHERE d.linked_kind = 'bill' AND d.linked_id = b.id) AS document_count, (SELECT COUNT(*) FROM pt_capture_drafts c WHERE c.bill_id = b.id) AS captured FROM pt_bills b WHERE b.bill_date <= ? AND b.status <> 'void' ORDER BY b.bill_date, b.id", end)
+  for (const bill of bills.filter(b => b.status === 'draft' && b.bill_date >= start && b.document_count && !b.captured)) {
+    await proposeAction({ action: 'post-bill', id: bill.id, revision: bill.revision, date: bill.bill_date }, `Record supported bill: ${bill.reference}`, 'drafts')
+  }
+  const invoices = await all(db, "SELECT * FROM pt_invoices WHERE issue_date <= ? AND void_date IS NULL ORDER BY issue_date, id", end)
+  for (const inv of invoices.filter(i => ['draft', 'approved'].includes(i.status) && i.issue_date >= start && i.issue_date <= end)) {
+    await proposeAction({ action: inv.status === 'draft' ? 'approve-invoice' : 'issue-invoice', id: inv.id, revision: inv.revision, date: inv.issue_date }, `${inv.status === 'draft' ? 'Approve' : 'Issue'} invoice: ${inv.number}`, 'drafts')
+  }
+  for (const i of invoices) i.open_cents = await openBalance(db, 'invoice', i.id, i.total_cents)
+  for (const b of bills) b.open_cents = await openBalance(db, 'bill', b.id, b.total_cents)
+  const payments = await all(db, "SELECT p.*, p.amount_cents - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a WHERE a.source_kind = 'payment' AND a.source_id = p.id AND a.voided_by IS NULL), 0) AS unallocated_cents FROM pt_payments p WHERE p.reversal_id IS NULL AND p.payment_date <= ? ORDER BY p.payment_date, p.id", end)
+  for (const p of payments) p.unallocated_cents -= await refunded(db, 'payment', p.id)
+  for (const payment of payments.filter(p => !p.reversal_id && p.payment_date <= end && p.unallocated_cents > 0)) {
+    const targets = payment.direction === 'received'
+      ? invoices.filter(i => i.kind === 'invoice' && i.status === 'issued' && i.customer_id === payment.contact_id && i.issue_date <= end && i.open_cents > 0)
+      : bills.filter(b => (b.status === 'posted' || b.opening) && b.status !== 'void' && b.vendor_id === payment.contact_id && b.bill_date <= end && b.open_cents > 0)
+    const competing = payments.filter(p => !p.reversal_id && p.direction === payment.direction && p.contact_id === payment.contact_id && p.payment_date <= end && p.unallocated_cents > 0)
+    if (targets.length !== 1 || competing.length !== 1 || targets[0].open_cents !== payment.unallocated_cents) continue
+    const target = targets[0], day = [start, payment.payment_date, target.issue_date ?? target.bill_date].sort().at(-1)!
+    await proposeAction({ action: 'allocate-payment', id: payment.id, date: day, allocations: [{ targetId: target.id, amount: (payment.unallocated_cents / 100).toFixed(2) }] }, `Apply supported payment ${payment.reference} to ${target.number ?? target.reference}`, 'unapplied')
+  }
   const recognition = await recognitionView(db, end), recurring = await recurringJournalsView(db, end)
   const mechanical = state.checks.filter((c: Data) => !['proposals', 'questions'].includes(c.key)).map((c: Data) => ({
-    key: c.key, title: c.title, status: c.ok ? 'done' : c.key === 'bank' && reconciliations.length && reconciliations.every(r => ['done', 'proposed'].includes(r.status)) ? 'proposed' : 'needs-evidence', detail: c.detail,
+    key: c.key, title: c.title, status: c.ok ? 'done' : ['drafts', 'unapplied'].includes(c.key) && c.items?.length && c.items.every((item: Data) => corrections.some(x => x.check === c.key && x.recordId === item.id)) ? 'proposed' : c.key === 'bank' && reconciliations.length && reconciliations.every(r => ['done', 'proposed'].includes(r.status)) ? 'proposed' : 'needs-evidence', detail: c.detail,
     recommendation: c.ok ? 'No further mechanical action.' : `Resolve in the existing ${c.title.toLowerCase()} workflow; do not waive this check.`,
     evidence: c.items ?? [],
   }))
