@@ -17,14 +17,15 @@ export async function settlementFence(db:D1Database):Promise<Sql>{
  return guard(`(${expression})=?`,Object.values(state)[0])
 }
 
-/** Only immutable originals with a correction can affect source-derived coding.
+/** Read all immutable siblings of a corrected document posting.
  * Invoice extras follow all sale ordinals and retain their posting account,
  * side and reviewed dimension group, independently of person-entered memos. */
 export async function correctedDocumentPostings(db:D1Database){
  return all(db,`SELECT l.*,i.kind AS invoice_kind,i.discount_account_id,
   (SELECT count(*) FROM pt_invoice_lines il WHERE il.invoice_id=i.id) AS invoice_line_count
   FROM pt_journal_lines l LEFT JOIN pt_invoices i ON i.journal_id=l.entry_id
-  WHERE l.id IN (SELECT document_line_id FROM pt_reclassifications WHERE document_line_id IS NOT NULL)
+  WHERE l.entry_id IN (SELECT entry_id FROM pt_journal_lines WHERE id IN
+   (SELECT document_line_id FROM pt_reclassifications WHERE document_line_id IS NOT NULL))
   ORDER BY l.entry_id,l.line_no`)
 }
 

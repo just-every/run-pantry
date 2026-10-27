@@ -144,8 +144,8 @@ export async function cashLines(db: D1Database, from: string, to: string): Promi
   const docs = await documents(db)
   if (!docs.size) return []
   const coding = await documentCoding(db)
-  // Only corrected originals need a posting lookup; ordinary components already
-  // carry their reviewed dimensions. Never load unrelated years of postings.
+  // Resolve originals within corrected documents before following their own ids.
+  // Ordinary documents already carry their reviewed dimensions.
   const posted = coding.size ? await correctedDocumentPostings(db) : []
   const byEntry = new Map<string, typeof posted>()
   for (const line of posted) { const rows = byEntry.get(line.entry_id) ?? []; rows.push(line); byEntry.set(line.entry_id, rows) }

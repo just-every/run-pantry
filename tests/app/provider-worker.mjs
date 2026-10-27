@@ -18,7 +18,7 @@ export async function providerWorker({ bindings, outbound, clock = false }) {
   const optionsFor = origin => ({ ...convertV4MiniflareOptions({
     host: '127.0.0.1', port:0, modules: true, script: bundle.outputFiles[0].text,
     compatibilityDate: options.workerOptions.compatibilityDate, compatibilityFlags: options.workerOptions.compatibilityFlags,
-    d1Databases: { DB: 'pantry' }, assets: { ...options.workerOptions.assets, binding: 'ASSETS' },
+    d1Databases: { DB: 'pantry' }, r2Buckets: { PANTRY_DOCUMENTS: 'pantry-documents' }, assets: { ...options.workerOptions.assets, binding: 'ASSETS' },
     bindings: { AUTH_ORIGIN: origin, AUTH_LOCAL: 'true', OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: 'app-test-session-secret-0123456789abcdef', SETUP_TOKEN: TOKEN, MAIL_PROVIDER: 'development', MAIL_FROM: 'Pantry <pantry@example.test>', ...bindings },
     outboundService: outbound,
   }), resourcePersistencePath: dir })
