@@ -142,7 +142,13 @@ async function events(db: D1Database, docs: Map<string, Doc>): Promise<Event[]> 
 /** Every recognised share on the cash basis dated from..to (inclusive). */
 export async function cashLines(db: D1Database, from: string, to: string): Promise<CashLine[]> {
   const docs = await documents(db)
-  const coding=await documentCoding(db),posted=await all(db,'SELECT * FROM pt_journal_lines ORDER BY entry_id,line_no')
+  if (!docs.size) return []
+  const coding = await documentCoding(db)
+  // Only corrected originals need a posting lookup; ordinary components already
+  // carry their reviewed dimensions. Never load unrelated years of postings.
+  const posted = coding.size ? await all(db, 'SELECT * FROM pt_journal_lines WHERE id IN (SELECT document_line_id FROM pt_reclassifications WHERE document_line_id IS NOT NULL) ORDER BY entry_id,line_no') : []
+  const byEntry = new Map<string, typeof posted>()
+  for (const line of posted) { const rows = byEntry.get(line.entry_id) ?? []; rows.push(line); byEntry.set(line.entry_id, rows) }
   const settled = new Map<string, number>(), out: CashLine[] = []
   for (const e of await events(db, docs)) {
     const d = docs.get(e.docId)!
@@ -151,7 +157,7 @@ export async function cashLines(db: D1Database, from: string, to: string): Promi
     if (e.date < from || e.date > to) continue
     const was = spread(d.parts, d.control, d.total, before), now = spread(d.parts, d.control, d.total, after)
     const common = { date: e.date, docKind: d.kind, docId: d.id, docRef: d.ref, docJournalId: d.journalId, docTotal: d.total, contactId: d.contactId, contactName: d.contactName, settledBefore: before, settledAfter: after, settlement: e.settlement }
-    const source=posted.filter(l=>l.entry_id===d.journalId)
+    const source=byEntry.get(d.journalId) ?? []
     d.parts.forEach((p, i) => {
       const share = now[i] - was[i]; if (!share) return
       const original=p.ordinal?source.find(l=>l.line_no===p.ordinal):source.find(l=>l.account_id===p.accountId&&(l.debit_cents-l.credit_cents)*p.sign>0&&['class','location','project'].every(k=>(l[k+'_name']??'')===(p[k+'_name' as keyof Component]??''))&&(p.role==='tax'?l.memo.startsWith('Sales tax '):l.memo.startsWith('Discounts ')))

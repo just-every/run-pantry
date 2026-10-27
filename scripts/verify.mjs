@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-const sequence = ['build', 'typecheck', 'test:pantry', 'test:runtime', 'test:app']
+const sequence = ['contract:check', 'build', 'typecheck', 'test:pantry', 'test:runtime', 'test:app']
 const pnpm = name => ['pnpm', ['run', name]]
 // Only CI browser consumers opt into the source job's build. Local verification
 // and the source job keep their original build-first sequence.

@@ -42,10 +42,12 @@ export async function generalLedger(db: D1Database, from: string, to: string, ac
       lines.push({ id: `cash-${i}`, entry_id: l.docJournalId, account_id: l.accountId, entry_date: l.date, number: null, entry_memo: settlementMemo(l), memo: l.description, contact_name: l.contactName, contact_id: l.contactId, debit_cents: Math.max(l.net, 0), credit_cents: Math.max(-l.net, 0), class_name:l.class_name??'',location_name:l.location_name??'',project_name:l.project_name??'',source_kind: l.docKind, item_id: l.itemId ?? null })
     lines.sort((x, y) => x.entry_date < y.entry_date ? -1 : x.entry_date > y.entry_date ? 1 : (x.number ?? Infinity) - (y.number ?? Infinity))
   }
+  const byAccount = new Map<string, typeof lines>()
+  for (const line of lines) { const rows = byAccount.get(line.account_id) ?? []; rows.push(line); byAccount.set(line.account_id, rows) }
   const accounts = await all(db, `SELECT id, code, name, type FROM pt_accounts ${accountId ? 'WHERE id = ?' : ''} ORDER BY code`, ...(accountId ? [accountId] : []))
   return { basis, from, to,...(dimension?{dimension}:{}), accounts: accounts.map(a => {
     let running = opening.get(a.id) ?? 0
-    const rows = lines.filter(l => l.account_id === a.id).map(l => ({ ...l, running: (running += l.debit_cents - l.credit_cents) }) as Data)
+    const rows = (byAccount.get(a.id) ?? []).map(l => ({ ...l, running: (running += l.debit_cents - l.credit_cents) }) as Data)
     return { ...a, opening: opening.get(a.id) ?? 0, rows, closing: running } as Data
   }).filter(a => a.rows.length || a.opening !== 0) }
 }

@@ -9,8 +9,10 @@ export async function ledgerActivity(db: D1Database, kind: string, from: string,
   // Some source lines identify a contact only on their control line. Carry that
   // source contact to the other lines before applying a payee filter.
   const contacts = await all(db, `SELECT l.entry_id, l.contact_id, c.name FROM pt_journal_lines l JOIN pt_contacts c ON c.id=l.contact_id GROUP BY l.entry_id,l.contact_id`)
+  const byEntry = new Map<string, (typeof contacts)[number]>()
+  for (const contact of contacts) if ((!payee || contact.contact_id === payee) && !byEntry.has(contact.entry_id)) byEntry.set(contact.entry_id, contact)
   const rows = gl.accounts.flatMap(a => a.rows.map((l: any) => {
-    const contact = contacts.find(c => c.entry_id === l.entry_id && (!payee || c.contact_id === payee))
+    const contact = byEntry.get(l.entry_id)
     return { ...l, account: `${a.code} · ${a.name}`, contact_id: l.contact_id ?? contact?.contact_id, contact_name: l.contact_name ?? contact?.name ?? '' }
   })).filter(l => !payee || l.contact_id === payee).sort((a, b) => a.entry_date.localeCompare(b.entry_date) || String(a.number ?? '').localeCompare(String(b.number ?? '')) || a.account.localeCompare(b.account))
   return { basis, basisLabel: BASIS_LABEL[basis], note: 'Posted lines within the inclusive date range. Cash basis substitutes settled invoice/bill shares on their settlement dates. Account and payee filters select lines; filtered journal totals need not balance.',

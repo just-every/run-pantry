@@ -20,9 +20,12 @@ export async function settlementFence(db:D1Database):Promise<Sql>{
 /** Resolve a document component by its immutable posting ordinal or grouped
  * extra, so source-derived reports use the same correction as cash/ledger. */
 export async function documentComponentCoding(db:D1Database){
- const coding=await documentCoding(db),posted=await all(db,'SELECT * FROM pt_journal_lines ORDER BY line_no')
+ const coding = await documentCoding(db)
+ const posted = coding.size ? await all(db, 'SELECT * FROM pt_journal_lines WHERE id IN (SELECT document_line_id FROM pt_reclassifications WHERE document_line_id IS NOT NULL) ORDER BY line_no') : []
+ const byEntry = new Map<string, typeof posted>()
+ for (const line of posted) { const rows = byEntry.get(line.entry_id) ?? []; rows.push(line); byEntry.set(line.entry_id, rows) }
  return (source:Data,role:'sale'|'discount'='sale')=>{
-  const original=posted.find(l=>l.entry_id===source.journal_id&&(role==='sale'?l.line_no===Number(source.line_no)+1:l.memo.startsWith('Discounts ')&&['class','location','project'].every(k=>(l[k+'_name']??'')===(source[k+'_name']??''))))
+  const original=(byEntry.get(source.journal_id) ?? []).find(l=>(role==='sale'?l.line_no===Number(source.line_no)+1:l.memo.startsWith('Discounts ')&&['class','location','project'].every(k=>(l[k+'_name']??'')===(source[k+'_name']??''))))
   return original?correctedTags(original,coding):dimensionTags(source)
  }
 }
