@@ -45,6 +45,20 @@ The installation's `pt_hosted_backup_runs` table records completion, the object 
 
 The active document store is still D1; R2 holds complete recovery archives containing those document bytes. A fresh hosted deployment drill and the large-business report timing proof remain OPS-001 work.
 
+## Restore into a fresh hosted deployment
+
+Reserve a new hosted environment at the same Pantry revision, apply its normal migrations, and keep its writers and Cron paused during recovery. The destination must contain only its unchanged migration defaults. The restore refuses existing books and never merges or replaces them.
+
+Run from the deployed checkout with its mode-0600 Cloudflare deploy file and a mode-0600 archive:
+
+```sh
+node scripts/hosted-restore.mjs --environment recovery --env-file .env.pantry --input /private/pantry-books.rer --journal /private/latest-pantry-books.rer --yes
+```
+
+The command also accepts injected `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` instead of a file. It validates the full archive and the optional later journal before remote staging, then uses the same Pantry policy, migration replay and ERASURE-001 fence as local import. A missing later journal is reported explicitly: a fresh destination cannot discover erasures made after the backup on its own. A refused archive publishes no books. Provider diagnostics and document values never enter command errors.
+
+Compare the restored report snapshots, document inventory and original bytes with the source before resuming writers and Cron. Owner sign-ins and provider keys are configured separately. This command currently restores the D1-backed documents in Pantry archives; active document object storage remains OPS-001 work.
+
 ## Restore into a fresh install
 
 A restore goes into an installation with no books yet. On the new computer (or in a new folder), get Pantry, put the archive in its `exports` folder, import it, then set up the owner:

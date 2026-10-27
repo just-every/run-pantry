@@ -1,4 +1,4 @@
-import { documentCoding } from './dimensions/corrections'
+import { correctedDocumentPostings, documentCoding, isInvoiceExtra } from './dimensions/corrections'
 // Cash or accrual: one ledger, two ways of reading it. The books are always
 // accrual; the cash basis is calculated from them and never written back.
 //
@@ -146,7 +146,7 @@ export async function cashLines(db: D1Database, from: string, to: string): Promi
   const coding = await documentCoding(db)
   // Only corrected originals need a posting lookup; ordinary components already
   // carry their reviewed dimensions. Never load unrelated years of postings.
-  const posted = coding.size ? await all(db, 'SELECT * FROM pt_journal_lines WHERE id IN (SELECT document_line_id FROM pt_reclassifications WHERE document_line_id IS NOT NULL) ORDER BY entry_id,line_no') : []
+  const posted = coding.size ? await correctedDocumentPostings(db) : []
   const byEntry = new Map<string, typeof posted>()
   for (const line of posted) { const rows = byEntry.get(line.entry_id) ?? []; rows.push(line); byEntry.set(line.entry_id, rows) }
   const settled = new Map<string, number>(), out: CashLine[] = []
@@ -160,7 +160,7 @@ export async function cashLines(db: D1Database, from: string, to: string): Promi
     const source=byEntry.get(d.journalId) ?? []
     d.parts.forEach((p, i) => {
       const share = now[i] - was[i]; if (!share) return
-      const original=p.ordinal?source.find(l=>l.line_no===p.ordinal):source.find(l=>l.account_id===p.accountId&&(l.debit_cents-l.credit_cents)*p.sign>0&&['class','location','project'].every(k=>(l[k+'_name']??'')===(p[k+'_name' as keyof Component]??''))&&(p.role==='tax'?l.memo.startsWith('Sales tax '):l.memo.startsWith('Discounts ')))
+      const original=p.ordinal?source.find(l=>l.line_no===p.ordinal):source.find(l=>isInvoiceExtra(l,p,p.accountId,p.sign))
       const corrected=original?coding.get(original.id):undefined,tags=corrected??p
       // Split recognized controls by the original reviewed component shares.
       // Recoding an income/expense component does not silently recode its AR/AP.

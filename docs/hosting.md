@@ -19,7 +19,7 @@ In the Cloudflare dashboard, open **Workers & Pages**. The first time, Cloudflar
 
 1. In the Cloudflare dashboard, open **Workers & Pages**. Copy the **Account ID** shown on the right.
 2. Open **My Profile → API Tokens** ([dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens)) and choose **Create Token**, then **Create Custom Token**.
-3. Name it `Pantry deploy` and add two account permissions: **Workers Scripts: Edit** and **D1: Edit**. Under **Account Resources**, choose your account. No zone permission is needed.
+3. Name it `Pantry deploy` and add three account permissions: **Workers Scripts: Edit**, **D1: Edit** and **Workers R2 Storage: Edit**. Under **Account Resources**, choose your account. No zone permission is needed.
 4. Choose **Continue to summary**, then **Create Token**, and copy the token. Cloudflare shows it once.
 
 ## 3. Write the deploy file

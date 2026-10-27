@@ -17,15 +17,33 @@ export async function settlementFence(db:D1Database):Promise<Sql>{
  return guard(`(${expression})=?`,Object.values(state)[0])
 }
 
-/** Resolve a document component by its immutable posting ordinal or grouped
- * extra, so source-derived reports use the same correction as cash/ledger. */
+/** Only immutable originals with a correction can affect source-derived coding.
+ * Invoice extras follow all sale ordinals and retain their posting account,
+ * side and reviewed dimension group, independently of person-entered memos. */
+export async function correctedDocumentPostings(db:D1Database){
+ return all(db,`SELECT l.*,i.kind AS invoice_kind,i.discount_account_id,
+  (SELECT count(*) FROM pt_invoice_lines il WHERE il.invoice_id=i.id) AS invoice_line_count
+  FROM pt_journal_lines l LEFT JOIN pt_invoices i ON i.journal_id=l.entry_id
+  WHERE l.id IN (SELECT document_line_id FROM pt_reclassifications WHERE document_line_id IS NOT NULL)
+  ORDER BY l.entry_id,l.line_no`)
+}
+
+export function isInvoiceExtra(line:Data,source:Data,accountId:string,sign:number){
+ return line.invoice_kind && Number(line.line_no)>Number(line.invoice_line_count)+1 &&
+  line.account_id===accountId && (line.debit_cents-line.credit_cents)*sign>0 &&
+  ['class','location','project'].every(k=>(line[k+'_name']??'')===(source[k+'_name']??''))
+}
+
+/** Resolve the original component first, then follow that posting's own id. */
 export async function documentComponentCoding(db:D1Database){
- const coding = await documentCoding(db)
- const posted = coding.size ? await all(db, 'SELECT * FROM pt_journal_lines WHERE id IN (SELECT document_line_id FROM pt_reclassifications WHERE document_line_id IS NOT NULL) ORDER BY line_no') : []
- const byEntry = new Map<string, typeof posted>()
- for (const line of posted) { const rows = byEntry.get(line.entry_id) ?? []; rows.push(line); byEntry.set(line.entry_id, rows) }
- return (source:Data,role:'sale'|'discount'='sale')=>{
-  const original=(byEntry.get(source.journal_id) ?? []).find(l=>(role==='sale'?l.line_no===Number(source.line_no)+1:l.memo.startsWith('Discounts ')&&['class','location','project'].every(k=>(l[k+'_name']??'')===(source[k+'_name']??''))))
+ const coding=await documentCoding(db)
+ const posted=coding.size?await correctedDocumentPostings(db):[]
+ const byEntry=new Map<string,typeof posted>()
+ for(const line of posted){const rows=byEntry.get(line.entry_id)??[];rows.push(line);byEntry.set(line.entry_id,rows)}
+ return(source:Data,role:'sale'|'discount'='sale')=>{
+  const original=(byEntry.get(source.journal_id)??[]).find(l=>role==='sale'
+   ?l.line_no===Number(source.line_no)+1
+   :isInvoiceExtra(l,source,l.discount_account_id,l.invoice_kind==='credit'?-1:1))
   return original?correctedTags(original,coding):dimensionTags(source)
  }
 }

@@ -33,6 +33,7 @@
     "verify:release": "node tests/release/verify.mjs",
     "agent": "node scripts/pantry-agent.mjs",
     "hosted-backup": "node scripts/hosted-backup.mjs",
+    "hosted-restore": "node scripts/hosted-restore.mjs",
     "delivery:spec": "node scripts/build-deployment-spec.mjs",
     "check:deployment-spec": "node scripts/build-deployment-spec.mjs --check",
     "contract:write": "node src/base/contract-docs.mjs write",
