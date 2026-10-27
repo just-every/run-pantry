@@ -11,8 +11,8 @@ import { runWebhooks } from './webhooks/deliver'
 export async function runScheduled(controller:{cron:string;scheduledTime:number},env:Bindings) {
   await upgradeTins(env)
   const deliveries=runWebhooks(env,controller.scheduledTime)
-  if(controller.cron!=='*/30 * * * *'){await deliveries;return}
+  const backup=(async()=>{await syncDocumentObjects(env);await runHostedBackup(env,controller.scheduledTime)})()
+  if(controller.cron!=='*/30 * * * *'){await Promise.all([deliveries,backup]);return}
   await runDue(env,10)
-  await syncDocumentObjects(env)
-  await Promise.all([runHostedBackup(env,controller.scheduledTime),deliveries,runDueWork(env,{scheduled:true,reportAt:new Date(controller.scheduledTime)}),runAgent(env,{scheduled:true})])
+  await Promise.all([backup,deliveries,runDueWork(env,{scheduled:true,reportAt:new Date(controller.scheduledTime)}),runAgent(env,{scheduled:true})])
 }

@@ -8,6 +8,10 @@
     {
       "kind": "r2",
       "binding": "PANTRY_BACKUPS"
+    },
+    {
+      "kind": "r2",
+      "binding": "PANTRY_DOCUMENTS"
     }
   ],
   "migrations": [

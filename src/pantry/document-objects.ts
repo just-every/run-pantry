@@ -27,9 +27,10 @@ export async function syncDocumentObjects(env: Bindings, limit = 32) {
     if (!current || current.erased_at) continue
     const file = await documentFile(db,doc.id)
     requireThat(file && await sha256(file.bytes)===doc.sha256,'Document recovery bytes do not match their recorded hash',500)
-    await bucket.put(key,file.bytes,{httpMetadata:{contentType:file.mediaType},customMetadata:{sha256:doc.sha256}})
-    const stored = await bucket.get(key)
-    requireThat(stored && await sha256(new Uint8Array(await stored.arrayBuffer()))===doc.sha256,'Stored document does not match its recorded hash',500)
+    await bucket.put(key,file.bytes,{sha256:doc.sha256,httpMetadata:{contentType:file.mediaType},customMetadata:{sha256:doc.sha256}})
+    const stored = await bucket.head(key)
+    const digest = stored?.checksums.sha256
+    requireThat(stored && stored.size===file.bytes.length && digest && Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('')===doc.sha256,'Stored document does not match its recorded hash',500)
     // If erasure won during upload, withdraw the new copy as well. If it wins
     // after this check, its own cleanup finds the reserved receipt above.
     const live = await one(db,'SELECT id FROM pt_documents WHERE id=? AND erased_at IS NULL AND sha256=?',doc.id,doc.sha256)

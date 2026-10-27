@@ -28,8 +28,11 @@ export async function documentFile(db: D1Database, id: string, bucket?: R2Bucket
     const receipt = await one<{object_key:string}>(db,'SELECT object_key FROM pt_document_objects WHERE document_id=? AND ready=1',id)
     if (receipt) {
       const object = await bucket.get(receipt.object_key)
+      if (!object) await db.prepare('UPDATE pt_document_objects SET ready=0 WHERE document_id=?').bind(id).run()
       requireThat(object,'This document is unavailable from object storage; retry after recovery',503)
       const bytes = new Uint8Array(await object.arrayBuffer())
+      if (bytes.length!==doc.size || await sha256(bytes)!==doc.sha256)
+        await db.prepare('UPDATE pt_document_objects SET ready=0 WHERE document_id=?').bind(id).run()
       requireThat(bytes.length===doc.size && await sha256(bytes)===doc.sha256,'This document failed its integrity check',500)
       // Do not return bytes if erasure committed while the provider was read.
       const live = await one(db,'SELECT id FROM pt_documents WHERE id=? AND erased_at IS NULL',id)

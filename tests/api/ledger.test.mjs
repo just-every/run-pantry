@@ -82,7 +82,12 @@ test('PAN-03 customers, vendors and source documents are kept, with document byt
   assert.deepEqual(Buffer.from(await (await bucket.get(key)).arrayBuffer()),bytes)
   await bucket.put(key,Buffer.from('synthetic-pantry-986'))
   assert.equal((await h.send(`/api/pantry/documents/${doc.id}`,undefined,{cookie:vic})).status,500,'Corrupt object bytes are refused')
-  await bucket.put(key,bytes)
+  await h.cron(Date.parse('2026-10-01T12:00:00Z'))
+  assert.deepEqual(Buffer.from(await (await fetch(`${h.origin}/api/pantry/documents/${doc.id}`,{headers:{cookie:vic}})).arrayBuffer()),bytes,'Cron repairs a corrupt object from the verified recovery mirror')
+  await bucket.delete(key)
+  assert.equal((await h.send(`/api/pantry/documents/${doc.id}`,undefined,{cookie:vic})).status,503,'Missing committed objects are refused')
+  await h.cron(Date.parse('2026-10-01T12:00:00Z'))
+  assert.deepEqual(Buffer.from(await (await bucket.get(key)).arrayBuffer()),bytes,'A missing object is repaired on the next scheduled tick')
   // Link an unposted source to an erased enquiry: both the object and ordinary
   // download disappear, while the source hash remains in the books.
   const lead=await h.command('contact.save',{kind:'vendor',name:'synthetic-pantry-987'})

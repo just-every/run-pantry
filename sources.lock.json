@@ -131,7 +131,7 @@
       "executable": false
     },
     "deploy.json": {
-      "sha256": "0d4d4791f2671cca6eeda119bb713f51837111ab90948e615938704a1dade577",
+      "sha256": "7e7c4fdeee31b9ebde00ce98b6370eaeae13f1ff39382023a244878b814f8fd4",
       "executable": false
     },
     "docs/agent-work.md": {
@@ -139,7 +139,7 @@
       "executable": false
     },
     "docs/backup.md": {
-      "sha256": "417b5200e4dff7332a36df1618fb3bae8451844e03f914f73ce46e0aa55d4824",
+      "sha256": "c2fd98ace38db676ffa1b89a62d34740c799b72591c93b770d1b1f6dbba72596",
       "executable": false
     },
     "docs/bank-feeds-and-rules.md": {
@@ -403,7 +403,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "a85cb3fa4ea0bac5645ff4ef29b0b7f0443526f3ee189ca3d39f42d1d85491bf",
+      "sha256": "8e41b84b0b06c8b08e9b98ed1e073d04811397037ab20b4f58857d75ef634373",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -3811,11 +3811,11 @@
       "executable": false
     },
     "src/pantry/document-objects.ts": {
-      "sha256": "230bd5bf26e548662483372ca20bd303aa72f36f42332c02c955939a0078bb2b",
+      "sha256": "6bdbf184b2fec6a7d4dfc2f3e06f174649cda3ad7c08a02d78f183755a176dbc",
       "executable": false
     },
     "src/pantry/documents.ts": {
-      "sha256": "722b1b4fe0e673b135e3c799eff5291aa630e32578940a5125f4627de7d8d347",
+      "sha256": "cd8527b2af8791ca09a15744f1551e1639211fb53b064c13f204d7f327159221",
       "executable": false
     },
     "src/pantry/drilldown.ts": {
@@ -4667,7 +4667,7 @@
       "executable": false
     },
     "src/pantry/scheduled.ts": {
-      "sha256": "358ea315c37bdcd9458bfcab77bedca32001d869c32a62428e779561634c73f1",
+      "sha256": "f67241afbd31dcfe139f88440cbde54460f089cb56c5cc14684c3a47fd624b4c",
       "executable": false
     },
     "src/pantry/seal.ts": {
@@ -5883,7 +5883,7 @@
       "executable": false
     },
     "tests/api/ledger.test.mjs": {
-      "sha256": "c6196e380735d4987f7d98fbacbac42f361d7e862b714fa60585c3f0663752e1",
+      "sha256": "b3bf0b009fc0187a44848e4db72dfcf2e5a7d62fddee9c0b8cc82e4b6dc2f97e",
       "executable": false
     },
     "tests/api/member-at.mjs": {
