@@ -112,12 +112,12 @@ test('PAN-14 the accountant package holds the period\'s reports, reconciliations
   const preview=await h.command('erasure.preview',{kind:'contact',id:lead.id})
   await h.command('erasure.execute',{kind:'contact',id:lead.id,fingerprint:preview.fingerprint,requester:'Synthetic requester',channel:'in-person',reason:'Remove obsolete enquiry',confirm:'ERASE'})
   assert.equal(await h.db.prepare('SELECT id FROM rer_portability_jobs WHERE id=?').bind(interrupted.job_id).first(),null,'Erasure deletes the unfinished archive job')
-  await Promise.all([backupTick('2026-10-02'),backupTick('2026-10-02')])
+  await backupTick('2026-10-02')
   const restarted=await h.db.prepare('SELECT * FROM pt_hosted_backup_runs WHERE day=?').bind('2026-10-01').first()
   assert.notEqual(restarted.job_id,interrupted.job_id,'The next daily tick starts a fresh snapshot')
   assert.ok(restarted.job_id)
   assert.equal(restarted.error_code,null)
-  await backupTick('2026-10-03')
+  await Promise.all([backupTick('2026-10-03'),backupTick('2026-10-03')])
   for(let tick=0;tick<12;tick++) {
     const receipt=await h.db.prepare('SELECT * FROM pt_hosted_backup_runs WHERE day=?').bind('2026-10-01').first()
     if(receipt?.status==='complete')break

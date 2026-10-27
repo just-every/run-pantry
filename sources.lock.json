@@ -5751,7 +5751,7 @@
       "executable": false
     },
     "tests/api/close.test.mjs": {
-      "sha256": "b66895c041ad6bc54448221d5a89a637fe02dfa49e4ca555fd48341d12194e07",
+      "sha256": "a8d3152d7af8111d7fc797f87e24bb1d81cdd8b163dabbc5dccad91ac41475ea",
       "executable": false
     },
     "tests/api/collections-journey.mjs": {
