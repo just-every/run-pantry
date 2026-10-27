@@ -6023,7 +6023,7 @@
       "executable": false
     },
     "tests/app/accountant-console.test.mjs": {
-      "sha256": "cdbf8c93c14f18c6348b54c42f27f51857aeeb401fdb5c6fd234eece02b918b6",
+      "sha256": "8895bc7b671a9626d81ef87415f694e56104c7615009567a7b78395cae3879ac",
       "executable": false
     },
     "tests/app/app.test.mjs": {

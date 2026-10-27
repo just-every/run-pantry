@@ -45,10 +45,13 @@ test('accountant connects three clients with distinct status and grants, and own
     assert.ok(message)
     const enabled=await owner.request.post(app.origin+'/auth/settings/identity',{headers:{origin:app.origin},data:{idpSignIn:true}})
     assert.equal(enabled.status(),200,await enabled.text())
-    const signIn=await shared.newPage();await signIn.goto(app.origin+'/signin?returnTo=%2Fapp%2Fsettings')
+    const signIn=await shared.newPage(), navigationErrors=[]
+    signIn.on('requestfailed',request=>navigationErrors.push(`${new URL(request.url()).origin}${new URL(request.url()).pathname}: ${request.failure()?.errorText}`))
+    signIn.on('console',message=>{if(message.type()==='error')navigationErrors.push(message.text().replace(/https?:\/\/[^\s'"]+/g,value=>{const url=new URL(value);return url.origin+url.pathname}))})
+    await signIn.goto(app.origin+'/signin?returnTo=%2Fapp%2Fsettings')
     await signIn.getByRole('button',{name:'Continue with Practice identity',exact:true}).click()
     if(i===0) {
-      await signIn.waitForURL(url=>url.origin===idp.issuer || url.searchParams.has('notice'))
+      await signIn.waitForURL(url=>url.origin===idp.issuer || url.searchParams.has('notice'),{timeout:10000}).catch(error=>{throw new Error(`OIDC navigation failed at ${new URL(signIn.url()).origin}${new URL(signIn.url()).pathname}: ${navigationErrors.join('; ')}`,{cause:error})})
       const destination=new URL(signIn.url())
       assert.equal(destination.origin,idp.issuer,`OIDC start refused: ${destination.searchParams.get('notice')}`)
       await signIn.getByRole('button',{name:'Sign in to practice',exact:true}).click()
