@@ -25,5 +25,11 @@
     "MAIL_FROM": "",
     "MAIL_RELAY_URL": "",
     "MAIL_ACCOUNT_ID": ""
-  }
+  },
+  "r2_buckets": [
+    {
+      "binding": "PANTRY_BACKUPS",
+      "bucket_name": "local-pantry-backups"
+    }
+  ]
 }

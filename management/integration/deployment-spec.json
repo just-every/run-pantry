@@ -4,6 +4,10 @@
     {
       "kind": "d1",
       "binding": "DB"
+    },
+    {
+      "kind": "r2",
+      "binding": "PANTRY_BACKUPS"
     }
   ],
   "migrations": [
@@ -714,6 +718,12 @@
       "name": "0118_month_close.sql",
       "sha256": "03a864479e7fcfe617bfa7265338cae2878919b1077e97f4842de0f905fcfe7f",
       "sql": "-- Recurring preparation is explicit owner consent; existing approvals still govern posting.\nCREATE TABLE pt_month_close_schedules (\n agent_id TEXT NOT NULL REFERENCES pt_agents(id),\n period TEXT NOT NULL,\n enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),\n approved_by TEXT NOT NULL,\n updated_at TEXT NOT NULL,\n PRIMARY KEY (agent_id, period)\n);\nALTER TABLE pt_close_tasks ADD COLUMN judgment_kind TEXT;\nALTER TABLE pt_close_tasks ADD COLUMN proposal_id TEXT;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0119_hosted_backups.sql",
+      "sha256": "17629822c67f22763b1a0d3152a3cec42fb86b96620fcb3cbf107b840b756492",
+      "sql": "-- Operational backup receipts stay with this installation, outside its archive.\nCREATE TABLE pt_hosted_backup_runs (\n  day TEXT PRIMARY KEY,\n  job_id TEXT,\n  object_key TEXT,\n  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','building','complete')),\n  lease_id TEXT,\n  lease_until INTEGER NOT NULL DEFAULT 0,\n  completed_at TEXT,\n  content_hash TEXT,\n  error_code TEXT\n);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

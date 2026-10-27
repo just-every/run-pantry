@@ -6,7 +6,7 @@ import '../browser-home.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'
-import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -121,7 +121,7 @@ async function snapshot(context, origin, docName) {
 
 test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts restore, occupied books stay protected, and known erasures fence older archives', async t => {
   t.after(async () => { for (const server of [...running]) await server.stop(); for (const root of roots) await rm(root, { recursive: true, force: true }) })
-  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH, args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
 
   // The first install, with books and a document.
   const first = await fresh(), port = await freePort()
@@ -194,7 +194,25 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   const before = await snapshot(context, server.origin, 'acme-a-778.pdf')
   assert.deepEqual(before.bytes, pdf)
   await context.close(); await server.stop()
-  const exported=await ok(first, ['export', '--output', 'exports/pantry-books.rer'])
+  // The hosted backup uses Cloudflare's SQL snapshot, then the same archive
+  // policy as local export. Exercise its public command, not a fabricated file.
+  const sql = join(first, 'exports/hosted.sql')
+  await mkdir(join(first, 'exports'), {recursive:true})
+  await promisify(execFile)(join(first, 'node_modules/.bin/wrangler'), ['d1','execute','foundation','--local','--command',"INSERT OR IGNORE INTO rer_portability_state(id,source_identity) VALUES(1,'"+(await import('node:crypto')).randomUUID()+"')"], {cwd:first,env,maxBuffer:16*1024*1024})
+  await promisify(execFile)(join(first, 'node_modules/.bin/wrangler'), ['d1','export','foundation','--local','--output',sql], {cwd:first,env,maxBuffer:16*1024*1024})
+  const converted = await promisify(execFile)(process.execPath, [join(first,'scripts/hosted-archive.mjs'),'--input-sql',sql,'--output',join(first,'exports/pantry-books.rer')], {cwd:first,env,maxBuffer:16*1024*1024})
+  const exported=converted.stdout
+  assert.equal(JSON.parse(exported).format,'pantry-hosted-backup/1')
+  assert.equal((await stat(join(first,'exports/pantry-books.rer'))).mode & 0o777,0o600)
+  const duplicate = await promisify(execFile)(process.execPath, [join(first,'scripts/hosted-archive.mjs'),'--input-sql',sql,'--output',join(first,'exports/pantry-books.rer')], {cwd:first,env}).then(()=>null,e=>e)
+  assert.equal(duplicate?.code,2,'a scheduled backup cannot overwrite an existing archive')
+  assert.match(duplicate.stderr,/output_exists/)
+  const unsafe=join(first,'exports/unsupported.sql'),unpublished=join(first,'exports/unsupported.rer')
+  await writeFile(unsafe,"ATTACH DATABASE 'synthetic-pantry-1' AS other;")
+  const unsafeResult=await promisify(execFile)(process.execPath,[join(first,'scripts/hosted-archive.mjs'),'--input-sql',unsafe,'--output',unpublished],{cwd:first,env}).then(()=>null,e=>e)
+  assert.equal(unsafeResult?.code,2,'the dump reader refuses a general SQLite shell operation')
+  await assert.rejects(stat(unpublished),{code:'ENOENT'},'a refused SQL dump publishes no archive')
+
   const credentials=[modelKey,rotatedModelKey,archivedAgent.token,archivedIntegration.token,process.env.PANTRY_STRIPE_KEY].filter(Boolean)
   for(const credential of credentials)assert.ok(!exported.includes(credential),'export diagnostics exclude credentials')
   const archivedSubscriptions=[]
