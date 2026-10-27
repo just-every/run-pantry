@@ -75,8 +75,22 @@ async function remote(c: Context, origin: string, token: string) {
   const response = await fetch(origin + '/api/pantry/accountant-status', { redirect: 'manual', signal: AbortSignal.timeout(5000), headers: { authorization: `Bearer ${token}` } })
   requireThat(response.ok, 'Client status permission is no longer available', response.status === 401 || response.status === 403 ? 403 : 502)
   requireThat(Number(response.headers.get('content-length') ?? 0) <= 8192, 'Client status response is too large', 502)
-  const body = await response.text()
-  requireThat(body.length <= 8192, 'Client status response is too large', 502)
+  requireThat(response.body, 'Client status response is empty', 502)
+  const reader = response.body.getReader(), chunks: Uint8Array[] = []
+  let length = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      length += value.byteLength
+      requireThat(length <= 8192, 'Client status response is too large', 502)
+      chunks.push(value)
+    }
+  } finally { await reader.cancel() }
+  const bytes = new Uint8Array(length)
+  let offset = 0
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length }
+  const body = new TextDecoder().decode(bytes)
   const value = JSON.parse(body)
   requireThat(value.email === c.actor.email && value.role === 'accountant', 'Client status belongs to another accountant', 403)
   // Explicit projection: a remote installation cannot smuggle data or links into this console.
@@ -114,12 +128,12 @@ export async function accountantStatus(request: Request, original: Bindings) {
   const token = /^Bearer ([a-zA-Z0-9_-]{40,256})$/.exec(request.headers.get('authorization') ?? '')?.[1]
   requireThat(token, 'Client status key required', 401)
   const hash = await sha256(token)
-  const member = await one(env.DB, `SELECT m.* FROM pt_accountant_status_grants g JOIN pt_members m ON m.email=g.email AND m.revision=g.member_revision
+  const member = await one(env.DB, `SELECT m.* FROM pt_accountant_status_grants g JOIN pt_members m ON m.email=g.email AND m.revision=g.member_revision JOIN oa_operators o ON o.email=m.email AND o.status='active'
     WHERE g.token_hash=? AND g.expires_at>? AND m.active=1 AND m.role='accountant'`, hash, Date.now())
   requireThat(member, 'Client status permission removed or expired', 403)
   const actor = {kind:'person',id:'',session:'',email:member.email,name:member.name,role:'accountant',grants:{post:!!member.can_post,lock:!!member.can_lock,reopen:!!member.can_reopen},policy:{bankAccounts:member.bank_accounts === null ? null : JSON.parse(member.bank_accounts)}} as Person
   const value = await summary(env.DB, actor)
   // Recheck the grant after all reads, so a concurrent owner removal refuses the response.
-  requireThat(await one(env.DB, `SELECT 1 FROM pt_accountant_status_grants g JOIN pt_members m ON m.email=g.email AND m.revision=g.member_revision WHERE g.token_hash=? AND g.expires_at>? AND m.active=1 AND m.role='accountant'`, hash, Date.now()), 'Client status permission removed or expired', 403)
+  requireThat(await one(env.DB, `SELECT 1 FROM pt_accountant_status_grants g JOIN pt_members m ON m.email=g.email AND m.revision=g.member_revision JOIN oa_operators o ON o.email=m.email AND o.status='active' WHERE g.token_hash=? AND g.expires_at>? AND m.active=1 AND m.role='accountant'`, hash, Date.now()), 'Client status permission removed or expired', 403)
   return { ...value, email: member.email }
 }

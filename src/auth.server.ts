@@ -19,6 +19,9 @@ export interface Bindings {
  RER_VERSION?: { id: string }
  /** Exact client origins the owner permits this console to contact. */
  PANTRY_ACCOUNTANT_CLIENTS?: string
+ /** Server-owned native OIDC provider configuration; may contain client credentials. */
+ PANTRY_OIDC_PROVIDERS?: string
+ OIDC_TRANSACTION_SECRET?: string
  IDENTITY_PROVIDER?: string
  AUTH_ORIGIN: string
  AUTH_LOCAL?: string
@@ -65,7 +68,15 @@ export interface Bindings {
 export const runtimeBindings = (env: Bindings): Bindings => env.RER_DEV_ORIGIN && env.AUTH_LOCAL === 'true' ? { ...env, AUTH_ORIGIN: env.RER_DEV_ORIGIN } : env
 // MAIL_FROM is the bare address rer deploy accepts; sign-in and invitation emails carry the app's name.
 const senderFrom = (from?: string) => from && !from.includes('<') ? `${branding.name.replace(/[<>"\\,;:@()[\]]/g, '').trim()} <${from.trim()}>` : from
-export const authConfig = (env: Bindings): AuthConfig => ({ dependencies: true, origin: env.AUTH_ORIGIN, local: env.AUTH_LOCAL === 'true', OWNER_EMAIL: env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, INSTALLATION_KEY: env.INSTALLATION_KEY, INSTALLATION_KEY_PREVIOUS: env.INSTALLATION_KEY_PREVIOUS, SETUP_TOKEN: env.SETUP_TOKEN, MAIL_FROM: senderFrom(env.MAIL_FROM), branding: { productName: branding.name, accentColor: branding.primaryColor, signInPath: '/signin', theme: theme.href } })
+function trustedProviders(env: Bindings): AuthConfig['providers'] {
+ if (!env.PANTRY_OIDC_PROVIDERS) return []
+ try {
+  const providers = JSON.parse(env.PANTRY_OIDC_PROVIDERS)
+  if (!Array.isArray(providers)) throw new Error()
+  return providers
+ } catch { throw new Error('Trusted OIDC provider configuration is invalid') }
+}
+export const authConfig = (env: Bindings): AuthConfig => ({ providers: trustedProviders(env), OIDC_TRANSACTION_SECRET: env.OIDC_TRANSACTION_SECRET, dependencies: true, origin: env.AUTH_ORIGIN, local: env.AUTH_LOCAL === 'true', OWNER_EMAIL: env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, INSTALLATION_KEY: env.INSTALLATION_KEY, INSTALLATION_KEY_PREVIOUS: env.INSTALLATION_KEY_PREVIOUS, SETUP_TOKEN: env.SETUP_TOKEN, MAIL_FROM: senderFrom(env.MAIL_FROM), branding: { productName: branding.name, accentColor: branding.primaryColor, signInPath: '/signin', theme: theme.href } })
 export function operatorAuth(env: Bindings) {
  return createOperatorAuth({ db: env.DB, config: authConfig(env), mailSender: operatorMail(env), clientIp: request => request.headers.get('CF-Connecting-IP') ?? '' })
 }

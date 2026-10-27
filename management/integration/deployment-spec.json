@@ -741,6 +741,8 @@
     "SETUP_TOKEN"
   ],
   "optionalSecretNames": [
+    "PANTRY_OIDC_PROVIDERS",
+    "OIDC_TRANSACTION_SECRET",
     "MAIL_API_KEY",
     "PLAID_CLIENT_ID",
     "PLAID_SECRET",

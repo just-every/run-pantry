@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "4fa81d0e54a990f69ee60d2237071b262a8ecf8480762ba0a265ca4c1e9e94b9",
+      "sha256": "4421274029af2d9c1b644d2cad9f1344b7dd5904de089d638cb6d779b2618e81",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "aa5cbf854db3e7fcad927cc0aef4bf0e158aa77fb4aa7af8c1198e6341a55646",
+      "sha256": "c48f915f8e5a1e75b7d43b2d699526cd6bb0741fef0935dfdd60733b7e2bcf62",
       "executable": false
     },
     "DEMO.md": {
@@ -135,7 +135,7 @@
       "executable": false
     },
     "docs/accountant-console.md": {
-      "sha256": "8949eaf15b0ed141bb7d5c5b73cccb9cb2b388f5f0ee149fce003c7b6b180406",
+      "sha256": "9043e66d75db5586dce95b32dc7a2234a145e73be537953a8e733df12be4a986",
       "executable": false
     },
     "docs/agent-work.md": {
@@ -407,7 +407,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "be582f4367482e509c6b34d2ed90e7bbcff4b6409bd383bf9beebe40855c899d",
+      "sha256": "9646544c2275b725d91f06f43ee283e3abcceacf2c1750a321a83fb69eaba511",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -911,7 +911,7 @@
       "executable": false
     },
     "packaging.json": {
-      "sha256": "853430e540a67188eba55f0ecefe596e8210f9b1429fe7c42931203abe4d5faf",
+      "sha256": "ef2d399fdefb8a3e572870743aa03079d01aabeb549a120d8aac14d8c602b1ff",
       "executable": false
     },
     "pnpm-lock.yaml": {
@@ -1439,7 +1439,7 @@
       "executable": false
     },
     "src/auth.server.ts": {
-      "sha256": "7cf5734e256b4ec8a4ded1d241c5f441dee294dc0c1437fd46df4bba87f70467",
+      "sha256": "0f912f754c4e0db4b02cb946780cb7d765d74432e7418704b16bba7efe0100d2",
       "executable": false
     },
     "src/base/contract-filter.ts": {
@@ -3335,7 +3335,7 @@
       "executable": false
     },
     "src/pantry/accountant-console.ts": {
-      "sha256": "0df632c9c4f4c016ead02b73657d9129a9db028937e6d7393ddd5b6944116980",
+      "sha256": "9c3ac206c4ee435ab3d6145a1087e6b948892be70da2ce2e26f3cb5434909621",
       "executable": false
     },
     "src/pantry/accountant-export.ts": {
@@ -5183,7 +5183,7 @@
       "executable": false
     },
     "src/ui/accountant-console.tsx": {
-      "sha256": "79c65a032b56304af7e07e56a2b32b0672bff73caf6d893e551bead433342752",
+      "sha256": "49143879de0edec696620c8c5d830569c39056a068d70449d10ea99658ff1871",
       "executable": false
     },
     "src/ui/activity-labels.ts": {
@@ -6015,7 +6015,7 @@
       "executable": false
     },
     "tests/app/accountant-console.test.mjs": {
-      "sha256": "5dcb6a7ea26d18898bf9a342ab673548c59f8c7774283c98560b8b7e67454faa",
+      "sha256": "83d02e755da3301b8861f37920e4c419c98b31d70bb4c44a836a3a9dbb904e67",
       "executable": false
     },
     "tests/app/app.test.mjs": {
@@ -6179,7 +6179,7 @@
       "executable": false
     },
     "tests/app/provider-worker.mjs": {
-      "sha256": "289ead0bee594632f13ee3974be3ad6c832f8b1f2287e375a3a85aa8b41b3327",
+      "sha256": "3bc3477dbf32c24f88c2b10a44b9b7a6fd82c1852f964896a7eb6d72dd5d449a",
       "executable": false
     },
     "tests/app/queue-journey.mjs": {
@@ -6272,6 +6272,10 @@
     },
     "tests/clock.ts": {
       "sha256": "ef6dc3efe8e4a75e8d47d9aefc87339dfeec6507be7516368422530102302b4c",
+      "executable": false
+    },
+    "tests/providers/accountant-oidc.mjs": {
+      "sha256": "762a4433ba01349e219d91912370547c8a393c8e78cd51770da10033a28e749a",
       "executable": false
     },
     "tests/providers/autopay-card.mjs": {

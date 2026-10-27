@@ -19,7 +19,7 @@ export async function providerWorker({ bindings, outbound, clock = false }) {
     host: '127.0.0.1', port:0, modules: true, script: bundle.outputFiles[0].text,
     compatibilityDate: options.workerOptions.compatibilityDate, compatibilityFlags: options.workerOptions.compatibilityFlags,
     d1Databases: { DB: 'pantry' }, assets: { ...options.workerOptions.assets, binding: 'ASSETS' },
-    bindings: { AUTH_ORIGIN: origin, AUTH_LOCAL: 'true', OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: 'app-test-session-secret-0123456789abcdef', SETUP_TOKEN: TOKEN, MAIL_PROVIDER: 'development', MAIL_FROM: 'Pantry <pantry@example.test>', ...bindings },
+    bindings: { AUTH_ORIGIN: origin, AUTH_LOCAL: 'true', OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: 'app-test-session-secret-0123456789abcdef', SETUP_TOKEN: TOKEN, MAIL_PROVIDER: 'development', MAIL_FROM: 'Pantry <pantry@example.test>', ...(typeof bindings === 'function' ? bindings(origin) : bindings) },
     outboundService: outbound,
   }), resourcePersistencePath: dir })
   const close = async () => { await mf?.dispose(); await rm(dir, { recursive: true, force: true }) }
@@ -29,6 +29,10 @@ export async function providerWorker({ bindings, outbound, clock = false }) {
     for (const file of (await readdir('migrations/core')).filter(f => f.endsWith('.sql')).sort())
       await db.batch(unstable_splitSqlQuery(await readFile('migrations/core/' + file, 'utf8')).map(sql => db.prepare(sql)))
     await mf.ready
-    return { origin, close, db, cron:async(scheduledTime=Date.now())=>(await mf.getWorker()).scheduled({cron:'*/30 * * * *',scheduledTime}) }
+    return { origin, close, db, configure:async nextBindings=>{
+      bindings=nextBindings
+      await mf.setOptions({...optionsFor(origin),host:'127.0.0.1',port:0})
+      if((await mf.ready).origin!==origin)throw new Error('Worker origin changed during configuration')
+    }, cron:async(scheduledTime=Date.now())=>(await mf.getWorker()).scheduled({cron:'*/30 * * * *',scheduledTime}) }
   } catch (error) { await close(); throw error }
 }
