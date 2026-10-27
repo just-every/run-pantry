@@ -55,6 +55,8 @@ export async function monthCloseJourney(h) {
   assert.deepEqual(incomeVariance.citations, [s.income.id])
   const expenseVariance = report.variances.find(v => v.accountId === s.acct['6000'])
   assert.deepEqual([expenseVariance.currentCents, expenseVariance.priorCents, expenseVariance.changeCents], [16200, 0, 16200])
+  assert.deepEqual(report.variances.map(v => v.accountId).sort(), [s.acct['4000'], s.acct['6000']].sort())
+  assert.deepEqual(expenseVariance.citations.slice().sort(), [s.expense.id, recurringEntry.id, accrual.id].sort())
   for (const v of report.variances) for (const id of v.citations) assert.equal((await h.view('reports/record/entry/' + id)).id, id)
   const repeat = await agent.call('month-close', { period: '2026-09' })
   assert.equal(repeat.packet.id, report.packet.id)
@@ -88,6 +90,7 @@ export async function monthCloseJourney(h) {
   assert.equal((await h.view('close/2026-09')).status, 'open')
   const readyReport = await agent.call('month-close', { period: '2026-09' })
   assert.deepEqual(readyReport.mechanical.filter(c => c.status !== 'done'), [])
+  assert.equal((await h.view('close/2026-09')).status, 'open', 'agent completion leaves the lock to the accountant')
   const pendingPackets = (await agent.call('context')).proposals.filter(p => p.status === 'proposed' && p.payload.monthClose && p.payload.period === '2026-09')
   assert.deepEqual(pendingPackets.map(p => p.id), [readyReport.packet.id], 'refresh replaces the obsolete mechanical work list')
 
@@ -130,6 +133,9 @@ export async function monthCloseJourney(h) {
   await h.command('close.task', { id: finishedTask.id, revision: finishedTask.revision, done: false }, ann, 409)
   await agent.call('month-close', { period: '2026-09' }, 409)
 
+  // A second period exercises typed work with real drafts and both payment
+  // directions, including ambiguity, missing evidence and stale approval.
+  await typedMonthCorrections(h, s, agent, member, ann)
   await agent.call('month-close', { period: 'bad-month' }, 400)
   // Scheduling is opt-in, uses the existing approved schedules, is repeatable,
   // and stops when the agent is disabled.
@@ -141,9 +147,115 @@ export async function monthCloseJourney(h) {
   assert.equal(proposals.length, 1)
   await h.cron(Date.parse('2026-10-02T12:30:00Z'))
   assert.equal((await agent.call('context')).proposals.filter(p => p.payload.monthClose && p.payload.period === '2026-10').length, 1)
+  const novemberBefore = (await h.view('proposals')).proposals.filter(p => p.payload.monthClose && p.payload.period === '2026-11').length
   await h.command('month-close.schedule', { agentId: row.id, period: '2026-11', enabled: true })
   await h.command('agent.deactivate', { id: row.id })
   await h.cron(Date.parse('2026-11-02T12:00:00Z'))
-  assert.equal((await h.view('proposals')).proposals.filter(p => p.payload.monthClose && p.payload.period === '2026-11').length, 0)
+  assert.equal((await h.view('proposals')).proposals.filter(p => p.payload.monthClose && p.payload.period === '2026-11').length, novemberBefore)
   await agent.call('month-close', { period: '2026-11' }, 401)
+}
+
+export async function typedMonthCorrections(h, s, agent, member, ann) {
+  const doc = await h.command('document.upload', { name: 'synthetic-pantry-20.txt', mediaType: 'text/plain', base64: Buffer.from('Synthetic support: office allocation 17 dollars.').toString('base64') })
+  let draft = await h.command('journal.save-draft', { date: '2026-11-15', memo: 'synthetic-pantry-21', documentId: doc.id, lines: [{ accountId: s.acct['6000'], debit: '17.00' }, { accountId: s.acct['3000'], credit: '17.00' }] })
+  const vendor = await h.command('contact.save', { kind: 'vendor', name: 'synthetic-pantry-23' })
+  const customer = await h.command('contact.save', { kind: 'customer', name: 'synthetic-pantry-24' })
+  const bill = await h.command('bill.save', { vendorId: vendor.id, reference: 'synthetic-pantry-25', billDate: '2026-11-05', lines: [{ description: 'Synthetic office costs', accountId: s.acct['6000'], amount: '50.00' }] })
+  await h.command('document.upload', { name: 'synthetic-pantry-26.txt', mediaType: 'text/plain', base64: Buffer.from('Synthetic bill 50 dollars.').toString('base64'), linkedKind: 'bill', linkedId: bill.id })
+  const invoice = await h.command('invoice.save-draft', { customerId: customer.id, issueDate: '2026-11-05', lines: [{ description: 'Synthetic service', quantity: '1', rate: '75.00', accountId: s.acct['4000'], taxCode: 'exempt' }] })
+  const receive = await h.command('payment.record', { direction: 'received', contactId: customer.id, bankAccountId: s.bank.id, date: '2026-11-10', amount: '75.00', reference: 'synthetic-pantry-27' })
+  const pay = await h.command('payment.record', { direction: 'paid', contactId: vendor.id, bankAccountId: s.bank.id, date: '2026-11-10', amount: '50.00', reference: 'synthetic-pantry-28' })
+  const row = (await h.view('state')).settings.agents.find(a => a.name === 'synthetic-pantry-8')
+  await h.command('month-close.schedule', { agentId: row.id, period: '2026-11', enabled: true })
+  await h.cron(Date.parse('2026-11-22T12:00:00Z'))
+  const report = await agent.call('month-close', { period: '2026-11' })
+  assert.equal((await agent.call('context')).proposals.filter(p => p.payload.action === 'post-draft' && p.status === 'proposed').length, 1)
+  assert.equal(report.mechanical.find(c => c.key === 'drafts').status, 'proposed')
+  const actions = report.corrections.filter(c => c.check === 'drafts')
+  assert.deepEqual(actions.map(c => [c.kind, c.recordId]).sort(), [['post-draft', draft.id], ['post-bill', bill.id], ['approve-invoice', invoice.id]].sort())
+  assert.equal((await h.view('journal')).entries.find(e => e.id === draft.id).status, 'draft')
+  const keeper = await member('synthetic-pantry-29@example.test', 'bookkeeper')
+  const restricted = await member('synthetic-pantry-30@example.test', 'accountant', { canPost: true, bankAccounts: [] })
+  const viewer = await member('synthetic-pantry-33@example.test', 'viewer')
+  const proposal = id => agent.call('proposals/' + id)
+  const decide = async p => {
+    await h.command('proposal.preview', { id: p.id, revision: p.revision }, viewer, 403)
+    await h.command('proposal.decide', { id: p.id, revision: p.revision }, viewer, 403)
+    const effects = (await h.command('proposal.preview', { id: p.id, revision: p.revision })).effects
+    await h.command('proposal.decide', { id: p.id, revision: p.revision, previewToken: effects.token })
+    const action = { 'post-draft': 'journal.post', 'post-bill': 'bill.record', 'approve-invoice': 'invoice.approve', 'issue-invoice': 'invoice.issue', 'allocate-payment': 'payment.allocate' }[p.payload.action]
+    if (action) {
+      const activity = await h.view('activity')
+      assert.ok(activity.audit.some(a => a.action === action && a.subject_id === p.payload.id && a.actor_email === 'owner@example.test'), 'the native correction audit names its record and human approver')
+      assert.ok(activity.approvals.some(a => a.subject_kind === 'proposal' && a.subject_id === p.id), 'the exact proposal approval is retained')
+    }
+    return effects
+  }
+  const posting = await proposal(actions.find(c => c.kind === 'post-draft').proposalId)
+  await h.command('proposal.preview', { id: posting.id, revision: posting.revision }, keeper, 403)
+  await h.command('proposal.preview', { id: posting.id, revision: posting.revision }, restricted, 403)
+  const initialEffects = (await h.command('proposal.preview', { id: posting.id, revision: posting.revision })).effects
+  assert.equal(initialEffects.netIncome.after - initialEffects.netIncome.before, -1700)
+  draft = await h.command('journal.save-draft', { id: draft.id, revision: draft.revision, date: '2026-11-15', memo: 'synthetic-pantry-21 revised', documentId: doc.id, lines: [{ accountId: s.acct['6000'], debit: '18.00' }, { accountId: s.acct['3000'], credit: '18.00' }] })
+  await h.command('proposal.decide', { id: posting.id, revision: posting.revision, previewToken: initialEffects.token }, undefined, 409)
+  const revised = await agent.call('month-close', { period: '2026-11' })
+  const draftProposal = await proposal(revised.corrections.find(c => c.recordId === draft.id).proposalId)
+  const effects = await decide(draftProposal)
+  assert.equal(effects.netIncome.after - effects.netIncome.before, -1800)
+  assert.equal((await h.view('journal')).entries.find(e => e.id === draft.id).status, 'posted')
+  await h.command('proposal.decide', { id: draftProposal.id, revision: draftProposal.revision, previewToken: effects.token }, undefined, 409)
+  await decide(await proposal(revised.corrections.find(c => c.kind === 'post-bill').proposalId))
+  await decide(await proposal(revised.corrections.find(c => c.kind === 'approve-invoice').proposalId))
+  const approved = await agent.call('month-close', { period: '2026-11' })
+  await decide(await proposal(approved.corrections.find(c => c.kind === 'issue-invoice').proposalId))
+  const allocations = await agent.call('month-close', { period: '2026-11' })
+  assert.deepEqual(allocations.corrections.filter(c => c.kind === 'allocate-payment').map(c => c.recordId).sort(), [receive.id, pay.id].sort())
+  for (const correction of allocations.corrections.filter(c => c.kind === 'allocate-payment')) {
+    const p = await proposal(correction.proposalId)
+    const before = (await h.command('proposal.preview', { id: p.id, revision: p.revision })).effects
+    assert.deepEqual(before.bases.accrual.before, before.bases.accrual.after)
+    const cashChange = before.bases.cash.after.profitAndLoss.netIncome - before.bases.cash.before.profitAndLoss.netIncome
+    assert.equal(cashChange, correction.recordId === receive.id ? 7500 : -5000)
+    await decide(p)
+  }
+  const sales = await h.view('sales')
+  assert.equal(sales.invoices.find(i => i.id === invoice.id).open_cents, 0)
+  assert.equal(sales.bills.find(b => b.id === bill.id).open_cents, 0)
+  assert.deepEqual(sales.payments.filter(p => [receive.id, pay.id].includes(p.id)).map(p => p.unallocated_cents), [0, 0])
+  assert.equal((await h.view('close/2026-11')).status, 'open')
+  // The supported month reaches every mechanical check before its four
+  // reviews; preparation and approvals leave the actual lock to the accountant.
+  const imported = await h.command('statement.import', { bankAccountId: s.bank.id, fileName: 'synthetic-pantry-32.csv', content: 'Date,Description,Amount\n2026-11-10,Synthetic receipt,75.00\n2026-11-10,Synthetic payment,-50.00\n', opening: '1125.00', closing: '1150.00', start: '2026-11-01', end: '2026-11-30', confirmLast4: '4821' })
+  const matching = await agent.call('month-close', { period: '2026-11' })
+  for (const correction of matching.corrections.filter(c => c.kind === 'match')) await decide(await proposal(correction.proposalId))
+  const reconciled = await agent.call('month-close', { period: '2026-11' })
+  const rec = reconciled.reconciliations.find(r => r.statementId === imported.statement.id)
+  const reconciliation = await proposal(rec.proposalId)
+  await h.command('proposal.decide', { id: reconciliation.id, revision: reconciliation.revision })
+  const complete = await agent.call('month-close', { period: '2026-11' })
+  assert.deepEqual(complete.mechanical.filter(c => c.status !== 'done'), [])
+  assert.deepEqual(complete.corrections, [])
+  assert.equal(complete.status, 'open')
+  await h.command('proposal.decide', { id: complete.packet.id, revision: complete.packet.revision }, ann)
+  const reviews = (await h.view('close/2026-11')).tasks.filter(t => t.judgment_kind)
+  assert.deepEqual(reviews.map(t => t.judgment_kind).sort(), ['estimates', 'materiality', 'reclassification', 'reopening'])
+  for (const task of reviews) await h.command('close.task', { id: task.id, revision: task.revision, note: 'Reviewed source evidence and recommendation.' }, ann)
+  for (const pending of (await h.view('proposals')).proposals.filter(p => p.status === 'proposed')) await h.command('proposal.decide', { id: pending.id, revision: pending.revision, decision: pending.kind === 'variance-note' ? 'approve' : 'reject' }, ann)
+  assert.equal((await h.view('close/2026-11')).status, 'open')
+  await h.command('period.lock', { period: '2026-11' }, ann)
+  assert.equal((await h.view('close/2026-11')).status, 'locked')
+  await h.command('proposal.preview', { id: posting.id, revision: posting.revision }, undefined, 409)
+  const ambiguous = await h.command('contact.save', { kind: 'customer', name: 'synthetic-pantry-31' })
+  for (let i = 0; i < 2; i++) {
+    const inv = await h.command('invoice.save-draft', { customerId: ambiguous.id, issueDate: '2026-12-20', lines: [{ description: 'Synthetic service', quantity: '1', rate: '30.00', accountId: s.acct['4000'], taxCode: 'exempt' }] })
+    const a = await h.command('invoice.approve', { id: inv.id, revision: inv.revision })
+    await h.command('invoice.issue', { id: a.id })
+  }
+  const ambiguousPayment = await h.command('payment.record', { direction: 'received', contactId: ambiguous.id, bankAccountId: s.bank.id, date: '2026-12-21', amount: '30.00' })
+  const unsupported = await h.command('journal.save-draft', { date: '2026-12-16', memo: 'synthetic-pantry-22', lines: [{ accountId: s.acct['6000'], debit: '19.00' }, { accountId: s.acct['3000'], credit: '19.00' }] })
+  const unresolved = await agent.call('month-close', { period: '2026-12' })
+  assert.ok(!unresolved.corrections.some(c => c.recordId === unsupported.id))
+  assert.ok(!unresolved.corrections.some(c => c.recordId === ambiguousPayment.id))
+  assert.equal(unresolved.mechanical.find(c => c.key === 'unapplied').status, 'needs-evidence')
+  assert.equal(unresolved.mechanical.find(c => c.key === 'drafts').status, 'needs-evidence')
 }

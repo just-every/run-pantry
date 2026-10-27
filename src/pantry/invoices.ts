@@ -16,7 +16,7 @@ import { all, approval, assertOpen, audit, changed, one, periodOpen, q, run, typ
 import { controlAccount } from './accounts'
 import { contact } from './contacts'
 import { entryStatements, type Line } from './journal'
-import type { Command } from './context'
+import type { Command, Context } from './context'
 import { documentSelectionStatements, issuedDocumentStatements } from './invoice-documents'
 import { customValues, nextInvoiceNumber, selectedTemplate } from './invoice-templates'
 import { applicableExemption, assertInvoiceExemption, destinationState, exemptionDay, exemptionFence } from './exemptions'
@@ -169,7 +169,7 @@ async function approvalChecks(db: D1Database, current: Data) {
   return certificateGuards
 }
 
-const approve: Command = { need: 'post', async run(c, b) {
+export async function invoiceApprovalPlan(c: Pick<Context, 'db' | 'actor'>, b: Data) {
   const current = await invoice(c.db, text(b.id, 'Invoice'))
   requireThat(current.status === 'draft', 'Only a draft is approved', 409)
   requireThat(current.revision === b.revision, 'Invoice changed since you reviewed it; review it again', 409)
@@ -180,10 +180,14 @@ const approve: Command = { need: 'post', async run(c, b) {
   }
   const certificateGuards = await approvalChecks(c.db, current)
   const revision = uid()
-  await run(c.db, [authority(c.actor, 'post'), ...(current.deposit ? bankAuthority(c.actor, [current.deposit.bankAccountId]) : []), ...certificateGuards, ...treatmentFence(current.early_offer), periodOpen(current.issue_date), approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
+  return { id: current.id, day: current.issue_date, dates: [current.issue_date], statements: [authority(c.actor, 'post'), ...(current.deposit ? bankAuthority(c.actor, [current.deposit.bankAccountId]) : []), ...certificateGuards, ...treatmentFence(current.early_offer), periodOpen(current.issue_date), approval(who(c.actor), current.kind, current.id, current.revision, 'approve', 'approved', optionalText(b.note, 'Note', 500)),
     q("UPDATE pt_invoices SET status = 'approved', approved_by = ?, approved_revision = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'draft'", c.actor.email, revision, revision, current.id, b.revision), changed(),
-    audit(who(c.actor), `${current.kind}.approve`, current.kind, current.id, current.early_offer ? { earlyOffer: current.early_offer } : {})])
-  return invoice(c.db, current.id)
+    audit(who(c.actor), `${current.kind}.approve`, current.kind, current.id, current.early_offer ? { earlyOffer: current.early_offer } : {})] }
+}
+const approve: Command = { need: 'post', async run(c, b) {
+  const plan = await invoiceApprovalPlan(c, b)
+  await run(c.db, plan.statements)
+  return invoice(c.db, plan.id)
 } }
 
 /** The invoice fields issuing reads; an invoice being created in the same batch passes them directly. */
@@ -245,14 +249,18 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
   return { journalId, statements }
 }
 
-const issue: Command = { need: 'record', async run(c, b) {
+export async function invoiceIssuingPlan(c: Pick<Context, 'db' | 'actor'>, b: Data) {
   const current = await invoice(c.db, text(b.id, 'Invoice'))
   if (current.write_off || current.early_detail?.honoredAfterWindow) must(c.actor, 'post')
   requireThat(current.status === 'approved' && current.approved_revision === current.revision, 'Approve the current version before issuing', 409)
   await assertOpen(c.db, current.issue_date)
   const issued = await issueStatements(c.db, current as Issuable, c.actor)
-  await run(c.db, [authority(c.actor, 'record'), ...(current.write_off || current.early_detail?.honoredAfterWindow ? [authority(c.actor, 'post')] : []), ...issued.statements])
-  return invoice(c.db, current.id)
+  return { id: current.id, day: current.issue_date, dates: [current.issue_date], statements: [authority(c.actor, 'record'), ...(current.write_off || current.early_detail?.honoredAfterWindow ? [authority(c.actor, 'post')] : []), ...issued.statements] }
+}
+const issue: Command = { need: 'record', async run(c, b) {
+  const plan = await invoiceIssuingPlan(c, b)
+  await run(c.db, plan.statements)
+  return invoice(c.db, plan.id)
 } }
 
 const approveIssue: Command = { need: 'post', async run(c, b) {

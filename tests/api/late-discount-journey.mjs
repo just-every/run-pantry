@@ -48,6 +48,7 @@ export async function lateDiscountJourney({ h, acct, customer, bank, ann }) {
   assert.equal((await h.command('invoice.approve-issue', { id: withinCredit.id, revision: withinCredit.revision, limitRevision: (await limit()).revision }, book)).early_discount, 1)
   const parallel = await make()
   const credits = await Promise.all([1, 2].map(() => h.command('early-discount.prepare-late', { ...body, invoiceId: parallel.id }, book)))
+  assert.equal(new Set(credits.map(c => c.number)).size, 2, 'Concurrent preparations retain separate credit numbers')
   for (const c of credits) await h.command('invoice.approve', { id: c.id, revision: c.revision }, ann)
   const attempts = await Promise.all(credits.map(c => h.send('/api/pantry/command/invoice.issue', { id: c.id }, { cookie: ann })))
   assert.deepEqual(attempts.map(r => r.status).sort(), [200, 409], 'Concurrent honors cannot discount the same invoice twice')

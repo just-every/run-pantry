@@ -122,7 +122,7 @@ const deleteDraft: Command = { need: 'record', async run(c, b) {
 } }
 
 /** Posting a manual draft is an approval of the exact revision the approver reviewed. */
-const post: Command = { need: 'post', async run(c, b) {
+export async function journalPostingPlan(c: Pick<import('./context').Context, 'db' | 'actor'>, b: Data) {
   const current = await entry(c.db, text(b.id, 'Entry'))
   requireThat(current.status === 'draft', 'Entry is already posted', 409)
   requireThat(current.source_kind === 'manual', 'Opening balances post through the cutover sign-off', 409)
@@ -130,8 +130,12 @@ const post: Command = { need: 'post', async run(c, b) {
   requireThat(c.actor.kind === 'person' && (c.actor.role === 'owner' || current.prepared_by !== c.actor.email), 'Someone other than the preparer approves this entry', 403)
   if (current.adjusting) await assertAdjustingDate(c.db, current.entry_date)
   await assertOpen(c.db, current.entry_date)
-  await run(c.db, [authority(c.actor, 'post'), ...nativeApprovalAuthority(c.actor, 'journal', current.lines.reduce((sum: number, l: Data) => sum + l.debit_cents, 0)), ...await ledgerBankAuthority(c.db, c.actor, current.lines.map((l: Data) => l.account_id), 'post'), approval(who(c.actor), 'journal', current.id, current.revision, 'post', 'approved', optionalText(b.note, 'Note', 500)), ...postStatements(current.id, c.actor.email, current.revision), audit(who(c.actor), 'journal.post', 'journal', current.id, { before: draftSnapshot(current), after: { status: 'posted', postedBy: c.actor.email } })])
-  return entry(c.db, current.id)
+  return { id: current.id, day: current.entry_date, dates: [current.entry_date], statements: [authority(c.actor, 'post'), ...nativeApprovalAuthority(c.actor, 'journal', current.lines.reduce((sum: number, l: Data) => sum + l.debit_cents, 0)), ...await ledgerBankAuthority(c.db, c.actor, current.lines.map((l: Data) => l.account_id), 'post'), approval(who(c.actor), 'journal', current.id, current.revision, 'post', 'approved', optionalText(b.note, 'Note', 500)), ...postStatements(current.id, c.actor.email, current.revision), audit(who(c.actor), 'journal.post', 'journal', current.id, { before: draftSnapshot(current), after: { status: 'posted', postedBy: c.actor.email } })] }
+}
+const post: Command = { need: 'post', async run(c, b) {
+  const plan = await journalPostingPlan(c, b)
+  await run(c.db, plan.statements)
+  return entry(c.db, plan.id)
 } }
 
 /** `unmatching`: the same batch ends the entry's match first (undoing a filing by rule). */

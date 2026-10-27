@@ -16,7 +16,11 @@ export async function fixtureTime(request: Request, action: (request: Request) =
   const clean = new Request(request, { headers })
   const time = new NativeDate(at).getTime()
   if (!Number.isFinite(time)) throw new Error('Invalid fixture clock')
-  return clocks.run(time, () => action(clean))
+  // Historical books must not mint a session already expired by D1's clock.
+  // Preserve future scenarios while keeping past-date sign-ins current.
+  const requestTime = new URL(request.url).pathname === '/auth/bootstrap'
+    ? Math.max(time, NativeDate.now()) : time
+  return clocks.run(requestTime, () => action(clean))
 }
 
 export async function fixtureScheduled(at: number, action: () => Promise<void>) {
