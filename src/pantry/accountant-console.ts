@@ -1,6 +1,8 @@
 import type { Bindings } from '../auth.server'
 import { runtimeBindings } from '../auth.server'
 import { authority, who, type Person } from './access'
+import { dashboard } from './dashboard'
+import { overview } from './views'
 import { limitedBanks } from './access-policy/doors'
 import type { Command, Context } from './context'
 import { requireThat, sha256, text, uid } from './core'
@@ -26,14 +28,11 @@ async function summary(db: D1Database, actor: Person) {
   const entity = await one(db, 'SELECT legal_name FROM pt_entity WHERE id=1')
   const grants = { post: actor.grants.post, lock: actor.grants.lock, reopen: actor.grants.reopen }
   if (limitedBanks(actor)) return { name: entity?.legal_name ?? 'Unconfigured business', role: actor.role, grants, restricted: true, currentThrough: null, reviewQueue: null, openQuestions: null, closeStatus: null }
-  const row = await one(db, `SELECT
-    (SELECT MAX(end_date) FROM pt_periods WHERE status='locked') AS locked,
-    (SELECT COUNT(*) FROM pt_journal_entries WHERE status='draft') +
-    (SELECT COUNT(*) FROM pt_proposals WHERE status='proposed') +
-    (SELECT COUNT(*) FROM pt_receipts WHERE status='review') AS reviewQueue,
-    (SELECT COUNT(*) FROM pt_questions WHERE status IN ('open','confirm')) AS openQuestions`)
+  const [status, work] = await Promise.all([dashboard(db, new Date().toISOString().slice(0,10)), overview(db)])
+  const reviewQueue = Object.entries(work.queue).filter(([key]) => key !== 'questions').reduce((sum, [,count]) => sum + count, 0) + status.work.billsToApprove
   return { name: entity?.legal_name ?? 'Unconfigured business', role: actor.role, grants, restricted: false,
-    currentThrough: row?.locked ?? null, reviewQueue: Number(row?.reviewQueue ?? 0), openQuestions: Number(row?.openQuestions ?? 0), closeStatus: row?.locked ? `Locked through ${row.locked}` : 'No locked periods' }
+    currentThrough: status.currentThrough, reviewQueue, openQuestions: work.queue.questions,
+    closeStatus: work.lastLocked ? `Locked through ${work.lastLocked}` : 'No locked periods' }
 }
 
 export const accountantCommands: Record<string, Command> = {
@@ -73,7 +72,7 @@ export const accountantCommands: Record<string, Command> = {
 }
 
 async function remote(c: Context, origin: string, token: string) {
-  const response = await fetch(origin + '/accountant-status', { redirect: 'manual', signal: AbortSignal.timeout(5000), headers: { authorization: `Bearer ${token}` } })
+  const response = await fetch(origin + '/api/pantry/accountant-status', { redirect: 'manual', signal: AbortSignal.timeout(5000), headers: { authorization: `Bearer ${token}` } })
   requireThat(response.ok, 'Client status permission is no longer available', response.status === 401 || response.status === 403 ? 403 : 502)
   requireThat(Number(response.headers.get('content-length') ?? 0) <= 8192, 'Client status response is too large', 502)
   const body = await response.text()

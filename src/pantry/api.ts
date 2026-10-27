@@ -160,7 +160,7 @@ api.use('*', async (c, next) => {
   c.executionCtx.waitUntil(runDueWork(c.env).catch(error => console.error('Pantry due work failed:', error)))
 })
 api.get('/health', c => c.json({ status: 'ok', ...deploymentHealth(c.env) }))
-api.get('/accountant-status', async c => { c.header('cache-control','no-store'); return c.json(await accountantStatus(c.req.raw,c.env)) })
+api.get('/api/pantry/accountant-status', async c => { c.header('cache-control','no-store'); return c.json(await accountantStatus(c.req.raw,c.env)) })
 registerTextingRoutes(api)
 api.route('/', customer)
 api.route('/', w9Public)

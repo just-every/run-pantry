@@ -714,6 +714,12 @@
       "name": "0118_month_close.sql",
       "sha256": "03a864479e7fcfe617bfa7265338cae2878919b1077e97f4842de0f905fcfe7f",
       "sql": "-- Recurring preparation is explicit owner consent; existing approvals still govern posting.\nCREATE TABLE pt_month_close_schedules (\n agent_id TEXT NOT NULL REFERENCES pt_agents(id),\n period TEXT NOT NULL,\n enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),\n approved_by TEXT NOT NULL,\n updated_at TEXT NOT NULL,\n PRIMARY KEY (agent_id, period)\n);\nALTER TABLE pt_close_tasks ADD COLUMN judgment_kind TEXT;\nALTER TABLE pt_close_tasks ADD COLUMN proposal_id TEXT;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0119_accountant_console.sql",
+      "sha256": "03e82e42571e021c647bc23771cab192678781799a31fecff51325819ea5becc",
+      "sql": "-- Read-only client status grants are separate from native sign-in authority.\nCREATE TABLE pt_accountant_status_grants (\n email TEXT PRIMARY KEY REFERENCES pt_members(email) ON UPDATE CASCADE ON DELETE CASCADE,\n token_hash TEXT NOT NULL UNIQUE,\n member_revision TEXT NOT NULL,\n expires_at INTEGER NOT NULL\n);\nCREATE TABLE pt_accountant_clients (\n person_id TEXT NOT NULL,\n origin TEXT NOT NULL,\n token_sealed TEXT NOT NULL,\n PRIMARY KEY (person_id, origin)\n);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",
@@ -724,6 +730,7 @@
   "durableObjectMigrations": [],
   "publicVariables": {
     "MAIL_PROVIDER": "",
+    "PANTRY_ACCOUNTANT_CLIENTS": "",
     "MAIL_FROM": "",
     "MAIL_RELAY_URL": "",
     "MAIL_ACCOUNT_ID": ""

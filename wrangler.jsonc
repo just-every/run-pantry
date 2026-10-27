@@ -22,6 +22,7 @@
   ],
   "vars": {
     "MAIL_PROVIDER": "",
+    "PANTRY_ACCOUNTANT_CLIENTS": "",
     "MAIL_FROM": "",
     "MAIL_RELAY_URL": "",
     "MAIL_ACCOUNT_ID": ""

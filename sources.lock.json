@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "385d5088363140cbb395c3c269c2010a39165d6c023e1a50bed2f433de7ed27a",
+      "sha256": "4fa81d0e54a990f69ee60d2237071b262a8ecf8480762ba0a265ca4c1e9e94b9",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -95,7 +95,7 @@
       "executable": false
     },
     "AGENTS.md": {
-      "sha256": "4a9374ddf79d175dd415401f0b8e76271d70d02dd4cf6762e797d93a9b70fa6b",
+      "sha256": "ff895caaa679a0ef1a0d272f6d2e9605de0b120ac2136a81eea91aff08f0f0a6",
       "executable": false
     },
     "API.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "6f57f73a4101e97c2fcbdeb6d3e7d843def95660a0d4b2d48ed01507cf42bdd1",
+      "sha256": "aa5cbf854db3e7fcad927cc0aef4bf0e158aa77fb4aa7af8c1198e6341a55646",
       "executable": false
     },
     "DEMO.md": {
@@ -134,6 +134,10 @@
       "sha256": "880a7d1331f99e27330ccbe9ce1d328369ea18698b0a7eaba9782a2e8da4ea29",
       "executable": false
     },
+    "docs/accountant-console.md": {
+      "sha256": "8949eaf15b0ed141bb7d5c5b73cccb9cb2b388f5f0ee149fce003c7b6b180406",
+      "executable": false
+    },
     "docs/agent-work.md": {
       "sha256": "1c0f6c7f46eda9afc9b5811f97b1cc9f9c7b05360877dc20f88abff4c55bfcf1",
       "executable": false
@@ -147,7 +151,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "61d2265b5a9778248614be85fdddb788450f7552816df8b6ae2583a9fdbbd761",
+      "sha256": "535d16ca058d3ecec46a22a0614d287d3042de63b0b4c2a5ad7fa51da6a409ef",
       "executable": false
     },
     "docs/close.md": {
@@ -403,7 +407,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "6993243e571d6e5f081053aeebb47ced11cdb0c3324a9eb81fd3cf2d9e692dc0",
+      "sha256": "be582f4367482e509c6b34d2ed90e7bbcff4b6409bd383bf9beebe40855c899d",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -879,7 +883,7 @@
       "executable": false
     },
     "migrations/core/0119_accountant_console.sql": {
-      "sha256": "e0ad266ca6894982ffb1b29e12ed333e9d048a8c22cc33ed2f41f7d08868704e",
+      "sha256": "03e82e42571e021c647bc23771cab192678781799a31fecff51325819ea5becc",
       "executable": false
     },
     "migrations/rewrites.json": {
@@ -907,7 +911,7 @@
       "executable": false
     },
     "packaging.json": {
-      "sha256": "274204f8777ec87e0058e5ffaafff64c19a502b709232999f8386962359fe346",
+      "sha256": "853430e540a67188eba55f0ecefe596e8210f9b1429fe7c42931203abe4d5faf",
       "executable": false
     },
     "pnpm-lock.yaml": {
@@ -1208,6 +1212,10 @@
     },
     "scripts/ci/chromium-probe.mjs": {
       "sha256": "c57c6ab541b0c9eb2a10896da3d027b4400f15744063acfd16d7faeb00c02110",
+      "executable": false
+    },
+    "scripts/contract-docs.mjs": {
+      "sha256": "ce29e5977412fade51d0e8a775511950535df2388199be6ea25d199e94750f5f",
       "executable": false
     },
     "scripts/delivery/base/artifact.mjs": {
@@ -3327,7 +3335,7 @@
       "executable": false
     },
     "src/pantry/accountant-console.ts": {
-      "sha256": "1e052baeb3c33148634abeae23ed9a1567d2eb80066460a48c7659125421ac97",
+      "sha256": "0df632c9c4f4c016ead02b73657d9129a9db028937e6d7393ddd5b6944116980",
       "executable": false
     },
     "src/pantry/accountant-export.ts": {
@@ -3343,7 +3351,7 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "384a9a3a631c7e2494691be8e713e6fb78367c0a47762fc69b19117b519d4245",
+      "sha256": "0686827b25715c34009739df9d77187ab168dfbbcbc57eac0e53d5d126a4648b",
       "executable": false
     },
     "src/pantry/approved-write-offs.ts": {
@@ -5175,7 +5183,7 @@
       "executable": false
     },
     "src/ui/accountant-console.tsx": {
-      "sha256": "d2a96f94ce7e3e3345a4447b0223a36df11bea5196d001d9bf217989eda11312",
+      "sha256": "79c65a032b56304af7e07e56a2b32b0672bff73caf6d893e551bead433342752",
       "executable": false
     },
     "src/ui/activity-labels.ts": {
@@ -6006,6 +6014,10 @@
       "sha256": "60f271d46578e9afb6f4c58bfd5d868aab83d59ab1784d86fec12c4f90918635",
       "executable": false
     },
+    "tests/app/accountant-console.test.mjs": {
+      "sha256": "5dcb6a7ea26d18898bf9a342ab673548c59f8c7774283c98560b8b7e67454faa",
+      "executable": false
+    },
     "tests/app/app.test.mjs": {
       "sha256": "78622b62e73d4991eedb863efd3d04c1773adcff0f8992ab69105caf11fc90fd",
       "executable": false
@@ -6363,7 +6375,7 @@
       "executable": false
     },
     "wrangler.jsonc": {
-      "sha256": "d29870f116ede60a672fcc074355d046c23f41d88e2c6b63a131d6bd2de7edec",
+      "sha256": "fd9fb978d0d88651ba2d2e53501b7d4f37756aa04cb34153ecba1236dcf4cda6",
       "executable": false
     }
   }
