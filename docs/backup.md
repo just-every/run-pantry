@@ -37,7 +37,7 @@ For an owner-controlled scheduler, run the same command from the exact deployed 
 cd ./run-pantry && node scripts/hosted-backup.mjs --env-file ./pantry-deploy.env --environment production
 ```
 
-New own-account hosted deploys provision a private `PANTRY_BACKUPS` R2 binding. The minute Cron starts one complete archive per UTC day and advances at most 32 archive parts per tick; the accounting schedule remains half-hourly. A durable lease prevents overlapping ticks from publishing duplicates. Multipart uploads keep memory bounded; failed uploads are aborted. Failed work retries on a later tick, and erasure invalidates an unfinished snapshot before a fresh snapshot is taken. No archive is deleted automatically.
+New own-account hosted deploys provision a private `PANTRY_BACKUPS` R2 binding. The half-hour Cron starts one complete archive per UTC day and advances at most 32 archive parts per tick. Minute ticks drain original-document copies without advancing the larger database snapshot. A durable lease prevents overlapping ticks from publishing duplicates. Multipart uploads keep memory bounded; failed uploads are aborted. Failed work retries on a later tick, and erasure invalidates an unfinished snapshot before a fresh snapshot is taken. No archive is deleted automatically.
 
 A saved archive job can disappear when an owner erases personal data. The next scheduled tick replaces that missing job with a fresh snapshot through the same erasure fence, finishes the oldest incomplete day, then continues later days. A provider upload failure retains a valid completed snapshot for retry.
 

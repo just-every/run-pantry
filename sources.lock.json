@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "a4fe655bf12c23db6ee64f1786da2922cb2fe6786c5c8075986da38bf25a45bc",
+      "sha256": "4129acbad605ae1cbdfac79b0f33ddb68dca3841ae1c557d9093d28798a04710",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "a115208bbf9a5f570eb9e1d53bcb9473aff07e304f36080eba8c1409f52e69eb",
+      "sha256": "a015d704e7e8399a7470d2cba44adadcf089d05e28521303b84fa8e12df676dd",
       "executable": false
     },
     "DEMO.md": {
@@ -139,7 +139,7 @@
       "executable": false
     },
     "docs/backup.md": {
-      "sha256": "55f42ba1e6141bf9aa435c19608477a9a895d48c04bb06ac8a8f4d7f6e54ea6c",
+      "sha256": "b734805680b0a06f53d463e8838f18e14b5521329069732b947b161c9da6f78b",
       "executable": false
     },
     "docs/bank-feeds-and-rules.md": {
@@ -4667,7 +4667,7 @@
       "executable": false
     },
     "src/pantry/scheduled.ts": {
-      "sha256": "f67241afbd31dcfe139f88440cbde54460f089cb56c5cc14684c3a47fd624b4c",
+      "sha256": "2e21994f34757a10de73135ea58d37d178ec2a135397f09afbdbd9d3576c9a6c",
       "executable": false
     },
     "src/pantry/seal.ts": {
