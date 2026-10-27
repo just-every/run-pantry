@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "7be14d9bb24dc8a27507f1fc9e66c965ffdc2b971ef8c8601afdefa2ecd9ae6a",
+      "sha256": "6de26c31d9487e14d8a6a6f3d0579b5595cd6c0057ad40b250f2f48d51a2f038",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "b3798281a7049cb05a1ac2582004ada059c2fd02a5fbea2eb7a88cff228ca2f6",
+      "sha256": "be66cd443da1316f7592d2d541600338cf73f20595d98b6c8194ca7907c651a2",
       "executable": false
     },
     "DEMO.md": {
@@ -1200,6 +1200,10 @@
     },
     "rer-setup.json": {
       "sha256": "de50dddcda776fc2822fa70475bdc98bc2330e504c709476a36bd6be207dfdc5",
+      "executable": false
+    },
+    "RULINGS.md": {
+      "sha256": "f52e4c10808f1b4c9a8ec57c6ce59cf1d857d8a962219dd9facb7704d1cb37da",
       "executable": false
     },
     "RUN-LOCALLY.md": {
@@ -6019,7 +6023,7 @@
       "executable": false
     },
     "tests/app/accountant-console.test.mjs": {
-      "sha256": "c63f4a0b4d86b9aa54b90b39114cf4932932f9050a61f7fdb4d8165f78f4031e",
+      "sha256": "65bbf5456d113df7bdb21d75c1466ba9a1c5048baf4d31dbf78a30c7cc009b0e",
       "executable": false
     },
     "tests/app/app.test.mjs": {

@@ -14,7 +14,8 @@ test('accountant connects three clients with distinct status and grants, and own
   t.after(() => browser.close())
   const owners = [], accountants = [], keys = [], expiries = [], charts = [], entries = []
   const email = 'synthetic-pantry-1@example.test'
-  const idp=accountantIssuer(email), shared=await browser.newContext()
+  // Hosted requests carry this edge header; native OIDC requires it for start limits.
+  const idp=accountantIssuer(email), shared=await browser.newContext({extraHTTPHeaders:{'CF-Connecting-IP':'192.0.2.126'}})
   await shared.route(idp.issuer+'/**',idp.browserRoute)
   async function command(context, i, op, data, status=200) {
     const response = await context.request.post(apps[i].origin + '/api/pantry/command/' + op, {headers:{origin:apps[i].origin},data})
