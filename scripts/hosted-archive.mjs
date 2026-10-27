@@ -65,6 +65,8 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
     process.exitCode = 2
   } else {
     let proxy
+    const previousLog = process.env.WRANGLER_LOG
+    process.env.WRANGLER_LOG = 'warn'
     try {
       let bucket
       if (args.includes('--local-documents')) {
@@ -78,6 +80,10 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
       // Native SQL errors can include private row values; report only a code.
       console.error('Hosted archive failed (' + (error.code === 'EEXIST' ? 'output_exists' : ['unsupported_snapshot_statement','source_erasure_identity_missing','snapshot_foreign_keys'].includes(error.message) ? error.message : /^[A-Za-z_]+$/.test(error.code ?? '') ? error.code : 'snapshot_invalid') + '); original SQL was retained. No archive was published.')
       process.exitCode = 2
-    } finally { await proxy?.dispose() }
+    } finally {
+      await proxy?.dispose()
+      if (previousLog === undefined) delete process.env.WRANGLER_LOG
+      else process.env.WRANGLER_LOG = previousLog
+    }
   }
 }

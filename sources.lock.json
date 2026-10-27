@@ -1387,7 +1387,7 @@
       "executable": false
     },
     "scripts/hosted-archive.mjs": {
-      "sha256": "6361be4318753e7261e25b142dc555711c9289bd4d5167199e25f67abcb8f537",
+      "sha256": "1b019dc6d93bdb3ba15c4dd6fe8b2680a2f3a0f306c2a03fce8794f3210e3a00",
       "executable": false
     },
     "scripts/hosted-backup.mjs": {
