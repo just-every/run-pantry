@@ -4,6 +4,10 @@
     {
       "kind": "d1",
       "binding": "DB"
+    },
+    {
+      "kind": "r2",
+      "binding": "PANTRY_BACKUPS"
     }
   ],
   "migrations": [

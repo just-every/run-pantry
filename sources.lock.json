@@ -403,7 +403,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "6506523f67dfd18fa14e0ca5b56505ba78e0811140f2a6a144ad09f94051e9bb",
+      "sha256": "478a935279616a4ad9e5c6e7afdfec4fc5159dfc7f3cc41df24165ec0e60faed",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -1399,7 +1399,7 @@
       "executable": false
     },
     "scripts/installer/portability.mjs": {
-      "sha256": "e07ed0e5190549cc0952e524a8206cb7d80c8d6fc583a6dda0c73725ad72f704",
+      "sha256": "374cffbe1b77a843896b45cf34c9a343b067f45cc3a49c60bbbdca3ca8fe615b",
       "executable": false
     },
     "scripts/installer/seed.mjs": {
@@ -3350,6 +3350,10 @@
       "sha256": "9ff67623de4859a602f8739291caca215694f3e3ce21e32e90b78c6b8600c1cb",
       "executable": false
     },
+    "src/pantry/archive-policy.mjs": {
+      "sha256": "e07ed0e5190549cc0952e524a8206cb7d80c8d6fc583a6dda0c73725ad72f704",
+      "executable": false
+    },
     "src/pantry/ask/index.ts": {
       "sha256": "4003964d256c3bb6b3f30d5dbd0805a4adc85663a3b74d0a4e51bccc963f81ef",
       "executable": false
@@ -4043,7 +4047,7 @@
       "executable": false
     },
     "src/pantry/hosted-backup.mjs": {
-      "sha256": "8c56557d315d123fa34d097db32ce0a7a111a257a661186ada5cce14606e813b",
+      "sha256": "c65a31762c62e8f62350d1fcd241166427293d2cc3590e3e75d95a42be0f970d",
       "executable": false
     },
     "src/pantry/integrations/credentials.ts": {
@@ -6266,6 +6270,10 @@
       "sha256": "ef6dc3efe8e4a75e8d47d9aefc87339dfeec6507be7516368422530102302b4c",
       "executable": false
     },
+    "tests/ops/hosted-scale.mjs": {
+      "sha256": "9df02238d5306b2d3636f7b5fc9d841f48a8c94c6268b906362a73695873b4ac",
+      "executable": false
+    },
     "tests/providers/autopay-card.mjs": {
       "sha256": "1c0306a32443578fe1607b59cba9a2cc08e98510cc7df42943a81c01688fd4b2",
       "executable": false
@@ -6367,7 +6375,7 @@
       "executable": false
     },
     "wrangler.jsonc": {
-      "sha256": "d29870f116ede60a672fcc074355d046c23f41d88e2c6b63a131d6bd2de7edec",
+      "sha256": "2b66921e0cbbbc80cbb62da9c3fb3ac798a2693eb7f924b6d6ec417c25cd505c",
       "executable": false
     }
   }

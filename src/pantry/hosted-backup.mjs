@@ -1,5 +1,5 @@
 import { createPortability } from '@runeditrun/rer/modules/portability'
-import policy from '../../scripts/installer/portability.mjs'
+import policy from './archive-policy.mjs'
 
 // Stream bounded multipart pieces; an archive can exceed the Worker's memory.
 // Publication happens only after every piece succeeds. Failed uploads abort.
@@ -33,9 +33,12 @@ async function storeArchive(bucket, key, source) {
  */
 export async function runHostedBackup(env, scheduledTime) {
   if (!env.PANTRY_BACKUPS) return
-  const db=env.DB, day=new Date(scheduledTime).toISOString().slice(0,10)
+  const db=env.DB, today=new Date(scheduledTime).toISOString().slice(0,10)
   const lease=crypto.randomUUID(), stamp=Date.now()
-  await db.prepare('INSERT OR IGNORE INTO pt_hosted_backup_runs(day) VALUES(?)').bind(day).run()
+  await db.prepare('INSERT OR IGNORE INTO pt_hosted_backup_runs(day) VALUES(?)').bind(today).run()
+  const pending=await db.prepare("SELECT day FROM pt_hosted_backup_runs WHERE status<>'complete' ORDER BY day LIMIT 1").first()
+  if (!pending) return
+  const day=pending.day
   const claim=await db.prepare("UPDATE pt_hosted_backup_runs SET lease_id=?,lease_until=? WHERE day=? AND status<>'complete' AND lease_until<? RETURNING *").bind(lease,stamp+10*60_000,day,stamp).first()
   if (!claim) return
   let job=claim.job_id
