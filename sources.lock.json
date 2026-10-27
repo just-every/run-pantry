@@ -6051,7 +6051,7 @@
       "executable": false
     },
     "tests/app/close-opening-journey.mjs": {
-      "sha256": "6ae3c55d80a09a6689b95d6fdc4ba183320665f2d9344f40489f44363bcdc2c1",
+      "sha256": "975998f21c2836aa84bcaac36f1c68d6967f7361f1c723bc0456079f6f0067d5",
       "executable": false
     },
     "tests/app/collections-journey.mjs": {
