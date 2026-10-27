@@ -112,7 +112,7 @@ test('PAN-14 the accountant package holds the period\'s reports, reconciliations
   const preview=await h.command('erasure.preview',{kind:'contact',id:lead.id})
   await h.command('erasure.execute',{kind:'contact',id:lead.id,fingerprint:preview.fingerprint,requester:'Synthetic requester',channel:'in-person',reason:'Remove obsolete enquiry',confirm:'ERASE'})
   assert.equal(await h.db.prepare('SELECT id FROM rer_portability_jobs WHERE id=?').bind(interrupted.job_id).first(),null,'Erasure deletes the unfinished archive job')
-  await backupTick('2026-10-02')
+  await Promise.all([backupTick('2026-10-02'),backupTick('2026-10-02')])
   const restarted=await h.db.prepare('SELECT * FROM pt_hosted_backup_runs WHERE day=?').bind('2026-10-01').first()
   assert.notEqual(restarted.job_id,interrupted.job_id,'The next daily tick starts a fresh snapshot')
   assert.ok(restarted.job_id)
@@ -139,12 +139,15 @@ test('PAN-14 the accountant package holds the period\'s reports, reconciliations
   assert.ok(inventory.objects.some(o=>o.key===receipt.object_key))
   const archive=await bucket.get(receipt.object_key), rows=[]
   const {readArchive}=await import('@runeditrun/rer/modules/portability')
-  let closing
+  let closing,manifest
   for await(const record of readArchive(archive.body)) {
     if(record.kind==='part')rows.push(...record.items.filter(i=>i.kind==='row'))
     if(record.kind==='closing')closing=record
+    if(record.kind==='manifest')manifest=record
   }
   assert.equal(closing.contentHash,receipt.content_hash)
+  assert.ok(manifest.epoch>0)
+  assert.ok(manifest.journal.length>0,'The replacement snapshot carries the erasure fence')
   assert.ok(rows.some(i=>i.table==='pt_journal_entries'&&i.row.id===posted.id))
   const document=rows.find(i=>i.table==='pt_documents'&&i.row.name==='brightline-inv-88.pdf')
   assert.ok(document,'scheduled backups include supporting document bytes')
@@ -152,8 +155,7 @@ test('PAN-14 the accountant package holds the period\'s reports, reconciliations
   assert.equal(rows.some(i=>i.table==='pt_hosted_backup_runs'||i.table==='oa_sessions'||i.table==='pt_stripe'),false)
   await Promise.all([backupTick(),backupTick()])
   assert.deepEqual((await bucket.list()).objects.map(o=>o.key),inventory.objects.map(o=>o.key))
-  assert.equal(rows.find(i=>i.table==='pt_contacts'&&i.row.id===lead.id)?.row.name,undefined,'The replacement archive contains no erased lead')
-
+  assert.equal(rows.some(i=>i.table==='pt_contacts'&&i.row.id===lead.id),false,'The replacement archive contains no erased lead')
 })
 
 const recurringToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
