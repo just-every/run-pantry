@@ -304,3 +304,9 @@ test('AGENT-009 tax readiness proposes W-9 requests, shows nexus and deadlines a
 
 import { taxReminderJourney } from './tax-reminder-journey.mjs'
 test('Owner reviewed tax batches respect consent, opt-outs, caps and recorded calendar estimates',taxReminderJourney)
+
+import { monthCloseJourney } from './month-close-journey.mjs'
+test('AGENT-005 coordinated month prepares reconciliations, four evidence-backed judgment reviews and exact cited variances without locking', async t => {
+  const h = await harness({ clock: '2026-10-01T12:00:00Z' }); t.after(h.close)
+  await monthCloseJourney(h)
+})

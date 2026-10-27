@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "5ae7ef41225fecb582ef7866f112620aa96e81cc0bf4a29720b0ed4db18c15b2",
+      "sha256": "1b007a943881080174ea19a1116feacdce04a722db56f8133797c1858afb9193",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -99,7 +99,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "0f2f2527e68c29a5a99c7ebf3123e440c15c3ec03a5dd366ab8ef873a5494735",
+      "sha256": "31cbbd6729186148727fc81e1553d6fed3f5362a201495ac3518ad0d1de2389e",
       "executable": false
     },
     "base-copies.json": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "85a9199c8359a66493434e68186a077a4a28e4029b3f1a4617a6179b06809c1a",
+      "sha256": "d571ccf27071505c8dff8a7fd764575fa656fda05eb0f548ffb9a553be7c3db3",
       "executable": false
     },
     "DEMO.md": {
@@ -135,7 +135,7 @@
       "executable": false
     },
     "docs/agent-work.md": {
-      "sha256": "c9a57c0a5047908fa2fe125fe8b3eef25f27dfb80387bdd9e75cee7fd3d3df80",
+      "sha256": "dfd1310d40b40f774cb6b17fa3e036ad5829c6bb307ee4fae23f42842b37ed50",
       "executable": false
     },
     "docs/backup.md": {
@@ -1403,7 +1403,7 @@
       "executable": false
     },
     "scripts/pantry-agent.mjs": {
-      "sha256": "57d12157919c8acc722001e9c9dc7600e7c8736eb0e66c3bfc90b58cf47a7f64",
+      "sha256": "2c9779dba150d3d6a55ce774c68e2b5b8f6581d3288c62a9308f8a5759865604",
       "executable": false
     },
     "scripts/verify.mjs": {
@@ -3327,7 +3327,7 @@
       "executable": false
     },
     "src/pantry/api.ts": {
-      "sha256": "44701236d4d5962ec0c0b70353b975a709b09dea61c5aebb990cdf7179175a5a",
+      "sha256": "6a5293de7bec597daf23fb7dad82d0e56625e57b0c6efec23d13223307eaadf7",
       "executable": false
     },
     "src/pantry/approved-write-offs.ts": {
@@ -4178,6 +4178,10 @@
       "sha256": "8e079194819640e15285d77bcde3397488858ea233551f2364b7986905f654d6",
       "executable": false
     },
+    "src/pantry/month-close.ts": {
+      "sha256": "6b670c8063aa930e9b9dbb0cf000718abf893623ab8c67f3f8cb3fbd57f89de0",
+      "executable": false
+    },
     "src/pantry/nexus-thresholds.ts": {
       "sha256": "ec5b32284dfe9081dc1c8368c31ef933dbbc76e47dffc0bb5c9bbf615a9fe1b5",
       "executable": false
@@ -4259,7 +4263,7 @@
       "executable": false
     },
     "src/pantry/proposals.ts": {
-      "sha256": "b879acc9502e5f575979fbc646eb14d0b5359f2dc91c146524e122b40939c022",
+      "sha256": "8bce50eab6d161085e31274d496ef2d8859d00b7f340a3c874d1957d9b7aa12d",
       "executable": false
     },
     "src/pantry/provider-match.ts": {
@@ -4423,7 +4427,7 @@
       "executable": false
     },
     "src/pantry/reconcile.ts": {
-      "sha256": "c0f0ea12587941a4399b134a9d7e4f1db8809e71b50da2320e00fd76e9f7e89b",
+      "sha256": "937d2722a7a049f9483604746851e3ee183cd173f928777497895b2f352e8f29",
       "executable": false
     },
     "src/pantry/reconciliation-undo.ts": {
@@ -5439,7 +5443,7 @@
       "executable": false
     },
     "src/ui/more.tsx": {
-      "sha256": "c53e955dc25edcacb4fb7882c76d159dcf8a0f158fbe5fd1a12999ca2011d3d5",
+      "sha256": "0647c6e4325b88336b94739067aa6357efd661bef6cceaf741cf374efa31e9ae",
       "executable": false
     },
     "src/ui/move-in-sources.ts": {
@@ -5655,7 +5659,7 @@
       "executable": false
     },
     "tests/api/agent.test.mjs": {
-      "sha256": "a942e9dfc197bdc0571776ba9f631afd5555eac32b7c837f9724cb367c4bee76",
+      "sha256": "ffa511910fed4c3de28ef8a61fc2b6828db1170ddbd50caab7bfd455bc0c0ecb",
       "executable": false
     },
     "tests/api/approved-write-off-journey.mjs": {
@@ -5818,6 +5822,10 @@
       "sha256": "414eb0d11bca9e52f2741a35d673b7cfbd0358bb176c1c354c2c685769be9fa8",
       "executable": false
     },
+    "tests/api/month-close-journey.mjs": {
+      "sha256": "ba7ae7914fbf263d598aca4989858b0d12bcfdc182305be46d786705bddedd9e",
+      "executable": false
+    },
     "tests/api/move-in.test.mjs": {
       "sha256": "b4011f277106f93e74aa227e9f0a0997a6452eab2ebcd458c62c72fc458c4298",
       "executable": false
@@ -5967,7 +5975,7 @@
       "executable": false
     },
     "tests/app/app.test.mjs": {
-      "sha256": "de84b8d35985d5412f31abb952bcf0451427a0f9b3568d6a2c7dc67f4ed93061",
+      "sha256": "8bace5360ad356f99f3c56855214951fc2e08bcf8779dfcbf75e1a175c6969d8",
       "executable": false
     },
     "tests/app/approved-adjustments-journey.mjs": {
@@ -6104,6 +6112,10 @@
     },
     "tests/app/migration-destinations.mjs": {
       "sha256": "4b9fd8f924272ac29d841a4813d19b81127d4f19ca2c3f2d97d0ab286344970f",
+      "executable": false
+    },
+    "tests/app/month-close-journey.mjs": {
+      "sha256": "4a3b14c4be3c68d5d31b5f14ff392ff00b80c65d0d16ae3bec0f0388c6a2b2e3",
       "executable": false
     },
     "tests/app/move-in-journey.mjs": {

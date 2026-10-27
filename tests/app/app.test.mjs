@@ -1,3 +1,4 @@
+import { monthCloseBrowser } from './month-close-journey.mjs'
 import { askJourney } from './ask-books-journey.mjs'
 import { managedMailJourney } from './managed-mail-journey.mjs'
 import { archiveJourney } from './archive-journey.mjs'
@@ -496,6 +497,7 @@ test('CLOSE-003 custom task assignment, due dates, revision review and month loc
       assert.deepEqual(errors, [])
     } finally { await context.close() }
   }
+  await monthCloseBrowser(browser)
 })
 
 test('ERASURE-001 owner preview, receipt, retention confirmation and Activity at 1440 and 390', async t => {
