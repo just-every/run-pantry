@@ -1399,7 +1399,7 @@
       "executable": false
     },
     "scripts/hosted-r2.mjs": {
-      "sha256": "4d52deef584ff0fe66249432a2a4072ebd1adbce9c1d7f2bd9f450fcb794090f",
+      "sha256": "0d9697d64569131ef81e4268cb5373fc50c40cc475bc3935668da58abb6f9f6e",
       "executable": false
     },
     "scripts/hosted-restore.mjs": {

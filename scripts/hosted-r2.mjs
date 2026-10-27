@@ -36,7 +36,7 @@ export function hostedR2({ accountId, token, bucketName, fetcher = fetch }) {
       const response=await request(path(key),{headers:range?{range:`bytes=${range.offset}-${range.offset+range.length-1}`}:undefined})
       if(response.status===404)return null
       if(!response.ok)throw new Error('object_read_failed')
-      return {key,size:Number(response.headers.get('content-length')),etag:(response.headers.get('etag')??'').replaceAll('"',''),httpMetadata:metadataFor(response.headers),customMetadata:{},arrayBuffer:()=>response.arrayBuffer()}
+      return {key,body:response.body,size:Number(response.headers.get('content-length')),etag:(response.headers.get('etag')??'').replaceAll('"',''),httpMetadata:metadataFor(response.headers),customMetadata:{},arrayBuffer:()=>response.arrayBuffer()}
     },
     async put(key, value, options={}) {
       const bytes=value instanceof Uint8Array?value:new Uint8Array(value)
