@@ -25,7 +25,7 @@ export async function drainDocumentObjects(db, bucket, limit = 32) {
       await db.prepare("UPDATE pt_document_objects SET state='erased' WHERE object_key=? AND state='erase-pending'").bind(item.object_key).run()
       continue
     }
-    const doc = await db.prepare('SELECT id,content,size,sha256,media_type,erased_at FROM pt_documents WHERE id=? AND EXISTS(SELECT 1 FROM pt_document_objects o WHERE o.document_id=pt_documents.id AND o.state='staged')').bind(item.document_id).first()
+    const doc = await db.prepare("SELECT id,content,size,sha256,media_type,erased_at FROM pt_documents WHERE id=? AND EXISTS(SELECT 1 FROM pt_document_objects o WHERE o.document_id=pt_documents.id AND o.state='staged')").bind(item.document_id).first()
     if (!doc || doc.erased_at) continue // its transactional trigger queued erasure
     const bytes = await stagedDocumentBytes(db, doc)
     // Never overwrite an existing original or an erasure tombstone.

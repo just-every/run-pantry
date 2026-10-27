@@ -1,4 +1,3 @@
-import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -7,7 +6,7 @@ import { harness, books } from './harness.mjs'
 import { hostedRestoreCommand, hostedRestoreFailure } from '../../scripts/hosted-restore.mjs'
 import { cloudflareEdge, domainImage, recordHostedMigrations, restoredSnapshot, restoreEnvironment, saveHostedArchive } from './hosted-restore-journey.mjs'
 
-test('OPS-001 owner hosted restore preserves posted books and binary originals, refuses occupied books and fences older archives', async t => {
+export async function hostedRestoreFlow(t) {
   const directory = await mkdtemp(join(tmpdir(), 'pantry-hosted-restore-'))
   let active
   t.after(async () => { await active?.close(); await rm(directory, { recursive: true, force: true }) })
@@ -61,4 +60,5 @@ test('OPS-001 owner hosted restore preserves posted books and binary originals, 
   const fenced = cloudflareEdge(active.db,await active.bucket('PANTRY_DOCUMENTS'))
   await assert.rejects(hostedRestoreCommand([...args, '--journal', journal], { env: restoreEnvironment, fetch: fenced.fetch }), error => ['erased_row', 'erasure_epoch', 'later_journal'].includes(hostedRestoreFailure(error)))
   assert.deepEqual(await domainImage(active.db), fresh, 'A later erasure journal prevents all product-row publication')
-})
+  await active.close(); active = undefined
+}

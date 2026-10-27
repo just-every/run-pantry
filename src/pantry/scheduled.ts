@@ -12,7 +12,7 @@ export async function runScheduled(controller:{cron:string;scheduledTime:number}
   await upgradeTins(env)
   await drainDocumentObjects(env.DB,env.PANTRY_DOCUMENTS)
   const deliveries=runWebhooks(env,controller.scheduledTime)
-  if(controller.cron!=='*/30 * * * *'){await deliveries;return}
+  if(controller.cron!=='*/30 * * * *'){await Promise.all([runHostedBackup(env,controller.scheduledTime),deliveries]);return}
   await runDue(env,10)
   await Promise.all([runHostedBackup(env,controller.scheduledTime),deliveries,runDueWork(env,{scheduled:true,reportAt:new Date(controller.scheduledTime)}),runAgent(env,{scheduled:true})])
 }

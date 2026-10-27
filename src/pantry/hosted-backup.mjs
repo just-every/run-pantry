@@ -29,7 +29,7 @@ async function storeArchive(bucket, key, source) {
 }
 
 /** A private R2 binding opts a hosted installation into daily complete archives.
- * Each half-hour tick advances a bounded portion of the durable D1 snapshot.
+ * Each minute tick advances a bounded portion of the durable D1 snapshot.
  * The archive contains ledger and document bytes under the ordinary erasure
  * fence and credential exclusions. No automatic retention deletion is done.
  */

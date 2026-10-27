@@ -120,6 +120,7 @@ async function snapshot(context, origin, docName) {
 }
 
 test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts restore, occupied books stay protected, and known erasures fence older archives', async t => {
+  await (await import('../api/hosted-restore-flow.mjs')).hostedRestoreFlow(t)
   t.after(async () => { for (const server of [...running]) await server.stop(); for (const root of roots) await rm(root, { recursive: true, force: true }) })
   const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH, args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
 

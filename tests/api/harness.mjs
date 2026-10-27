@@ -99,7 +99,7 @@ export async function harness({ bindings = {}, outbound, log, entry = 'tests/api
       return { status: r.status, text: await r.text() }
     }
     /** Fire the Worker's Cron trigger. */
-    const cron = async (scheduledTime=clock ? Date.parse(clock) : Date.now()) => (await mf.getWorker()).scheduled({ cron: '*/30 * * * *',scheduledTime })
+    const cron = async (scheduledTime=clock ? Date.parse(clock) : Date.now(), cron='*/30 * * * *') => (await mf.getWorker()).scheduled({ cron,scheduledTime })
     const close = async () => { await mf.dispose(); await rm(dir, { recursive: true, force: true }) }
     return { db, bucket: name => mf.getR2Bucket(name), origin, owner, mail, send, command, view, member, agent, confirmMail, email, cron, close }
   } catch (error) {

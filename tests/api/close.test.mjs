@@ -104,7 +104,7 @@ test('PAN-14 the accountant package holds the period\'s reports, reconciliations
   // The real scheduled door publishes the complete recovery archive to private
   // object storage. Concurrent or repeated ticks never create a second backup.
   const lead=await h.command('contact.save',{kind:'customer',name:'synthetic-pantry-984'})
-  const backupTick=(day='2026-10-01')=>h.cron(Date.parse(day+'T12:00:00Z'))
+  const backupTick=(day='2026-10-01')=>h.cron(Date.parse(day+'T12:00:00Z'),'* * * * *')
   await backupTick()
   const interrupted=await h.db.prepare('SELECT * FROM pt_hosted_backup_runs WHERE day=?').bind('2026-10-01').first()
   assert.equal(interrupted.status,'building','The first tick leaves a resumable archive')
