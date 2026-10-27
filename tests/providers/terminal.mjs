@@ -10,7 +10,7 @@ await mkdir(proof,{recursive:true,mode:0o700})
 const receipt={head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),testMode:true,startedAt:new Date().toISOString(),status:'running',providerCalls:[],isolatedEdges:['unrelated account event inventory']}
 const retain=()=>writeFile(join(proof,'terminal-provider.json'),JSON.stringify(receipt,null,2)+'\n',{mode:0o600})
 async function stripe(path,params,method=params?'POST':'GET') {
- const r=await fetch('https://api.stripe.com/v1'+path,{method,headers:{authorization:`Bearer ${key}`,'stripe-version':'2026-09-30.endive','content-type':'application/x-www-form-urlencoded'},...(params?{body:new URLSearchParams(params)}:{}),signal:AbortSignal.timeout(30000)})
+ const r=await fetch('https://api.stripe.com/v1'+path,{method,headers:{authorization:`Bearer ${key}`,'stripe-version':'2024-06-20','content-type':'application/x-www-form-urlencoded'},...(params?{body:new URLSearchParams(params)}:{}),signal:AbortSignal.timeout(30000)})
  const value=await r.json()
  receipt.providerCalls.push({path,method,http:r.status,...(!r.ok?{code:value.error?.code??null}:{})});await retain()
  assert.equal(r.status,200,`Stripe ${method} ${path} HTTP ${r.status}`)
@@ -27,7 +27,8 @@ try {
    const u=new URL(request.url);assert.equal(u.hostname,'api.stripe.com')
    if(u.pathname==='/v1/events')return Response.json({data:[],has_more:false})
    const r=await fetch(request.url,{method:request.method,headers:Object.fromEntries(['authorization','content-type','stripe-version','idempotency-key'].filter(n=>request.headers.has(n)).map(n=>[n,request.headers.get(n)])),...(!['GET','HEAD'].includes(request.method)?{body:await request.text()}:{}),signal:AbortSignal.timeout(30000)})
-   receipt.providerCalls.push({path:u.pathname,method:request.method,http:r.status});await retain()
+   const failure=!r.ok?await r.clone().json().catch(()=>({})):null
+   receipt.providerCalls.push({path:u.pathname,method:request.method,http:r.status,...(failure?{type:failure.error?.type??null,code:failure.error?.code??null,param:failure.error?.param??null}:{} )});await retain()
    return new Response(await r.arrayBuffer(),{status:r.status,headers:{'content-type':'application/json'}})
  }})
  const {acct}=await books(h)

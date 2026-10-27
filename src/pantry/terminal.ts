@@ -5,10 +5,14 @@ import { authority, must, who } from './access'
 import { cents, date, now, requireThat, text, uid, type Data } from './core'
 import { all, assertOpen, audit, changed, guard, one, q, run, type Sql } from './db'
 import { entryStatements } from './journal'
-import { checkoutAmount, recordSucceeded, stripeSettings } from './stripe'
-import { managedInstall, stripeCall, unseal } from './stripe-api'
+import { checkoutAmount, offeredMethods, recordSucceeded, stripeSettings } from './stripe'
+import { managedInstall, stripeCall as providerCall, unseal } from './stripe-api'
 import { invoice } from './invoices'
 import { processorDimensions } from './dimensions/processor'
+
+// The connected account's current API removed explicit method types; Terminal
+// requires card-present intents, so use Stripe's supported prior contract here.
+const stripeCall = (key: string, method: 'GET' | 'POST', path: string, params: Data = {}, idempotency?: string) => providerCall(key, method, path, params, idempotency, '2024-06-20')
 
 async function connection(env: Bindings, db: D1Database) {
   requireThat(!managedInstall(env), 'This installation cannot reach Stripe Terminal', 409)
@@ -17,6 +21,7 @@ async function connection(env: Bindings, db: D1Database) {
   return { s, key: await unseal(env, s.key_sealed) }
 }
 const accountFence = (s: Data) => guard('EXISTS(SELECT 1 FROM pt_stripe WHERE id=1 AND account_id=? AND revision=?)', s.account_id, s.revision)
+const inputFields = (b: Data, fields: string[]) => requireThat(Object.keys(b).every(k=>fields.includes(k)), 'Only the named Terminal fields are accepted; card details belong at Stripe')
 const selected = async (db: D1Database, id: string) => {
   const row = await one(db, 'SELECT * FROM pt_terminal_payments WHERE id=?', id)
   requireThat(row, 'Terminal payment not found', 404)
@@ -26,6 +31,7 @@ export async function terminalView(db: D1Database) {
   return { settings: await one(db, 'SELECT * FROM pt_terminal_settings WHERE id=1'), payments: await all(db, 'SELECT * FROM pt_terminal_payments ORDER BY created_at DESC LIMIT 100') }
 }
 const settings: Command = { need: 'owner', async run(c,b) {
+  inputFields(b,['tipAccountId'])
   const id = text(b.tipAccountId, 'Tip account')
   requireThat(await one(c.db, "SELECT 1 FROM pt_accounts WHERE id=? AND active=1 AND type IN ('income','liability') AND subtype NOT IN ('receivable','payable')", id), 'Choose an active income or tip liability account')
   await run(c.db, [authority(c.actor,'owner'), q('INSERT INTO pt_terminal_settings(id,tip_account_id,revision) VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET tip_account_id=excluded.tip_account_id,revision=excluded.revision',id,uid()), audit(who(c.actor),'terminal.settings','terminal-settings','1',{tipAccountId:id})])
@@ -48,6 +54,7 @@ const prepare: Command = { need: 'owner', async run(c,b) {
     inv=await invoice(c.db,text(b.invoiceId,'Invoice'))
     requireThat(inv.kind==='invoice' && inv.status==='issued' && !inv.void_date && inv.open_cents>0,'Choose an issued open invoice',409)
     requireThat(tip===0,'Record invoice tips as a separate sale for now',409)
+    requireThat((await offeredMethods(c.env,c.db,inv.customer_id)).includes('card'),'Card payment is not offered for this customer',409)
     const charge=await checkoutAmount(c.db,inv);amount=charge.amount;early=charge.windowEnd;customer=inv.customer_id
   } else {
     requireThat(b.taxTreatment==='exempt','This Terminal sale door supports an explicitly exempt service only; taxable item receipts are not available yet',409)
@@ -67,6 +74,7 @@ const prepare: Command = { need: 'owner', async run(c,b) {
   return selected(c.db,id)
 } }
 const process: Command = { need:'owner', async run(c,b) {
+  inputFields(b,['id'])
   let row=await selected(c.db,text(b.id,'Terminal payment'))
   const {s,key}=await connection(c.env,c.db)
   requireThat(row.provider_account===s.account_id,'Reconnect the original Stripe account for this payment',409)
@@ -74,6 +82,7 @@ const process: Command = { need:'owner', async run(c,b) {
   await assertOpen(c.db,row.sale_date)
   if(row.invoice_id) {
     const inv=await invoice(c.db,row.invoice_id),charge=await checkoutAmount(c.db,inv)
+    requireThat((await offeredMethods(c.env,c.db,inv.customer_id)).includes('card'),'Card payment is not offered for this customer',409)
     requireThat(inv.status==='issued' && !inv.void_date && charge.amount===row.amount_cents && charge.windowEnd===row.early_window_end,'Invoice balance or payment offer changed; prepare a new payment',409)
   }
   await run(c.db,[authority(c.actor,'owner'),accountFence(s)])
@@ -126,7 +135,7 @@ export async function syncTerminal(c:Context,id:string) {
 }
 export const terminalCommands:Record<string,Command>={
   'terminal.settings':settings,'terminal.prepare':prepare,'terminal.process':process,
-  'terminal.sync':{need:'owner',run:(c,b)=>syncTerminal(c,text(b.id,'Terminal payment'))},
-  'terminal.list':{need:'owner',run:c=>terminalView(c.db)},
-  'terminal.readers':{need:'owner',async run(c){const {key}=await connection(c.env,c.db);const r=await stripeCall(key,'GET','/terminal/readers',{limit:100});return {readers:(r.data??[]).map((x:Data)=>({id:x.id,label:x.label,status:x.status,deviceType:x.device_type})),hasMore:!!r.has_more}}},
+  'terminal.sync':{need:'owner',run:(c,b)=>{inputFields(b,['id']);return syncTerminal(c,text(b.id,'Terminal payment'))}},
+  'terminal.list':{need:'owner',run:(c,b)=>{inputFields(b,[]);return terminalView(c.db)}},
+  'terminal.readers':{need:'owner',async run(c,b){inputFields(b,[]);const {key}=await connection(c.env,c.db);const r=await stripeCall(key,'GET','/terminal/readers',{limit:100});return {readers:(r.data??[]).map((x:Data)=>({id:x.id,label:x.label,status:x.status,deviceType:x.device_type})),hasMore:!!r.has_more}}},
 }

@@ -134,3 +134,11 @@ their maintenance.
 
 Pinned reference: https://github.com/runeditrun/base/blob/79f61faef682f9d6cdb64e843cfbd3cf02887982/TANSTACK-START-MIGRATION.md
 Native-session/runtime evidence: https://github.com/runeditrun/base/tree/79f61faef682f9d6cdb64e843cfbd3cf02887982/default-seed
+
+## Lander-Regenerate
+
+`CONTRACT.md` owns acceptance text, status, evidence and gaps. After changing it,
+run `node scripts/contract-docs.mjs write`, then `node scripts/contract-docs.mjs check`.
+This regenerates the acceptance record, the homepage claim register and status
+summary counts. Regenerate the edition source lock last with
+`node scripts/edition-authoring/cli.mjs lock`, then run its `check` command.

@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "385d5088363140cbb395c3c269c2010a39165d6c023e1a50bed2f433de7ed27a",
+      "sha256": "f479348b47fd01de0b43fc5554eb7bba00e6a5fe696ec01e8d69e581bd1ec79d",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -95,11 +95,11 @@
       "executable": false
     },
     "AGENTS.md": {
-      "sha256": "4a9374ddf79d175dd415401f0b8e76271d70d02dd4cf6762e797d93a9b70fa6b",
+      "sha256": "8de08e1ca75055951c229fd065b51292e2b49779e44c7ada64453bb3f4681e36",
       "executable": false
     },
     "API.md": {
-      "sha256": "423f2427c5ca8b9ae58de4c0f59aec79fc0be54550f2e3b73e6ffd2d86d72943",
+      "sha256": "9b7f3a714755a07e5c4e4443e287c1ea1a4b6cca804edc9fac86278f2461e0e3",
       "executable": false
     },
     "base-copies.json": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "92068e9e450d20d805f4d93673c4eb42ae07c15fd7ac45da56e58b02395146ed",
+      "sha256": "f358fcb6a03e21cdc037340b911a70967afffd0c89842f93ae5b759266038260",
       "executable": false
     },
     "DEMO.md": {
@@ -147,7 +147,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "61d2265b5a9778248614be85fdddb788450f7552816df8b6ae2583a9fdbbd761",
+      "sha256": "08b85fd8cd8682d0774b554ac1ed20a13f4e3625f3bcc4d6f24fd6c0751dd872",
       "executable": false
     },
     "docs/close.md": {
@@ -1212,6 +1212,10 @@
     },
     "scripts/ci/chromium-probe.mjs": {
       "sha256": "c57c6ab541b0c9eb2a10896da3d027b4400f15744063acfd16d7faeb00c02110",
+      "executable": false
+    },
+    "scripts/contract-docs.mjs": {
+      "sha256": "6b1c5b71435e3c2e71bae69e30be918ad45e76bea87a6b5b2219d5e0114100b3",
       "executable": false
     },
     "scripts/delivery/base/artifact.mjs": {
@@ -4715,7 +4719,7 @@
       "executable": false
     },
     "src/pantry/stripe-api.ts": {
-      "sha256": "152c98a5b43ebc1e01617bdb65821d80a2e33fe5c322a814b42a1083546d362d",
+      "sha256": "dadee4f7b7add76882ec0939fd61ef82ee2ec1722f8b3c2ecf0340b6d33ec9f1",
       "executable": false
     },
     "src/pantry/stripe-clearing-close.ts": {
@@ -4783,7 +4787,7 @@
       "executable": false
     },
     "src/pantry/terminal.ts": {
-      "sha256": "7c2b74b43cb5b0eee549b54c85a3d3b473235965955a465145e574ef37f8225b",
+      "sha256": "0b3e782526adb18343c204ea54263425612e0af5b42462eec1e5a5b49dd590bd",
       "executable": false
     },
     "src/pantry/texting/commands.ts": {
@@ -5999,7 +6003,7 @@
       "executable": false
     },
     "tests/api/terminal-journey.mjs": {
-      "sha256": "f8df3975fa92a6c12fd75869567e45733d3838107cbf4b7e3db141c9c5443480",
+      "sha256": "ca7d302b63bb8e977dda6c354f9113ff0a619aad1586518f5a24f193898b89fa",
       "executable": false
     },
     "tests/api/texting-journey.mjs": {
@@ -6319,7 +6323,7 @@
       "executable": false
     },
     "tests/providers/terminal.mjs": {
-      "sha256": "e69b0db9948e89d19ee889ece962128ab8f3e6f65e8901b91d4dd44de473d11f",
+      "sha256": "7a03d869407f4f3aa1ed1f0daa9cd298251bce461bef7e1c8587cd0ca0915731",
       "executable": false
     },
     "tests/providers/texting.mjs": {
