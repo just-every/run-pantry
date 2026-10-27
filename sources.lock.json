@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "1b007a943881080174ea19a1116feacdce04a722db56f8133797c1858afb9193",
+      "sha256": "d4e84df9acac1ae8d06dd3e9ff1860fe31f1813a4b4e290e71020b71d5ebb335",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "d571ccf27071505c8dff8a7fd764575fa656fda05eb0f548ffb9a553be7c3db3",
+      "sha256": "d29cdd8c9755bed26a1a299de21f9720b9677c13bb74fb2089aee1c5d4cae41b",
       "executable": false
     },
     "DEMO.md": {
@@ -5659,7 +5659,7 @@
       "executable": false
     },
     "tests/api/agent.test.mjs": {
-      "sha256": "ffa511910fed4c3de28ef8a61fc2b6828db1170ddbd50caab7bfd455bc0c0ecb",
+      "sha256": "ecbd76efec02b912538da403417d1f344b836b034032138cdff654c164dc4b6d",
       "executable": false
     },
     "tests/api/approved-write-off-journey.mjs": {
