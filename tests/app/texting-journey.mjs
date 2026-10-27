@@ -17,7 +17,9 @@ export async function textingBrowser(t) {
  const clock={'x-synthetic-pantry-clock':'2026-10-20T14:00:00Z'}
  const owner=await browser.newContext({extraHTTPHeaders:clock})
  try {
-  assert.equal((await owner.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin},data:{token:TOKEN,displayName:'synthetic-pantry-1'},maxRedirects:0})).status(),303)
+  // D1 checks session expiry against its live clock; only the books use the
+  // historical instant. Signing in at that instant eventually expires the test.
+  assert.equal((await owner.request.post(app.origin+'/auth/bootstrap',{headers:{origin:app.origin,'x-synthetic-pantry-clock':new Date().toISOString()},data:{token:TOKEN,displayName:'synthetic-pantry-1'},maxRedirects:0})).status(),303)
   await owner.request.post(app.origin+'/setup',{headers:{origin:app.origin},form:{confirm:'yes'},maxRedirects:0})
   const command=async(op,data)=>{const r=await owner.request.post(`${app.origin}/api/pantry/command/${op}`,{headers:{origin:app.origin},data});assert.equal(r.status(),200,`${op}: ${await r.text()}`);return r.json()}
   const view=async path=>{const r=await owner.request.get(`${app.origin}/api/pantry/${path}`);assert.equal(r.status(),200,await r.text());return r.json()}

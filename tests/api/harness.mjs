@@ -76,7 +76,11 @@ export async function harness({ bindings = {}, outbound, log, entry = 'tests/api
     }
     /** Add a person with a Pantry role (which emails their invitation) and sign them in through it. */
     async function member(email, role, grants = {}) {
-      const added = await command('member.save', { email, name: email.split('@')[0], role, ...grants })
+      // Invitations use the same real session clock as confirmation; a pinned
+      // accounting date must not create an already-expired sign-in link.
+      const response = await send('/api/pantry/command/member.save', { email, name: email.split('@')[0], role, ...grants }, { cookie: owner, headers: { 'x-synthetic-pantry-clock': new Date().toISOString() } })
+      assert.equal(response.status, 200, JSON.stringify(response.value))
+      const added = response.value
       assert.deepEqual([added.invited, added.emailed], [email, true])
       return confirmMail(email)
     }

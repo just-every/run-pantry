@@ -57,6 +57,7 @@ Writes: `POST /api/pantry/command/:action` with a JSON object.
   - `match`: `{bankLineIds, journalLineIds, create?}` (only fees, bank income or transfers may be created).
   - `journal`: `{date, memo, documentId, passages[], lines[]}` — no document, no proposal: list missing evidence in a close packet instead.
   - `close-packet`: `{period, exceptions[], notes}` — approval turns exceptions into close review tasks. A reconciliation packet also carries `statementId` and the server-calculated `fingerprint`; approval rechecks the exact proof and uses the native reconciliation transaction.
+  - `journal` also carries an exact-record correction: `{action, id, revision, date}` for `post-draft`, `post-bill`, `approve-invoice` or `issue-invoice`; `allocate-payment` uses `{action, id, date, allocations:[{targetId, amount}]}`. These use the source record's native approval rules and a fresh `proposal.preview` token. No source date changes and no document sends are performed.
   - `variance-note`: `{period, body, citations[entryId]}` — kept beside the figures; it changes none.
   - `refs`: `[{kind, id, revision}]` records the agent relied on; any change makes the proposal stale.
 - `GET proposals/:id`: the decision.
