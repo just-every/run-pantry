@@ -164,6 +164,14 @@ its own connected US-dollar Stripe card account:
 
 Card details must go directly to the Stripe reader; these commands refuse card
 payload fields. An uncertain collection remains pending until Stripe confirms
-it. There is no automatic retry of collection, no Instant Payout instruction,
+it. Pending reader attempts also refuse invoice voiding and customer erasure,
+including an uncertain reader response. Resolve the payment before retrying
+either action. Completed erasure removes personal receipt descriptions and
+exemption notes from Terminal records while keeping amounts and card summaries.
+New journal memos contain the receipt reference only; historical posted-entry
+free text follows the retention boundary in ERASURE-001. Erased customers cannot
+start another Terminal sale.
+
+There is no automatic retry of collection, no Instant Payout instruction,
 and no general taxable receipt or native Tap to Pay door in this slice. The
 remaining requirements are recorded in SALES-001 and SALES-003 in CONTRACT.md.
