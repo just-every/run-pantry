@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "84b8adf104e37be99cc956ec1a6f415875d3a512d327d0a9c4c4f61754e2bd12",
+      "sha256": "385d5088363140cbb395c3c269c2010a39165d6c023e1a50bed2f433de7ed27a",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "7cf049a33083b322e14e03cae6a63dd3d2dec1e8fcdffc30cd70adac3c11cdc5",
+      "sha256": "d50ca9d205c21f32bf9c98683d0fa0f1998177b0826ef07f8fd0b4cd923bf67b",
       "executable": false
     },
     "DEMO.md": {
@@ -4155,7 +4155,7 @@
       "executable": false
     },
     "src/pantry/late-discount.ts": {
-      "sha256": "92fc569f65b34982dfe0d730f586594924d6212fb7fa09ef0ef8e320393bcb9f",
+      "sha256": "cc23295194bbc8b67c2724dc813a12dc7dfdac0d63a9145919f13a2766ef0a36",
       "executable": false
     },
     "src/pantry/late-fees/index.ts": {
@@ -5823,7 +5823,7 @@
       "executable": false
     },
     "tests/api/late-discount-journey.mjs": {
-      "sha256": "cb1d1b64c64a040b37f868704809099b1d466f1b810b555fb6c9a3860db96e20",
+      "sha256": "65e2a086f5a885d347fce4c9592ace0976e2a398467fe381758127afacfc4ec9",
       "executable": false
     },
     "tests/api/late-fee-journey.mjs": {
