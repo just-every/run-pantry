@@ -170,15 +170,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The first candidate measured app-5 at 8.9m and app-6 at 7.7m.
+        # Keep them alone: four browser jobs exceeded the twelve-minute ceiling.
         include:
           - name: app-journeys-1
-            shards: app-5 app-7
+            shards: app-5
           - name: app-journeys-2
-            shards: app-6 app-4
+            shards: app-6
           - name: app-journeys-3
-            shards: app-2 app-1
+            shards: app-1 app-7
           - name: app-journeys-4
-            shards: app-3 app-8
+            shards: app-2 app-8
+          - name: app-journeys-5
+            shards: app-3 app-4
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'

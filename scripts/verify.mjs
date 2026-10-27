@@ -36,9 +36,7 @@ export function verificationPlan(shard = process.env.VERIFY_SHARD ?? 'all') {
     const names = [...source.matchAll(/^test\('([^'\n]+)'[,)]/gm)].map(match => match[1])
     const registrations = [...source.matchAll(/^test\(/gm)].length
     if (!names.length || names.length !== registrations) throw new Error('Every app.test.mjs registration needs a literal name for CI partitioning')
-    // The measured migration journey takes over five minutes. Move the learning
-    // journey out of its partition so the packed CI jobs stay below twelve.
-    const selected = names.filter((name, position) => (name.startsWith('AGENT-006 ') ? 2 : position % 5 + 1) === part)
+    const selected = names.filter((_, position) => position % 5 === part - 1)
     const escape = name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const pattern = `^(?:${selected.map(escape).join('|')})(?:$| )`
     return browserPlan([process.execPath, ['--test', `--test-name-pattern=${pattern}`, 'tests/app/app.test.mjs']])
