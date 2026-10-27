@@ -3335,7 +3335,7 @@
       "executable": false
     },
     "src/pantry/accountant-console.ts": {
-      "sha256": "9c3ac206c4ee435ab3d6145a1087e6b948892be70da2ce2e26f3cb5434909621",
+      "sha256": "e7dc8bf4bbdcb09f0333a8ea7358dfbe8a43c2fb27862a9e9d8b637d66a8de12",
       "executable": false
     },
     "src/pantry/accountant-export.ts": {
@@ -6019,7 +6019,7 @@
       "executable": false
     },
     "tests/app/accountant-console.test.mjs": {
-      "sha256": "83d02e755da3301b8861f37920e4c419c98b31d70bb4c44a836a3a9dbb904e67",
+      "sha256": "c63f4a0b4d86b9aa54b90b39114cf4932932f9050a61f7fdb4d8165f78f4031e",
       "executable": false
     },
     "tests/app/app.test.mjs": {

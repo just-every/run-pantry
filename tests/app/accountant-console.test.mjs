@@ -66,7 +66,7 @@ test('accountant connects three clients with distinct status and grants, and own
       assert.equal(await card.getByLabel('New client status key').getAttribute('type'),'text')
       await card.getByRole('button',{name:'Hide key',exact:true}).click()
       if(evidence)for(const width of [1440,390]) {
-        await ownerPage.setViewportSize({width,height:1000})
+        await ownerPage.setViewportSize({width,height:width===390 ? 2400 : 1000})
         await card.screenshot({path:`${evidence}/accountant-sharing-${width}.png`})
       }
       await ownerPage.close()
@@ -112,7 +112,7 @@ test('accountant connects three clients with distinct status and grants, and own
   await page.goto(apps[hubIndex].origin+'/app/settings')
   const consoleCard=page.locator('section.card').filter({has:page.getByRole('heading',{name:'Accountant console',exact:true})})
   await consoleCard.getByText('Client 3',{exact:true}).waitFor()
-  assert.deepEqual(await consoleCard.getByRole('link',{name:'Open books'}).evaluateAll(links=>links.map(link=>link.href)),[...origins].sort().map(origin=>origin+'/app'))
+  assert.deepEqual(await consoleCard.getByRole('link',{name:'Open books'}).evaluateAll(links=>links.map(link=>link.href)),origins.map(origin=>origin+'/app'))
   assert.equal(await consoleCard.getByRole('row').count(),4)
   for(let i=0;i<3;i++) {
     const row=consoleCard.getByRole('row').filter({has:page.getByText(`Client ${i+1}`,{exact:true})})
@@ -127,7 +127,7 @@ test('accountant connects three clients with distinct status and grants, and own
   }
   assert.equal(idp.signIns,1,'opening every client retains the single identity-provider sign-in')
   if(evidence)for(const width of [1440,390]) {
-    await page.setViewportSize({width,height:1000});await page.evaluate(()=>window.scrollTo(0,0))
+    await page.setViewportSize({width,height:width===390 ? 2400 : 1000});await page.evaluate(()=>window.scrollTo(0,0))
     await consoleCard.screenshot({path:`${evidence}/accountant-console-${width}.png`})
   }
   await command(owners[2],2,'member.save',{email,name:'Shared accountant',role:'accountant',active:false})

@@ -118,7 +118,7 @@ export async function accountantConsole(c: Context) {
     }
   }
   await run(c.db, [authority(c.actor, 'read')])
-  return { clients, unavailable, trustedOrigins: trusted }
+  return { clients: clients.sort((a,b) => a.name.localeCompare(b.name) || a.origin.localeCompare(b.origin)), unavailable, trustedOrigins: trusted }
 }
 
 /** A key can read this summary only. It is never a native session or a posting credential. */
