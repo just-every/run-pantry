@@ -198,6 +198,7 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   // policy as local export. Exercise its public command, not a fabricated file.
   const sql = join(first, 'exports/hosted.sql')
   await mkdir(join(first, 'exports'), {recursive:true})
+  await promisify(execFile)(join(first, 'node_modules/.bin/wrangler'), ['d1','execute','foundation','--local','--command',"INSERT OR IGNORE INTO rer_portability_state(id,source_identity) VALUES(1,'"+(await import('node:crypto')).randomUUID()+"')"], {cwd:first,env,maxBuffer:16*1024*1024})
   await promisify(execFile)(join(first, 'node_modules/.bin/wrangler'), ['d1','export','foundation','--local','--output',sql], {cwd:first,env,maxBuffer:16*1024*1024})
   const converted = await promisify(execFile)(process.execPath, [join(first,'scripts/hosted-archive.mjs'),'--input-sql',sql,'--output',join(first,'exports/pantry-books.rer')], {cwd:first,env,maxBuffer:16*1024*1024})
   const exported=converted.stdout

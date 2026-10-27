@@ -51,7 +51,7 @@ if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pat
       console.log(JSON.stringify({ format: 'pantry-hosted-backup/1', ...receipt }))
     } catch (error) {
       // Native SQL errors can include private row values; report only a code.
-      console.error('Hosted archive failed (' + (error.code === 'EEXIST' ? 'output_exists' : /^[a-z_]+$/.test(error.code ?? '') ? error.code : 'snapshot_invalid') + '); original SQL was retained. No archive was published.')
+      console.error('Hosted archive failed (' + (error.code === 'EEXIST' ? 'output_exists' : ['unsupported_snapshot_statement','source_erasure_identity_missing','snapshot_foreign_keys'].includes(error.message) ? error.message : /^[A-Za-z_]+$/.test(error.code ?? '') ? error.code : 'snapshot_invalid') + '); original SQL was retained. No archive was published.')
       process.exitCode = 2
     }
   }
