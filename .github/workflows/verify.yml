@@ -172,13 +172,13 @@ jobs:
       matrix:
         include:
           - name: app-journeys-1
-            shards: app-1 app-5
+            shards: app-5 app-7
           - name: app-journeys-2
-            shards: app-2 app-3
+            shards: app-6 app-4
           - name: app-journeys-3
-            shards: app-4 app-8
+            shards: app-2 app-1
           - name: app-journeys-4
-            shards: app-6 app-7
+            shards: app-3 app-8
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'

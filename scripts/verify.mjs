@@ -23,8 +23,8 @@ export function verificationPlan(shard = process.env.VERIFY_SHARD ?? 'all') {
   const [, group, index] = match
   const part = Number(index)
   if (group === 'api' && part > 5) throw new Error(`Unknown API shard ${shard}`)
-  // Keep the long import and report suites on separate API workers.
-  // The other files divide across three more jobs, including new files.
+  // Keep import and report suites as dedicated logical partitions.
+  // The other files divide across three more partitions, including new files.
   const dedicatedApi=['move-in.test.mjs','reports.test.mjs']
   if(group==='api'&&part<=2)return [[process.execPath,['--test','--test-concurrency=1',`tests/api/${dedicatedApi[part-1]}`]]]
   // app.test.mjs contains many independent, sequential public-door journeys.
@@ -36,7 +36,9 @@ export function verificationPlan(shard = process.env.VERIFY_SHARD ?? 'all') {
     const names = [...source.matchAll(/^test\('([^'\n]+)'[,)]/gm)].map(match => match[1])
     const registrations = [...source.matchAll(/^test\(/gm)].length
     if (!names.length || names.length !== registrations) throw new Error('Every app.test.mjs registration needs a literal name for CI partitioning')
-    const selected = names.filter((_, position) => position % 5 === part - 1)
+    // The measured migration journey takes over five minutes. Move the learning
+    // journey out of its partition so the packed CI jobs stay below twelve.
+    const selected = names.filter((name, position) => (name.startsWith('AGENT-006 ') ? 2 : position % 5 + 1) === part)
     const escape = name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const pattern = `^(?:${selected.map(escape).join('|')})(?:$| )`
     return browserPlan([process.execPath, ['--test', `--test-name-pattern=${pattern}`, 'tests/app/app.test.mjs']])
