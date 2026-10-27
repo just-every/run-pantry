@@ -1,11 +1,15 @@
 import { spawnSync } from 'node:child_process'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const sequence = ['build', 'typecheck', 'test:pantry', 'test:runtime', 'test:app']
 const pnpm = name => ['pnpm', ['run', name]]
+// Only CI browser consumers opt into the source job's build. Local verification
+// and the source job keep their original build-first sequence.
+const prebuilt = process.env.CI === 'true' && process.env.VERIFY_PREBUILT === 'true'
+const browserPlan = test => prebuilt ? [test] : [pnpm('build'), test]
 export const shards = ['source', 'api-1', 'api-2', 'api-3', 'api-4', 'api-5', 'app-1', 'app-2', 'app-3', 'app-4', 'app-5', 'app-6', 'app-7', 'app-8']
 
 export function verificationPlan(shard = process.env.VERIFY_SHARD ?? 'all') {
@@ -35,7 +39,7 @@ export function verificationPlan(shard = process.env.VERIFY_SHARD ?? 'all') {
     const selected = names.filter((_, position) => position % 5 === part - 1)
     const escape = name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const pattern = `^(?:${selected.map(escape).join('|')})(?:$| )`
-    return [pnpm('build'), [process.execPath, ['--test', `--test-name-pattern=${pattern}`, 'tests/app/app.test.mjs']]]
+    return browserPlan([process.execPath, ['--test', `--test-name-pattern=${pattern}`, 'tests/app/app.test.mjs']])
   }
   const files = readdirSync(resolve(root, 'tests', group)).filter(name => name.endsWith('.test.mjs')).sort()
     .filter(name => group === 'app' ? name !== 'app.test.mjs' : !dedicatedApi.includes(name))
@@ -45,8 +49,8 @@ export function verificationPlan(shard = process.env.VERIFY_SHARD ?? 'all') {
   // startup. Serialize files within each job so their proxy startups cannot
   // race one another; the independent jobs still run in parallel.
   const test = [process.execPath, ['--test', '--test-concurrency=1', ...files]]
-  // Browser journeys exercise the real emitted Worker and assets, built in this job.
-  return group === 'app' ? [pnpm('build'), test] : [test]
+  // Browser journeys exercise the real emitted Worker and assets, shared by CI.
+  return group === 'app' ? browserPlan(test) : [test]
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -54,6 +58,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (process.argv[2] === '--plan') console.log(JSON.stringify(plan, null, 2))
   else {
     if (process.argv.length > 2) throw new Error('Usage: node scripts/verify.mjs [--plan]')
+    if (prebuilt && process.env.VERIFY_SHARD?.startsWith('app-')) {
+      if (!statSync(resolve(root, 'dist/server/wrangler.json')).isFile() || !statSync(resolve(root, 'dist/client')).isDirectory()) {
+        throw new Error('CI browser verification requires the shared source build')
+      }
+    }
     for (const [command, args] of plan) {
       const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', env: process.env })
       if (result.error) throw result.error

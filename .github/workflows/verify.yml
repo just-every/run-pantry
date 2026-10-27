@@ -67,20 +67,16 @@ jobs:
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
 
-  checks:
+  build:
+    name: Checks (source)
     needs: plan
     if: needs.plan.outputs.skip != 'true'
-    name: Checks (${{ matrix.shard }})
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [source, api-1, api-2, api-3, api-4, api-5, app-1, app-2, app-3, app-4, app-5, app-6, app-7, app-8]
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
-      VERIFY_SHARD: ${{ matrix.shard }}
+      VERIFY_SHARD: source
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
         with:
@@ -92,13 +88,11 @@ jobs:
       - name: Check edition source lock freshness
         # Technical foundation exports use composition.lock.json or reference-export.json.
         # Edition-owned seeds must commit both edition.json and sources.lock.json.
-        if: ${{ matrix.shard == 'source' && hashFiles('edition.json', 'sources.lock.json') != '' }}
+        if: ${{ hashFiles('edition.json', 'sources.lock.json') != '' }}
         run: node scripts/edition-authoring/cli.mjs check
       - run: npm install --global pnpm@10.12.4
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run deps
       - name: Install Chromium
-        if: ${{ matrix.shard == 'source' || matrix.shard == 'api-3' || startsWith(matrix.shard, 'app-') }}
         run: |
           set -euo pipefail
           pnpm exec playwright install chromium
@@ -107,14 +101,123 @@ jobs:
             timeout 420 pnpm exec playwright install-deps chromium
             node scripts/ci/chromium-probe.mjs
           }
-      # rer verify adds hosted-output and hydration checks after verify:app.
+      # rer verify builds once, then checks the emitted runtime, hosted output and hydration.
       - name: Verify source, emitted runtime, site and hosted hydration
-        if: ${{ matrix.shard == 'source' }}
         run: pnpm run verify
-      - name: Verify test shard
-        if: ${{ matrix.shard != 'source' }}
-        run: pnpm run verify:app
-  # Backup and restore as the docs give them, through rer on fresh clones; beside the main job.
+      - name: Archive the shared build
+        run: tar -cf "$RUNNER_TEMP/verify-build.tar" dist
+      - name: Share the verified build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: verify-build
+          path: ${{ runner.temp }}/verify-build.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  api:
+    name: Checks (${{ matrix.name }})
+    needs: plan
+    if: needs.plan.outputs.skip != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api-import-report
+            shards: api-1 api-2
+          - name: api-browser
+            shards: api-3 api-4
+          - name: api-ledger
+            shards: api-5
+    env:
+      CI: 'true'
+      WRANGLER_SEND_METRICS: 'false'
+      VERIFY_SHARDS: ${{ matrix.shards }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0; action runtime Node 24
+        with:
+          node-version: '22.20.0'
+          package-manager-cache: false
+      - run: npm install --global pnpm@10.12.4
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        if: ${{ matrix.name == 'api-browser' }}
+        run: |
+          set -euo pipefail
+          pnpm exec playwright install chromium
+          # Hosted ubuntu-24.04 already carries Chromium's libraries. Use apt only when a real launch fails.
+          node scripts/ci/chromium-probe.mjs || {
+            timeout 420 pnpm exec playwright install-deps chromium
+            node scripts/ci/chromium-probe.mjs
+          }
+      - name: Verify API partitions
+        run: |
+          set -euo pipefail
+          for shard in $VERIFY_SHARDS; do
+            VERIFY_SHARD="$shard" pnpm run verify:app
+          done
+
+  checks:
+    name: Checks (${{ matrix.name }})
+    needs: [plan, build]
+    if: needs.plan.outputs.skip != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: app-journeys-1
+            shards: app-1 app-5
+          - name: app-journeys-2
+            shards: app-2 app-3
+          - name: app-journeys-3
+            shards: app-4 app-8
+          - name: app-journeys-4
+            shards: app-6 app-7
+    env:
+      CI: 'true'
+      WRANGLER_SEND_METRICS: 'false'
+      VERIFY_SHARDS: ${{ matrix.shards }}
+      VERIFY_PREBUILT: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0; action runtime Node 24
+        with:
+          node-version: '22.20.0'
+          package-manager-cache: false
+      - run: npm install --global pnpm@10.12.4
+      - run: pnpm install --frozen-lockfile
+      - name: Download the verified build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: verify-build
+          path: ${{ runner.temp }}
+      - name: Restore the shared build
+        run: tar -xf "$RUNNER_TEMP/verify-build.tar"
+      - name: Install Chromium
+        run: |
+          set -euo pipefail
+          pnpm exec playwright install chromium
+          # Hosted ubuntu-24.04 already carries Chromium's libraries. Use apt only when a real launch fails.
+          node scripts/ci/chromium-probe.mjs || {
+            timeout 420 pnpm exec playwright install-deps chromium
+            node scripts/ci/chromium-probe.mjs
+          }
+      - name: Verify browser partitions
+        run: |
+          set -euo pipefail
+          for shard in $VERIFY_SHARDS; do
+            VERIFY_SHARD="$shard" pnpm run verify:app
+          done
+
+  # Backup and restore as the docs give them, through rer on fresh clones.
   restore:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
@@ -133,7 +236,6 @@ jobs:
           package-manager-cache: false
       - run: npm install --global pnpm@10.12.4
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run deps
       - name: Install Chromium
         run: |
           set -euo pipefail
@@ -144,9 +246,10 @@ jobs:
             node scripts/ci/chromium-probe.mjs
           }
       - run: pnpm run test:restore
+
   # Preserve the required check name and require all work unless the plan reuses a green push.
   verify:
-    needs: [plan, checks, restore]
+    needs: [plan, build, api, checks, restore]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 1
