@@ -26,6 +26,18 @@ export async function monthCloseBrowser(browser) {
       const context = await browser.newContext({ storageState: await owner.storageState(), viewport: { width, height: width === 390 ? 844 : 1000 } })
       try {
         const page = await context.newPage()
+        await page.goto(origin + '/app/settings')
+        await page.getByText('Monthly close preparation', { exact: true }).click()
+        if (width === 1440) {
+          await page.getByLabel('Close agent', { exact: true }).selectOption({ label: 'synthetic-pantry-11' })
+          await page.getByLabel('Close month', { exact: true }).fill('2026-09')
+          await page.getByLabel('Automatic preparation', { exact: true }).selectOption('yes')
+          const saved = page.waitForResponse(r => r.url().endsWith('/command/month-close.schedule'))
+          await page.getByRole('button', { name: 'Save close preparation', exact: true }).click()
+          assert.equal((await saved).status(), 200)
+        }
+        await page.getByRole('row').filter({ hasText: '2026-09' }).getByText('On', { exact: true }).waitFor()
+        if (proof) await page.screenshot({ path: `${proof}/month-close-settings-${width}.png`, fullPage: true })
         await page.goto(origin + '/app/agents')
         await page.getByText('2026-09 coordinated close review', { exact: true }).waitFor()
         for (const kind of ['materiality', 'estimates', 'reclassification', 'reopening']) await page.getByText(kind + ':', { exact: false }).first().waitFor()

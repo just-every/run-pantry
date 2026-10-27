@@ -17,6 +17,7 @@ export const assigneeGuard = (assignee: string | null) => guard(`? IS NULL OR EX
 export const saveCloseTask: Command = { need: 'record', async run(c, b) {
   const task = await one(c.db, 'SELECT * FROM pt_close_tasks WHERE id = ?', text(b.id, 'Task'))
   requireThat(task, 'Task not found', 404)
+  if (task.judgment_kind) requireThat(c.actor.kind === 'person' && ['owner', 'accountant'].includes(c.actor.role), 'Only the owner or accountant edits close judgments', 403)
   const title = text(b.title, 'Task', 200), { assignee, dueDate } = taskFields(b)
   // An edited task needs a fresh completion; its previous audit remains immutable.
   await run(c.db, [authority(c.actor, 'record'), assigneeGuard(assignee),

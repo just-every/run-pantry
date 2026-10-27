@@ -136,3 +136,5 @@ node tests/api/search-scale.mjs --receipt /outside/repository/search-scale.json
 ```
 
 The journey loads at least 250,000 synthetic posted lines and 20,000 documents into D1, then uses the authenticated native HTTP search door for each usual amount spelling, range, check number, memo, confirmed alias and document name. It asserts the real scenario records and a response below one second for each query, and records the exact unchanged commit SHA. Evidence stays outside the checkout. A local VM receipt does not claim hosted Cloudflare OPS-001 deployment acceptance.
+
+The owner command `POST /api/pantry/command/month-close.schedule` accepts `{agentId, period, enabled}`. It explicitly enables or disables accounting-tick preparation for one agent and month; the agent token cannot call this person command. An inactive agent or locked period is never prepared by the scheduler. No automatic proposal decision or period lock is introduced.

@@ -1,4 +1,4 @@
-import { prepareMonthClose } from './month-close'
+import { monthCloseCommands, prepareMonthClose } from './month-close'
 import { autopayCommands, registerAutopayRoutes } from './autopay'
 import { textingCommands, registerTextingRoutes, textingView } from './texting'
 import { paymentNoticeCommands,paymentNoticesView } from './payment-notices'
@@ -143,7 +143,7 @@ const commands: Record<string, Command> = {
   ...autopayCommands, ...textingCommands, ...statementCommands,
   ...taxReminderCommands,...taxReadinessCommands,...w9Commands, ...currencyCommands,...archiveCommands,...collectionCommands, ...standingCommands, ...learningCommands, ...assetCommands, ...dimensionCommands, ...siblingCommands,
   'stripe.events-compare': { need:'owner', async run(c) { await run(c.db,[authority(c.actor,'owner')]); return compareStripeEvents(c.env,c.db,true) } }, ...paymentNoticeCommands, ...invoiceVoidCommands, ...refundCommands, ...customerCreditCommands, ...lateDiscountCommands, ...approvedWriteOffCommands, ...lateFeeCommands, ...estimateCommands, ...customerDepositCommands, ...accessPolicyCommands, ...timeCommands, ...webhookCommands, ...erasureCommands, ...issuingLimitCommands, ...invoiceDocumentCommands, ...discountCommands, ...earlyPaymentCommands, ...billLifecycleCommands, ...recurringBillCommands, ...customReportCommands, ...itemCommands, ...checkCommands, ...budgetCommands, ...recognitionCommands, ...recurringJournalCommands, ...transferCommands, ...billApprovalCommands, ...exemptionCommands, ...nexusCommands, ...reviewCommands, ...writeOffCommands, ...settingsCommands, ...accountCommands, ...cashFlowCommands, ...contactCommands, ...journalCommands, ...invoiceCommands, ...payableCommands, ...vendorCreditCommands,
-  ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
+  ...monthCloseCommands, ...continuousCheckCommands, ...yearEndCommands, ...bankCommands, ...matchCommands, ...queueCommands, ...depositCommands, ...reconcileCommands, ...closeCommands, ...proposalCommands, ...moveInCommands, ...contractorCommands,
   ...reportDeliveryCommands, ...ruleCommands, ...feedCommands,
   ...receiptCommands, ...deliveryCommands, ...recurringCommands, ...stripeCommands, ...questionCommands, ...payoutCommands, ...gustoCommands, ...integrationCommands,
 }

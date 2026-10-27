@@ -176,6 +176,7 @@ export async function settingsView(c: Context): Promise<Data> {
     entity: await entity(c.db),
     members: owner ? await all(c.db, 'SELECT * FROM pt_members ORDER BY email') : [],
     agents: owner ? await all(c.db, 'SELECT id, name, created_by, created_at, active FROM pt_agents ORDER BY created_at') : [],
+    monthCloseSchedules: owner ? await all(c.db, 'SELECT agent_id, period, enabled FROM pt_month_close_schedules ORDER BY period, agent_id') : [],
     choices: { entityTypes: ENTITY_TYPES, states: STATES },
     // The owner address this install was set up with, which rer deploy gives a hosted Pantry unless .env.pantry names one.
     setupOwner: owner ? String(runtimeBindings(c.env).OWNER_EMAIL ?? '').toLowerCase() : null,

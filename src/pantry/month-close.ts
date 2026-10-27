@@ -1,8 +1,9 @@
 // A repeatable monthly agent command. It prepares work under existing human
 // approval doors; it never grants standing authority, posts, sends or locks.
-import type { Agent } from './access'
-import { monthBounds, requireThat, usd, type Data } from './core'
-import { all, one } from './db'
+import { authority, who, type Agent } from './access'
+import type { Command } from './context'
+import { monthBounds, now, requireThat, text, usd, type Data } from './core'
+import { all, audit, one, q, run } from './db'
 import { closeState } from './close'
 import { fileProposal, proposal, stillCurrent } from './proposals'
 import { reconciliationState, reconciliationFingerprint } from './reconcile'
@@ -10,7 +11,7 @@ import { recognitionView } from './recognition'
 import { recurringJournalsView } from './recurring-journals'
 
 async function prepare(db: D1Database, actor: Agent, input: Data) {
-  const existing = await one(db, "SELECT id FROM pt_proposals WHERE agent_id = ? AND kind = ? AND status = 'proposed' AND payload = ? ORDER BY created_at, id LIMIT 1", actor.id, input.kind, JSON.stringify(input.payload))
+  const existing = await one(db, "SELECT id FROM pt_proposals WHERE agent_id = ? AND kind = ? AND status IN ('proposed', 'approved') AND payload = ? ORDER BY created_at, id LIMIT 1", actor.id, input.kind, JSON.stringify(input.payload))
   if (existing) {
     const saved = await proposal(db, existing.id)
     if (await stillCurrent(db, saved.refs)) return saved
@@ -21,11 +22,22 @@ async function prepare(db: D1Database, actor: Agent, input: Data) {
 export async function prepareMonthClose(db: D1Database, actor: Agent, period: string) {
   const { start, end } = monthBounds(period), state = await closeState(db, period)
   requireThat(state.status !== 'locked', `${period} is locked; a person must decide whether to reopen it`, 409)
-  const reconciliations: Data[] = []
+  const reconciliations: Data[] = [], corrections: Data[] = []
   for (const s of await all(db, 'SELECT id FROM pt_statements WHERE end_date <= ? ORDER BY end_date, id', end)) {
     const r = await reconciliationState(db, s.id)
     if (r.completed) { reconciliations.push({ statementId: s.id, status: 'done', evidence: `/app/bank?statement=${s.id}` }); continue }
-    const locked = await one(db, "SELECT id FROM pt_periods WHERE status = 'locked' AND ? BETWEEN start_date AND end_date", r.statement.end_date)
+    const periodLocked = await one(db, "SELECT id FROM pt_periods WHERE status = 'locked' AND ? BETWEEN start_date AND end_date", r.statement.end_date)
+    // Only a unique equal posting on the same date is mechanical. Ambiguous
+    // candidates and absent source evidence stay unresolved; no account is guessed.
+    for (const line of r.lines.filter((l: Data) => !l.match_id && !l.removed_at && !l.excluded_at)) {
+      const postings = r.postings.filter((p: Data) => !p.match_id && p.amount === line.amount_cents && p.entry_date === line.posted_date)
+      const competing = r.lines.filter((l: Data) => !l.match_id && l.amount_cents === line.amount_cents && l.posted_date === line.posted_date)
+      if (!periodLocked && postings.length === 1 && competing.length === 1) {
+        const p = await prepare(db, actor, { kind: 'match', summary: `Match ${line.description} to recorded entry ${postings[0].number}`, payload: { bankLineIds: [line.id], journalLineIds: [postings[0].id], create: [] } })
+        corrections.push({ kind: 'match', statementId: s.id, lineId: line.id, postingId: postings[0].id, proposalId: p.id })
+      }
+    }
+    const locked = periodLocked
     if (locked) r.blockers.push({ kind: 'locked', message: `A person must decide whether to reopen ${locked.id}` })
     if (r.ready && !locked) {
       const p = await prepare(db, actor, { kind: 'close-packet', summary: `Reconcile ${r.bank.name} through ${r.statement.end_date}`, payload: { period: r.statement.end_date.slice(0, 7), exceptions: [], statementId: s.id, fingerprint: await reconciliationFingerprint(r) } })
@@ -34,7 +46,7 @@ export async function prepareMonthClose(db: D1Database, actor: Agent, period: st
   }
   const recognition = await recognitionView(db, end), recurring = await recurringJournalsView(db, end)
   const mechanical = state.checks.filter((c: Data) => !['proposals', 'questions'].includes(c.key)).map((c: Data) => ({
-    key: c.key, title: c.title, status: c.ok ? 'done' : 'proposed', detail: c.detail,
+    key: c.key, title: c.title, status: c.ok ? 'done' : c.key === 'bank' && reconciliations.length && reconciliations.every(r => ['done', 'proposed'].includes(r.status)) ? 'proposed' : 'needs-evidence', detail: c.detail,
     recommendation: c.ok ? 'No further mechanical action.' : `Resolve in the existing ${c.title.toLowerCase()} workflow; do not waive this check.`,
     evidence: c.items ?? [],
   }))
@@ -73,7 +85,29 @@ export async function prepareMonthClose(db: D1Database, actor: Agent, period: st
   const unresolved = mechanical.filter((m: Data) => m.status !== 'done')
   const packet = await prepare(db, actor, { kind: 'close-packet', summary: `${period} coordinated close review`, payload: {
     period, exceptions, notes: `${unresolved.length} mechanical checks still need action; ${scheduleExceptions.length} schedule exceptions; ${reconciliations.filter(r => r.status === 'proposed').length} reconciliations proposed. Review the attached work list before completing judgment tasks.`,
-    monthClose: { mechanical, reconciliations, scheduleExceptions, judgments, variances },
-  }, refs: [...new Map(lines.map(l => [l.id, { kind: 'journal', id: l.id, revision: l.revision }])).values()] })
-  return { period, status: state.status, mechanical, reconciliations, scheduleExceptions, judgments, variances, packet }
+    monthClose: { mechanical, reconciliations, corrections, scheduleExceptions, judgments, variances },
+  }, refs: [...new Map(lines.map(l => [l.id, { kind: 'journal', id: l.id, revision: l.revision }])).values(), ...recognition.schedules.map(s => ({ kind: 'recognition-schedule', id: s.id, revision: s.revision })), ...recurring.templates.map((t: Data) => ({ kind: 'recurring-journal', id: t.id, revision: t.revision }))] })
+  return { period, status: state.status, mechanical, reconciliations, corrections, scheduleExceptions, judgments, variances, packet }
+}
+
+
+export const monthCloseCommands: Record<string, Command> = {
+  'month-close.schedule': { need: 'owner', async run(c, b) {
+    const period = text(b.period, 'Period'); monthBounds(period)
+    const id = text(b.agentId, 'Agent'), enabled = b.enabled === true
+    requireThat(await one(c.db, 'SELECT 1 FROM pt_agents WHERE id = ? AND active = 1', id), 'Choose an active agent', 409)
+    await run(c.db, [authority(c.actor, 'owner'),
+      q('INSERT INTO pt_month_close_schedules (agent_id, period, enabled, approved_by, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(agent_id, period) DO UPDATE SET enabled = excluded.enabled, approved_by = excluded.approved_by, updated_at = excluded.updated_at', id, period, enabled ? 1 : 0, c.actor.email, now()),
+      audit(who(c.actor), 'month-close.schedule', 'agent', id, { period, enabled })])
+    return { agentId: id, period, enabled }
+  } },
+}
+
+/** Called after approved schedules have run. Disabled agents and locked periods
+ * are excluded; preparation can never decide, send, reopen or lock. */
+export async function runMonthCloses(db: D1Database, today: string) {
+  const rows = await all(db, `SELECT a.*, s.period FROM pt_month_close_schedules s JOIN pt_agents a ON a.id = s.agent_id
+    WHERE s.enabled = 1 AND a.active = 1 AND s.period <= ?
+    AND NOT EXISTS (SELECT 1 FROM pt_periods p WHERE p.id = s.period AND p.status = 'locked') ORDER BY s.period, a.id`, today.slice(0, 7))
+  for (const a of rows) await prepareMonthClose(db, { kind: 'agent', id: a.id, email: `agent:${a.name}`, name: a.name, tokenHash: a.token_hash }, a.period)
 }

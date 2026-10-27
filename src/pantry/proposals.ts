@@ -25,6 +25,8 @@ const REF_TABLES: Record<string, { table: string; revision: boolean }> = {
   bill: { table: 'pt_bills', revision: true },
   invoice: { table: 'pt_invoices', revision: true },
   statement: { table: 'pt_statements', revision: false },
+  'recognition-schedule': { table: 'pt_recognition_schedules', revision: true },
+  'recurring-journal': { table: 'pt_recurring_journals', revision: true },
 }
 
 /** Cited records with the revision the agent saw; immutable records need only exist. */
@@ -150,6 +152,7 @@ const decide: Command = { need: 'record', async run(c, b) {
   const p = await proposal(c.db, text(b.id, 'Proposal'))
   requireThat(p.status === 'proposed', 'This proposal is already decided', 409)
   requireThat(p.revision === b.revision, 'Proposal changed; reload', 409)
+  if (p.payload.monthClose) requireThat(c.actor.kind === 'person' && ['owner', 'accountant'].includes(c.actor.role), 'Only the owner or accountant reviews coordinated close judgments', 403)
   const reject = b.decision === 'reject', note = optionalText(b.note, 'Note', 500)
   const mark = (status: string, resultKind: string | null = null, resultId: string | null = null): Sql[] => [
     q("UPDATE pt_proposals SET status = ?, decided_by = ?, decided_at = ?, decision_note = ?, result_kind = ?, result_id = ?, revision = ? WHERE id = ? AND revision = ? AND status = 'proposed'", status, c.actor.email, now(), note, resultKind, resultId, uid(), p.id, p.revision), changed(),
@@ -195,7 +198,7 @@ const decide: Command = { need: 'record', async run(c, b) {
     const noteId = uid()
     await run(c.db, [authority(c.actor, 'record'),
       q("INSERT INTO pt_notes (id, kind, period, body, evidence, proposal_id, approved_by, approved_at) VALUES (?, 'close-packet', ?, ?, ?, ?, ?, ?)", noteId, period, optionalText(p.payload.notes, 'Notes', 5000), JSON.stringify(p.payload.exceptions), p.id, c.actor.email, now()),
-      ...p.payload.exceptions.map((e: string) => q("INSERT INTO pt_close_tasks (id, period, title, status, revision) VALUES (?, ?, ?, 'open', ?)", uid(), period, e.slice(0, 200), uid())),
+      ...p.payload.exceptions.map((e: string, i: number) => q("INSERT INTO pt_close_tasks (id, period, title, status, revision, judgment_kind, proposal_id) VALUES (?, ?, ?, 'open', ?, ?, ?)", uid(), period, e.slice(0, 200), uid(), p.payload.monthClose?.judgments[i]?.kind ?? null, p.payload.monthClose ? p.id : null)),
       ...mark('approved', 'note', noteId), audit(who(c.actor), 'proposal.approve', 'proposal', p.id, { kind: p.kind, tasks: p.payload.exceptions.length })])
   } else {
     const noteId = uid()

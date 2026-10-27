@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Action, Card, Chip, command, day, Field, Form, monthName, Table, useWho, type D } from './kit'
+import { Action, Card, Chip, command, day, Details, Field, Form, monthName, Table, useWho, type D } from './kit'
 
 export function CloseBoard({ board, period, select }: { board: D; period: string; select: (id: string) => void }) {
   return <Card title="Monthly close board">
@@ -30,7 +30,7 @@ export function ReviewTasks({ s, canRecord, onChange }: { s: D; canRecord: boole
   const people = s.assignees.map((p: D) => ({ value: p.email, label: p.name || p.email }))
   return <Card title="Review tasks" actions={open && (!s.tasks.length || s.checks.some((c: D) => c.key === 'year-end-reviews' && !c.ok)) && <Action tone="primary" disabled={pending} run={() => update('close.tasks', { period: s.id })}>Add the standard review tasks</Action>}>
     <Table heads={['Task', 'Assigned to', 'Due', 'Status', 'Completed by', '']} empty="No review tasks yet. Add the standard ones, or your own.">
-      {s.tasks.map((t: D) => <tr key={t.id}><td><strong>{t.title}</strong>{t.note && <small className="sub">{t.note}</small>}
+      {s.tasks.map((t: D) => <tr key={t.id}><td><strong>{t.title}</strong>{t.note && <small className="sub">{t.note}</small>}{t.judgment_kind && <><p>Accountant judgment: {t.judgment_kind}</p><a href="/app/agents">Review agent evidence</a></>}
         {open && editing === t.id && <Form label="Save review task" submit={b => update('close.task-save', { id: t.id, revision: t.revision, ...b })}>
           <Field label="Task title" name="title" defaultValue={t.title} required />
           <Field label="Task assignee" name="assignee" options={people} defaultValue={t.assignee ?? ''} empty="Unassigned" />

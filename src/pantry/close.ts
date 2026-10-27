@@ -122,6 +122,7 @@ const ensureTasks: Command = { need: 'record', async run(c, b) {
 const completeTask: Command = { need: 'record', async run(c, b) {
   const task = await one(c.db, 'SELECT * FROM pt_close_tasks WHERE id = ?', text(b.id, 'Task'))
   requireThat(task, 'Task not found', 404)
+  if (task.judgment_kind) requireThat(c.actor.kind === 'person' && ['owner', 'accountant'].includes(c.actor.role), 'Only the owner or accountant reviews close judgments', 403)
   const done = b.done !== false
   await run(c.db, [authority(c.actor, 'record'), guard("NOT EXISTS (SELECT 1 FROM pt_periods WHERE id = ? AND status = 'locked')", task.period),
     q('UPDATE pt_close_tasks SET status = ?, note = ?, done_by = ?, done_at = ?, revision = ? WHERE id = ? AND revision = ?', done ? 'done' : 'open', optionalText(b.note, 'Note', 1000), done ? c.actor.email : null, done ? now() : null, uid(), task.id, b.revision), changed(),

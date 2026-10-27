@@ -37,6 +37,15 @@ function Agents() {
     <Table heads={['Agent', 'Created', 'Status', '']} empty="No agents yet.">
       {state.settings.agents.map((a: D) => <tr key={a.id}><td>{a.name}</td><td>{day(a.created_at)} by {a.created_by}</td><td>{a.active ? <Chip tone="good">Active</Chip> : <Chip>Turned off</Chip>}</td><td>{a.active ? <Action tone="danger" run={async () => { await command('agent.deactivate', { id: a.id }); await reload() }}>Turn off</Action> : null}<Details facts={{ id: a.id }} /></td></tr>)}
     </Table>
+    {state.settings.agents.some((a: D) => a.active) && <details className="setup-steps"><summary>Monthly close preparation</summary>
+      <p>On each accounting tick, prepare this month again after approved schedules run. Every correction still needs approval. Turning off the agent stops preparation.</p>
+      <Form label="Save close preparation" submit={b => command('month-close.schedule', { ...b, enabled: b.enabled === 'yes' })} onDone={reload}>
+        <Field label="Close agent" name="agentId" options={state.settings.agents.filter((a: D) => a.active).map((a: D) => ({ value: a.id, label: a.name }))} required />
+        <Field label="Close month" name="period" type="month" required />
+        <Field label="Automatic preparation" name="enabled" options={[{ value: 'no', label: 'Off' }, { value: 'yes', label: 'On' }]} />
+      </Form>
+      <Table heads={['Month', 'Agent', 'Preparation']}>{state.settings.monthCloseSchedules.map((s: D) => <tr key={s.agent_id + s.period}><td>{s.period}</td><td>{state.settings.agents.find((a: D) => a.id === s.agent_id)?.name}</td><td>{s.enabled ? 'On' : 'Off'}</td></tr>)}</Table>
+    </details>}
     <Form label="Create agent token" submit={b => command('agent.create', b)} onDone={async r => { setToken(r); await reload() }} className="grid-form"><Field label="Agent name" name="name" required /></Form>
   </Card>
 }

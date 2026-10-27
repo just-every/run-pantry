@@ -14,7 +14,7 @@ function ProposalBody({ p, accounts }: { p: D; accounts: D[] }) {
     <blockquote className="evidence">{p.payload.passages.map((x: string, i: number) => <p key={i}>“{x}”</p>)}<footer>Quoted from the cited document. <a href={`/api/pantry/documents/${p.payload.documentId}`}>Open document</a></footer></blockquote>
   </>
   if (p.kind === 'close-packet' && p.payload.statementId) return <p>Statement balances and matched postings agree. <a href={`/app/bank?statement=${p.payload.statementId}`}>Review statement proof</a>. Approval records the reconciliation; it does not lock the period.</p>
-  if (p.kind === 'close-packet') return <><p>{p.payload.notes}</p><ul>{p.payload.exceptions.map((e: string, i: number) => <li key={i}>{e}</li>)}</ul>{p.payload.monthClose && <Details facts={{ 'Mechanical work': JSON.stringify(p.payload.monthClose.mechanical), 'Statement work': JSON.stringify(p.payload.monthClose.reconciliations), 'Schedule exceptions': JSON.stringify(p.payload.monthClose.scheduleExceptions), 'Judgment evidence': JSON.stringify(p.payload.monthClose.judgments) }} />}</>
+  if (p.kind === 'close-packet') return <><p>{p.payload.notes}</p><ul>{p.payload.exceptions.map((e: string, i: number) => <li key={i}>{e}</li>)}</ul>{p.payload.monthClose && <Details facts={{ 'Mechanical work': JSON.stringify(p.payload.monthClose.mechanical), 'Statement work': JSON.stringify(p.payload.monthClose.reconciliations), 'Corrections': JSON.stringify(p.payload.monthClose.corrections), 'Schedule exceptions': JSON.stringify(p.payload.monthClose.scheduleExceptions), 'Judgment evidence': JSON.stringify(p.payload.monthClose.judgments) }} />}</>
   if (p.kind === 'variance-note') return <><p>{p.payload.body}</p><p className="hint">Explanation only: it cites {p.payload.citations.length} posted entries and changes no figure.</p><ul>{p.payload.citations.map((id: string) => <li key={id}><a href={`/api/pantry/reports/record/entry/${id}`}>Open cited entry</a></li>)}</ul></>
   return <p className="hint">{p.payload.bankLineIds.length} statement line(s) to {(p.payload.journalLineIds ?? []).length} posting(s). Review it on the statement in Bank.</p>
 }
@@ -30,11 +30,11 @@ export function Agents() {
     {waiting.map((p: D) => <Card key={p.id} title={<><Icon name="agent" /> {KIND[p.kind]} from {p.agent_name}</>} actions={<Chip tone="agent">Proposed</Chip>}>
       <p><strong>{p.summary}</strong></p>
       <ProposalBody p={p} accounts={shared.state.accounts} />
-      <ProposalApproval p={p} canApprove={shared.state.actor.can.record} onDone={async()=>{await reload();await shared.reload()}} />
+      <ProposalApproval p={p} canApprove={shared.state.actor.can.record && (!p.payload.monthClose || ['owner', 'accountant'].includes(shared.state.actor.role))} onDone={async()=>{await reload();await shared.reload()}} />
       <Details facts={{ id: p.id, filed: p.created_at, cited: p.refs.map((r: D) => `${r.kind}:${r.id}`).join(', ') }} />
     </Card>)}
     {decided.length > 0 && <Card title="Decided"><Table heads={['Filed', 'Kind', 'Summary', 'Decision', 'By']}>
-      {decided.map((p: D) => <tr key={p.id}><td>{day(p.created_at)}</td><td>{KIND[p.kind]}</td><td>{p.summary}</td><td>{p.status === 'approved' ? <Chip tone="good">Approved</Chip> : p.status === 'stale' ? <Chip tone="warn">Stale</Chip> : <Chip>Rejected</Chip>}</td><td>{who(p.decided_by)}</td></tr>)}
+      {decided.map((p: D) => <tr key={p.id}><td>{day(p.created_at)}</td><td>{KIND[p.kind]}</td><td>{p.summary}{p.payload.monthClose && <details><summary>Close evidence</summary><ProposalBody p={p} accounts={shared.state.accounts} /></details>}</td><td>{p.status === 'approved' ? <Chip tone="good">Approved</Chip> : p.status === 'stale' ? <Chip tone="warn">Stale</Chip> : <Chip>Rejected</Chip>}</td><td>{who(p.decided_by)}</td></tr>)}
     </Table></Card>}
   </>
 }
