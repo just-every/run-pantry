@@ -28,7 +28,7 @@ export function Thread({ messages }: { messages: D[] }) {
 }
 
 /** One question with its record and every way to answer it. */
-export function QuestionCard({ q, onDone, focused = false, compact = false, accountants }: { q: D; onDone: () => Promise<void>; focused?: boolean; compact?: boolean; accountants?: D[] }) {
+export function QuestionCard({ q, onDone, focused = false, compact = false }: { q: D; onDone: () => Promise<void>; focused?: boolean; compact?: boolean }) {
   const { state } = useShared(), can = state.actor.can.record, who = useWho()
   const [pick, setPick] = useState<string>(''), [remember, setRemember] = useState(false), [note, setNote] = useState(''), [words, setWords] = useState(''), [other, setOther] = useState('')
   const choice = q.choices.find((c: D) => c.id === pick)
@@ -44,7 +44,7 @@ export function QuestionCard({ q, onDone, focused = false, compact = false, acco
     <dl className="facts record">{facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
     <p className="hint">{asked}{q.recordLink && <> · <a href={q.recordLink}>Open the record</a></>}</p>
     <p className="hint">For {q.assignee ? who(q.assignee) : 'the owner'}{q.assignee && <> · {q.assignee}</>}</p>
-    {can && (q.status === 'open' || q.status === 'confirm') && <AssignAccountant q={q} accountants={accountants} onDone={onDone} />}
+    {can && (q.status === 'open' || q.status === 'confirm') && <AssignAccountant q={q} onDone={onDone} />}
     {q.status !== 'open' && q.status !== 'confirm' ? <div className="callout" role="status"><Icon name="ok" /><div>
       <strong>{q.answer ? <>Answered: “{q.answer}”</> : STATUS[q.status]?.[0]}</strong>
       <span>{q.answered_by ? <>{who(q.answered_by)}{q.answered_via === 'email' ? ' by email' : ' in Pantry'}, {day(q.answered_at)}. </> : null}{q.messages.filter((m: D) => m.via === 'agent').at(-1)?.body}</span>
@@ -138,7 +138,7 @@ export function Questions({ focus }: { focus?: string }) {
     <LearnedRecognition/>
     <div className="split split-wide-left">
       <div className="stack">
-        {current && <QuestionCard key={current.id} q={current} onDone={refresh} focused={current === focused} accountants={data.accountants} />}
+        {current && <QuestionCard key={current.id} q={current} onDone={refresh} focused={current === focused} />}
         {rest.length > 0 && <Card title={`Still to answer (${rest.length})`}>
           <ol className="answered">{rest.map((x: D) => <li key={x.id}>
             <div><strong>{x.title}</strong><span className="hint">{x.why}</span><span className="hint">For {x.assignee ? who(x.assignee) : 'the owner'}</span></div>

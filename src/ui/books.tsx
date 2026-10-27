@@ -62,6 +62,7 @@ function EntryPanel({ e, onChange }: { e: D; onChange: () => Promise<void> }) {
   const mayPost = state.actor.can.post && (state.actor.role === 'owner' || e.prepared_by !== state.actor.email)
   if (editing) return <Card title="Edit draft"><JournalEditor entry={e} onDone={async () => { await onChange(); setEditing(false) }} /></Card>
   return <Card title={<>{e.number ? `Entry ${e.number}` : 'Draft entry'} — {e.memo}</>} actions={e.status === 'posted' ? <Chip tone="good">Posted</Chip> : <Chip tone="warn">Draft</Chip>}>
+    {state.settings.entity?.books_start && e.entry_date < state.settings.entity.books_start && <p className="callout callout-warn">Before books start: this entry carries into opening balances and is outside that period’s activity.</p>}
     {e.status === 'posted' && <div className="callout callout-good"><Icon name="ok" /><div><strong>{e.reversed_by_id ? 'Posted and reversed' : 'Posted — reverse to correct'}</strong><span>{e.reverses_id ? 'This entry reverses an earlier one. ' : ''}Posted entries never change; a reversal keeps both in the history.</span></div></div>}
     <dl className="facts"><div><dt>Date</dt><dd>{day(e.entry_date)}</dd></div><div><dt>Source</dt><dd>{SOURCE[e.source_kind]}{e.adjusting && <> · <Chip tone="info">Adjusting</Chip></>}</dd></div><div><dt>Prepared by</dt><dd>{e.prepared_kind === 'agent' && <Icon name="agent" />}{who(e.prepared_by)}</dd></div><div><dt>{e.status === 'posted' ? 'Posted by' : 'Approver'}</dt><dd>{e.posted_by ? who(e.posted_by) : 'The owner, or someone else with the posting grant'}</dd></div></dl>
     <Table heads={['#', 'Account', 'Description', 'Debit', 'Credit']} figures={[3, 4]}>
@@ -103,11 +104,12 @@ function Journal() {
 }
 
 export function Books() {
-  const [tab, setTab] = useState('Chart of accounts'), { state } = useShared()
+  const [tab, setTab] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'journal' ? 'Journal entries' : 'Chart of accounts'), { state } = useShared()
   const tb = useView<D>(`reports/trial-balance?to=${today()}`)
   const balances = new Map<string, number>((tb.data?.rows ?? []).map((r: D) => [r.id, r.net]))
   return <>
     <PageHead title="Books" lead="Your chart of accounts and journal. Posted entries never change: corrections are reversals." />
+    <p>Post opening balances as one journal entry dated the day before your first bank statement starts. The owner can post it, or leave the draft for the accountant. <a href="/app/books?tab=journal">Open journal entries</a>.</p>
     <Tabs tabs={['Chart of accounts', 'Journal entries', 'Sales tax', 'Review']} current={tab} onChange={setTab} />
     {tab === 'Chart of accounts' && <div className="split"><Chart balances={balances} />{state.actor.can.record && <NewAccount />}</div>}
     {tab === 'Journal entries' && <Journal />}

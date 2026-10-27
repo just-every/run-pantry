@@ -1,3 +1,4 @@
+import { BankOpening } from './bank-opening'
 import { FeedStatement } from './feed-statement'
 // Bank: transactions from feeds and statement files, the rules that file them,
 // and accounts, statement imports (CSV or OFX) and the statements waiting to reconcile.
@@ -46,7 +47,7 @@ function NewBankAccount({ onDone }: { onDone: () => Promise<void> }) {
     <Field label="Ledger account" name="accountId" required options={accountOptions(state.accounts, a => a.subtype === 'bank' && !used.has(a.id))} hint="Chart accounts with the Bank or card role. For a credit card, use 2100 Credit card or add a liability account with that role under Books." />
     <Field label="Last four digits" name="numberLast4" required inputMode="numeric" />
     <Field label="Routing number (optional)" name="routing" inputMode="numeric" />
-    <Field label="Opening statement date" name="openingDate" type="date" required /><Field label="Opening statement balance" name="openingBalance" required inputMode="decimal" />
+    <Field label="Opening statement date" name="openingDate" type="date" required hint="Balance as of the day before your first statement starts; for a September 1 statement, use August 31." /><Field label="Opening statement balance" name="openingBalance" required inputMode="decimal" />
   </Form></Card>
 }
 
@@ -57,7 +58,7 @@ function Statements({ data, connections, refresh, open }: { connections: D[]; da
   return <div className="split split-wide-left split-bank">
     <div className="stack">
       <Card title="Bank and card accounts"><Table heads={['Account', 'Bank', 'Ledger account', 'Opening statement']} figures={[3]} empty="No bank accounts yet.">
-        {data.accounts.map((a: D) => <tr key={a.id}><td>{a.name} <small className="sub">…{a.number_last4}</small></td><td>{a.institution}</td><td>{a.ledger_code} · {a.ledger_name}</td><td className="fig">{usd(a.opening_cents)} on {day(a.opening_date)}</td></tr>)}
+        {data.accounts.map((a: D) => <tr key={a.id}><td>{a.name} <small className="sub">…{a.number_last4}</small></td><td>{a.institution}</td><td>{a.ledger_code} · {a.ledger_name}</td><td className="fig">{usd(a.opening_cents)} as of {day(a.opening_date)}{shared.state.actor.can.record && !data.statements.some((s: D) => s.bank_account_id === a.id && s.reconciliation_id) && <BankOpening bank={a} onDone={refresh} />}</td></tr>)}
       </Table></Card>
       <Card title="Statements"><Table heads={['Account', 'Period', 'Lines', 'Closing', 'Status', '']} figures={[2, 3]} empty="No statements imported yet.">
         {data.statements.map((s: D) => <tr key={s.id}><td>{data.accounts.find((a: D) => a.id === s.bank_account_id)?.name}</td><td className="nowrap">{day(s.start_date)} – {day(s.end_date)}</td><td className="fig">{s.line_count}{s.duplicate_count ? ` (+${s.duplicate_count} already in)` : ''}</td><td className="fig">{usd(s.closing_cents)}</td>

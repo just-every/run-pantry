@@ -2,17 +2,17 @@
 import { authority, who } from '../access'
 import type { Command } from '../context'
 import { now, requireThat, text, uid, usd } from '../core'
-import { all, audit, changed, guard, one, periodOpen, q, run } from '../db'
+import { all, audit, changed, one, periodOpen, q, run } from '../db'
 import { recordView } from '../records'
 import { reportSource } from './report-source'
 import { emailQuestion } from './mail'
+import { questionRecipients, recipientLive } from './recipients'
 import { newRef, OPEN, question, say } from './store'
 
 export const accountants = (db: D1Database) => all(db, "SELECT email, name FROM pt_members WHERE active = 1 AND role = 'accountant' ORDER BY name, email")
-const accountantLive = (email: string) => guard("EXISTS (SELECT 1 FROM pt_members WHERE email = ? AND role = 'accountant' AND active = 1)", email)
 async function assignee(db: D1Database, value: unknown) {
-  const email = text(value, 'Accountant', 254).toLowerCase()
-  requireThat((await accountants(db)).some(a => a.email === email), 'Choose an invited, active accountant')
+  const email = text(value, 'Mention a person', 255).replace(/^@/, '').toLowerCase()
+  requireThat((await questionRecipients(db)).some(a => a.email === email), 'Choose an active owner, bookkeeper or accountant with full, unmasked access to the books')
   return email
 }
 
@@ -33,7 +33,7 @@ async function source(db: D1Database, kind: string, id: string) {
 const ask: Command = { need: 'record', async run(c, b) {
   const kind = text(b.subjectKind, 'Record type', 40), subjectId = text(b.subjectId, 'Record', 2000), words = text(b.question, 'Your question', 2000)
   const to = await assignee(c.db, b.assignee), s = await source(c.db, kind, subjectId), id = uid()
-  await run(c.db, [authority(c.actor, 'record'), accountantLive(to), periodOpen(s.date),
+  await run(c.db, [authority(c.actor, 'record'), recipientLive(to), periodOpen(s.date),
     q(`INSERT INTO pt_questions (id, kind, fingerprint, subject_kind, subject_id, period, record_date, amount_cents, title, question, why, facts, choices, status, ref, asked_at, revision, assignee)
       VALUES (?, 'accountant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 'open', ?, ?, ?, ?)`, id, `person:${id}`, kind, subjectId, s.date.slice(0, 7), s.date, s.amount, s.title, words, `Asked by ${c.actor.email}; waiting for ${to}.`, JSON.stringify(s.facts), newRef(), now(), uid(), to),
     say(id, c.actor.email, 'app', words), audit(who(c.actor), 'question.ask', kind, subjectId, { question: id, assignee: to })])
@@ -44,7 +44,7 @@ const ask: Command = { need: 'record', async run(c, b) {
 const assign: Command = { need: 'record', async run(c, b) {
   const qn = await question(c.db, text(b.id, 'Question')), to = await assignee(c.db, b.assignee)
   requireThat(OPEN.includes(qn.status), 'This question is already answered', 409)
-  await run(c.db, [authority(c.actor, 'record'), accountantLive(to),
+  await run(c.db, [authority(c.actor, 'record'), recipientLive(to),
     q("UPDATE pt_questions SET assignee = ?, email_status = '', emailed_to = NULL, emailed_at = NULL, revision = ? WHERE id = ? AND revision = ?", to, uid(), qn.id, qn.revision), changed(),
     say(qn.id, c.actor.email, 'app', `Asked ${to} to answer.`), audit(who(c.actor), 'question.assign', 'question', qn.id, { assignee: to })])
   await emailQuestion(c.env, c.db, await question(c.db, qn.id))

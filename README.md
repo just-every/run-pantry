@@ -9,10 +9,14 @@ Website and guides: [run-pantry.com](https://run-pantry.com) · [docs](https://r
 You need macOS, Linux or Windows with WSL2, and git. One line gets Pantry and starts it:
 
 ```sh
-npx -y @runeditrun/rer dev just-every/run-pantry
+curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-pantry
 ```
 
-Without Node, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-pantry` does the same and brings its own Node. `rer` is the Run Edit Run command that installs, starts, backs up and restores Pantry.
+This brings its own Node; you do not need to install Node first. `rer` is the Run Edit Run command that installs, starts, backs up and restores Pantry. If you already have Node, you can instead run:
+
+```sh
+npx -y @runeditrun/rer dev just-every/run-pantry
+```
 
 It clones Pantry into a `run-pantry` folder, installs it (a few minutes the first time) and starts it in the background. When it is ready it prints:
 

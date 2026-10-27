@@ -2,7 +2,7 @@ import { DimensionFields } from './dimensions'
 // A journal entry draft: one debit or credit per line, with the balance check
 // shown as the person types. The server decides; this only helps.
 import { useState } from 'react'
-import { accountOptions, command, Field, today, usd, useShared, type D } from './kit'
+import { accountOptions, command, Field, day, today, usd, useShared, type D } from './kit'
 
 type Line = { accountId: string; debit: string; credit: string; memo: string;className?:string;locationName?:string;projectName?:string }
 const blank = (): Line => ({ accountId: '', debit: '', credit: '', memo: '' })
@@ -11,6 +11,8 @@ const toCents = (v: string) => /^\d+(\.\d{1,2})?$/.test(v.replace(/,/g, '').trim
 export function JournalEditor({ entry, onDone }: { entry?: D; onDone: (saved: D) => void | Promise<void> }) {
   const { state } = useShared()
   const [lines, setLines] = useState<Line[]>(entry ? entry.lines.map((l: D) => ({ accountId: l.account_id, debit: l.debit_cents ? (l.debit_cents / 100).toFixed(2) : '', credit: l.credit_cents ? (l.credit_cents / 100).toFixed(2) : '', memo: l.memo,className:l.class_name,locationName:l.location_name,projectName:l.project_name })) : [blank(), blank()])
+  const [entryDate, setEntryDate] = useState(entry?.entry_date ?? today())
+  const booksStart = state.settings.entity?.books_start
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const debit = lines.reduce((s, l) => s + toCents(l.debit), 0), credit = lines.reduce((s, l) => s + toCents(l.credit), 0)
   const options = accountOptions(state.accounts, a => !['receivable', 'payable'].includes(a.subtype))
@@ -21,9 +23,10 @@ export function JournalEditor({ entry, onDone }: { entry?: D; onDone: (saved: D)
     try { await onDone(await command('journal.save-draft', { id: entry?.id, revision: entry?.revision, date: f.get('date'), memo: f.get('memo'), adjusting: f.get('adjusting') === 'on', lines })) } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
   }}>
     <div className="grid-form">
-      <Field label="Entry date" name="date" type="date" defaultValue={entry?.entry_date ?? today()} required />
+      <Field label="Entry date" name="date" type="date" value={entryDate} onChange={(e: any) => setEntryDate(e.target.value)} required />
       <Field label="Description" name="memo" defaultValue={entry?.memo} required wide />
     </div>
+    {booksStart && entryDate < booksStart && <p className="callout callout-warn" role="status">This entry is before books start ({day(booksStart)}). It carries into opening balances and is outside that period’s activity. For opening balances, use the day before your first statement.</p>}
     <label><input type="checkbox" name="adjusting" defaultChecked={Boolean(entry?.adjusting)} /> Adjusting entry (fiscal year end)</label>
     <div className="table-wrap"><table className="ledger lines-editor"><thead><tr><th>#</th><th>Account</th><th>Line memo</th><th className="fig">Debit</th><th className="fig">Credit</th><th /></tr></thead>
       <tbody>{lines.map((l, i) => <tr key={i}>

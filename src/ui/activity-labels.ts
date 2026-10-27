@@ -4,9 +4,9 @@ import { monthName } from './kit'
 const ACTIONS: Record<string, string> = {
   'account.create': 'Added an account', 'account.update': 'Changed an account',
   'agent.create': 'Created an agent token', 'agent.deactivate': 'Turned off an agent token',
-  'bank-account.create': 'Added a bank account',
+  'bank-account.create': 'Added a bank account', 'bank-account.correct-opening': 'Corrected a bank opening balance',
   'bank-rule.create': 'Made a bank rule', 'bank-rule.edit': 'Changed a bank rule', 'bank-rule.retire': 'Retired a bank rule', 'bank-rule.file': 'Filed by bank rule', 'bank-rule.undo': 'Undid a line filed by rule',
-  'bill.draft': 'Drafted a bill', 'bill.edit': 'Changed a bill draft', 'bill.record': 'Recorded a bill', 'bill.evidence-waived': "Waived a bill's receipt",
+  'bill.draft': 'Drafted a bill', 'bill.edit': 'Changed a bill draft', 'bill.approve': 'Approved a bill', 'bill.record': 'Recorded a bill', 'bill.evidence-waived': "Waived a bill's receipt",
   'books-agent.run': 'Pantry checked the books', 'books-agent.settings': "Changed Pantry's questions and emails",
   'chart.start': 'Started the chart of accounts',
   'close.tasks': 'Added review tasks', 'close.task-done': 'Finished a review task', 'close.task-reopened': 'Reopened a review task',
@@ -51,16 +51,24 @@ const RECORDS: Record<string, string> = {
 }
 
 const APPROVALS: Record<string, string> = {
-  'period.lock': 'Locking the month', 'period.reopen': 'Reopening the month', 'invoice.approve': 'Invoice', 'credit.approve': 'Credit note', 'recurring.approve': 'Recurring invoice',
+  'period.lock': 'Locking the month', 'period.reopen': 'Reopening the month', 'bill.approve': 'Bill', 'invoice.approve': 'Invoice', 'credit.approve': 'Credit note', 'recurring.approve': 'Recurring invoice',
   'journal.post': 'Posting a journal entry', 'journal.reverse': 'Reversing a journal entry', 'cutover.accept': 'Move-in sign-off',
   'proposal.match': "Agent's bank match", 'proposal.journal': "Agent's journal entry", 'proposal.close-packet': "Agent's close packet", 'proposal.variance-note': "Agent's variance explanation",
+  'recurring-journal.approve': 'Recurring journal entry', 'recognition.approve': 'Recognition schedule', 'recurring-price.approve': 'Recurring invoice price',
+  'customer-refund.approve': 'Customer refund', 'autopay.scheduled-charge': 'Scheduled customer charge', 'tax-reminder-batch.send': 'Sending tax reminders',
+  'credit.write-off': 'Writing off an invoice', 'journal.reclassify': 'Reclassifying a journal entry',
 }
 
 /** A code no one has worded yet, made readable: "gusto-payroll" → "Gusto payroll". */
 const words = (code: string) => { const t = code.replace(/[-_.]+/g, ' ').trim(); return t ? t[0].toUpperCase() + t.slice(1) : code }
 
 export const actionLabel = (action: string) => ACTIONS[action] ?? words(action)
-export const approvalLabel = (kind: string, action: string) => APPROVALS[`${kind}.${action}`] ?? `${recordLabel(kind)} · ${action.replace(/[-_]+/g, ' ')}`
+export function approvalLabel(kind: string, action: string) {
+  const verb = action.startsWith(`${kind}.`) ? action.slice(kind.length + 1) : action
+  if (verb === 'approve-document-draft') return `${recordLabel(kind)} from a document`
+  if (verb === 'integration.post') return `Posting ${recordLabel(kind).toLowerCase()} through a connection`
+  return APPROVALS[`${kind}.${verb}`] ?? `${recordLabel(kind)} · ${words(verb)}`
+}
 
 /** The record an entry touched, in words; a month is named. */
 export function recordLabel(kind: string, id?: string) {

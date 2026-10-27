@@ -3,7 +3,7 @@
 // its lines add up to its balances, every line is matched, and the ledger's
 // bank balance less items not yet on a statement equals the closing balance.
 import { authority, who, type Actor } from './access'
-import { now, requireThat, text, uid, usd, type Data } from './core'
+import { addDays, now, requireThat, text, uid, usd, type Data } from './core'
 import { all, audit, guard, one, q, run, assertOpen, type Sql } from './db'
 import type { Command } from './context'
 import { reconciliationHistory, reconciliationUndoPreview, reconciliationUndoCommands } from './reconciliation-undo'
@@ -37,23 +37,26 @@ export async function reconciliationState(db: D1Database, statementId: string): 
   if (unmatched.length) blockers.push({ kind: 'unmatched', amount: unmatched.reduce((s, l) => s + l.amount_cents, 0), ids: unmatched.map(l => l.id), message: `${unmatched.length} statement line${unmatched.length === 1 ? '' : 's'} not matched to the books` })
 
   const balanceAt = async (day: string) => Number((await one(db, "SELECT COALESCE(SUM(l.debit_cents - l.credit_cents), 0) AS n FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id WHERE e.status = 'posted' AND l.account_id = ? AND e.entry_date <= ?", bank.account_id, day))?.n ?? 0)
-  const baseline = await balanceAt(bank.opening_date)
-  if (baseline !== bank.opening_cents) blockers.push({ kind: 'baseline', amount: baseline - bank.opening_cents, message: `The books show ${usd(baseline)} in ${bank.name} on ${bank.opening_date}, but its opening statement balance is ${usd(bank.opening_cents)}; post the opening balance or correct it` })
+  const first = await one(db, 'SELECT MIN(start_date) AS start FROM pt_statements WHERE bank_account_id = ?', bank.id)
+  const openingAsOf = bank.opening_date < first!.start ? bank.opening_date : addDays(first!.start, -1)
+  if (bank.opening_date > openingAsOf) blockers.push({ kind: 'opening-date', message: `Correct the opening statement date to ${openingAsOf}, the day before the first statement starts. Its opening balance excludes first-day activity.` })
+  const baseline = await balanceAt(openingAsOf)
+  if (baseline !== bank.opening_cents) blockers.push({ kind: 'baseline', amount: baseline - bank.opening_cents, message: `The books show ${usd(baseline)} in ${bank.name} as of ${openingAsOf}, but its opening statement balance is ${usd(bank.opening_cents)}; post the opening balance or correct it` })
   const book = await balanceAt(statement.end_date)
   // Book postings after the bank's opening that no statement line up to this end date has cleared.
   const outstanding = await all(db, `SELECT l.id, l.debit_cents - l.credit_cents AS amount, e.entry_date, e.memo, e.number FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id
     WHERE e.status = 'posted' AND l.account_id = ? AND e.entry_date > ? AND e.entry_date <= ?
     AND NOT EXISTS (SELECT 1 FROM pt_match_postings mp JOIN pt_match_bank_lines mb ON mb.match_id = mp.match_id AND mb.active = 1 JOIN pt_bank_lines bl ON bl.id = mb.bank_line_id
       WHERE mp.journal_line_id = l.id AND mp.active = 1 AND bl.posted_date <= ?)
-    ORDER BY e.entry_date, e.number, l.id`, bank.account_id, bank.opening_date, statement.end_date, statement.end_date)
+    ORDER BY e.entry_date, e.number, l.id`, bank.account_id, openingAsOf, statement.end_date, statement.end_date)
   const outstandingTotal = outstanding.reduce((s, o) => s + Number(o.amount), 0)
   const cleared = book - outstandingTotal
   const difference = statement.closing_cents - cleared
   if (difference !== 0 && !blockers.some(b => b.kind === 'unmatched' || b.kind === 'baseline')) blockers.push({ kind: 'difference', amount: difference, message: `Cleared books ${usd(cleared)} differ from the statement closing ${usd(statement.closing_cents)} by ${usd(difference)}` })
   const postings = await all(db, `SELECT l.id, l.debit_cents - l.credit_cents AS amount, e.entry_date, e.memo, e.number, mp.match_id FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id
     LEFT JOIN pt_match_postings mp ON mp.journal_line_id = l.id AND mp.active = 1
-    WHERE e.status = 'posted' AND l.account_id = ? AND e.entry_date > ? AND e.entry_date <= ? AND e.reversed_by_id IS NULL ORDER BY e.entry_date, e.number, l.id`, bank.account_id, bank.opening_date, statement.end_date)
-  return { undo: await reconciliationUndoPreview(db, statementId), history: await reconciliationHistory(db, statementId), feedBalances, statement, bank, completed: done, opening: statement.opening_cents, closing: statement.closing_cents, book, outstanding, outstandingTotal, cleared, difference, lines, postings, blockers, ready: !done && blockers.length === 0 }
+    WHERE e.status = 'posted' AND l.account_id = ? AND e.entry_date > ? AND e.entry_date <= ? AND e.reversed_by_id IS NULL ORDER BY e.entry_date, e.number, l.id`, bank.account_id, openingAsOf, statement.end_date)
+  return { undo: await reconciliationUndoPreview(db, statementId), history: await reconciliationHistory(db, statementId), feedBalances, statement, bank, openingAsOf, completed: done, opening: statement.opening_cents, closing: statement.closing_cents, book, outstanding, outstandingTotal, cleared, difference, lines, postings, blockers, ready: !done && blockers.length === 0 }
 }
 
 /** The batch that records a ready statement's reconciliation with its proof. */
@@ -65,6 +68,7 @@ export async function completion(db: D1Database, actor: Actor, statementId: stri
   const id = uid(), matchIds = [...new Set(state.lines.map((l: Data) => l.match_id))]
   const proof = { opening: state.opening, closing: state.closing, book: state.book, outstanding: state.outstanding, cleared: state.cleared, lines: state.lines.map((l: Data) => ({ id: l.id, date: l.posted_date, amount: l.amount_cents, match: l.match_id })) }
   return { state, statements: [
+    guard('EXISTS (SELECT 1 FROM pt_bank_accounts WHERE id = ? AND revision = ?)', state.bank.id, state.bank.revision),
     // The proof must still hold at commit: no match changed, lock or posting arrived.
     guard("NOT EXISTS (SELECT 1 FROM pt_periods WHERE status = 'locked' AND start_date <= ? AND end_date >= ?)", state.statement.end_date, state.statement.start_date),
     guard(`(SELECT COUNT(*) FROM pt_match_bank_lines mb JOIN pt_bank_lines l ON l.id = mb.bank_line_id WHERE mb.active = 1 AND l.bank_account_id = ? AND l.posted_date BETWEEN ? AND ?) = ?`, state.bank.id, state.statement.start_date, state.statement.end_date, state.lines.length),

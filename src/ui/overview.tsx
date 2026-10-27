@@ -29,7 +29,7 @@ export function Overview() {
         <span className="progress-bar" aria-hidden="true"><span style={{ width: `${(done / steps.length) * 100}%` }} /></span>
         <ol className="steps">{steps.map((s: D, i: number) => <li key={s.key} className={`step${s.done ? ' done' : ''}`}>
           <span className="step-no">{i + 1}</span>
-          <div className="step-text"><strong>{s.title}</strong><span>{s.detail}</span></div>
+          <div className="step-text"><strong>{s.title}</strong><span>{s.detail}</span>{s.key === 'chart' && !s.done && <span>Post opening balances as one journal entry. <a href="/app/books?tab=journal">Open journal entries</a>.</span>}</div>
           {s.done ? <Chip tone="good">Complete</Chip> : <Chip tone="warn">To do</Chip>}
           <Link className={`btn ${s.key === next ? 'btn-primary' : 'btn-secondary'}`} to={GO[s.go]} search={(s.go === 'settings' ? { step: 'business' } : s.go === 'contacts' ? { tab: 'contacts' } : undefined) as any}>{s.done ? 'View' : 'Start'}</Link>
         </li>)}</ol>

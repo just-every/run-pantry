@@ -189,6 +189,7 @@ async function assertStatementMatches(h, s, st, before) {
 }
 
 test('BANK-005 / PAN-09 a statement reconciles only when its balances are proven, and every difference is explained first', async t => {
+  await (await import('./opening-reconciliation.mjs')).openingReconciliation(t)
   const h = await harness(); t.after(() => h.close())
   const s = await september(h)
   const before = await count(h, "SELECT COUNT(*) AS n FROM pt_journal_entries WHERE status = 'posted'")

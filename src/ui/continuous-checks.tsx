@@ -28,7 +28,7 @@ export function ContinuousChecks() {
   if (!data) return error ? <Card title="Continuous checks"><p role="alert" className="error">{error}</p></Card> : null
   const open = data.flags.filter((f: D) => f.status === 'open'), dismissed = data.flags.filter((f: D) => f.status === 'dismissed')
   return <Card title="Continuous checks" actions={open.length ? <Chip tone="warn">{open.length} flagged</Chip> : <Chip tone="good">Nothing flagged</Chip>}>
-    <p className="hint">Pantry runs these every day, not only at close{data.settings.lastRunOn ? `; last run ${day(data.settings.lastRunOn)}` : ''}. Each flag cites its lines and the rule and setting that raised it, and stays dismissed until its lines change.</p>
+    <p className="hint">Pantry runs these every day, not only at close{data.settings.lastRunOn && <>; last run {day(data.settings.lastRunOn)}</>}. Each flag cites its lines and the rule and setting that raised it, and stays dismissed until its lines change.</p>
     <Table heads={['Check', 'Flag', 'Lines', 'Rule and setting', '']} empty="No check is flagged.">
       {open.map((f: D) => <tr key={f.id}><td><strong>{f.ruleTitle}</strong><small className="sub">since {day(f.firstFlaggedOn)}</small></td><td>{f.title}<small className="sub">{f.detail}</small></td>
         <td><ul className="plain">{f.lines.map((l: D) => <li key={`${l.kind}:${l.id}`}>{l.label}{l.date ? ` · ${day(l.date)}` : ''}{l.amountCents != null ? ` · ${usd(l.amountCents)}` : ''}</li>)}</ul></td>

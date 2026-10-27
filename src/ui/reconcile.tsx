@@ -1,3 +1,4 @@
+import { BankOpening } from './bank-opening'
 // The reconciliation workspace: balance proof, statement lines beside ledger
 // postings, a match being built (or an agent's proposal to approve), and
 // Finish, which stays unavailable until the proof holds.
@@ -138,6 +139,7 @@ export function Reconcile({ statementId, back }: { statementId: string; back: ()
       <Details facts={{ 'SHA-256': r.statement.source_sha256 }} />
       {r.feedBalances.map((f: D) => <p key={f.id}>Bank reports {usd(f.balance_cents)}{f.kind.startsWith('credit') ? ' owed' : ''} · {f.balance_as_of ? `as of ${f.balance_as_of}` : `observed ${f.balance_observed_at ?? 'at an unknown time'}; bank gave no as-of time`}. {f.balance_as_of?.slice(0, 10) === r.statement.end_date ? 'Dated to statement end; must agree with the closing balance.' : 'Context only; does not replace the statement balance or block completion.'}</p>)}
     </Card>
+    {!finished && shared.state.actor.can.record && <Card title="Opening statement balance"><p>{usd(r.bank.opening_cents)} as of {day(r.bank.opening_date)}. This is the balance before the first statement’s activity. <a href="/app/books?tab=journal">Post opening balances in one journal entry</a>.</p><BankOpening bank={r.bank} onDone={refresh} /></Card>}
     <ReconciliationUndo info={r.undo} history={r.history} statementId={statementId} onDone={refresh} />
     {!finished && r.blockers.length > 0 && <div className="callout callout-warn" role="status"><Icon name="alert" /><div><strong>Before you can finish</strong><ul>{r.blockers.map((b: D) => <li key={b.kind}>{b.message}</li>)}</ul></div></div>}
     <div className="split even">

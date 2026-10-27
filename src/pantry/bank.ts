@@ -4,7 +4,7 @@ import { matchWaitingReceipts } from './receipts/review'
 // recorded; importing it never posts to the ledger.
 import { authority, who } from './access'
 import { cents, date, now, optionalText, requireThat, sha256, text, uid, type Data } from './core'
-import { all, audit, guard, one, q, run, type Sql } from './db'
+import { all, assertOpen, audit, changed, guard, one, q, run, type Sql } from './db'
 import { account } from './accounts'
 import { documentInsert } from './contacts'
 import { parseCsvStatement, parseOfxStatement, type ParsedStatement } from './statement-files'
@@ -27,6 +27,27 @@ const saveBankAccount: Command = { need: 'record', async run(c, b) {
       id, text(b.name, 'Name', 120), ledger.id, text(b.institution, 'Bank', 120), last4, routing, date(b.openingDate, 'Opening statement date'), cents(b.openingBalance, 'Opening statement balance', { signed: true, zero: true }), uid()),
     audit(who(c.actor), 'bank-account.create', 'bank-account', id, { name: b.name, last4 })])
   return (await one(c.db, 'SELECT * FROM pt_bank_accounts WHERE id = ?', id))!
+} }
+
+/** Correct the starting evidence before any reconciliation relies on it. */
+const correctOpening: Command = { need: 'record', async run(c, b) {
+  const bank = await one(c.db, 'SELECT * FROM pt_bank_accounts WHERE id = ?', text(b.id, 'Bank account'))
+  requireThat(bank, 'Bank account not found', 404)
+  requireThat(bank.revision === b.revision, 'Bank account changed; reload before correcting it', 409)
+  requireThat(!await one(c.db, 'SELECT 1 FROM pt_reconciliations WHERE bank_account_id = ?', bank.id), 'Undo the reconciliations before changing their opening evidence', 409)
+  const openingDate = date(b.openingDate, 'Opening balance as of'), opening = cents(b.openingBalance, 'Opening statement balance', { signed: true, zero: true })
+  const first = await one(c.db, 'SELECT MIN(start_date) AS start FROM pt_statements WHERE bank_account_id = ?', bank.id)
+  requireThat(!first?.start || openingDate < first.start, `The opening balance is as of the day before the first statement starts (${first?.start}), or an earlier date`, 409)
+  await assertOpen(c.db, bank.opening_date)
+  await assertOpen(c.db, openingDate)
+  const revision = uid(), reason = text(b.reason, 'Reason for correction', 500)
+  await run(c.db, [authority(c.actor, 'record'),
+    guard('NOT EXISTS (SELECT 1 FROM pt_reconciliations WHERE bank_account_id = ?)', bank.id),
+    guard("NOT EXISTS (SELECT 1 FROM pt_periods WHERE status = 'locked' AND (? BETWEEN start_date AND end_date OR ? BETWEEN start_date AND end_date))", bank.opening_date, openingDate),
+    guard('NOT EXISTS (SELECT 1 FROM pt_statements WHERE bank_account_id = ? AND start_date <= ?)', bank.id, openingDate),
+    q('UPDATE pt_bank_accounts SET opening_date = ?, opening_cents = ?, revision = ? WHERE id = ? AND revision = ?', openingDate, opening, revision, bank.id, b.revision), changed(),
+    audit(who(c.actor), 'bank-account.correct-opening', 'bank-account', bank.id, { before: { date: bank.opening_date, balance: bank.opening_cents }, after: { date: openingDate, balance: opening }, reason })])
+  return (await one(c.db, 'SELECT * FROM pt_bank_accounts WHERE id = ?', bank.id))!
 } }
 
 function parse(format: string, content: string): ParsedStatement {
@@ -115,6 +136,7 @@ const correctBalances: Command = { need: 'record', async run(c, b) {
 
 export const bankCommands: Record<string, Command> = {
   'bank-account.save': saveBankAccount,
+  'bank-account.correct-opening': correctOpening,
   'statement.import': importStatement,
   'statement.correct-balances': correctBalances,
 }
