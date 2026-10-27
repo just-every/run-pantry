@@ -67,6 +67,8 @@ export async function parseLines(db: D1Database, raw: unknown, { control = false
 export async function entry(db: D1Database, id: string) {
   const row = await one(db, 'SELECT * FROM pt_journal_entries WHERE id = ?', id)
   requireThat(row, 'Journal entry not found', 404)
+  const entity = await one(db, 'SELECT books_start FROM pt_entity WHERE id = 1')
+  row.dateWarning = entity && row.entry_date < entity.books_start ? `This entry is before books start (${entity.books_start}). It carries into opening balances; it is outside the activity of periods starting on that date. Use the day before your first statement for opening balances.` : null
   row.adjusting = Boolean(row.adjusting)
   row.lines = await all(db, 'SELECT l.*, a.code AS account_code, a.name AS account_name FROM pt_journal_lines l JOIN pt_accounts a ON a.id = l.account_id WHERE l.entry_id = ? ORDER BY l.line_no', id)
   return row

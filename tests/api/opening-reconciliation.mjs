@@ -1,0 +1,68 @@
+import assert from 'node:assert/strict'
+import { harness } from './harness.mjs'
+
+export async function openingReconciliation(t) {
+  const h = await harness(); t.after(() => h.close())
+  await h.command('entity.save', { legalName: 'Brightline Plumbing & Heating LLC', entityType: 'single-member-llc', state: 'OR', fiscalYearStart: 1, taxMethod: 'accrual', booksStart: '2026-09-01', policies: '' })
+  await h.command('chart.start', {})
+  const acct = Object.fromEntries((await h.view('state')).accounts.map(a => [a.code, a.id]))
+  const bank = await h.command('bank-account.save', { name: 'Brightline Operating', institution: 'Cascade Community Bank', accountId: acct['1000'], numberLast4: '4821', openingDate: '2026-09-01', openingBalance: '18250' })
+  const journal = async (date, memo, lines) => {
+    const draft = await h.command('journal.save-draft', { date, memo, lines })
+    return h.command('journal.post', { id: draft.id, revision: draft.revision })
+  }
+  const opening = await journal('2026-08-31', 'Opening balances', [{ accountId: acct['1000'], debit: '18250' }, { accountId: acct['3000'], credit: '18250' }])
+  await journal('2026-09-01', 'September rent', [{ accountId: acct['6100'], debit: '1400' }, { accountId: acct['1000'], credit: '1400' }])
+  await journal('2026-09-12', 'Customer deposit', [{ accountId: acct['1000'], debit: '4690' }, { accountId: acct['4000'], credit: '4690' }])
+  const imported = await h.command('statement.import', { bankAccountId: bank.id, fileName: 'brightline-september.csv', content: 'Posting Date,Description,Amount\n09/01/2026,September rent,-1400.00\n09/12/2026,Customer deposit,4690.00\n', opening: '18250', closing: '21540', start: '2026-09-01', end: '2026-09-30', confirmLast4: '4821' })
+  let r = await h.view(`reconciliation/${imported.statement.id}`)
+  assert.equal(r.blockers.some(b => b.kind === 'baseline'), false, 'first-day rent must not change the opening balance proof')
+  assert.equal(r.openingAsOf, '2026-08-31')
+  assert.ok(r.blockers.some(b => b.kind === 'opening-date'))
+  assert.match(opening.dateWarning, /before books start.*2026-09-01/)
+  const correction = { id: bank.id, revision: bank.revision, openingDate: '2026-08-31', openingBalance: '18250', reason: 'Opening balance excludes September 1 rent' }
+  await h.command('bank-account.correct-opening', correction, '', 401)
+  const accountant = await h.member('opening-accountant@example.test', 'accountant', { canLock: true })
+  const viewer = await h.member('opening-viewer@example.test', 'viewer')
+  await h.command('bank-account.correct-opening', correction, viewer, 403)
+  await h.command('bank-account.correct-opening', { ...correction, openingDate: '2026-09-01' }, h.owner, 409)
+  const corrected = await h.command('bank-account.correct-opening', correction)
+  await h.command('bank-account.correct-opening', correction, h.owner, 409)
+  r = await h.view(`reconciliation/${imported.statement.id}`)
+  for (const line of r.lines) {
+    const posting = r.postings.find(p => Number(p.amount) === line.amount_cents)
+    assert.ok(posting)
+    await h.command('match.approve', { bankLineIds: [line.id], journalLineIds: [posting.id] })
+  }
+  r = await h.view(`reconciliation/${imported.statement.id}`)
+  assert.deepEqual([r.ready, r.difference, r.book, r.outstandingTotal], [true, 0, 2154000, 0])
+  const done = await h.command('reconciliation.complete', { statementId: imported.statement.id })
+  assert.equal(done.completed.closing_cents, 2154000)
+  await h.command('bank-account.correct-opening', { ...correction, revision: corrected.revision }, h.owner, 409)
+  const deposit = r.lines.find(l => l.amount_cents === 469000)
+  const box = (await h.command('receipt-address.create', { mailbox: 'books@example.test' })).address
+  const asked = (await h.command('question.ask', { subjectKind: 'bank-line', subjectId: deposit.id, question: 'Which customer sent this deposit?', assignee: '@owner@example.test' }, accountant)).question
+  const board = async () => (await h.view('close-board?year=2026')).months.find(m => m.id === '2026-09')
+  assert.equal((await board()).waiting, 1)
+  const message = h.mail.find(m => m.subject.includes(asked.ref))
+  assert.deepEqual([message.to].flat(), ['owner@example.test'])
+  const raw = ['From: Olivia Owner <owner@example.test>', `To: ${box}`, `Subject: Re: ${message.subject}`, `Message-ID: <${crypto.randomUUID()}@mail.example.test>`, 'Date: Tue, 27 Oct 2026 12:00:00 +0000', 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', '', 'Cedar Studio paid this September invoice.', ''].join('\r\n')
+  const delivered = await h.email(raw, { from: 'owner@example.test', to: box })
+  assert.equal(delivered.status, 200, delivered.text)
+  const thread = (await h.view(`questions/record?kind=bank-line&id=${deposit.id}`)).questions.find(q => q.id === asked.id)
+  assert.deepEqual([thread.answer, thread.answered_by, thread.answered_via], ['Cedar Studio paid this September invoice.', 'owner@example.test', 'email'])
+  assert.equal((await board()).waiting, 0)
+  let close = await h.command('close.tasks' , { period: '2026-09', title: 'Confirm opening balances', assignee: 'owner@example.test', dueDate: '2026-10-05' })
+  close = await h.command('close.tasks', { period: '2026-09', title: 'Review the first statement', assignee: 'owner@example.test', dueDate: '2026-10-06' })
+  for (const task of close.tasks) await h.command('close.task', { id: task.id, revision: task.revision, done: true })
+  close = await h.view('close/2026-09')
+  assert.equal(close.ready, true, JSON.stringify(close.checks.filter(c => !c.ok)))
+  await h.command('period.lock', { period: '2026-09' }, accountant)
+  assert.equal((await h.view('close/2026-09')).period.status, 'locked')
+  assert.deepEqual([(await board()).status, (await board()).done, (await board()).total], ['locked', 2, 2])
+  assert.ok((await h.view('close/2026-09')).approvals.some(a => a.actor_email === 'opening-accountant@example.test' && a.decision === 'approved'))
+  const activity = await h.view('activity')
+  const event = activity.audit.find(e => e.action === 'bank-account.correct-opening')
+  assert.ok(event)
+  assert.deepEqual(JSON.parse(event.detail), { before: { date: '2026-09-01', balance: 1825000 }, after: { date: '2026-08-31', balance: 1825000 }, reason: correction.reason })
+}

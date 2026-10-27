@@ -426,6 +426,7 @@ test('Settings carry the Business and API-001 financial-report and vendor-credit
 })
 
 test('CLOSE-003 custom task assignment, due dates, revision review and month locking work at 1440 and 390', async t => {
+  await (await import('./close-opening-journey.mjs')).closeOpeningJourney()
   const app = await worker(); t.after(() => app.close())
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] }); t.after(() => browser.close())
   const owner = await browser.newContext(); t.after(() => owner.close())

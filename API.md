@@ -33,6 +33,7 @@ Writes: `POST /api/pantry/command/:action` with a JSON object.
 | `bill.save`, `bill.record` | record | `vendorId, reference, billDate, dueDate?, lines[{description, accountId, amount}], post` / `id, revision` |
 | `bill.waive-evidence` | post | `id, revision, reason` |
 | `payment.record`, `payment.allocate` | record | `direction ('received'|'paid'), contactId, date, amount, bankAccountId, reference, allocations[{targetId, amount}]` / `paymentId, date, allocations` |
+| `bank-account.correct-opening` | record | `id, revision, openingDate, openingBalance, reason`; before any reconciliation relies on it, with an as-of date before the first statement starts |
 | `bank-account.save` | record | `name, institution, accountId, numberLast4, routing, openingDate, openingBalance` |
 | `statement.import` | record | `bankAccountId, fileName, content, opening, closing, start, end, confirmLast4` (CSV) |
 | `statement.correct-balances` | record | `id, opening, closing, reason` (before reconciliation) |

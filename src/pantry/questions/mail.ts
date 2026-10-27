@@ -11,6 +11,7 @@ import { parseMime as parseBaseMime } from '../../modules/mail/src/inbound/mime.
 import { ownerEmail } from '../access'
 import { now, uid, type Data } from '../core'
 import { all, one, q, run } from '../db'
+import { questionRecipients } from './recipients'
 import { pantryAddress } from '../receipts/mail'
 import { answer, confirm, hear, ownerByEmail, memberByEmail, effectMessage, financialQuestionAllowed } from './answer'
 import { AGENT, OPEN, parse, say, type Question } from './store'
@@ -68,6 +69,10 @@ function questionBody(qn: Question, link: string, replies: boolean, business: st
 /** Email one question to the owner and record the outcome on it. */
 export async function emailQuestion(env: Bindings, db: D1Database, qn: Question) {
   const to = qn.assignee || await ownerEmail(db, env), s = await sender(db, env)
+  if (qn.assignee && !(await questionRecipients(db)).some(p => p.email === to)) {
+    await run(db, [q("UPDATE pt_questions SET email_status = 'failed', email_detail = ? WHERE id = ?", 'The mentioned person no longer has full, unmasked access to these books.', qn.id)])
+    return 'failed'
+  }
   const { text, html } = questionBody(qn, questionLink(env, qn.id), !!await pantryAddress(db, env), s.business)
   const sent = to ? await deliver(env, db, to, `${qn.question.length <= 90 ? qn.question : qn.title} ${subjectRef(qn.ref)}`, text, html) : { status: 'no-mail' as const, detail: 'The owner has no email address.' }
   await run(db, [q('UPDATE pt_questions SET email_status = ?, emailed_at = ?, emailed_to = ?, email_detail = ? WHERE id = ?', sent.status, sent.status === 'sent' ? now() : null, to || null, sent.detail, qn.id),
@@ -116,7 +121,7 @@ export async function receiveReply(env: Bindings, raw: Uint8Array): Promise<Repl
   const qn = parse(row), owner = await ownerEmail(db, env), from = String(m.from ?? '').toLowerCase()
   const recipient = qn.assignee || owner
   if (!from || from !== recipient || (qn.emailed_to && from !== qn.emailed_to)) return { result: 'refused', reason: 'Only the question’s recipient answers by email' }
-  const by = qn.assignee ? await memberByEmail(db, from) : ownerByEmail(owner), words = replyText(m)
+  const by = from === owner ? ownerByEmail(owner) : await memberByEmail(db, from), words = replyText(m)
   if (!by || !financialQuestionAllowed(by)) return { result: 'refused', reason: 'The recipient no longer has full, unmasked access to these books' }
   if (qn.kind === 'accountant' && OPEN.includes(qn.status) && words) { await hear(env, db, qn.id, words, by); return { result: 'answered', question: qn.id } }
   if (!OPEN.includes(qn.status)) {

@@ -32,12 +32,12 @@ export const ownerByEmail = (email: string): Answerer => ({
 
 /** Email answers retain the invited member's current grants, checked again in the write. */
 export async function memberByEmail(db: D1Database, email: string): Promise<Answerer | null> {
-  const m = await one(db, "SELECT m.*, p.mask_tin, p.mask_bank, p.revision AS privacy_revision FROM pt_members m JOIN pt_role_privacy p ON p.role = m.role JOIN oa_operators o ON lower(o.email) = m.email AND o.status = 'active' WHERE m.email = ? AND m.active = 1 AND m.role = 'accountant'", email)
+  const m = await one(db, "SELECT m.*, p.mask_tin, p.mask_bank, p.revision AS privacy_revision FROM pt_members m JOIN pt_role_privacy p ON p.role = m.role JOIN oa_operators o ON lower(o.email) = m.email AND o.status = 'active' WHERE m.email = ? AND m.active = 1 AND m.role IN ('accountant', 'bookkeeper')", email)
   if (!m) return null
   const person: Person = { kind: 'person', id: '', email, name: m.name, session: '', role: m.role, revision: m.revision, grants: { post: !!m.can_post, lock: !!m.can_lock, reopen: !!m.can_reopen }, policy: { bankAccounts: m.bank_accounts === null ? null : JSON.parse(m.bank_accounts), timePeople: JSON.parse(m.time_people), billLimit: m.bill_limit_cents, paymentLimit: m.payment_limit_cents, journalLimit: m.journal_limit_cents, maskTin: !!m.mask_tin, maskBank: !!m.mask_bank, privacyRevision: m.privacy_revision } }
   return { person, audit: { email, kind: 'person' }, via: 'email', authority: need => {
     requireThat(allowed(person, need), 'This answer needs the posting grant', 403)
-    return guard(`EXISTS (SELECT 1 FROM pt_members m JOIN pt_role_privacy p ON p.role = m.role WHERE m.email = ? AND m.active = 1 AND m.role = 'accountant' AND m.revision = ? AND p.revision = ? AND m.bank_accounts IS ? AND m.bill_limit_cents IS ? AND m.payment_limit_cents IS ? AND m.journal_limit_cents IS ? AND EXISTS (SELECT 1 FROM oa_operators o WHERE lower(o.email) = m.email AND o.status = 'active')${need === 'post' ? ' AND m.can_post = 1' : ''})`, email, m.revision, m.privacy_revision, m.bank_accounts, m.bill_limit_cents, m.payment_limit_cents, m.journal_limit_cents)
+    return guard(`EXISTS (SELECT 1 FROM pt_members m JOIN pt_role_privacy p ON p.role = m.role WHERE m.email = ? AND m.active = 1 AND m.role IN ('accountant', 'bookkeeper') AND m.revision = ? AND p.revision = ? AND m.bank_accounts IS ? AND m.bill_limit_cents IS ? AND m.payment_limit_cents IS ? AND m.journal_limit_cents IS ? AND EXISTS (SELECT 1 FROM oa_operators o WHERE lower(o.email) = m.email AND o.status = 'active')${need === 'post' ? ' AND m.can_post = 1' : ''})`, email, m.revision, m.privacy_revision, m.bank_accounts, m.bill_limit_cents, m.payment_limit_cents, m.journal_limit_cents)
   } }
 }
 
