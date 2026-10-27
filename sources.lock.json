@@ -1374,6 +1374,10 @@
       "sha256": "ce9c6eb4f127e88b32d538655a3fb3a2dc9fc3e83e48782fd56ffd3377da16fd",
       "executable": false
     },
+    "scripts/installer/business-carry.mjs": {
+      "sha256": "e2c759f3e362576ba19239af37a0ef24b2e3d985857c97bb6d19910b54febf52",
+      "executable": false
+    },
     "scripts/installer/erasure-history.mjs": {
       "sha256": "28cc6c7b3ced2da9ba934e17ac832b719e42763a9b6e100dbeb14583a56b57e2",
       "executable": false
@@ -1419,7 +1423,7 @@
       "executable": false
     },
     "src/auth.server.ts": {
-      "sha256": "bc5e579a36b8da90d8d5baf59a707d7ac8f33ed9358f337706c4ecc7a22d7eb5",
+      "sha256": "77cf8e706bfc45e6790f308337bc774268ee23568a89b5dd2f8cab8d3a59f389",
       "executable": false
     },
     "src/base/contract-filter.ts": {
@@ -4615,7 +4619,7 @@
       "executable": false
     },
     "src/pantry/settings.ts": {
-      "sha256": "127d03e05642550ee62e727f3264886af6ac2c236f2af7f237d70b2978fa7309",
+      "sha256": "669713b194614d13280ab68beea0a863104c7747b3f1806f089ac4c2e4371e09",
       "executable": false
     },
     "src/pantry/standing/index.ts": {
@@ -5219,7 +5223,7 @@
       "executable": false
     },
     "src/ui/business-settings.tsx": {
-      "sha256": "5ea6bfaafc037d523c75459c52ef39aabd047cbd6a050ebfc1a8d0c85fc85ee2",
+      "sha256": "ce0bf7a9763d985003b7d05134fbeea9a6bc5f51dad55a407c9fc5a2b1944a0d",
       "executable": false
     },
     "src/ui/capture-approval-rules.tsx": {
@@ -5967,7 +5971,7 @@
       "executable": false
     },
     "tests/app/app.test.mjs": {
-      "sha256": "7176b89d0d176979bfc246bae1ec714aadb13b680b29ff6bf4d6b1920612b033",
+      "sha256": "de84b8d35985d5412f31abb952bcf0451427a0f9b3568d6a2c7dc67f4ed93061",
       "executable": false
     },
     "tests/app/approved-adjustments-journey.mjs": {
@@ -6008,6 +6012,10 @@
     },
     "tests/app/budgets.test.mjs": {
       "sha256": "0173ca929698a5413008604f510717890c9f5ad666d3da8e069b9fdb005e640d",
+      "executable": false
+    },
+    "tests/app/business-carry-journey.mjs": {
+      "sha256": "57a081033e9457dfbc735417443ce365efb1d019723b7c9e6a02899bf5f6a4b6",
       "executable": false
     },
     "tests/app/capture-fixtures.mjs": {
@@ -6191,7 +6199,7 @@
       "executable": false
     },
     "tests/app/worker.mjs": {
-      "sha256": "7fba2460d04e1e325b7d49f716879ba9eb8db8a3c5503183d0a99068397201d6",
+      "sha256": "bf19dd4335b8734ab7e9e513d95e24d0ed32985d78777fb2818433912d203280",
       "executable": false
     },
     "tests/app/year-end.test.mjs": {
@@ -6303,7 +6311,7 @@
       "executable": false
     },
     "vite.config.ts": {
-      "sha256": "4fb18ef68889184ef0d765862a239879001a53f13d55ab29b4974edc953d6eaa",
+      "sha256": "17abcac7ce49604c663ae8462b8c8f9bbcfe331364b63d0104376c90901cd218",
       "executable": false
     },
     "vite.site.config.ts": {
