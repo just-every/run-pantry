@@ -1,10 +1,11 @@
-// Convert an owner-provided Cloudflare D1 export in an isolated disposable D1.
+// Convert an owner-provided Cloudflare D1 export in an isolated disposable SQLite database.
 // The ordinary Pantry policy and Base archive writer retain the erasure fence,
 // scrub credentials and produce exactly the format consumed by rer import.
 import { readFile, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { Miniflare, convertV4MiniflareOptions } from 'miniflare'
+import { DatabaseSync } from 'node:sqlite'
+import { sqliteD1 } from './hosted-sqlite.mjs'
 import { unstable_splitSqlQuery } from 'wrangler'
 import { createPortability } from '@runeditrun/rer/modules/portability'
 import { exportArchive } from '@runeditrun/rer/modules/portability/files'
@@ -12,14 +13,21 @@ import policy from './installer/portability.mjs'
 
 export async function hostedArchive({ input, output }) {
   const directory = await mkdtemp(join(tmpdir(), 'pantry-hosted-archive-'))
-  let mf
+  let database
   try {
-    mf = new Miniflare({ ...convertV4MiniflareOptions({ modules: true, script: 'export default {fetch(){return new Response(null,{status:404})}}',
-      compatibilityDate: '2026-09-08', d1Databases: { DB: 'snapshot' } }), resourcePersistencePath: directory })
-    const db = await mf.getD1Database('DB')
-    const statements = unstable_splitSqlQuery(await readFile(input, 'utf8'))
-    // One atomic import also honours the deferred foreign keys in D1 exports.
-    await db.batch(statements.map(sql => db.prepare(sql)))
+    database = new DatabaseSync(join(directory,'snapshot.sqlite'),{allowExtension:false})
+    database.exec('PRAGMA foreign_keys=ON; BEGIN')
+    for(const sql of unstable_splitSqlQuery(await readFile(input,'utf8'))) {
+      const command=sql.replace(/^(?:\s+|--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)*/,'')
+      // This is a D1 dump reader, not a general SQLite shell. In particular,
+      // never allow ATTACH, VACUUM INTO, writable_schema or extension loading.
+      if(!/^(?:CREATE\s+(?:UNIQUE\s+)?(?:TABLE|INDEX|TRIGGER|VIEW)\b|INSERT\s+INTO\b|DELETE\s+FROM\s+["\`]?sqlite_sequence\b|PRAGMA\s+(?:defer_foreign_keys|foreign_keys)\s*=\s*(?:TRUE|FALSE|ON|OFF|0|1)\s*;?\s*$)/i.test(command))
+        throw new Error('unsupported_snapshot_statement')
+      database.exec(sql)
+    }
+    database.exec('COMMIT')
+    if(database.prepare('PRAGMA foreign_key_check').all().length)throw new Error('snapshot_foreign_keys')
+    const db=sqliteD1(database)
     // A restored SQL dump must retain the source-bound journal. A new identity
     // would make later erasure archives unable to fence this backup.
     const identity = await db.prepare('SELECT source_identity FROM rer_portability_state WHERE id=1').first()
@@ -27,7 +35,7 @@ export async function hostedArchive({ input, output }) {
     const service = await createPortability({ db, policy })
     return await exportArchive(service, output, ['local runtime caches and logs'])
   } finally {
-    await mf?.dispose()
+    database?.close()
     await rm(directory, { recursive: true, force: true })
   }
 }

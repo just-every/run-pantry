@@ -6,7 +6,7 @@ import '../browser-home.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'
-import { copyFile, mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -206,6 +206,11 @@ test('BILL-001/INVOICE-001/AUDIT-001/REPORT-006/ERASURE-001 books and receipts r
   const duplicate = await promisify(execFile)(process.execPath, [join(first,'scripts/hosted-archive.mjs'),'--input-sql',sql,'--output',join(first,'exports/pantry-books.rer')], {cwd:first,env}).then(()=>null,e=>e)
   assert.equal(duplicate?.code,2,'a scheduled backup cannot overwrite an existing archive')
   assert.match(duplicate.stderr,/output_exists/)
+  const unsafe=join(first,'exports/unsupported.sql'),unpublished=join(first,'exports/unsupported.rer')
+  await writeFile(unsafe,"ATTACH DATABASE 'synthetic-pantry-1' AS other;")
+  const unsafeResult=await promisify(execFile)(process.execPath,[join(first,'scripts/hosted-archive.mjs'),'--input-sql',unsafe,'--output',unpublished],{cwd:first,env}).then(()=>null,e=>e)
+  assert.equal(unsafeResult?.code,2,'the dump reader refuses a general SQLite shell operation')
+  await assert.rejects(stat(unpublished),{code:'ENOENT'},'a refused SQL dump publishes no archive')
 
   const credentials=[modelKey,rotatedModelKey,archivedAgent.token,archivedIntegration.token,process.env.PANTRY_STRIPE_KEY].filter(Boolean)
   for(const credential of credentials)assert.ok(!exported.includes(credential),'export diagnostics exclude credentials')

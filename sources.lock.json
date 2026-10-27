@@ -1375,11 +1375,15 @@
       "executable": false
     },
     "scripts/hosted-archive.mjs": {
-      "sha256": "386c503deeac85a4b32fbdf82241614f0fb92108037af3645c27e2195ec0957a",
+      "sha256": "5f146dc5825f652d1372b2b544ab7610ed851d517aba559a82ee5350b3771a96",
       "executable": false
     },
     "scripts/hosted-backup.mjs": {
       "sha256": "f4ac739885291bb93abbf44a95e67939ffbe4ae6e4fd839d580f6f07e2a14896",
+      "executable": false
+    },
+    "scripts/hosted-sqlite.mjs": {
+      "sha256": "7eb1feb46f7a6291bf44b8e692c90ef01cd0cbe16d4eedfd1ef1402ac88ca52c",
       "executable": false
     },
     "scripts/install.mjs": {
@@ -6335,7 +6339,7 @@
       "executable": false
     },
     "tests/restore/restore.test.mjs": {
-      "sha256": "a302a27de2d9f4e6f3a383551048d6f9a6c3e48411938ce21cd331b6651598fb",
+      "sha256": "a06227c394a3b184f43177cac1d9f8ddea59b29e23a57bfaae6b02251910c4b0",
       "executable": false
     },
     "tests/runtime.mjs": {
