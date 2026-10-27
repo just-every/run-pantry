@@ -11,11 +11,16 @@ import { recognitionView } from './recognition'
 import { recurringJournalsView } from './recurring-journals'
 
 async function prepare(db: D1Database, actor: Agent, input: Data) {
-  const existing = await one(db, "SELECT id FROM pt_proposals WHERE agent_id = ? AND kind = ? AND status IN ('proposed', 'approved') AND payload = ? ORDER BY created_at, id LIMIT 1", actor.id, input.kind, JSON.stringify(input.payload))
-  if (existing) {
-    const saved = await proposal(db, existing.id)
+  const existing = await all(db, "SELECT id FROM pt_proposals WHERE agent_id = ? AND kind = ? AND status IN ('proposed', 'approved') AND payload = ? ORDER BY created_at, id", actor.id, input.kind, JSON.stringify(input.payload))
+  for (const row of existing) {
+    const saved = await proposal(db, row.id)
     if (await stillCurrent(db, saved.refs)) return saved
   }
+  // Changed work replaces this agent's pending version, rather than leaving a
+  // month of obsolete packets for the accountant to dismiss individually.
+  await run(db, [authority(actor, 'record'),
+    q("UPDATE pt_proposals SET status = 'stale', revision = ? WHERE agent_id = ? AND kind = ? AND summary = ? AND status = 'proposed' AND json_extract(payload, '$.period') IS ?", crypto.randomUUID(), actor.id, input.kind, input.summary, input.payload.period ?? null),
+    audit(who(actor), 'proposal.refresh', 'agent', actor.id, { kind: input.kind, period: input.payload.period ?? null, summary: input.summary })])
   return fileProposal(db, actor, input)
 }
 

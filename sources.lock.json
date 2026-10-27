@@ -4187,7 +4187,7 @@
       "executable": false
     },
     "src/pantry/month-close.ts": {
-      "sha256": "70e7f53151c13619dbf5fe4bc25c2da61f3df4ef2615bf944c77daadf996d971",
+      "sha256": "607eef26f7bd7c6b4b0f1cdecf7d95a7205f992d7664bba595d8cc2bf8a6ec44",
       "executable": false
     },
     "src/pantry/nexus-thresholds.ts": {
@@ -5675,7 +5675,7 @@
       "executable": false
     },
     "tests/api/agent.test.mjs": {
-      "sha256": "ecbd76efec02b912538da403417d1f344b836b034032138cdff654c164dc4b6d",
+      "sha256": "d96c0e33582bd31f14bd496e49553b7804cf129b45ebe5c7ad1db8664f8e7d9f",
       "executable": false
     },
     "tests/api/approved-write-off-journey.mjs": {
@@ -5839,7 +5839,7 @@
       "executable": false
     },
     "tests/api/month-close-journey.mjs": {
-      "sha256": "3e76670aa115d9f4465d1039be35695189f4f2827c1f115bf0ccbaa81206ffe0",
+      "sha256": "c8ce63f245f7462ab445b8887e12304fa1fd8de2568720b3739c470640e7cbad",
       "executable": false
     },
     "tests/api/move-in.test.mjs": {

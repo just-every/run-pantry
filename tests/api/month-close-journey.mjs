@@ -88,6 +88,9 @@ export async function monthCloseJourney(h) {
   assert.equal((await h.view('close/2026-09')).status, 'open')
   const readyReport = await agent.call('month-close', { period: '2026-09' })
   assert.deepEqual(readyReport.mechanical.filter(c => c.status !== 'done'), [])
+  const pendingPackets = (await agent.call('context')).proposals.filter(p => p.status === 'proposed' && p.payload.monthClose && p.payload.period === '2026-09')
+  assert.deepEqual(pendingPackets.map(p => p.id), [readyReport.packet.id], 'refresh replaces the obsolete mechanical work list')
+
   // Packet approval creates exactly four protected judgment tasks.
   const member = async (email, role, grants = {}) => {
     // Auth uses the session clock; the ledger remains fixed to the seeded month.
