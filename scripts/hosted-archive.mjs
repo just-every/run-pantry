@@ -17,15 +17,28 @@ export async function hostedArchive({ input, output }) {
   try {
     database = new DatabaseSync(join(directory,'snapshot.sqlite'),{allowExtension:false})
     database.exec('PRAGMA foreign_keys=ON; BEGIN')
+    const tables=[], indexes=[], views=[], rows=[], triggers=[]
     for(const sql of unstable_splitSqlQuery(await readFile(input,'utf8'))) {
       const command=sql.replace(/^(?:\s+|--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)*/,'')
       // This is a D1 dump reader, not a general SQLite shell. In particular,
       // never allow ATTACH, VACUUM INTO, writable_schema or extension loading.
       if(!/^(?:CREATE\s+(?:UNIQUE\s+)?(?:TABLE|INDEX|TRIGGER|VIEW)\b|INSERT\s+INTO\b|DELETE\s+FROM\s+["\`]?sqlite_sequence\b|PRAGMA\s+(?:defer_foreign_keys|foreign_keys)\s*=\s*(?:TRUE|FALSE|ON|OFF|0|1)\s*;?\s*$)/i.test(command))
         throw new Error('unsupported_snapshot_statement')
-      database.exec(sql)
+      if(/^CREATE\s+TABLE\b/i.test(command))tables.push(sql)
+      else if(/^CREATE\s+(?:UNIQUE\s+)?INDEX\b/i.test(command))indexes.push(sql)
+      else if(/^CREATE\s+VIEW\b/i.test(command))views.push(sql)
+      else if(/^CREATE\s+TRIGGER\b/i.test(command))triggers.push(sql)
+      else if(!/^PRAGMA\b/i.test(command))rows.push(sql)
     }
+    // D1 dumps interleave each table with its rows. Deferred foreign keys
+    // still need their referenced tables to exist at insert time. Build the
+    // complete schema first, then load its frozen rows, then restore triggers
+    // so immutable-posting guards do not replay historical business actions.
+    for(const sql of [...tables,...indexes,...views])database.exec(sql)
+    database.exec('PRAGMA defer_foreign_keys=ON')
+    for(const sql of rows)database.exec(sql)
     database.exec('COMMIT')
+    for(const sql of triggers)database.exec(sql)
     if(database.prepare('PRAGMA foreign_key_check').all().length)throw new Error('snapshot_foreign_keys')
     const db=sqliteD1(database)
     // A restored SQL dump must retain the source-bound journal. A new identity

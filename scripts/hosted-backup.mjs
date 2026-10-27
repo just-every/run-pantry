@@ -2,7 +2,7 @@
 // Credentials are read from the private deploy file or injected environment.
 import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { chmodSync, mkdtempSync, lstatSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { hostedArchive } from './hosted-archive.mjs'
@@ -10,6 +10,9 @@ import { hostedArchive } from './hosted-archive.mjs'
 const root = resolve(dirname(new URL(import.meta.url).pathname), '..')
 const args = process.argv.slice(2), flag = name => { const i = args.indexOf(name); return i < 0 ? undefined : args[i + 1] }
 const fail = message => { console.error(message); process.exit(2) }
+if (args.length === 1 && args[0] === '--help') {
+  console.log('usage: node scripts/hosted-backup.mjs [--env-file PRIVATE_FILE] [--environment NAME] [--output NEW.rer]'); process.exit(0)
+}
 const environment = flag('--environment') ?? 'production'
 if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(environment)) fail('Choose a valid environment name')
 const envFile = flag('--env-file')
@@ -21,10 +24,12 @@ if (envFile) {
     values = Object.fromEntries(readFileSync(path, 'utf8').split(/\r?\n/).map(line => /^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line)).filter(Boolean).map(([, k, v]) => [k, v.replace(/^(["'])(.*)\1$/, '$2')]))
   } catch { fail('The private deploy file could not be read') }
 }
-for (const key of ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN']) if (!(values[key] ?? process.env[key])) fail('Supply the Cloudflare account and D1 token through the private deploy file or environment')
 const declaration = JSON.parse(readFileSync(join(root, 'deploy.json'), 'utf8'))
 const database = `${declaration.project.split('/').at(-1)}-${environment}-${declaration.d1[0].binding.toLowerCase().replaceAll('_', '-')}`
 const output = resolve(flag('--output') ?? join('exports', `${database}-${new Date().toISOString().replaceAll(':', '-')}.rer`))
+// Refuse an occupied destination before any provider call or database pause.
+if (lstatSync(output, {throwIfNoEntry:false})) fail('Output already exists; choose a new archive path. No provider request was made.')
+for (const key of ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN']) if (!(values[key] ?? process.env[key])) fail('Supply the Cloudflare account and D1 token through the private deploy file or environment')
 process.umask(0o077)
 const directory = mkdtempSync(join(tmpdir(), 'pantry-hosted-backup-')), sql = join(directory, 'snapshot.sql')
 try {

@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "161cb96e7a99874c4ec72886f5adbe69ad703d6f2537051bc7bda3e182dca7ef",
+      "sha256": "3ee71228bee143c0ed80dd8ec109e775f996f2d761269b08cf022af341536ede",
       "executable": false
     },
     "DEMO.md": {
@@ -139,7 +139,7 @@
       "executable": false
     },
     "docs/backup.md": {
-      "sha256": "f7c803390c86ec6c0ebeb9c6636a09cd89c5aa4661c0da2c59467fdabfdc1c76",
+      "sha256": "14e197f8b2d3f24e446a02a595514f74ce416c5977c87abdedba0fac761d60e3",
       "executable": false
     },
     "docs/bank-feeds-and-rules.md": {
@@ -1375,11 +1375,11 @@
       "executable": false
     },
     "scripts/hosted-archive.mjs": {
-      "sha256": "31fd6ea0c18a86e55fc73a6c7888bd216f54fdf9579f7e3cda277fe50c75917e",
+      "sha256": "b16bcd61c6207433c4c57e49e02a01bb1f2a096fcc5100ee24764dbde3201a6a",
       "executable": false
     },
     "scripts/hosted-backup.mjs": {
-      "sha256": "f4ac739885291bb93abbf44a95e67939ffbe4ae6e4fd839d580f6f07e2a14896",
+      "sha256": "dbe27e2e19bd4b9db25053408532d98ccae7a3d74c0a7dd268acaef6b8adc24d",
       "executable": false
     },
     "scripts/hosted-sqlite.mjs": {

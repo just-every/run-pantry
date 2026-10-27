@@ -34,7 +34,7 @@ Only use a snapshot produced after the source installation established its erasu
 For an owner-controlled scheduler, run the same command from the exact deployed checkout, with its private deploy file, once per day. Keep the archive directory on encrypted storage outside the deployed database, monitor the command's exit status, and copy successful archives to a separate failure domain. The command returns nonzero on provider or conversion failure and never replaces an earlier archive. Example scheduler command:
 
 ```sh
-cd /path/to/run-pantry && node scripts/hosted-backup.mjs --env-file ./pantry-deploy.env --environment production
+cd ./run-pantry && node scripts/hosted-backup.mjs --env-file ./pantry-deploy.env --environment production
 ```
 
 New own-account hosted deploys provision a private `PANTRY_BACKUPS` R2 binding. The existing half-hour Cron starts one complete archive per UTC day and advances at most 32 archive parts per tick. A durable lease prevents overlapping ticks from publishing duplicates. Multipart uploads keep memory bounded; failed uploads are aborted. Failed work retries on a later tick, and erasure invalidates an unfinished snapshot before a fresh snapshot is taken. No archive is deleted automatically.
