@@ -115,7 +115,7 @@ const dismiss: Command = { need: 'record', async run(c, b) {
 const readAgain: Command = { need: 'record', async run(c, b) {
   const r = await receipt(c.db, text(b.id, 'Receipt'))
   requireThat(r && r.status === 'review', 'Receipt not found or already decided', 404)
-  const file = await documentFile(c.db, r.file_document_id ?? r.document_id)
+  const file = await documentFile(c.db, r.file_document_id ?? r.document_id, c.env.PANTRY_DOCUMENTS)
   requireThat(file, 'Document not found', 404)
   const input = file.mediaType === 'message/rfc822' ? emailReadable(file.bytes, file.name) : readable({ name: file.name, mediaType: file.mediaType, bytes: file.bytes })
   const cols = await readingColumns(c.db, await readWith(c.db, c.env, input))

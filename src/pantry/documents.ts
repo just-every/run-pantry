@@ -20,10 +20,23 @@ export async function documentStatements(by: string, input: NewDocument) {
 }
 
 /** The document's exact bytes, joined from its parts when it has them. */
-export async function documentFile(db: D1Database, id: string) {
+export async function documentFile(db: D1Database, id: string, bucket?: R2Bucket) {
   const doc = await one<{ name: string; media_type: string; size: number; sha256: string; content: ArrayBuffer; erased_at: string|null }>(db, 'SELECT name, media_type, size, sha256, content, erased_at FROM pt_documents WHERE id = ?', id)
   if (!doc) return null
   requireThat(!doc.erased_at, 'This document’s bytes were erased after retention expiry', 410)
+  if (bucket) {
+    const receipt = await one<{object_key:string}>(db,'SELECT object_key FROM pt_document_objects WHERE document_id=? AND ready=1',id)
+    if (receipt) {
+      const object = await bucket.get(receipt.object_key)
+      requireThat(object,'This document is unavailable from object storage; retry after recovery',503)
+      const bytes = new Uint8Array(await object.arrayBuffer())
+      requireThat(bytes.length===doc.size && await sha256(bytes)===doc.sha256,'This document failed its integrity check',500)
+      // Do not return bytes if erasure committed while the provider was read.
+      const live = await one(db,'SELECT id FROM pt_documents WHERE id=? AND erased_at IS NULL',id)
+      requireThat(live,'This document’s bytes were erased after retention expiry',410)
+      return { name:doc.name,mediaType:doc.media_type,sha256:doc.sha256,bytes }
+    }
+  }
   let bytes = new Uint8Array(doc.content as ArrayBuffer)
   if (bytes.length !== doc.size) {
     const parts = await all<{ content: ArrayBuffer }>(db, 'SELECT content FROM pt_document_parts WHERE document_id = ? ORDER BY seq', id)

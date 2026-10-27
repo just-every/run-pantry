@@ -30,6 +30,10 @@
     {
       "binding": "PANTRY_BACKUPS",
       "bucket_name": "local-pantry-backups"
+    },
+    {
+      "binding": "PANTRY_DOCUMENTS",
+      "bucket_name": "local-pantry-documents"
     }
   ]
 }

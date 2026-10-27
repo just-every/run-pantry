@@ -724,6 +724,12 @@
       "name": "0119_hosted_backups.sql",
       "sha256": "17629822c67f22763b1a0d3152a3cec42fb86b96620fcb3cbf107b840b756492",
       "sql": "-- Operational backup receipts stay with this installation, outside its archive.\nCREATE TABLE pt_hosted_backup_runs (\n  day TEXT PRIMARY KEY,\n  job_id TEXT,\n  object_key TEXT,\n  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','building','complete')),\n  lease_id TEXT,\n  lease_until INTEGER NOT NULL DEFAULT 0,\n  completed_at TEXT,\n  content_hash TEXT,\n  error_code TEXT\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0120_document_objects.sql",
+      "sha256": "6c77e739d174b285cc16915ef9fbb7f03cb13450bf3227a2ec5ad7a54a3474b8",
+      "sql": "-- Object receipts are installation-local. Archives keep the exact recovery copy.\nCREATE TABLE pt_document_objects (\n  document_id TEXT PRIMARY KEY REFERENCES pt_documents(id) ON DELETE CASCADE,\n  object_key TEXT NOT NULL UNIQUE,\n  ready INTEGER NOT NULL DEFAULT 0 CHECK(ready IN (0,1))\n);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

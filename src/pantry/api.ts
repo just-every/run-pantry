@@ -88,6 +88,7 @@ import { anyDue, runDue, syncItem } from './feeds/sync'
 import { receive, verify } from './feeds/webhook'
 import { availability } from './feeds/plaid'
 import { documentFile } from './documents'
+import { syncDocumentObjects } from './document-objects'
 import { receiptCommands, receiptRoutes } from './receipts/routes'
 import { deliveryCommands, deliveriesView, reminderPlans, sendingView } from './delivery'
 import { recurringCommands, recurringView } from './recurring'
@@ -155,6 +156,7 @@ export const api = new Hono<{ Bindings: Bindings }>()
 api.use('*', async (c, next) => {
   await upgradeTins(c.env)
   await next()
+  if(c.req.method!=='GET' && c.res.status<400)await syncDocumentObjects(c.env)
   if(c.req.method!=='GET')c.executionCtx.waitUntil(runWebhooks(c.env).catch(()=>console.error('Webhook dispatch failed')))
   c.executionCtx.waitUntil(runDueWork(c.env).catch(error => console.error('Pantry due work failed:', error)))
 })
@@ -360,7 +362,7 @@ for (const format of ['csv', 'pdf', 'xlsx']) api.get(`/api/pantry/reports/contra
 
 api.get('/api/pantry/documents/:id', async c => {
   const ctx = await reader(c)
-  const doc = await documentFile(ctx.db, c.req.param('id'))
+  const doc = await documentFile(ctx.db, c.req.param('id'), ctx.env.PANTRY_DOCUMENTS)
   requireThat(doc, 'Document not found', 404)
   // ?view=1 shows a photo in the page; everything else downloads.
   const inline = c.req.query('view') === '1' && /^image\/(png|jpeg|webp|gif)$/.test(doc.mediaType)

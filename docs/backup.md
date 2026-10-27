@@ -19,7 +19,7 @@ The archive is saved in the `exports` folder, with its checksums inside it: `rer
 rer run hosted-backup --env-file .env.pantry
 ```
 
-Add `--environment NAME` if you deployed with one. The command establishes the database's stable erasure-journal identity if this is its first backup, then takes Cloudflare's SQL snapshot and converts it to a private, checksum-verified `.rer` archive. The receipt lists table counts, exclusions, archive hash and content hash. The same Pantry policy as local export removes credentials and disables restored connections and standing consent. Documents currently stored in D1 travel byte for byte.
+Add `--environment NAME` if you deployed with one. The command establishes the database's stable erasure-journal identity if this is its first backup, then takes Cloudflare's SQL snapshot and converts it to a private, checksum-verified `.rer` archive. The receipt lists table counts, exclusions, archive hash and content hash. The same Pantry policy as local export removes credentials and disables restored connections and standing consent. Documents travel byte for byte from the D1 recovery mirror, including hosted originals served from private R2 storage.
 
 Restore the resulting archive with the ordinary `rer import` command below. Supply the latest post-erasure archive with `--journal` when restoring an older backup. This uses ERASURE-001's existing journal fence; a fresh destination without that later journal cannot discover erasures made after its backup.
 
@@ -43,7 +43,9 @@ A saved archive job can disappear when an owner erases personal data. The next s
 
 The installation's `pt_hosted_backup_runs` table records completion, the object key, content hash and a value-free failure code. Download a completed archive using the owner's Cloudflare R2 tools, then restore it as below. Keep the bucket private. Existing deployments without the binding continue their accounting schedule and need redeployment to enable it. A backup remains in the same Cloudflare account; copy it elsewhere for independent disaster recovery.
 
-The active document store is still D1; R2 holds complete recovery archives containing those document bytes. A fresh hosted deployment drill and the large-business report timing proof remain OPS-001 work.
+Hosted deployments also provision a private `PANTRY_DOCUMENTS` bucket. Successful app mutations copy up to 32 pending originals to R2 and verify their hashes; the half-hour schedule drains remaining uploads. Downloads use the verified object through the existing session or scoped integration door, never a public bucket URL. Missing or corrupted committed objects are refused. D1 keeps a byte-for-byte recovery mirror so existing local export and import remain self-contained. Restored books rebuild their installation-local object receipts and copy originals into the new bucket on later mutations or scheduled ticks.
+
+Owner-confirmed erasure deletes the corresponding R2 objects before a successful command response. Failed provider deletions retain their receipts for retry; erased documents cannot be downloaded. An upload racing erasure rechecks the journaled document state and deletes its copy. Earlier completed recovery archives retain the existing later-journal requirement. A fresh hosted deployment drill and the large-business report timing proof remain OPS-001 work.
 
 ## Restore into a fresh install
 

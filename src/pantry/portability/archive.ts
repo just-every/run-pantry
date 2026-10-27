@@ -11,7 +11,7 @@ export async function originalFiles(c: Context, s: Snapshot, plan: Plan, destina
   const files: ExportFile[] = [], inventory: Data[] = [], attachments: Data[] = []
   for (const d of s.documents) {
     if (d.erased_at) { block(plan, `Document:${d.id}`, 'Original bytes were erased after retention expiry; no replacement document was generated.'); inventory.push({ ...d, available: false }); continue }
-    const original = await documentFile(c.db, d.id)
+    const original = await documentFile(c.db, d.id, c.env.PANTRY_DOCUMENTS)
     requireThat(original && original.bytes.length === d.size && await sha256(original.bytes) === d.sha256, `Original document ${d.id} failed its stored size or SHA-256 check`, 409)
     const file = `originals/${safeName(d.id)}/${safeName(d.name)}`
     files.push({ name: file, data: original.bytes })

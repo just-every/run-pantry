@@ -14,6 +14,8 @@ export interface Bindings {
  DB: D1Database
  /** Private daily recovery archives; no public bucket access. */
  PANTRY_BACKUPS?: R2Bucket
+ /** Private original documents, served only after the ordinary grant check. */
+ PANTRY_DOCUMENTS?: R2Bucket
  /** Built browser files; hosted deploys run the Worker first (staticAssetResponse). */
  ASSETS?: Fetcher
  RER_DEPLOY_SOURCE?: string

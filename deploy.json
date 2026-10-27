@@ -105,6 +105,9 @@
   "r2": [
     {
       "binding": "PANTRY_BACKUPS"
+    },
+    {
+      "binding": "PANTRY_DOCUMENTS"
     }
   ]
 }
