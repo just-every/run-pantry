@@ -6023,7 +6023,7 @@
       "executable": false
     },
     "tests/app/accountant-console.test.mjs": {
-      "sha256": "8895bc7b671a9626d81ef87415f694e56104c7615009567a7b78395cae3879ac",
+      "sha256": "8093a69d544e525622e688cbf5fbc273b762fb530e2539666edd033777f11cbb",
       "executable": false
     },
     "tests/app/app.test.mjs": {
@@ -6283,7 +6283,7 @@
       "executable": false
     },
     "tests/providers/accountant-oidc.mjs": {
-      "sha256": "762a4433ba01349e219d91912370547c8a393c8e78cd51770da10033a28e749a",
+      "sha256": "7912c929a60f40e50f89d5fe3f0fd7e25703c044111445c2e6deb9e81bad6319",
       "executable": false
     },
     "tests/providers/autopay-card.mjs": {
