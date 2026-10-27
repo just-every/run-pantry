@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "3d47ef4ac1178a097fd08981f906ce72ee0a50fbe5638898dc49207f3e8a5951",
+      "sha256": "a4fe655bf12c23db6ee64f1786da2922cb2fe6786c5c8075986da38bf25a45bc",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "72877a1579ea189e6609b7238af3ee3e9ff193f25058c9f31749068095b2f671",
+      "sha256": "a115208bbf9a5f570eb9e1d53bcb9473aff07e304f36080eba8c1409f52e69eb",
       "executable": false
     },
     "DEMO.md": {
@@ -3519,7 +3519,7 @@
       "executable": false
     },
     "src/pantry/contact-totals.ts": {
-      "sha256": "64828bdffaaa01a039c32da4968832ba2589ec0b9cf11853a9ace3dba8ca1209",
+      "sha256": "58f368708fdb0a4c156aa9289e091b257a7f6a4f3830d23d20676f9cbb6e140e",
       "executable": false
     },
     "src/pantry/contacts.ts": {
@@ -4191,7 +4191,7 @@
       "executable": false
     },
     "src/pantry/items/report.ts": {
-      "sha256": "a17b070a9978845321ead6fce618d592b14136b9f66be3d3a097666a73e7283d",
+      "sha256": "7a532085151b72fce1b69fb7140cd3f7e3ed5c3496cce592043c6162e62df087",
       "executable": false
     },
     "src/pantry/journal.ts": {
@@ -4651,7 +4651,7 @@
       "executable": false
     },
     "src/pantry/reports.ts": {
-      "sha256": "26149459583ddfb3e5754bc64b29564e710d466cfe78896ce401e1331364148a",
+      "sha256": "cb5974a30b1e4b8ff520607326bc19c452ae25241d134f965b8cf4979942ff2a",
       "executable": false
     },
     "src/pantry/review.ts": {

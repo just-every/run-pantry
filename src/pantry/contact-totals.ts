@@ -1,9 +1,8 @@
-import type { DimensionScope } from './dimensions/scope'
+import { inDimension, type DimensionScope } from './dimensions/scope'
 // Income and costs grouped by the counterparty carried by the posted line or
 // its source document. Unassigned postings stay visible so totals tie to P&L.
-import { generalLedger } from './reports'
 import { all } from './db'
-import type { Basis } from './basis'
+import { cashLines, sameOnCash, type Basis } from './basis'
 import type { Data } from './core'
 
 /** The counterparty group of a posted or settled ledger line; the report and its drill-through share it. */
@@ -21,15 +20,27 @@ export async function contactGrouping(db: D1Database, kind: 'customer' | 'vendor
 }
 
 export async function contactTotals(db: D1Database, kind: 'customer' | 'vendor', from: string, to: string, basis: Basis, dimension?: DimensionScope) {
-  const grouping = await contactGrouping(db, kind)
   const groups = new Map<string, { id: string; name: string; amount: number }>()
-  const ledger = await generalLedger(db, from, to, undefined, basis, dimension)
-  for (const account of ledger.accounts.filter(a => a.type === (kind === 'customer' ? 'income' : 'expense'))) {
-    for (const line of account.rows) {
-      const id = grouping.of(line)
-      const group = groups.get(id) ?? { id, name: grouping.name(id), amount: 0 }
-      group.amount += (line.debit_cents - line.credit_cents) * (kind === 'customer' ? -1 : 1)
-      groups.set(id, group)
+  const type = kind==='customer'?'income':'expense', sign=kind==='customer'?-1:1
+  // Aggregate only the requested account family at D1. A summary must not
+  // transport the entire general ledger merely to discard its individual rows.
+  const posted=await all<{id:string;name:string;amount:number}>(db,`SELECT COALESCE(c.id,'unassigned') AS id,COALESCE(c.name,'Unassigned') AS name,SUM(l.debit_cents-l.credit_cents) AS amount
+    FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id JOIN pt_accounts a ON a.id=l.account_id
+    LEFT JOIN pt_invoices i ON i.journal_id=COALESCE(e.reverses_id,e.id)
+    LEFT JOIN pt_bills b ON b.journal_id=COALESCE(e.reverses_id,e.id)
+    LEFT JOIN pt_vendor_credits v ON v.journal_id=COALESCE(e.reverses_id,e.id)
+    LEFT JOIN pt_contacts c ON c.id=COALESCE(NULLIF(l.contact_id,''),i.customer_id,b.vendor_id,v.vendor_id) AND c.kind=?
+    WHERE e.status='posted' AND e.entry_date BETWEEN ? AND ? AND a.type=? ${basis==='cash'?`AND ${sameOnCash()}`:''} ${dimension?`AND l.${dimension.kind}_name=?`:''}
+    GROUP BY c.id,c.name`,kind,from,to,type,...(dimension?[dimension.value]:[]))
+  for(const row of posted)groups.set(row.id,{...row,amount:Number(row.amount)*sign})
+  if(basis==='cash') {
+    const accounts=new Map((await all(db,'SELECT id,type FROM pt_accounts')).map(a=>[a.id,a.type]))
+    const contacts=new Map((await all(db,'SELECT id,kind,name FROM pt_contacts')).map(c=>[c.id,c]))
+    for(const line of await cashLines(db,from,to)) {
+      if(accounts.get(line.accountId)!==type || !inDimension(line,dimension))continue
+      const contact=contacts.get(line.contactId),id=contact?.kind===kind?line.contactId:'unassigned'
+      const group=groups.get(id)??{id,name:id==='unassigned'?'Unassigned':contact!.name as string,amount:0}
+      group.amount+=line.net*sign;groups.set(id,group)
     }
   }
   const rows = [...groups.values()].filter(r => r.amount !== 0).sort((a, b) => a.name.localeCompare(b.name))

@@ -47,7 +47,7 @@ export async function generalLedger(db: D1Database, from: string, to: string, ac
   const accounts = await all(db, `SELECT id, code, name, type FROM pt_accounts ${accountId ? 'WHERE id = ?' : ''} ORDER BY code`, ...(accountId ? [accountId] : []))
   return { basis, from, to,...(dimension?{dimension}:{}), accounts: accounts.map(a => {
     let running = opening.get(a.id) ?? 0
-    const rows = (byAccount.get(a.id) ?? []).map(l => ({ ...l, running: (running += l.debit_cents - l.credit_cents) }) as Data)
+    const rows = (byAccount.get(a.id) ?? []).map(l => { l.running=(running += l.debit_cents - l.credit_cents);return l as Data })
     return { ...a, opening: opening.get(a.id) ?? 0, rows, closing: running } as Data
   }).filter(a => a.rows.length || a.opening !== 0) }
 }
