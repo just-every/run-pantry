@@ -26,7 +26,7 @@ export function JournalEditor({ entry, onDone }: { entry?: D; onDone: (saved: D)
       <Field label="Entry date" name="date" type="date" value={entryDate} onChange={(e: any) => setEntryDate(e.target.value)} required />
       <Field label="Description" name="memo" defaultValue={entry?.memo} required wide />
     </div>
-    {booksStart && entryDate < booksStart && <p className="callout callout-warn" role="status">This entry is before books start ({day(booksStart)}). It carries into opening balances and is outside that period’s activity. For opening balances, use the day before your first statement.</p>}
+    {booksStart && entryDate < booksStart && <p className="callout callout-warn" role="status"><span>This entry is before books start ({day(booksStart)}). It carries into opening balances and is outside that period’s activity. For opening balances, use the day before your first statement.</span></p>}
     <label><input type="checkbox" name="adjusting" defaultChecked={Boolean(entry?.adjusting)} /> Adjusting entry (fiscal year end)</label>
     <div className="table-wrap"><table className="ledger lines-editor"><thead><tr><th>#</th><th>Account</th><th>Line memo</th><th className="fig">Debit</th><th className="fig">Credit</th><th /></tr></thead>
       <tbody>{lines.map((l, i) => <tr key={i}>
