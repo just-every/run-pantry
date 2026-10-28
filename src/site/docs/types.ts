@@ -4,7 +4,7 @@
 export type DocsTocEntry = { depth: 2 | 3; id: string; text: string }
 
 /** One page as docs/site.json lists it, with the title of the section it sits in. */
-export type DocsPageMeta = { slug: string; title: string; file: string; summary: string; section: string }
+export type DocsPageMeta = { slug: string; title: string; file: string; source: 'docs' | 'repository'; summary: string; section: string }
 
 export type DocsSection = { title: string; pages: DocsPageMeta[] }
 

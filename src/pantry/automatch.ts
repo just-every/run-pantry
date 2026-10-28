@@ -24,7 +24,7 @@ async function openInvoices(db: D1Database): Promise<Candidate[]> {
       i.total_cents - COALESCE((SELECT SUM(a.amount_cents) FROM pt_allocations a LEFT JOIN pt_payments p ON a.source_kind = 'payment' AND p.id = a.source_id
         WHERE a.target_kind = 'invoice' AND a.target_id = i.id AND (a.source_kind = 'credit' OR p.reversal_id IS NULL) AND a.voided_by IS NULL), 0) AS open_cents
     FROM pt_invoices i JOIN pt_contacts c ON c.id = i.customer_id WHERE i.kind = 'invoice' AND i.status = 'issued'`)
-  // A live early-payment offer (INVOICE-010) also takes a deposit of the amount still due for its discount, dated in its window.
+  // A live early-payment offer (INVOICE-014) also takes a deposit of the amount still due for its discount, dated in its window.
   for (const r of rows) if (r.early_offer) {
     const early = await offerState(db, r, '0000-00-00')
     if (early?.state === 'live' && early.due > 0) Object.assign(r, { early_due: early.due, window_end: early.offer.windowEnd })

@@ -1,4 +1,4 @@
-// Suggested early-payment discount treatments by state (INVOICE-010), recorded
+// Suggested early-payment discount treatments by state (INVOICE-012), recorded
 // from each state's primary source. A suggestion never applies itself: someone
 // with the post grant records a code's treatment, and a choice against a row is
 // allowed with a reason and labelled. This is not tax advice.

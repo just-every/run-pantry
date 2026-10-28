@@ -1,4 +1,4 @@
-// Optional late honors reuse only the invoice's approved INVOICE-010 offer.
+// Optional late honors reuse only the invoice's approved INVOICE-012 offer.
 import { authority, who } from './access'
 import { date, now, requireThat, text, uid, type Data } from './core'
 import { assertOpen, audit, guard, one, periodOpen, q, run, type Sql } from './db'

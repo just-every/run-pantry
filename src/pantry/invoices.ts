@@ -96,7 +96,7 @@ export async function parseInvoice(db: D1Database, b: Data, options: { estimate?
   const deposit = await parseDeposit(db, b.deposit, issueDate, total, credit)
   const settings = discounts.length || b.earlyPayment ? await discountSettings(db) : null
   const discountAccountId = discounts.length ? settings?.discount_account_id ?? null : null
-  // An early-payment term (INVOICE-010) becomes an offer computed now and approved with this exact revision.
+  // An early-payment term (INVOICE-012) becomes an offer computed now and approved with this exact revision.
   const terms = parseTerms(b.earlyPayment, issueDate, dueDate, credit ? 'credit' : 'invoice')
   const offer: Offer | null = terms && !options.estimate ? await computeOffer(db, terms, issueDate, lines, total, deposit?.amount ?? 0, settings?.early_account_id ?? settings?.discount_account_id ?? null) : null
   requireThat(!offer || offer.payBy > 0, 'The deposit already covers the early-payment amount; lower the deposit or leave out the term')
@@ -240,7 +240,7 @@ export async function issueStatements(db: D1Database, current: Issuable, actor: 
   if (!credit) statements.push(...await depositForIssue(db, actor, {...current,revision:issuedRevision,status:'issued'}))
   if (credit) {
     const target = await invoice(db, current.credit_for!)
-    // Any credit other than the early-payment discount itself withdraws a live early-payment offer (INVOICE-010).
+    // Any credit other than the early-payment discount itself withdraws a live early-payment offer (INVOICE-013).
     if (!current.early_for_number && !lateHonor) statements.push(...await withdrawalStatements(db, actor, target, current.id, current.number))
     const applied = Math.min(current.total_cents, target.open_cents)
     if (applied > 0) statements.push(q("INSERT INTO pt_allocations (id, source_kind, source_id, target_kind, target_id, amount_cents, allocation_date, created_by, created_at) VALUES (?, 'credit', ?, 'invoice', ?, ?, ?, ?, ?)", uid(), current.id, target.id, applied, current.issue_date, actor.email, now()))

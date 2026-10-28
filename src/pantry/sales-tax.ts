@@ -14,7 +14,7 @@ import { cashLines, type Basis, type CashLine } from './basis'
 import { balances, prevDay } from './reports'
 import { suggestionFor } from './early-payment-table'
 
-// Early-payment discounts (INVOICE-010) are their own columns. On reduce lines the
+// Early-payment discounts (INVOICE-015) are their own columns. On reduce lines the
 // discount lowers taxable sales and tax in the period of the discount's date;
 // retain lines keep taxable sales and tax as invoiced (column "tax kept"); a
 // discount on an exempt line is shown for information only.

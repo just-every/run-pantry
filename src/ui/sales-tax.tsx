@@ -1,4 +1,4 @@
-// Sales tax by state and tax code for a period, INVOICE-010's early-payment
+// Sales tax by state and tax code for a period, INVOICE-015's early-payment
 // columns when discounts were taken, and its tie to the ledger's sales tax
 // liability accounts. Every amount opens to the lines behind it.
 import { Link, useSearch } from '@tanstack/react-router'

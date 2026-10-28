@@ -47,7 +47,7 @@ export type CashLine = {
   contactId: string; contactName: string
   class_name?:string;location_name?:string;project_name?:string
   role: 'control' | 'sale' | 'tax' | 'expense' | 'discount'; description: string; taxCode: string | null; itemId?: string | null
-  /** On an early-payment discount credit's line (INVOICE-010): the treatment it applied. */
+  /** On an early-payment discount credit's line (INVOICE-015): the treatment it applied. */
   early?: string | null
   settledBefore: number; settledAfter: number
   settlement: Settlement

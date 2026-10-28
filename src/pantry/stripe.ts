@@ -31,7 +31,7 @@ function dayEnd(day: string, timeZone: string) {
   return guess - (local - guess) + 999
 }
 
-/** What Checkout charges now (INVOICE-010 R10): while an early-payment offer is live with at least 30 minutes of its last day left,
+/** What Checkout charges now (INVOICE-014): while an early-payment offer is live with at least 30 minutes of its last day left,
  *  the amount still due for the discount, expiring by the end of that day; otherwise the open balance. */
 export async function checkoutAmount(db: D1Database, inv: Data) {
   const tz = (await sendingSettings(db)).time_zone, early = await offerState(db, inv, businessDay(tz))

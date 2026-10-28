@@ -90,7 +90,7 @@ customer.get('/i/:token', async c => {
   const chip = inv.disputed_cents > 0 ? '<p class="status due">Payment disputed</p>' : paid ? '<p class="status paid">Paid</p>' : processing ? '<p class="status due">Payment processing</p>' : `<p class="status due">${overdue ? 'Overdue · was due' : 'Due'} ${escape(longDay(inv.due_date))}</p>`
   const offered = paid || processing ? [] : await offeredMethods(c.env, db, inv.customer_id)
   const methods = offered.filter(m => m !== 'offline')
-  // INVOICE-010: a live early-payment offer is charged at the amount still due for its discount; afterwards the page says how it ended.
+  // INVOICE-012: a live early-payment offer is charged at the amount still due for its discount; afterwards the page says how it ended.
   const charge = paid ? null : await checkoutAmount(db, inv), early = charge?.early ?? null
   const offerNote = !early ? ''
     : early.state === 'live' && charge!.windowEnd ? `<p class="status due">Early-payment discount: ${escape(percentLabel(early.offer.percentMilli))} if paid by ${escape(longDay(early.offer.windowEnd))}. Pay ${escape(usd(charge!.amount))} by then.</p>`

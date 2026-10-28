@@ -410,7 +410,7 @@ test('API-001 / REPORT-002 scoped financial reports read native nonzero books, b
 })
 
 
-test('API-001 / INVOICE-010 scoped issuance counts the deposit toward the frozen early-payment offer and settles once like native invoices', async t => {
+test('API-001 / INVOICE-010/012/013/014/016 scoped issuance counts the deposit toward the frozen early-payment offer and settles once like native invoices', async t => {
   const h = await harness(); t.after(h.close)
   const { acct } = await books(h)
   const ds=(await h.view('dimensions')).settings
@@ -502,7 +502,7 @@ test('API-001 scoped drafts and issued invoices retain the same destination and 
 })
 
 
-test('API-001 / INVOICE-010 scoped discount, delivery, deposit and early-term refusals match native doors without reserving failed keys', async t => {
+test('API-001 / INVOICE-010/012/013/014/016 scoped discount, delivery, deposit and early-term refusals match native doors without reserving failed keys', async t => {
   const h = await harness(); t.after(h.close)
   const { acct } = await books(h)
   const customer = await h.command('contact.save', { kind: 'customer', name: 'Cedar Consulting' })
@@ -650,10 +650,10 @@ test('scoped vendor credits share native posting and allocation rules, replay on
 })
 
 
-test('API-001 owner-only webhook consent emits atomic thin signed approval, posting, payment, match and lock events',async t=>{
+test('API-003 owner-only webhook consent emits atomic thin signed approval, posting, payment, match and lock events',async t=>{
   const {webhookLifecycle}=await import('./webhook-journey.mjs');await webhookLifecycle(t)
 })
-test('API-001 webhook retries persist every delay, stop after six attempts, rotate for 24 hours and honour disable, delete and erasure',async t=>{
+test('API-003 webhook retries persist every delay, stop after six attempts, rotate for 24 hours and honour disable, delete and erasure',async t=>{
   const {webhookRetries}=await import('./webhook-journey.mjs');await webhookRetries(t)
 })
 
@@ -663,6 +663,6 @@ test('API-001 record-type readers expose bounded native records with granular co
 })
 
 
-test('API-001 webhook transport times out a slow receiver without reading its response',async t=>{
+test('API-003 webhook transport times out a slow receiver without reading its response',async t=>{
  const {webhookTimeout}=await import('./webhook-journey.mjs');await webhookTimeout(t)
 })

@@ -1012,3 +1012,207 @@ Every capability claimed on the homepage rebuilt on the owner-approved page stru
 | 49 | Click any number. | 1099-NEC · 2026, "W-9 on file", "under $2,000" | TAXFORM-001, TAXFORM-002, TAXFORM-003 | done for tracking at the tax year's threshold; the online W-9 request (TAXFORM-003) is done under the ct-approved native scope; automatic request mail remains TAXFORM-004 |
 | 50 | Interlude | "Books up to date · Oct 31" | PAN-13 | done |
 | 51 | Closing | "Open source accounting for US small businesses" / "Free and open source, MIT licensed" | OWN-001 | partial; ownership and MIT licensing ship, provider-fee disclosure remains DATA-001 |
+
+## Contract rewrite receipts — 28 October 2026
+
+Existing done-row receipts moved without a new judgement.
+
+### PAN-19
+
+Posting is proven at the provider network edge. Live US Stripe test reads find no payouts and payouts disabled, so automatic-payout booking awaits a paid automatic payout. Live Gusto company and processed-payroll reads pass with a company token, but its zero payrolls cannot prove posting; Pantry’s consent/callback requires the company admin.
+
+### PAN-20
+
+Posting is proven at the provider network edge. Live US Stripe test reads find no payouts and payouts disabled, so automatic-payout booking awaits a paid automatic payout. Live Gusto company and processed-payroll reads pass with a company token, but its zero payrolls cannot prove posting; Pantry’s consent/callback requires the company admin.
+
+### BANK-002
+
+Inclusive books-start, last-reconciled and explicit dates; a provider request up to 730 days. Pre-books, opening-balance and locked observations stay as reference outside posting. Provider IDs and unique date/amount/description matches adopt existing statement evidence; doubtful pairs require a versioned, audited choice. Thirteen months against three OFX months, both decisions, replay and unchanged reconciliation proof are asserted through public doors, with Bank end states at 1440/390.
+
+### BANK-003
+
+Verified webhooks, manual refresh and six-hour scheduled sync, pending lines excluded from posting, posted tip amount, unposted modifications/removals and durable named exceptions preserving categorized, matched and reconciled lines, ledger and proofs; replay deduplicated. Provider responses are exercised at the network edge.
+
+### BANK-004
+
+Every mapped connection shows last/next sync and plain errors, broken/stale/expiring feed notices appear on Bank and Overview and email the owner once per incident with visible mail outcomes. Close lists accounts whose successful feed pull has not covered month end until recovered. Update-mode re-link resumes the saved cursor without duplicates; disconnect retains lines. Actual Plaid sandbox ITEM_LOGIN_REQUIRED and signed US PENDING_DISCONNECT callback were exercised; mail acceptance is tested at its network edge.
+
+### BANK-005
+
+Typed balances over existing matched feed lines, original Plaid PDF and SHA-256, unchanged PAN-09 proof and dated feed-balance refusal. Plaid is exercised at its documented network edge; production institution support remains provider-dependent.
+
+### BANK-007
+
+Reopen-grant holders confirm the exact newest-first cascade with a reason. Immutable proof/statement snapshots remain linked to the undo; matches unfreeze without changing postings. Locked months route to reopening; close flags each undone month until new proofs are completed. Offered in the client accountant review workspace; cross-client navigation remains ACCT-001.
+
+### RULE-001
+
+Native split coding with payee, included tax, memo and class/location/project tags; explicit stale-checked category batches; retained personal/duplicate exclusion reasons; keyboard selection; created-entry-only reversal. The fifty-line HTTP and built 1440/390 journeys prove the split, card payment, retained exclusion, open-invoice payment, 20-line batch and undo; the HTTP journey also proves stale-batch atomic refusal and preservation of another bank match. DIM-001 retains the structured dimensions feature: catalogue, required dimensions and report/project views; the queue stores literal tags on its own category postings and reversals. Existing matching/lock proof: `tests/api/bank.test.mjs` › “PAN-08 statement lines match to the books through splits, fees, transfers and partial settlements, never posting a recorded payment twice”; file/feed queue proof: `tests/api/rules.test.mjs` › “RULE-002 bank rules that file routine lines”.
+
+### RULE-004
+
+Feed/CSV transfers and card payments pair atomically once with account evidence, reuse recorded transfers, hold unknown/ambiguous halves for explicit choice, name the expected account, age after five complete US banking business days, and support two-sided undo. Named API/browser acceptance covers amounts, late arrivals, ambiguity, roles, locked dates, replay, reports and 1440/390 end states (ct 19 Oct 04:33Z).
+
+### CAPTURE-005
+
+Email/photo captures and ordinary/integration document uploads compare file hashes, normalized vendor/invoice number or vendor/date/total against captured and bill-linked originals. Duplicates link to the first and cannot file again without an audited Keep reason; Skip retains evidence. Atomic guards recheck the original at filing.
+
+### CAPTURE-006
+
+Name variants, confirmed aliases, sender/email domains, address, phone and W-9 EIN propose existing identities; conflicting signals wait for a person. Accepting a new vendor or an alias requires confirmation. Account, terms, 1099 and class defaults fill the draft; existing contact and payment details never change from a reading.
+
+### CAPTURE-007
+
+Accepted vendor, line coding, purchase tax, terms, due date, class and source bytes become bill or paid-charge expense drafts. Exact-revision approval and owner rules precede atomic posting; edits clear approval. Email/PDF evidence survives on the bill and every split expense entry, with no missing-evidence close exception.
+
+### ITEM-001
+
+Services and non-inventory products with description, default rate, income account, taxable/not-taxable category with default code, unique name and SKU, and active status; invoice, credit and recurring lines pick items and keep them; inactive items are refused on new invoices and kept on old ones; sales by item on both bases ties to profit and loss income. Estimates, sales receipts and connected apps inherit items under INVOICE-006, SALES-001 and INTEG-004.
+
+### INVOICE-001
+
+Owner document templates and sequence, customer defaults, real previews, immutable issued bytes/hash reused by email and hosted/download doors; imported and upgrade snapshots are labeled, and staged import undo remains available. Future sales/estimate clauses inherit this surface.
+
+### INVOICE-003
+
+Unguessable signed-out page and PDF, payment options and history, first external view once, audited revocation and configurable expiry after final settlement across page, PDF and payment doors; resending creates a fresh token.
+
+### PAY-002
+
+Signed events are read back from the connected test or live Stripe account and recorded once. ACH returns and counted-payment refunds reverse settlement and earned discounts together. Independent daily event inventory retains missing and held items and names incomplete provider reads. Receipt claims retain accepted, failed or uncertain mail outcomes without automatic resend. PAY-005, SALES-001 and SALES-002 inherit current receipt preferences, provider outcomes and discount reversal before shipping.
+
+### PAY-004
+
+Feed and file deposits naming one invoice of the exact amount by invoice number or the customer's stored payment reference record, allocate and match automatically with an audit entry and one-click undo. Unique amount-only deposits wait for one authorized confirmation; both paths are atomic. Ambiguity waits, repeated confirmation/import cannot double-post, and undo reopens the invoice.
+
+### INVOICE-004
+
+ct ruling 26 Oct 00:34:34Z applied: approved credit correction remains distinct from a separate void lifecycle. Owner void requires an open date, reason and current revision; existing settlements must first be undone, processing Checkout prevents void, and open sessions expire before the terminal write. The issued original and linked inverse journal remain, while reminders, sending, payment links and collections stop. Consented text delivery remains INVOICE-011; PAY-005 and future collection doors inherit this terminal stop before shipping.
+
+### INVOICE-005
+
+Weekly, monthly, quarterly and yearly schedules with end dates, draft or approved automatic sending, exact per-line amount approvals, dated price changes with separate revision approval, once-only catch-up and visible failed runs and mail outcomes.
+
+### INVOICE-006
+
+Custody (ct 22 Oct 2026): reviewed send and typed-name acceptance retain the exact revision, name, server time and trusted platform peer; IP is owner-only and missing trusted peer refuses acceptance. An owner explicitly reads and confirms a selected completed Inkwell envelope or accepted Platter proposal; normalized proof and signed PDF are owner-only, with source credentials transient and never saved. Owner-selected API scope exposes association/hash metadata only. Sending or accepting an estimate, making accounting entries, charging and erasing still require their explicit actions. The customer's explicit acceptance sends only its confirmation email. Existing ERASURE-001 financial-support retention and owner-confirmed expiry apply. INTEG-001 retains broader automatic sibling synchronization; current owner-driven estimate handoffs are proven. Valid-until expiry is implemented and proven in the named INVOICE-006 HTTP and 1440/390 browser journeys; the native restore journey retains the saved calendar and deadline with its PDF. No remaining INVOICE-006 gap. Automatic sibling synchronization stays INTEG-001's.
+
+### INVOICE-017
+
+Custody (ct 22 Oct 2026): reviewed send and typed-name acceptance retain the exact revision, name, server time and trusted platform peer; IP is owner-only and missing trusted peer refuses acceptance. An owner explicitly reads and confirms a selected completed Inkwell envelope or accepted Platter proposal; normalized proof and signed PDF are owner-only, with source credentials transient and never saved. Owner-selected API scope exposes association/hash metadata only. Sending or accepting an estimate, making accounting entries, charging and erasing still require their explicit actions. The customer's explicit acceptance sends only its confirmation email. Existing ERASURE-001 financial-support retention and owner-confirmed expiry apply. INTEG-001 retains broader automatic sibling synchronization; current owner-driven estimate handoffs are proven. Valid-until expiry is implemented and proven in the named INVOICE-006 HTTP and 1440/390 browser journeys; the native restore journey retains the saved calendar and deadline with its PDF. No remaining INVOICE-006 gap. Automatic sibling synchronization stays INTEG-001's.
+
+### INVOICE-008
+
+Recorded and Stripe refunds require an exact approved instruction and current posting and bank authority; approved and pending amounts reserve the source balance. Pending or uncertain Stripe outcomes keep the same idempotent instruction until checked; failed outcomes release the reservation. Customer-credit cash refunds are capped by cash actually collected after earned discounts. Existing statement, fee, marked write-off, late-honor and credit-application evidence is retained. SALES-002 inherits these refund limits and approval controls before shipping.
+
+### INVOICE-009
+
+Current customer capabilities include estimate acceptance and conversion drill-through, proven by the INVOICE-006 journey in `tests/api/invoices-out.test.mjs` and its 1440/390 built browser journey in `tests/app/app.test.mjs`. INVOICE-008 statements and PAY-005 saved/autopay offerings inherit before shipping.
+
+### BILL-001
+
+Captured, draft, submitted, approved, outside-payment plan, paid and actively reconciled states with next actor and due date; $150 vendor credit, recurring draft occurrences, replay and undo proof through public doors. INTEG-001 inherits Purse PO provenance; BILLPAY-001 inherits provider scheduling before shipping.
+
+### BILL-002
+
+Captured drafts and manual/integration bills share owner rules by inclusive amount/vendor/account/class, exact-revision approval and edit reapproval. Approvers inspect complete vendor bills, payments, credits, documents, coding and activity beside the controls. One reminder per pending revision after 24 hours links to signed-in review. Web, signed-in email and phone-browser journeys cover captured/manual approval and changed-line reapproval. Native approval is explicitly owed by MOBILE-002 before it ships (ct 19 Oct 04:12Z, pattern 1).
+
+### BILL-003
+
+One or several bills, partial allocations and vendor credits settle against card/LOC liabilities with a stored card method and last four. Existing bill payments are offered before expense rules and clear feed/file lines without reposting. Card-funded payments are excluded from 1099 totals; paying the card from checking is one transfer. Payables and cash/accrual reports retain credit tie-outs.
+
+### CHECK-001
+
+Expense and bill-payment checks, per-bank sequences, voucher/three-per-page stock, alignment, reasoned void/reversal, bank-configured positive-pay snapshots, exact number/amount clearing and no duplicate posting. App and print paths exercised at 1440/390.
+
+### VENDOR-001
+
+W-9 status moved to TAXFORM-003 (ct 23 Oct split). Period expense totals use posted accrual expense lines, including manual journals and dated reversals. The year-history API opens every bill, payment and credit record. Period purchases use current posted bills less credits plus captured expenses by record date; payments are separate and current payable covers all dates. Provider preferences are recorded locally and never change a provider. MISC classifications require separate filing review and are excluded from NEC filing data. The ct-approved reveal requires owner or unmasked accountant, same-session email confirmation within five minutes and an audited disclosure; the display hides after thirty seconds.
+
+### SALESTAX-003
+
+Retained certificate bytes, covered states and expiry drive destination-specific invoice exemption and citations in staff/customer views and PDFs. Owner reminders are claimed once before expiry with visible delivery outcome. Expired or retired evidence blocks stale approval/issue; edits restore original tax choices and renewal never rewrites issued evidence.
+
+### SALESTAX-004
+
+Destination-state sales and invoices over each state's measuring periods against the versioned, sourced threshold table; one 80% and one 100% alert per crossing to the owner and accountants with the actual mail outcome; credits resolve alerts; the accountant's reasoned decision with its figures and table version shows on the state's row in Books › Sales tax at 1440 and 390.
+
+### TAXFORM-001
+
+No open gap in the ct 23 Oct native scope. TINs and receipt equality evidence use purpose-separated AES-GCM under the installation session secret; bounded compare-and-update batches seal existing digits before data responses or scheduled and inbound work, preserving revisions. Ordinary reads use last-four metadata. Default filing downloads retain posting authority and mask TINs; explicit full-TIN downloads require an owner or unmasked accountant with same-session email confirmation within five minutes and audited disclosure. Unavailable or changed encryption custody refuses full identity until the TIN is re-entered. The reveal display hides after thirty seconds. TAXFORM-003 retains the W-9 request, certification, vendor status, paid-without-W-9 list and restored-link obligations; its storage and filing-gate foundation is now implemented. ACCESS-002 remains partial.
+
+### TAXFORM-003
+
+ct-approved 25 Oct: owner-only explicit audited sharing of the exact vendor revision; one-use hashed random links expire after fourteen days. An expired request can be reissued only as a new link; the old link stays dead. Replacement, revocation and restore disable old links. Explicit electronic consent and encrypted certification originals inherit existing tax-record retention and owner-confirmed expiry under ERASURE-001. W-9 originals open only to the owner after native same-session step-up; TINs never enter logs, ordinary exports, mail bodies or URLs. Online certification satisfies the clause alternative. No automatic email is sent; automated requests and reminders are the named TAXFORM-004 gap.
+
+### REPORT-001
+
+P&L and balance sheet comparisons, fiscal months/quarters/YTD and customer P&L with exact ties, cash/accrual defaults/override and labeled pages/PDF/CSV; class/location/project splits are DIM-001’s obligation.
+
+### REPORT-002
+
+Every current financial report and dashboard reads the chosen basis; Native and scoped integration API/page defaults follow the declared tax method. Contact summaries tie to P&L, partial settlements include tax, every PDF page and CSV names its actual basis, package files label their semantics, and switching/exporting leaves the ledger unchanged. Open-item aging, statutory payment reports and indirect cash flow retain their explicitly named semantics. Future report variants inherit the obligation before shipping.
+
+### REPORT-003
+
+Indirect statement for any date range with operating, investing and financing activity, account classes defaulted from type/role and editable by the accountant, noncash adjustments, entry drill-down on every figure, exact opening-to-closing balance-sheet cash tie, CSV and accountant package exports.
+
+### REPORT-005
+
+P&L/BS, trial-balance balances/totals and general-ledger opening/debit/credit/running/closing figures tie to native sources on both bases. Cash-flow contributions retain native transactions, documents and bank evidence and export source CSV with the indirect-method label. Custom formulas/operands export JSON explanations and additive source CSV, retaining definition filters/revision/basis/range/operand through records and native JSON. Native records retain exact approvals/audit and Stripe/Plaid/Gusto events. Sales by customer/item and expenses by vendor, every comparison/period/YTD/customer column cell (change as current less prior lines, change % through its operands and rule), the four cash-bridge figures, budget/actual/variance figures (prorated plan cells) with variance % operands, and 1099 box 1, card/network, unrecorded and reversed figures (payment basis) open to their sources and export with their address and filters. Named public API and 1440/390 browser journeys assert these levels and the Software → bill → PDF/approval/payment → bank path. Ageing items, buckets, unapplied money, subledger and control; sales tax by code, state and all states with exempt sales, INVOICE-010's early-payment columns (to their discount credits and invoices) and the liability tie; and every everyday-library figure including reconciliation proofs open the same way.
+
+### REPORT-006
+
+Saved definitions over P&L, balance sheet, trial balance, sales by customer and expenses by vendor with columns, filters, grouping, comparisons, range and declared/explicit basis; section, formula and note rows; ordered management packages with cover and commentary as one PDF; personal or role-shared read/export with owner access stated, 404 elsewhere and the reader's own financial authority rechecked on every render. Every custom figure opens: grouped rows to their tied source lines, formula figures to each operand's row, value, basis and range, and each operand on to account lines and records; each report links to its source report on the same basis and range. Formulas and shares travel in JSON/PDF exports and archives. ACCESS-001 carries narrower roles.
+
+### REPORT-008
+
+Latest feed cash with coverage/timestamps and card debt separate; inclusive month-to-date bank movements; six-month cash/accrual P&L tied to reports; overdue receivables/payables and current work links for lines, missing receipts/documents, bills, connections and questions. Locked or fully reconciled books-current dates are calculated without inferring reconciliation from feed balances. Named API and built 1440/390 journeys assert figures, work destinations and lock advancement.
+
+### DIM-001
+
+Owner-enabled class/location/project catalogues and required-account coding cover current native and scoped transaction sources, generated controls, mixed feed allocations, recurring work, advances, checks, recognition and opening imports. Every current report retains dimension filters/splits, its actual basis/range, source figures and exports; statements, project income/cost and budget/actual signed contributions tie to whole-business values. Audit membership is frozen per event, with nonadditive counts and honest Unassigned history. Linked document recoding preserves originals, follows dated settlements, refuses locked or stale/concurrent work and carries effective coding through later payments and reversals. Native restore and built 1440/390 journeys pass. Future source/report doors inherit the clause obligations named above.
+
+### BUDGET-001
+
+Annual account/month entry, prior posted actuals plus a percentage, editable months, CSV and explicitly mapped USD Easel plans; any in-year date range, cash/accrual actuals, exact signed variances, labels and CSV. Class/location budgets are DIM-001’s obligation before dimensions ship.
+
+### CASH-001
+
+ct-approved forecast policy (23 Oct): existing full-financial native readers only, no new outbound notices or ledger writes; scenarios remain local to the chosen URL, and fractional median days round later. Recurring invoice amounts come from the same invoice parser used to issue them. PAY-005 places currently authorized recurring invoices and their future occurrences on due dates, overriding the historical median; revoked or invalid standing authority returns to the ordinary forecast assumptions.
+
+### CLOSE-001
+
+Exact-version daily, every-N-weeks and monthly template approval, atomic once-only original-date runs, draft mode, catch-up and visible missed/failed/locked exceptions with retained snapshots and explicit retry. Public Cron/API and 1440/390 browser journeys prove three $500 months, daily and fortnightly posts, 13-week draft schedules, changed-amount reapproval, locks, account failure and draft approval.
+
+### CLOSE-002
+
+Funded finite prepaid/deferred plans, month-end accruals and linked next-day reversals, explicit achieved milestones, exact approvals, dated remaining balances, shared-account ties and close guards, visible failures/retry, and 1440/390 journeys. AGENT-006 inherits proposal creation before standing work ships.
+
+### ASSET-001
+
+ct-approved asset policy (23 Oct): owner-set versioned threshold, disposal gain or loss and depreciation posted only through CLOSE-001 approval, final-period rounding remainder, method-named schedules and accountant-entered tax schedules. The owner prepares a disposal as a one-date CLOSE-001 template; it posts only after exact-revision approval and only while the asset, its source and its posted depreciation match the reviewed snapshot. Depreciation through the disposal date is posted or paused first, and preparing again replaces a disposal that has not posted. Register figures open to the source bill, capitalization, each posted book entry and the disposal entry (REPORT-005). No automatic tax elections.
+
+### CLOSE-005
+
+Exact-revision year-end adjusting flags and PDF/report; calculated earnings roll for calendar and non-calendar years; current 1099 readiness and Gusto-to-journal totals, named final-month review tasks and atomic twelve-month locking under existing grants and checks. Backdated writes and stale review are refused. Future TAXFORM-001, TAXFORM-002, TAXFORM-003 and PAYROLL-002 capabilities inherit their year-end checks before shipping; no external filing or payroll certification is claimed.
+
+### ACCT-003
+
+Bulk reclassification by one posted correcting entry per line (dated on the original's date, linked, originals unchanged, locked months refused), bulk write-off of small receivable and payable balances by applied credits, CLOSE-005's adjusting flag, review notes, and everything changed since a reviewer's last review with its author, in Books › Review at 1440 and 390. Dimension reclassification is DIM-001's obligation.
+
+### ACCESS-003
+
+Current bookkeeper/accountant/person doors satisfy ct scope55; ACCESS-001, SALES-001/002, INVOICE-008 and CURRENCY-001 inherit before shipping. No provider, legal or accounting acceptance claimed.
+
+### AUDIT-001
+
+Atomic immutable events retain actor/origin, record or stored history revision, exact approval or standing authority, and safe before/after snapshots. Activity filters by person, date and record. Accountant JSON/ZIP packages and real rer export/import preserve the raw audit and approvals. Legacy events remain untouched except by ERASURE-001 markers.
+
+### AGENT-007
+
+Native report-backed questions use an explicit month or quarter and basis; the current UTC year is used when omitted. Contractor spending names the selected expense accounts containing “contract”. Prior-year or equal-length prior-period comparisons, generated labels, native source links and REPORT-006 comparison definitions use the same posted calculators and current financial authority. Unsupported or ambiguous questions are refused; absent records produce no estimate.
+
+### AGENT-009
+
+ct-approved 25 Oct: owner or accountant reads readiness and packages. The accountant alone sets deadlines and estimated amounts while an accountant is assigned; otherwise the owner holds that setting authority. Every setting change is audited. Amounts are labelled estimates, never tax advice or a filing. In-app signals only; owner approval of the exact current vendor request generates a TAXFORM-003 link. No automatic outbound message, payment or tax decision. The nominal January 31 signal requires review of weekend, holiday and jurisdiction rules. The package retains fiscal-year reports, readiness and open questions. Email and calendar reminders are the named AGENT-011 gap.

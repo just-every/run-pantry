@@ -137,7 +137,7 @@ export async function paymentStatements(db: D1Database, actor: AuditActor, b: Da
   const control = await controlAccount(db, direction === 'received' ? 'receivable' : 'payable')
   const allocated = await allocations(db, direction, who_.id, b.allocations, amount)
   const id = uid(), journalId = uid(), received = direction === 'received'
-  // An allocation that first meets an invoice's early-payment offer posts its discount first and is capped (INVOICE-010).
+  // An allocation that first meets an invoice's early-payment offer posts its discount first and is capped (INVOICE-013).
   const early = received ? await takeEarlyDiscounts(db, actor, allocated.list, day, { sessionCounts: opts.sessionCounts, payments: id }) : { allocations: allocated.list.map(a => ({ ...a, counted: false })), before: [], after: [] }
   const bankLines: Line[] = opts.bankLines ?? [{ ...(opts.bankCoding??dimensionTags(b)), accountId:bank.account_id, debit:received?amount:0, credit:received?0:amount, memo:`${received?'Received from':'Paid to'} ${who_.name}` }]
   requireThat(bankLines.length>0&&bankLines.every(l=>l.accountId===bank.account_id&&Number.isSafeInteger(l.debit)&&Number.isSafeInteger(l.credit)&&l.debit>=0&&l.credit>=0&&((l.debit>0)!==(l.credit>0)))&&bankLines.reduce((sum,l)=>sum+l.debit-l.credit,0)===(received?amount:-amount),'Payment bank contributions do not equal its amount')

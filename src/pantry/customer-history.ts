@@ -73,7 +73,7 @@ export async function customerHistory(db: D1Database, rawId: string, rawAsOf?: s
   const rows: Data[] = invoices.map(i => {
     const issued = (i.status === 'issued' && (!i.void_date || i.void_date > asOf)) && i.issue_date <= asOf
     const applied = allocations.filter(a => i.kind === 'credit' ? a.source_kind === 'credit' && a.source_id === i.id : a.target_kind === 'invoice' && a.target_id === i.id)
-    // A reversed early-payment discount credit (INVOICE-010) nets to nothing from its reversal date.
+    // A reversed early-payment discount credit (INVOICE-013) nets to nothing from its reversal date.
     const reversed = i.kind === 'credit' && applied.some(a => a.voided_on && a.voided_on <= asOf)
     const balance = !issued ? null : reversed ? 0 : i.kind === 'credit' ? i.total_cents - sum(applied.filter(a => a.included_in_balance), 'amount_cents') - refundedAt('credit', i.id) : openById.get(i.id) ?? 0
     return { kind: i.kind, id: i.id, date: i.issue_date, due_date: i.due_date, created_at: i.created_at, reference: i.number,

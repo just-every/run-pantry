@@ -554,7 +554,7 @@ test('INVOICE-010 discounts, delivery charges and deposits on the invoice: tax o
   assert.equal(settings.revision.length > 0, true)
 })
 
-test('INVOICE-010 early-payment terms (with SALESTAX-001/002/004, INVOICE-001/003/005, PAY-001/002/004) and REPORT-005: per-code treatment, the offer approved with the invoice, an all-or-nothing linked discount credit in the window, reversal, Stripe and PAY-004, sales-tax columns and refusals', async t => {
+test('INVOICE-012/013/014/015/016 early-payment terms (with SALESTAX-001/002/004, INVOICE-001/003/005, PAY-001/002/004) and REPORT-005: per-code treatment, the offer approved with the invoice, an all-or-nothing linked discount credit in the window, reversal, Stripe and PAY-004, sales-tax columns and refusals', async t => {
   const KEY = 'synthetic-pantry-1001', sessions = new Map()
   const outbound = async request => {
     const url = new URL(request.url)
@@ -800,7 +800,7 @@ test('INVOICE-010 early-payment terms (with SALESTAX-001/002/004, INVOICE-001/00
   assert.equal(run.status, 'drafted'); assert.match(run.detail, /early-payment treatment changed/)
 })
 
-test('INVOICE-006 estimates accept exact revisions, reserve progress once and apply advance liabilities without receiving cash twice',async t=>{
+test('INVOICE-006/017 estimates accept exact revisions, reserve progress once and apply advance liabilities without receiving cash twice',async t=>{
  const h=await harness();t.after(()=>h.close())
  const {estimatesJourney,estimateInheritedJourney,estimateErasureJourney,estimateExpiryJourney}=await import('./estimates-journey.mjs')
  const x=await estimatesJourney(h),archive=await harness();t.after(()=>archive.close())
@@ -809,4 +809,4 @@ test('INVOICE-006 estimates accept exact revisions, reserve progress once and ap
 })
 import { estimateSiblingsJourney } from './estimate-siblings.mjs'
 
-test('INVOICE-006 owner reviews exact Inkwell and Platter records, retains verified proof and refuses mismatches without financial side effects', estimateSiblingsJourney)
+test('INVOICE-006/017 owner reviews exact Inkwell and Platter records, retains verified proof and refuses mismatches without financial side effects', estimateSiblingsJourney)

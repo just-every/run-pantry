@@ -1,4 +1,4 @@
-// INVOICE-010 early-payment terms, built to ct's ruling of 20 October 2026.
+// INVOICE-012 to INVOICE-016 early-payment terms, built to ct's ruling of 20 October 2026.
 // Each tax code carries an explicit treatment: undecided until someone with the
 // post grant records retain (the discount reduces only the price) or reduce (it
 // also reduces taxable sales and tax). An invoice's term (p% within k days) is

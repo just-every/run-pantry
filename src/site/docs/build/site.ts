@@ -17,7 +17,7 @@ export function buildDocs(root: string): DocsSite {
   const pages = sections.flatMap(section => section.pages)
   const files = [join(root, manifestPath)]
   const rendered = new Map(pages.map(page => {
-    const file = join(root, docsDirectory, page.file)
+    const file = join(root, page.source === 'repository' ? '.' : docsDirectory, page.file)
     files.push(file)
     return [page.slug, renderMarkdown(readFileSync(file, 'utf8'))] as const
   }))

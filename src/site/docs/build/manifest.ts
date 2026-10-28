@@ -25,17 +25,20 @@ export function readManifest(root: string): DocsSection[] {
       pages: entries.map((page, p) => {
         const where = `page ${p + 1} of "${title}"`
         const slug = text(page.slug), pageTitle = text(page.title), file = text(page.file), summary = text(page.summary)
+        const source = page.source === undefined ? 'docs' : page.source
+        if (source !== 'docs' && source !== 'repository') problems.push(`${where}: source must be docs or repository`)
         if (!slugPattern.test(slug)) problems.push(`${where}: slug "${slug}" must be lowercase words joined by hyphens`)
         if (slugs.has(slug)) problems.push(`${where}: slug "${slug}" is used twice`)
         slugs.add(slug)
         if (!pageTitle) problems.push(`${where}: no title`)
         if (!summary) problems.push(`${where}: no summary`)
-        const path = join(root, docsDirectory, file)
-        if (!file.endsWith('.md') || file.includes('/') || file.includes('\\')) problems.push(`${where}: file "${file}" must be a Markdown file in ${docsDirectory}/`)
+        const path = join(root, source === 'repository' ? '.' : docsDirectory, file)
+        if (!/^(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.md$/.test(file)) problems.push(`${where}: file "${file}" must be a relative Markdown path without traversal`)
         else if (!existsSync(path) || !statSync(path).isFile()) problems.push(`${where}: ${docsDirectory}/${file} does not exist`)
-        if (files.has(file)) problems.push(`${where}: ${docsDirectory}/${file} is listed twice`)
-        files.add(file)
-        return { slug, title: pageTitle, file, summary, section: title }
+        const identity = `${source}/${file}`
+        if (files.has(identity)) problems.push(`${where}: ${identity} is listed twice`)
+        files.add(identity)
+        return { slug, title: pageTitle, file, source: source === 'repository' ? 'repository' : 'docs', summary, section: title }
       }),
     }
   })

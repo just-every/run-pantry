@@ -3,34 +3,148 @@
     {
       "title": "Start here",
       "pages": [
-        { "slug": "getting-started", "title": "Getting started", "file": "getting-started.md", "summary": "Open Terminal and start Pantry on your own computer with one line; sign in as the owner and finish setup." },
-        { "slug": "first-month", "title": "Your first month", "file": "first-month.md", "summary": "The five setup steps on Overview, from the business details to your first close." }
+        {
+          "slug": "getting-started",
+          "title": "Getting started",
+          "file": "getting-started.md",
+          "summary": "Open Terminal and start Pantry on your own computer with one line; sign in as the owner and finish setup."
+        },
+        {
+          "slug": "first-month",
+          "title": "Your first month",
+          "file": "first-month.md",
+          "summary": "The five setup steps on Overview, from the business details to your first close."
+        }
       ]
     },
     {
       "title": "Run your books",
       "pages": [
-        { "slug": "sales-and-bills", "title": "Sales and bills", "file": "sales-and-bills.md", "summary": "Invoices that send and follow up, recurring invoices, card and ACH payment from the link, payments that match themselves, bills and payments." },
-        { "slug": "bank-feeds-and-rules", "title": "Bank feeds and rules", "file": "bank-feeds-and-rules.md", "summary": "Connect your bank and cards once, choose where each account goes, and let your rules file the routine transactions." },
-        { "slug": "questions", "title": "Questions from Pantry", "file": "questions.md", "summary": "Pantry asks you, by email first, about what doesn't add up; your answer files it, and the month's questions are one thread at close." },
-        { "slug": "stripe-and-gusto", "title": "Stripe payouts and Gusto payroll", "file": "stripe-and-gusto.md", "summary": "Stripe payouts split into sales, fees and refunds, and Gusto payrolls posted as one balanced entry, each matched to the bank by itself." },
-        { "slug": "receipts", "title": "Receipts", "file": "receipts.md", "summary": "Take a photo or forward the email; Pantry reads the vendor, date and total and attaches it to the right transaction when you accept." },
-        { "slug": "reconcile", "title": "Reconcile a bank statement", "file": "reconcile.md", "summary": "Import a CSV or OFX statement, match each line to your books, and finish when the difference is $0.00." },
-        { "slug": "journals", "title": "Journals and corrections", "file": "journals.md", "summary": "Prepare a balanced entry, have someone else post it, and correct a posted entry with a reversal." },
-        { "slug": "reports", "title": "Reports, cash or accrual", "file": "reports.md", "summary": "Open any figure to its records, switch between cash and accrual, report sales tax by state and track 1099 contractors." },
-        { "slug": "close", "title": "Close the month", "file": "close.md", "summary": "Pass the checklist, finish the review tasks, lock the month and download the accountant package." },
-        { "slug": "agent-work", "title": "Agent work", "file": "agent-work.md", "summary": "Give the agent you already use a token; it proposes matches and entries and a person approves each one." }
+        {
+          "slug": "sales-and-bills",
+          "title": "Sales and bills",
+          "file": "sales-and-bills.md",
+          "summary": "Invoices that send and follow up, recurring invoices, card and ACH payment from the link, payments that match themselves, bills and payments."
+        },
+        {
+          "slug": "bank-feeds-and-rules",
+          "title": "Bank feeds and rules",
+          "file": "bank-feeds-and-rules.md",
+          "summary": "Connect your bank and cards once, choose where each account goes, and let your rules file the routine transactions."
+        },
+        {
+          "slug": "questions",
+          "title": "Questions from Pantry",
+          "file": "questions.md",
+          "summary": "Pantry asks you, by email first, about what doesn't add up; your answer files it, and the month's questions are one thread at close."
+        },
+        {
+          "slug": "stripe-and-gusto",
+          "title": "Stripe payouts and Gusto payroll",
+          "file": "stripe-and-gusto.md",
+          "summary": "Stripe payouts split into sales, fees and refunds, and Gusto payrolls posted as one balanced entry, each matched to the bank by itself."
+        },
+        {
+          "slug": "receipts",
+          "title": "Receipts",
+          "file": "receipts.md",
+          "summary": "Take a photo or forward the email; Pantry reads the vendor, date and total and attaches it to the right transaction when you accept."
+        },
+        {
+          "slug": "reconcile",
+          "title": "Reconcile a bank statement",
+          "file": "reconcile.md",
+          "summary": "Import a CSV or OFX statement, match each line to your books, and finish when the difference is $0.00."
+        },
+        {
+          "slug": "journals",
+          "title": "Journals and corrections",
+          "file": "journals.md",
+          "summary": "Prepare a balanced entry, have someone else post it, and correct a posted entry with a reversal."
+        },
+        {
+          "slug": "reports",
+          "title": "Reports, cash or accrual",
+          "file": "reports.md",
+          "summary": "Open any figure to its records, switch between cash and accrual, report sales tax by state and track 1099 contractors."
+        },
+        {
+          "slug": "close",
+          "title": "Close the month",
+          "file": "close.md",
+          "summary": "Pass the checklist, finish the review tasks, lock the month and download the accountant package."
+        },
+        {
+          "slug": "agent-work",
+          "title": "Agent work",
+          "file": "agent-work.md",
+          "summary": "Give the agent you already use a token; it proposes matches and entries and a person approves each one."
+        }
       ]
     },
     {
       "title": "Keep your books",
       "pages": [
-        { "slug": "people", "title": "People and roles", "file": "people.md", "summary": "Owner, bookkeeper, accountant and viewer, the post, lock and reopen grants, and who may approve what." },
-        { "slug": "move-in", "title": "Move in from QuickBooks Online or Xero", "file": "move-in.md", "summary": "Preview your QuickBooks Online or Xero exports and their tie-outs, import them as staged records, carry Xero's attachments over, and sign them off." },
-        { "slug": "backup", "title": "Back up and restore", "file": "backup.md", "summary": "Export the whole book to one archive and restore it into an empty installation." },
-        { "slug": "connections", "title": "Connections and keys", "file": "connections.md", "summary": "Set up live bank feeds (Plaid), Gusto payroll, Xero attachments and email with accounts of your own: where each key comes from and where it goes." },
-        { "slug": "integrations", "title": "Sibling integrations", "file": "integrations.md", "summary": "Give a sibling book a scoped credential, send records once, mark bills ready and read their payments." },
-        { "slug": "hosting", "title": "Put Pantry online", "file": "hosting.md", "summary": "Deploy Pantry to your own Cloudflare account with rer deploy: the token it needs, the mail it sends with, and how to update or remove it." }
+        {
+          "slug": "people",
+          "title": "People and roles",
+          "file": "people.md",
+          "summary": "Owner, bookkeeper, accountant and viewer, the post, lock and reopen grants, and who may approve what."
+        },
+        {
+          "slug": "move-in",
+          "title": "Move in from QuickBooks Online or Xero",
+          "file": "move-in.md",
+          "summary": "Preview your QuickBooks Online or Xero exports and their tie-outs, import them as staged records, carry Xero's attachments over, and sign them off."
+        },
+        {
+          "slug": "backup",
+          "title": "Back up and restore",
+          "file": "backup.md",
+          "summary": "Export the whole book to one archive and restore it into an empty installation."
+        },
+        {
+          "slug": "connections",
+          "title": "Connections and keys",
+          "file": "connections.md",
+          "summary": "Set up live bank feeds (Plaid), Gusto payroll, Xero attachments and email with accounts of your own: where each key comes from and where it goes."
+        },
+        {
+          "slug": "integrations",
+          "title": "Sibling integrations",
+          "file": "integrations.md",
+          "summary": "Give a sibling book a scoped credential, send records once, mark bills ready and read their payments."
+        },
+        {
+          "slug": "hosting",
+          "title": "Put Pantry online",
+          "file": "hosting.md",
+          "summary": "Deploy Pantry to your own Cloudflare account with rer deploy: the token it needs, the mail it sends with, and how to update or remove it."
+        }
+      ]
+    },
+    {
+      "title": "Contract records",
+      "pages": [
+        {
+          "slug": "accounting-rules",
+          "title": "Accounting and custody rules",
+          "file": "contract-mechanisms.md",
+          "summary": "The detailed accounting, provider and custody rules behind the product contract."
+        },
+        {
+          "slug": "done-audit",
+          "title": "Carried done audit",
+          "file": "contract/DONE-AUDIT.md",
+          "summary": "The old-reference acceptance outcomes and the exact assertions that support or limit their carried status."
+        },
+        {
+          "slug": "rulings",
+          "title": "Contract rulings",
+          "file": "RULINGS.md",
+          "source": "repository",
+          "summary": "The recorded product decisions and ct rulings that govern Pantry\u2019s clauses."
+        }
       ]
     }
   ]

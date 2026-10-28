@@ -21,7 +21,7 @@ import { amountSnapshot, priceFence, pricesFor, recurringPriceCommands } from '.
 import { depositInput, discountInput, percentLabel } from './discounts'
 import { offerRefusal, type Offer } from './early-payment'
 
-/** The treatment revisions an offer relies on, which a sending template's approval covers (INVOICE-010). */
+/** The treatment revisions an offer relies on, which a sending template's approval covers (INVOICE-012). */
 const treatmentRevisions = (offer: Offer | null) => offer ? JSON.stringify(Object.fromEntries(offer.lines.filter(l => l.code).map(l => [l.code!.id, l.code!.revision]))) : null
 
 type Unit = 'week' | 'month' | 'year'
@@ -153,7 +153,7 @@ async function runOccurrence(env: Bindings, db: D1Database, t: Data) {
   const approverPosts = approvedBy && await one(db, `SELECT 1 AS ok WHERE ${approver.sql}`, ...approver.params)
   const sameAmounts = p.total === amounts.total_cents && p.tax === amounts.tax_cents && amountSnapshot(p) === amounts.amount_snapshot
   const discountAccount = !p.discounts.length || !!p.discountAccountId
-  // The approval covered the template's early-payment term with the treatment revisions it relied on (INVOICE-010).
+  // The approval covered the template's early-payment term with the treatment revisions it relied on (INVOICE-012).
   const sameTreatments = treatmentRevisions(p.offer) === t.early_treatments && !await offerRefusal(db, p.offer)
   const automatic = t.mode === 'send' && t.approved_revision === t.revision && priceApproved && sameAmounts && discountAccount && sameTreatments && !!approverPosts
   const why = t.mode === 'draft' ? 'Created as a draft for approval'

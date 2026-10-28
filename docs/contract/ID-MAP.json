@@ -111,9 +111,10 @@
       ]
     },
     "PAN-19": {
-      "how": "kept",
+      "how": "split",
       "to": [
-        "PAN-19"
+        "PAN-19",
+        "PAN-20"
       ]
     },
     "BANK-001": {
@@ -297,9 +298,10 @@
       ]
     },
     "INVOICE-006": {
-      "how": "kept",
+      "how": "split",
       "to": [
-        "INVOICE-006"
+        "INVOICE-006",
+        "INVOICE-017"
       ]
     },
     "INVOICE-007": {
@@ -315,9 +317,14 @@
       ]
     },
     "INVOICE-010": {
-      "how": "kept",
+      "how": "split",
       "to": [
-        "INVOICE-010"
+        "INVOICE-010",
+        "INVOICE-012",
+        "INVOICE-013",
+        "INVOICE-014",
+        "INVOICE-015",
+        "INVOICE-016"
       ]
     },
     "INVOICE-011": {
@@ -645,9 +652,10 @@
       ]
     },
     "API-001": {
-      "how": "kept",
+      "how": "split",
       "to": [
-        "API-001"
+        "API-001",
+        "API-003"
       ]
     },
     "API-EGRESS-001": {
@@ -675,9 +683,14 @@
       ]
     },
     "INTEG-003": {
-      "how": "kept",
+      "how": "split",
       "to": [
-        "INTEG-003"
+        "INTEG-003",
+        "INTEG-005",
+        "INTEG-006",
+        "INTEG-007",
+        "INTEG-008",
+        "INTEG-009"
       ]
     },
     "INTEG-004": {
