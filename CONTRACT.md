@@ -1848,7 +1848,7 @@ Each row declares possible classes, decided per call from its arguments, current
 
 | `pantry.capture.capture_by_photo_upload_001` | Capture by photo, upload and drag-and-drop | CAPTURE-001 | standard or external or sensitive or commitment | No MCP tool |
 
-| `pantry.capture.forwarding_email_address_002` | Forwarding email address | CAPTURE-002 | standard or external or sensitive or commitment | No MCP tool |
+| `pantry.capture.forwarding_email_address_002` | Forwarding email address | CAPTURE-002 | standard or external or commitment or security or sensitive or live | No MCP tool |
 
 | `pantry.capture.reading_receipts_and_bills_003` | Reading receipts and bills | CAPTURE-003 | standard or external or sensitive or commitment | No MCP tool |
 
@@ -1860,13 +1860,13 @@ Each row declares possible classes, decided per call from its arguments, current
 
 | `pantry.capture.bills_and_expenses_drafted_007` | Bills and expenses drafted from documents | CAPTURE-007 | standard or external or sensitive or commitment | No MCP tool |
 
-| `pantry.capture.missing_receipts_chased_008` | Missing receipts chased | CAPTURE-008 | standard or external or sensitive or commitment | No MCP tool |
+| `pantry.capture.missing_receipts_chased_008` | Missing receipts chased | CAPTURE-008 | standard or external or commitment or sensitive or live | No MCP tool |
 
 | `pantry.item.products_and_services_list_001` | Products and services list | ITEM-001 | standard or money | No MCP tool |
 
 | `pantry.invoice.branded_invoice_documents_001` | Branded invoice documents | INVOICE-001 | standard or external or money or commitment | No MCP tool |
 
-| `pantry.invoice.invoices_sent_by_email_002` | Invoices sent by email | INVOICE-002 | standard or external or money or commitment | No MCP tool |
+| `pantry.invoice.invoices_sent_by_email_002` | Invoices sent by email | INVOICE-002 | standard or external or money or commitment or live | No MCP tool |
 
 | `pantry.invoice.hosted_invoice_page_and_003` | Hosted invoice page and viewed status | INVOICE-003 | standard or external or money or commitment | No MCP tool |
 
@@ -1878,9 +1878,9 @@ Each row declares possible classes, decided per call from its arguments, current
 
 | `pantry.pay.payments_from_outside_stripe_004` | Payments from outside Stripe applied for you | PAY-004 | standard or external or money or commitment or gated or sensitive | No MCP tool |
 
-| `pantry.pay.saved_payment_methods_and_005` | Saved payment methods and autopay | PAY-005 | money or external or sensitive or gated or commitment | No MCP tool |
+| `pantry.pay.saved_payment_methods_and_005` | Saved payment methods and autopay | PAY-005 | standard or external or money or commitment or gated or sensitive or live | No MCP tool |
 
-| `pantry.invoice.reminders_that_stop_once_004` | Reminders that stop once paid | INVOICE-004 | standard or external or money or commitment | No MCP tool |
+| `pantry.invoice.reminders_that_stop_once_004` | Reminders that stop once paid | INVOICE-004 | standard or external or money or commitment or live | No MCP tool |
 
 | `pantry.invoice.recurring_invoices_005` | Recurring invoices | INVOICE-005 | standard or external or money or commitment or live | No MCP tool |
 
@@ -1892,7 +1892,7 @@ Each row declares possible classes, decided per call from its arguments, current
 
 | `pantry.invoice.discounts_delivery_charges_and_010` | Discounts, delivery charges and deposits on the invoice | INVOICE-010 | standard or external or money or commitment | No MCP tool |
 
-| `pantry.invoice.invoice_links_by_text_011` | Invoice links by text message | INVOICE-011 | standard or external or money or commitment | No MCP tool |
+| `pantry.invoice.invoice_links_by_text_011` | Invoice links by text message | INVOICE-011 | standard or external or money or commitment or live | No MCP tool |
 
 | `pantry.sales.sales_receipts_for_sales_001` | Sales receipts for sales paid on the spot | SALES-001 | money or commitment or external | No MCP tool |
 
@@ -2060,7 +2060,7 @@ Each row declares possible classes, decided per call from its arguments, current
 
 | `pantry.audit.who_what_and_when_001` | Who, what and when | AUDIT-001 | standard or sensitive | No MCP tool |
 
-| `pantry.erasure.erasure_within_record_keeping_001` | Erasure within record-keeping law | ERASURE-001 | destructive or sensitive | No MCP tool |
+| `pantry.erasure.erasure_within_record_keeping_001` | Erasure within record-keeping law | ERASURE-001 | access or security or destructive or sensitive | No MCP tool |
 
 | `pantry.data.declared_data_flows_and_001` | Declared data flows and credentials | DATA-001 | standard or external or money or commitment or accounts or gated or access or security or sensitive or live | No MCP tool |
 
@@ -2078,7 +2078,7 @@ Each row declares possible classes, decided per call from its arguments, current
 
 | `pantry.agent.ask_the_books_007` | Ask the books | AGENT-007 | standard or external or money or commitment or sensitive | No MCP tool |
 
-| `pantry.agent.collections_that_get_paid_008` | Collections that get paid | AGENT-008 | standard or external or money or commitment or sensitive | No MCP tool |
+| `pantry.agent.collections_that_get_paid_008` | Collections that get paid | AGENT-008 | standard or external or money or commitment or sensitive or live | No MCP tool |
 
 | `pantry.agent.tax_readiness_all_year_009` | Tax readiness all year | AGENT-009 | standard or external or money or commitment or sensitive | No MCP tool |
 
@@ -2130,11 +2130,11 @@ Each row declares possible classes, decided per call from its arguments, current
 **Requirement.** Pantry computes authority and custody classes from the records and configuration its accounting call reads or changes, retaining every applicable class alongside the call’s financial and outside-exposure classes.
 
 **Acceptance.**
-1. A member, role, device, integration or agent-grant change adds access with affected people count and whether authority widens or narrows; this includes PAN-01 membership/role/grant calls and provider connect, re-link and disconnect calls. A call changing both a grant and its credential keeps access and security.
-2. Credential, factor, webhook secret or protective-setting work adds security with the setting named.
+1. A member, role, device, integration or agent-grant change adds access with affected people count and whether authority widens or narrows; this includes PAN-01 membership/role/grant calls, provider connect/re-link/disconnect and member erasure that retires sign-in authority. Credential retirement also retains security.
+2. Credential, factor, webhook secret or protective-setting work adds security with the setting named, including private capture-address rotation and member-erasure credential retirement.
 3. An irreversible void, purge or expiry disposal adds destructive with its item count.
 4. A read, change, import or export of full bank, card, tax-identity or payroll identifiers adds sensitive with record count and data kind, including original documents, migration archives and CONNECT-003 full-TIN filing CSVs. Filing, binding transmitter authorization or financial sign-off retains commitment alongside sensitive, and outside disclosure also retains external; a masked-only read does not add sensitive.
-5. Changing a running hosted broker, mail route, public accounting service or scheduled service configuration adds live with the affected service; enabling a posting rule or recurring journal/invoice schedule retains commitment for the financial authority it binds, and changing its grant also retains access.
+5. Changing a running hosted broker, mail route, public accounting service or scheduled service configuration adds live with the affected service, including capture/mail routes and scheduled invoice sends, reminders, receipt requests, collections and autopay. Posting rules and recurring journal/invoice schedules also retain commitment for bound financial authority; changing a grant retains access.
 
 #### SURFACE-004 — Accounting records, changes and handoffs
 

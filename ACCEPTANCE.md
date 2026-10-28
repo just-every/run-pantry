@@ -2321,11 +2321,11 @@ Agent surface · target · **missing** · From new · Cites BASE-AGENT-005, BASE
 **Requirement.** Pantry computes authority and custody classes from the records and configuration its accounting call reads or changes, retaining every applicable class alongside the call’s financial and outside-exposure classes.
 
 **Acceptance.**
-1. A member, role, device, integration or agent-grant change adds access with affected people count and whether authority widens or narrows; this includes PAN-01 membership/role/grant calls and provider connect, re-link and disconnect calls. A call changing both a grant and its credential keeps access and security.
-2. Credential, factor, webhook secret or protective-setting work adds security with the setting named.
+1. A member, role, device, integration or agent-grant change adds access with affected people count and whether authority widens or narrows; this includes PAN-01 membership/role/grant calls, provider connect/re-link/disconnect and member erasure that retires sign-in authority. Credential retirement also retains security.
+2. Credential, factor, webhook secret or protective-setting work adds security with the setting named, including private capture-address rotation and member-erasure credential retirement.
 3. An irreversible void, purge or expiry disposal adds destructive with its item count.
 4. A read, change, import or export of full bank, card, tax-identity or payroll identifiers adds sensitive with record count and data kind, including original documents, migration archives and CONNECT-003 full-TIN filing CSVs. Filing, binding transmitter authorization or financial sign-off retains commitment alongside sensitive, and outside disclosure also retains external; a masked-only read does not add sensitive.
-5. Changing a running hosted broker, mail route, public accounting service or scheduled service configuration adds live with the affected service; enabling a posting rule or recurring journal/invoice schedule retains commitment for the financial authority it binds, and changing its grant also retains access.
+5. Changing a running hosted broker, mail route, public accounting service or scheduled service configuration adds live with the affected service, including capture/mail routes and scheduled invoice sends, reminders, receipt requests, collections and autopay. Posting rules and recurring journal/invoice schedules also retain commitment for bound financial authority; changing a grant retains access.
 
 **Evidence.** None.
 **Gap.** No Pantry MCP registry and risk-policy conformance journey prove these accounting deltas yet.
