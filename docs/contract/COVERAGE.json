@@ -3213,343 +3213,267 @@
       "file": "CONTRACT.md",
       "line": 442,
       "text": "| Provider | Clauses | Production path | What the business needs | Where the credential lives |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 444,
       "text": "| Plaid | BANK-001 to BANK-005 | Broker. Plaid Link runs in the owner's browser. Or own account: the business's own Plaid keys (`PLAID_CLIENT_ID`, `PLAID_SECRET`), for a business that already holds Plaid production access. | A login at the bank | Plaid access token, encrypted in the installation; Plaid client secret at Pantry Connect, or the business's own keys as installation secrets |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 445,
       "text": "| MX, Finicity | BANK-001 | Broker, for institutions Plaid serves poorly | A login at the bank | Connection IDs in the installation; partner keys at Pantry Connect |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 446,
       "text": "| SimpleFIN Bridge | BANK-001 | Own account. The owner buys SimpleFIN access and pastes its setup token. | A SimpleFIN Bridge account | Access URL, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 447,
       "text": "| Mercury, Brex | BANK-006, BILLPAY-001 (Mercury) | Own account: an API token an admin creates in the account's settings | Admin access to the account | Token, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 448,
       "text": "| Ramp | BANK-006 | Broker (Ramp OAuth), or own account: an API client a Ramp admin creates | A Ramp admin | OAuth token or client credentials, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 449,
       "text": "| Stripe | PAY-001 to PAY-005, PROC-001, SALES-001 to SALES-003, SALESTAX-001 (Stripe Tax) | Own account: a restricted key with the permissions Pantry lists. Or broker: Stripe Connect through Pantry Connect's platform, with the business keeping its own Stripe account and dashboard. | A Stripe account | Key or connected-account token, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 450,
       "text": "| Square | PROC-002 | Broker (Square OAuth), or own account: the seller's own access token | A Square seller account | Token, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 451,
       "text": "| PayPal | PROC-002 | Broker (PayPal partner app), or own account: live REST credentials created with the business's PayPal login | A PayPal business account | Token, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 452,
       "text": "| Shopify | PROC-002 | Own account: a custom app the merchant creates for its own store, with read access to orders and payouts. Or broker: Pantry Connect's public Shopify app. | Shopify store owner access | Admin API token, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 453,
       "text": "| Melio | BILLPAY-001, BILLPAY-002 | Broker. Pantry Connect is in Melio's embedded partner program, and the business signs up or signs in within Melio's own flow. | A Melio account, or one opened in the flow | Melio account token in the installation; Melio holds vendor bank details |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 454,
       "text": "| BILL | BILLPAY-001, BILLPAY-002 | Broker. The business signs in with its BILL account. | A BILL account | Session or OAuth token, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 455,
       "text": "| Gusto | PAYROLL-001, PAYROLL-002, CASH-001 | Broker (Gusto-approved app at Pantry Connect; a Gusto admin consents), or file: Gusto's payroll journal report | A Gusto admin | OAuth refresh token in the installation; client secret at Pantry Connect |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 456,
       "text": "| Rippling | PAYROLL-001, PAYROLL-002 | Broker (Rippling app partner), or file: Rippling's payroll register | A Rippling admin | OAuth token in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 457,
       "text": "| ADP RUN, Paychex Flex, QuickBooks Payroll | PAYROLL-001 | File: payroll register reports | Report access | None |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 458,
       "text": "| Avalara AvaTax | SALESTAX-001, SALESTAX-002 | Own account: the account ID and license key AvaTax issues to every customer | An AvaTax subscription | Key, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 459,
       "text": "| TaxJar | SALESTAX-001, SALESTAX-002 | Own account: the API token from a TaxJar plan that includes API access | That TaxJar plan | Token, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 460,
       "text": "| State rate sources | SALESTAX-001 | No account: Streamlined Sales Tax rate and boundary files and state lookup services, free | Nothing | None |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 461,
       "text": "| IRS IRIS | TAXFORM-002 | CONNECT-003: Pantry Connect as transmitter, or the IRIS Taxpayer Portal upload | Nothing (transmitter), or the business's own IRIS portal TCC | Transmitter code at Pantry Connect; business authorization kept with each filing |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 462,
       "text": "| Intuit QuickBooks Online | MIGRATE-001, MIGRATE-004, MIGRATE-006 | Broker (Intuit production app at Pantry Connect; the company's QuickBooks Online admin signs in), or file: PAN-16 report exports | A QuickBooks Online admin | OAuth refresh token in the installation; client secret at Pantry Connect |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 463,
       "text": "| Xero | MIGRATE-002, MIGRATE-004, MIGRATE-006 | Broker (Pantry Connect's certified Xero app), own account (a Xero custom connection bought from Xero), or file: Xero's report exports | A Xero adviser or admin | Token, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 464,
       "text": "| FreshBooks | MIGRATE-003 | Broker (Pantry Connect's FreshBooks app), or file: FreshBooks' exports | A FreshBooks admin | Token, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 465,
       "text": "| Hubdoc, Dext | MIGRATE-005 | File: archive exports | Export access | None |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 466,
       "text": "| Jobber | INTEG-003, INTEG-004, INVOICE-007 | Broker: Pantry Connect's public Jobber app, listed in Jobber's App Marketplace after Jobber's app review; a Jobber admin approves access. Or file: Jobber's invoice, payment, payout and timesheet exports. | A Jobber account on a plan that allows connected apps | OAuth token, encrypted in the installation; client secret at Pantry Connect |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 467,
       "text": "| Housecall Pro | INTEG-003, INTEG-004 | Own account on the MAX plan: an API key the admin creates, with webhooks. On other plans, file: the Payments Report and the job and invoice export. The Zapier triggers only list completed jobs. | A Housecall Pro admin | API key, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 468,
       "text": "| ServiceTitan | INTEG-003, INTEG-004, INVOICE-007 | Broker: Pantry Connect's app approved by ServiceTitan for many tenants, connected by the business's admin under API Application Access | A ServiceTitan admin | Tenant connection in the installation; app key and client secret at Pantry Connect |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 469,
       "text": "| QuickBooks Time | INTEG-003, INVOICE-007 | Own account: an access token from the API add-on, created by the admin. Or file: the timesheet export. | A QuickBooks Time admin | Token, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 470,
       "text": "| Harvest | INTEG-003, INTEG-004, INVOICE-007 | Own account: a personal access token with the account ID. Or broker: Pantry Connect's Harvest OAuth 2.0 app. | A Harvest administrator | Token, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 471,
       "text": "| Pantry Connect mail | CONNECT-005 and every clause that sends email (INVOICE-002 and the others it lists) | Broker, and the default for a new installation. Pantry Connect sends from its own verified sending domain through its email carrier, with the business's name as sender name and the business's confirmed address as Reply-To, and handles bounces and complaints. | Any email address the owner reads, such as a Gmail address | Installation registration only; the carrier account and sending domain at Pantry Connect |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 472,
       "text": "| Google (Gmail, Google Workspace) and Microsoft (Microsoft 365, Outlook.com) mailboxes | CONNECT-005 | Broker. The owner signs in to their mailbox and grants send-only access to Pantry Connect's verified Google app and publisher-verified Microsoft app. | The mailbox | OAuth refresh token, encrypted in the installation; client secrets at Pantry Connect |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 473,
       "text": "| Own mail provider (Postmark, Amazon SES, Resend, SendGrid, Cloudflare Email) | CONNECT-005 | Own account, with the sending domain verified by DNS records Pantry shows | A mail provider account and its domain | API key, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 474,
       "text": "| Pantry Connect inbound address | CONNECT-006, CAPTURE-002, CAPTURE-008, CLOSE-003 | Broker, and the default: an unguessable capture address at Pantry Connect's inbound domain, relayed to the installation | Nothing | Installation registration only |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 475,
       "text": "| Own inbound mail (Cloudflare Email Routing, Postmark inbound, Amazon SES receiving, SendGrid Inbound Parse) | CONNECT-006, CAPTURE-002 | Own account: an address on the business's own domain routed to the installation | The domain and its mail routing | Webhook secret, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 476,
       "text": "| Twilio | NOTIFY-001, INVOICE-011, CAPTURE-008, AGENT-002 | Own account. US A2P 10DLC brand and campaign registration (or toll-free verification) is guided from Pantry, because US carriers block unregistered business texting. | A Twilio account | API key, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 477,
       "text": "| Slack | NOTIFY-001 | Broker (Pantry Connect's Slack app), or own account: an incoming webhook | A Slack workspace admin | Token, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 478,
       "text": "| Model provider (Anthropic by default) and AWS Textract | CAPTURE-003, AGENT-001 to AGENT-010 | Own account: an API key or IAM access key | A provider account | Key, encrypted in the installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 479,
       "text": "| Apple Push Notification service, Firebase Cloud Messaging | MOBILE-002, NOTIFY-001 | Broker: Pantry Connect's push relay holds the published apps' push keys and receives only an event type, a record ID and the device token | Nothing | Push keys at Pantry Connect |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
       "line": 480,
       "text": "| Coaster, Purse and the other siblings, Crank, Nook | INTEG-001, INTEG-002, NOTIFY-001 | Own installations: tokens issued between the business's own installations under API-001 | The sibling installation | Token, encrypted in each installation |",
-      "to": "clause",
-      "ids": [
-        "CONNECT-001"
-      ]
+      "to": "docs",
+      "path": "docs/contract-mechanisms.md"
     },
     {
       "file": "CONTRACT.md",
