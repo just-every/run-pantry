@@ -49,6 +49,8 @@ Uploaded originals move from transactional D1 staging into verified private R2 o
 
 Reserve a new hosted environment at the same Pantry revision, apply its normal migrations, and keep its writers and Cron paused during recovery. The destination must contain only its unchanged migration defaults. The restore refuses existing books and never merges or replaces them.
 
+Provision the new environment through `rer deploy` with configured production sign-in mail or an approved Auth SSO installation. Cloudflare resource permissions alone do not configure sign-in. A deployment refused at this prerequisite has no fresh hosted destination to restore into; local or simulated-provider recovery does not establish a hosted drill.
+
 Run from the deployed checkout with its mode-0600 Cloudflare deploy file and a mode-0600 archive:
 
 ```sh

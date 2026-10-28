@@ -12,11 +12,17 @@ type Balance = { id: string; code: string; name: string; type: string; subtype: 
 
 export async function balances(db: D1Database, to: string, from = '0000-01-01', basis: Basis = 'accrual', dimension?:DimensionScope): Promise<Balance[]> {
   const kept = (basis === 'cash' ? `AND ${sameOnCash()}` : '')+(dimension?` AND l.${dimension.kind}_name = ?`:'')
-  const rows = await all(db, `SELECT a.id, a.code, a.name, a.type, a.subtype,
-      COALESCE(SUM(CASE WHEN e.status = 'posted' AND e.entry_date BETWEEN ? AND ? ${kept} THEN l.debit_cents END), 0) AS debit,
-      COALESCE(SUM(CASE WHEN e.status = 'posted' AND e.entry_date BETWEEN ? AND ? ${kept} THEN l.credit_cents END), 0) AS credit
-    FROM pt_accounts a LEFT JOIN pt_journal_lines l ON l.account_id = a.id LEFT JOIN pt_journal_entries e ON e.id = l.entry_id
-    GROUP BY a.id ORDER BY a.code`, from, to, ...(dimension?[dimension.value]:[]),from, to,...(dimension?[dimension.value]:[]))
+  // Select the dated postings before joining the chart. Opening balances and
+  // comparison periods need not scan every line outside their own range.
+  const rows = await all(db, `WITH activity AS (
+      SELECT l.account_id, SUM(l.debit_cents) AS debit, SUM(l.credit_cents) AS credit
+      FROM pt_journal_entries e JOIN pt_journal_lines l ON l.entry_id = e.id
+      WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? ${kept}
+      GROUP BY l.account_id
+    ) SELECT a.id, a.code, a.name, a.type, a.subtype,
+      COALESCE(activity.debit, 0) AS debit, COALESCE(activity.credit, 0) AS credit
+    FROM pt_accounts a LEFT JOIN activity ON activity.account_id = a.id
+    ORDER BY a.code`, from, to, ...(dimension?[dimension.value]:[]))
   const out = rows.map(r => ({ ...r, debit: Number(r.debit), credit: Number(r.credit) })) as Balance[]
   if (basis === 'cash') {
     const byId = new Map(out.map(b => [b.id, b]))
