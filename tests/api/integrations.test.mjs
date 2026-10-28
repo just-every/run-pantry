@@ -410,7 +410,7 @@ test('API-001 / REPORT-002 scoped financial reports read native nonzero books, b
 })
 
 
-test('API-001 / INVOICE-010/012/013/014/016 scoped issuance counts the deposit toward the frozen early-payment offer and settles once like native invoices', async t => {
+test('API-001 / INVOICE-010 / INVOICE-012 / INVOICE-013 / INVOICE-014 / INVOICE-016 scoped issuance counts the deposit toward the frozen early-payment offer and settles once like native invoices', async t => {
   const h = await harness(); t.after(h.close)
   const { acct } = await books(h)
   const ds=(await h.view('dimensions')).settings
@@ -502,7 +502,7 @@ test('API-001 scoped drafts and issued invoices retain the same destination and 
 })
 
 
-test('API-001 / INVOICE-010/012/013/014/016 scoped discount, delivery, deposit and early-term refusals match native doors without reserving failed keys', async t => {
+test('API-001 / INVOICE-010 / INVOICE-012 / INVOICE-013 / INVOICE-014 / INVOICE-016 scoped discount, delivery, deposit and early-term refusals match native doors without reserving failed keys', async t => {
   const h = await harness(); t.after(h.close)
   const { acct } = await books(h)
   const customer = await h.command('contact.save', { kind: 'customer', name: 'Cedar Consulting' })

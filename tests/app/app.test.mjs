@@ -42,7 +42,7 @@ test('CASH-001 cash projection, source records and what-if alert at 1440 and 390
 
 test('SEARCH-001 current transaction search and exact records at 1440 and 390', searchJourney)
 
-test('INVOICE-006/017 estimates, customer acceptance, progress invoices and advance deposits at 1440 and 390', estimatesJourney)
+test('INVOICE-006 / INVOICE-017 estimates, customer acceptance, progress invoices and advance deposits at 1440 and 390', estimatesJourney)
 
 test('MIGRATE-007 spreadsheet mapping, preview, undo, reimport and sign-off at 1440 and 390', moveInJourney)
 

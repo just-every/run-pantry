@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "e568b359bad66bc55a7b082d55d5ee45bf2be0cdc6bd2e3a598d8aa1783a8e7f",
+      "sha256": "2983be5ee622ee04d824292039845b930fc72e0a9b98ef89c9c5e5b544cd4d30",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "dc2409872cf8f74fcdd6bead3f4a853eef69926fa801c9b23cbbeca8db28f5ef",
+      "sha256": "335e2beb5d5d33310bd12b75d8597f843ec402d7fa939267c68e73aced5a0556",
       "executable": false
     },
     "DEMO.md": {
@@ -159,7 +159,7 @@
       "executable": false
     },
     "docs/contract-mechanisms.md": {
-      "sha256": "d56c8d2984111ad0330ced6b5c19d23bac9da041ebf9f864387bc883263b411f",
+      "sha256": "7fa284faee01509bf15b9962fdbc2de0bd8e1e0bb29ad4714e205c763eda2c8a",
       "executable": false
     },
     "docs/contract/COVERAGE.json": {
@@ -167,7 +167,7 @@
       "executable": false
     },
     "docs/contract/DONE-AUDIT.md": {
-      "sha256": "5ef062c9c9a9308a7a3de6a28c6a62a8077d499ed610434cb6d1b8f36af37741",
+      "sha256": "a5a3f769f23d009fffe39af70f877e7ff447d64e48dd4451ce4c0b6fb9119e6e",
       "executable": false
     },
     "docs/contract/ID-MAP.json": {
@@ -6499,11 +6499,11 @@
       "executable": false
     },
     "tests/api/integrations.test.mjs": {
-      "sha256": "02f17a1b502998dbc9fc60134ceb50638d947212fe796c7aacb28735a4dbb27b",
+      "sha256": "800da03e71ec9f575bc2d0b66daea9d20bb30a6cc9f238d195d0e608d3891d51",
       "executable": false
     },
     "tests/api/invoices-out.test.mjs": {
-      "sha256": "3cc6986eb3cd84620ed72fb99956196524236cc85226378dc95353b0adb6165e",
+      "sha256": "2bfbd74bc2b55f1c5ae321cbb9385f792a04b1b4456a1dc5858cb5545af9cb81",
       "executable": false
     },
     "tests/api/late-discount-journey.mjs": {
@@ -6687,7 +6687,7 @@
       "executable": false
     },
     "tests/app/app.test.mjs": {
-      "sha256": "ae5bf4df0400b36747cfcf997f6c78f3bbdede3ca6b618b55ea2c170f3465c65",
+      "sha256": "21d01e81241a353d51ae51173c97e32aed671c90cff8e9793865ac1c9efe03ec",
       "executable": false
     },
     "tests/app/approved-adjustments-journey.mjs": {
