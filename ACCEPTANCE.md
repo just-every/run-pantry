@@ -2259,9 +2259,8 @@ Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 **Requirement.** Pantry’s embedded bookkeeper uses the installation’s chosen model through Base’s AI adapter, with Claude as its initial model choice; outside agents use the same accounting actions. Financial-period locks bind these accounting actions, and the seed computes financial classes from its source records as described in the Agent surface.
 
 **Acceptance.**
-1. Under a company policy with a $20 monthly model-spend cap, reach the cap and see further spending refused while non-spending work remains available.
-2. Place an instruction in a source document and see the accounting result use only its evidence, with no widened grant or changed class.
-3. Under policies that authorize and refuse the same financial classes, see the corresponding accounting actions follow each decision without using a person’s identity.
+1. Read an accounting source through the installation’s chosen model and use the same accounting actions from an outside agent.
+2. Attempt a posting into a locked financial period through either embedded or outside accounting actions and see it refused with the books unchanged.
 
 **Evidence.** `src/pantry/access.ts`, `src/pantry/proposals.ts`, `src/pantry/questions/model.ts`, `src/pantry/receipts/settings.ts`, `tests/api/agent.test.mjs`
 **Gap.** Existing held-company-policy evidence: Owner-issued, revocable tokens can only read context and file proposals; Pantry's own reading uses the installation's sealed Anthropic or OpenAI-compatible key and treats documents and replies as untrusted; Base's ai module, per-agent permissions and data scope, the USD spending limit, rate limits, a full agent read log and the stop switch do not exist. The company’s policy must decide future tool calls by their declared classes; the current bounded behavior supplies no product disposition.

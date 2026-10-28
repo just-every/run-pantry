@@ -4375,10 +4375,57 @@
     {
       "file": "CONTRACT.md",
       "line": 580,
-      "text": " No agent can post into a locked period, approve, release a payment, lock, reopen or move money. **Acceptance evidence:** Set a $20 monthly limit and see agent work pause when it is reached. Plant an instruction in a document and see it ignored. Try each forbidden action with an agent token and be refused. ",
+      "text": " No agent can post into a locked period,",
       "to": "clause",
       "ids": [
         "AGENT-010"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 580,
+      "text": " approve, release a payment, lock, reopen or move money.",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-007",
+        "BASE-AGENT-008"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 580,
+      "text": " **Acceptance evidence:** Set a $20 monthly limit and see agent work pause when it is reached.",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-011"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 580,
+      "text": " Plant an instruction in a document and see it ignored.",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-005",
+        "BASE-AGENT-006"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 580,
+      "text": " Try each forbidden action with an agent token and be refused. ",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-007",
+        "BASE-AGENT-008"
+      ],
+      "also": [
+        {
+          "to": "clause",
+          "ids": [
+            "AGENT-010"
+          ]
+        }
       ]
     },
     {
