@@ -323,7 +323,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 1. Import three months by OFX, then connect the same account in the sandbox with 13 months of history and a locked month inside it.
 2. See no duplicate lines, the locked month's lines held as reference, the doubtful pair waiting for a decision, and a reconciliation that still proves under PAN-09.
 
-**Evidence.** `src/pantry/feeds/history.ts`, `src/pantry/feeds/commands.ts`, `src/pantry/feeds/sync.ts`, `src/ui/feed-history.tsx`, `src/ui/bank-connect.tsx`, `tests/api/feeds.test.mjs`, `tests/app/feed-history.test.mjs`
+**Evidence.** Covering journeys: “BANK-002 thirteen months of feed history preserve three imported OFX months, held references and the reconciliation proof” (tests/api/feeds.test.mjs); “BANK-002 history choices, reference-only observations and duplicate decisions through the built Bank screens at 1440 and 390” (tests/app/feed-history.test.mjs). Evidence: `src/pantry/feeds/history.ts`, `src/pantry/feeds/commands.ts`, `src/pantry/feeds/sync.ts`, `src/ui/feed-history.tsx`, `src/ui/bank-connect.tsx`, `tests/api/feeds.test.mjs`, `tests/app/feed-history.test.mjs`
 **Gap.** None.
 
 #### BANK-003 — Continuous sync of pending and posted lines
@@ -336,7 +336,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 1. Drive sandbox added, modified and removed events, including a pending card authorization that posts $4.18 higher with a tip, and a removal of a matched line.
 2. See the posted amount used, the unposted line updated, and an exception on the matched line with the ledger unchanged.
 
-**Evidence.** `src/pantry/feeds/sync.ts`, `src/pantry/feeds/transaction-exceptions.ts`, `src/ui/bank-feeds.tsx`, `tests/api/feeds.test.mjs`
+**Evidence.** Covering journeys: “BANK-003 continuous sync of pending and posted lines” (tests/api/feeds.test.mjs). Evidence: `src/pantry/feeds/sync.ts`, `src/pantry/feeds/transaction-exceptions.ts`, `src/ui/bank-feeds.tsx`, `tests/api/feeds.test.mjs`
 **Gap.** None.
 
 #### BANK-004 — Connection health and re-linking
@@ -363,7 +363,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 1. Reconcile a fed checking account for a month against a typed statement closing balance, then against a sandbox-fetched statement PDF.
 2. See the PDF stored with its SHA-256, the PAN-09 proof, and refusal when a provider balance explicitly dated to statement end disagrees with the statement; a later or undated balance does not block.
 
-**Evidence.** `src/pantry/feeds/statements.ts`, `src/pantry/reconcile.ts`, `src/ui/feed-statement.tsx`, `tests/api/feeds.test.mjs`, `tests/api/bank.test.mjs`, `tests/app/feed-history.test.mjs`
+**Evidence.** Covering journeys: “BANK-005 reconciliation from feeds and statements / REPORT-005 retained Plaid event” (tests/api/feeds.test.mjs). Evidence: `src/pantry/feeds/statements.ts`, `src/pantry/reconcile.ts`, `src/ui/feed-statement.tsx`, `tests/api/feeds.test.mjs`, `tests/api/bank.test.mjs`, `tests/app/feed-history.test.mjs`
 **Gap.** None.
 
 #### BANK-006 — Direct business-bank and spend-platform connections
@@ -421,7 +421,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 2. Edit the rule and confirm earlier postings are unchanged.
 3. Send an Adobe line dated in a locked month and see it wait in the queue.
 
-**Evidence.** `src/pantry/rules.ts`, `src/pantry/bank-lines.ts`, `src/ui/bank-rules.tsx`, `src/ui/bank-lines.tsx`, `migrations/core/0048_bank_rule_modes.sql`, `tests/api/rules.test.mjs`, `tests/app/bank-rules.test.mjs`
+**Evidence.** Covering journeys: “RULE-002 bank rules that file routine lines” (tests/api/rules.test.mjs). Evidence: `src/pantry/rules.ts`, `src/pantry/bank-lines.ts`, `src/ui/bank-rules.tsx`, `src/ui/bank-lines.tsx`, `migrations/core/0048_bank_rule_modes.sql`, `tests/api/rules.test.mjs`, `tests/app/bank-rules.test.mjs`
 **Gap.** None.
 
 #### RULE-003 — Suggestions learned from this business's own history
@@ -434,7 +434,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 1. Categorize five lines from one payee, then see the sixth suggested with its reason and confidence.
 2. Change it, and see the acceptance rate update and the next suggestion follow the change.
 
-**Evidence.** `src/pantry/line-suggestions.ts`, `src/pantry/bank-lines.ts`, `src/pantry/matching.ts`, `src/ui/line-suggestions.tsx`, `src/ui/bank-lines.tsx`, `src/ui/reconcile.tsx`, `migrations/core/0049_line_suggestions.sql`, `tests/api/rules.test.mjs`, `tests/app/bank-rules.test.mjs`
+**Evidence.** Covering journeys: “RULE-003 learned line suggestions follow human corrections and show decision rates for history, vendors and documents without posting” (tests/api/rules.test.mjs). Evidence: `src/pantry/line-suggestions.ts`, `src/pantry/bank-lines.ts`, `src/pantry/matching.ts`, `src/ui/line-suggestions.tsx`, `src/ui/bank-lines.tsx`, `src/ui/reconcile.tsx`, `migrations/core/0049_line_suggestions.sql`, `tests/api/rules.test.mjs`, `tests/app/bank-rules.test.mjs`
 **Gap.** None.
 
 #### RULE-004 — Transfers and card payments recognized
@@ -508,7 +508,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 2. Capture two $25.00 receipts against two $25.00 lines with different vendors and see each paired correctly.
 3. Capture a cash receipt and see the expense from the cash account.
 
-**Evidence.** `src/pantry/receipts/matches.ts`, `src/pantry/receipts/cash.ts`, `src/pantry/receipts/review.ts`, `src/pantry/bank.ts`, `src/pantry/feeds/sync.ts`, `src/ui/receipts.tsx`, `src/ui/receipt-cash.tsx`, `tests/api/receipts.test.mjs`, `tests/app/app.test.mjs`
+**Evidence.** Covering journeys: “CAPTURE-004 delayed receipt matching, vendor/card identity, tip and FX bounds, ambiguity and approved cash expense” (tests/api/receipts.test.mjs). Evidence: `src/pantry/receipts/matches.ts`, `src/pantry/receipts/cash.ts`, `src/pantry/receipts/review.ts`, `src/pantry/bank.ts`, `src/pantry/feeds/sync.ts`, `src/ui/receipts.tsx`, `src/ui/receipt-cash.tsx`, `tests/api/receipts.test.mjs`, `tests/app/app.test.mjs`
 **Gap.** None.
 
 #### CAPTURE-005 — Duplicate documents caught
@@ -534,7 +534,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 1. Capture bills from "THE HOME DEPOT #4417" and "Home Depot Pro" and see both matched to the vendor Home Depot, with the alias recorded after confirmation.
 2. Capture a bill from a new vendor and see a proposed vendor that a person accepts.
 
-**Evidence.** `src/pantry/receipts/vendor-match.ts`, `src/pantry/receipts/vendor-confirm.ts`, `src/ui/receipt-vendor.tsx`, `tests/api/receipts.test.mjs`
+**Evidence.** Covering journeys: “CAPTURE-006 vendor matching and creation: a phone photo is kept byte for byte, read by the install's own model, and attached to its card charge only when a person accepts” (tests/api/receipts.test.mjs). Evidence: `src/pantry/receipts/vendor-match.ts`, `src/pantry/receipts/vendor-confirm.ts`, `src/ui/receipt-vendor.tsx`, `tests/api/receipts.test.mjs`
 **Gap.** None.
 
 #### CAPTURE-007 — Bills and expenses drafted from documents
@@ -547,7 +547,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 1. Forward a $1,850 contractor bill and see a draft bill with its due date from the vendor's terms and the PDF attached.
 2. Approve it under BILL-002, see it posted to payables with the document linked, and see no missing-evidence exception at close.
 
-**Evidence.** `src/pantry/receipts/drafts.ts`, `src/pantry/receipts/draft-proposal.ts`, `src/pantry/receipts/draft-approval.ts`, `src/ui/receipt-draft.tsx`, `tests/api/receipts.test.mjs`
+**Evidence.** Covering journeys: “CAPTURE-007 captured bills and paid receipts become approved revision-specific drafts with source evidence through posting and close” (tests/api/receipts.test.mjs). Evidence: `src/pantry/receipts/drafts.ts`, `src/pantry/receipts/draft-proposal.ts`, `src/pantry/receipts/draft-approval.ts`, `src/ui/receipt-draft.tsx`, `tests/api/receipts.test.mjs`
 **Gap.** None.
 
 #### CAPTURE-008 — Missing receipts chased
@@ -712,7 +712,7 @@ Core · target · **done** · Cites BASE-MAIL-001 · Rules D-1, D-2, D-4, D-5, D
 2. See reminders only where due, none after payment or during the pause, and every send on the invoice's history.
 3. After an INVOICE-014 early-payment window a shortfall stays open and reminders continue; a discount that settles the invoice stops them like any payment.
 
-**Evidence.** `tests/api/invoices-out.test.mjs`, `tests/api/reminders-journey.mjs`, `tests/api/customer-delivery.test.mjs`, `tests/app/customer-record.test.mjs`, `tests/app/reminders-journey.mjs`, `tests/providers/invoice-reminder.mjs`, `tests/api/void-journey.mjs`, `tests/app/refunds-journey.mjs`
+**Evidence.** Covering journeys: “INVOICE-002 / INVOICE-003 / INVOICE-004 an issued invoice is emailed with its PDF and customer link; the first customer view is recorded; reminders follow the schedule once and stop when paid” (tests/api/invoices-out.test.mjs). Evidence: `tests/api/invoices-out.test.mjs`, `tests/api/reminders-journey.mjs`, `tests/api/customer-delivery.test.mjs`, `tests/app/customer-record.test.mjs`, `tests/app/reminders-journey.mjs`, `tests/providers/invoice-reminder.mjs`, `tests/api/void-journey.mjs`, `tests/app/refunds-journey.mjs`
 **Gap.** None.
 
 #### INVOICE-005 — Recurring invoices
@@ -727,7 +727,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 3. Fail a send and see it listed.
 4. A sending template's approval also covers its INVOICE-012 early-payment term and the treatment revisions it relies on; when a revision changes, the next invoice is a draft that says why.
 
-**Evidence.** `src/pantry/recurring.ts`, `src/pantry/recurring-prices.ts`, `src/ui/recurring.tsx`, `tests/api/invoices-out.test.mjs`, `tests/api/recurring-prices.test.mjs`
+**Evidence.** Covering journeys: “INVOICE-005 a recurring invoice creates drafts for approval, or once a second person approves it issues and sends each one on its own, once per occurrence” (tests/api/invoices-out.test.mjs); “INVOICE-005 recurring invoices retain three approved $2,400 months before a chosen price date, then wait for approval at the changed price” (tests/api/recurring-prices.test.mjs); “INVOICE-005 approving a dated price authorises its exact future amounts; schedules, pause, end and failed sends remain visible” (tests/api/recurring-prices.test.mjs); “INVOICE-012 / INVOICE-013 / INVOICE-014 / INVOICE-015 / INVOICE-016 early-payment terms (with SALESTAX-001/002/004, INVOICE-001 / INVOICE-003 / INVOICE-005, PAY-001/002/004) and REPORT-005: per-code treatment, the offer approved with the invoice, an all-or-nothing linked discount credit in the window, reversal, Stripe and PAY-004, sales-tax columns and refusals” (tests/api/invoices-out.test.mjs). Evidence: `src/pantry/recurring.ts`, `src/pantry/recurring-prices.ts`, `src/ui/recurring.tsx`, `tests/api/invoices-out.test.mjs`, `tests/api/recurring-prices.test.mjs`
 **Gap.** None.
 
 #### INVOICE-006 — Estimates, deposits and progress invoicing
@@ -784,7 +784,7 @@ Core · target · **done** · From INVOICE-010 · Rules D-1, D-2, D-4, D-5, D-7,
 1. Issue a $1,000 invoice with a 10% discount before tax, a $40 taxable delivery line and a $300 deposit by check.
 2. See tax calculated on $940, the discount posted to its account, the deposit posted, and the correct balance due on the PDF and the hosted page.
 
-**Evidence.** `src/pantry/invoices.ts`, `src/pantry/discounts.ts`, `src/pantry/early-payment.ts`, `src/pantry/early-payment-table.ts`, `src/pantry/payables.ts`, `src/pantry/stripe.ts`, `src/pantry/automatch.ts`, `src/pantry/customer-page.ts`, `src/pantry/invoice-documents.ts`, `src/pantry/sales-tax.ts`, `src/pantry/basis.ts`, `src/pantry/recurring.ts`, `tests/api/invoices-out.test.mjs`
+**Evidence.** Covering journeys: “INVOICE-010 discounts, delivery charges and deposits on the invoice: tax on the discounted base, the discount and deposit posted, the balance due on the PDF and the hosted page” (tests/api/invoices-out.test.mjs). Evidence: `src/pantry/invoices.ts`, `src/pantry/discounts.ts`, `src/pantry/early-payment.ts`, `src/pantry/early-payment-table.ts`, `src/pantry/payables.ts`, `src/pantry/stripe.ts`, `src/pantry/automatch.ts`, `src/pantry/customer-page.ts`, `src/pantry/invoice-documents.ts`, `src/pantry/sales-tax.ts`, `src/pantry/basis.ts`, `src/pantry/recurring.ts`, `tests/api/invoices-out.test.mjs`
 **Gap.** None.
 
 #### INVOICE-011 — Invoice links by text message
@@ -895,7 +895,7 @@ Core · target · **done** · From INVOICE-010 · Rules D-1, D-2, D-4, D-5, D-7,
 4. Partial payments in the window add up and a part after it does not; an overpayment leaves $21.65 unapplied; mixed lines ($100 at 8.25% and $100 at 9.5%, both reduce, and $100 exempt, 2%) give D $6.00, R $0.35 and $311.40 to pay.
 5. Reversing the day-8 payment reverses the discount and the balance is $1,082.50 again.
 
-**Evidence.** `src/pantry/invoices.ts`, `src/pantry/discounts.ts`, `src/pantry/early-payment.ts`, `src/pantry/early-payment-table.ts`, `src/pantry/payables.ts`, `src/pantry/stripe.ts`, `src/pantry/automatch.ts`, `src/pantry/customer-page.ts`, `src/pantry/invoice-documents.ts`, `src/pantry/sales-tax.ts`, `src/pantry/basis.ts`, `src/pantry/recurring.ts`, `tests/api/invoices-out.test.mjs`
+**Evidence.** Covering journeys: “INVOICE-012 / INVOICE-013 / INVOICE-014 / INVOICE-015 / INVOICE-016 early-payment terms (with SALESTAX-001/002/004, INVOICE-001 / INVOICE-003 / INVOICE-005, PAY-001/002/004) and REPORT-005: per-code treatment, the offer approved with the invoice, an all-or-nothing linked discount credit in the window, reversal, Stripe and PAY-004, sales-tax columns and refusals” (tests/api/invoices-out.test.mjs). Evidence: `src/pantry/invoices.ts`, `src/pantry/discounts.ts`, `src/pantry/early-payment.ts`, `src/pantry/early-payment-table.ts`, `src/pantry/payables.ts`, `src/pantry/stripe.ts`, `src/pantry/automatch.ts`, `src/pantry/customer-page.ts`, `src/pantry/invoice-documents.ts`, `src/pantry/sales-tax.ts`, `src/pantry/basis.ts`, `src/pantry/recurring.ts`, `tests/api/invoices-out.test.mjs`
 **Gap.** None.
 
 #### INVOICE-014 — Early-payment eligibility through collection doors
@@ -922,7 +922,7 @@ Core · target · **done** · From INVOICE-010 · Rules D-1, D-2, D-4, D-5, D-7,
 2. A New York invoice of $350 plus $28 at 10% paid $343.00 on day 8 posts a $35.00 credit with no tax line, the report keeping $350.00 and $28.00 with $35.00 under tax kept.
 3. An invoice dated before the report's range is flagged as an earlier-period sale, nexus sales are unchanged, and a treatment change sends a recurring template's next invoice to draft.
 
-**Evidence.** `src/pantry/invoices.ts`, `src/pantry/discounts.ts`, `src/pantry/early-payment.ts`, `src/pantry/early-payment-table.ts`, `src/pantry/payables.ts`, `src/pantry/stripe.ts`, `src/pantry/automatch.ts`, `src/pantry/customer-page.ts`, `src/pantry/invoice-documents.ts`, `src/pantry/sales-tax.ts`, `src/pantry/basis.ts`, `src/pantry/recurring.ts`, `tests/api/invoices-out.test.mjs`
+**Evidence.** Covering journeys: “INVOICE-012 / INVOICE-013 / INVOICE-014 / INVOICE-015 / INVOICE-016 early-payment terms (with SALESTAX-001/002/004, INVOICE-001 / INVOICE-003 / INVOICE-005, PAY-001/002/004) and REPORT-005: per-code treatment, the offer approved with the invoice, an all-or-nothing linked discount credit in the window, reversal, Stripe and PAY-004, sales-tax columns and refusals” (tests/api/invoices-out.test.mjs). Evidence: `src/pantry/invoices.ts`, `src/pantry/discounts.ts`, `src/pantry/early-payment.ts`, `src/pantry/early-payment-table.ts`, `src/pantry/payables.ts`, `src/pantry/stripe.ts`, `src/pantry/automatch.ts`, `src/pantry/customer-page.ts`, `src/pantry/invoice-documents.ts`, `src/pantry/sales-tax.ts`, `src/pantry/basis.ts`, `src/pantry/recurring.ts`, `tests/api/invoices-out.test.mjs`
 **Gap.** None.
 
 #### INVOICE-016 — Early-payment validation and authority
@@ -998,7 +998,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 3. See the next American Express feed line for that amount offered as the bill payment and matched with no second posting.
 4. See the vendor's 1099 total unchanged, and the card paid from checking recorded as a transfer.
 
-**Evidence.** `src/pantry/payables.ts`, `src/pantry/vendor-credits.ts`, `src/pantry/recorded-payments.ts`, `src/pantry/contractors.ts`, `src/ui/sales.tsx`, `tests/api/bank.test.mjs`
+**Evidence.** Covering journeys: “BILL-003 bills paid by credit card or line of credit” (tests/api/bank.test.mjs). Evidence: `src/pantry/payables.ts`, `src/pantry/vendor-credits.ts`, `src/pantry/recorded-payments.ts`, `src/pantry/contractors.ts`, `src/ui/sales.tsx`, `tests/api/bank.test.mjs`
 **Gap.** None.
 
 #### BILLPAY-001 — Pay bills through a provider
@@ -1173,7 +1173,7 @@ Core · target · **done**
 1. Store a resale certificate for one state, invoice that customer in that state and in another, and see exemption cited only in the covered state.
 2. Let it expire and see exempt treatment stop.
 
-**Evidence.** `src/pantry/exemptions.ts`, `src/pantry/exemption-reminders.ts`, `src/ui/exemption-certificates.tsx`, `tests/api/subledgers.test.mjs`
+**Evidence.** Covering journeys: “SALESTAX-003 certificates exempt only covered destinations, remind before expiry, stop stale approval and issue, and retain issued evidence” (tests/api/subledgers.test.mjs). Evidence: `src/pantry/exemptions.ts`, `src/pantry/exemption-reminders.ts`, `src/ui/exemption-certificates.tsx`, `tests/api/subledgers.test.mjs`
 **Gap.** None.
 
 #### SALESTAX-004 — Economic nexus watch
@@ -1281,7 +1281,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 1. Issue a $1,000 October invoice across two income accounts, half paid in November, and an October bill paid in October.
 2. See the October cash P&L exclude the invoice, November's include half split across both accounts, the balance sheet without receivables, the basis label on the PDF, and a bridge from accrual to cash net income that ties.
 
-**Evidence.** `src/pantry/basis.ts`, `src/pantry/integrations/routes.ts`, `tests/api/integrations.test.mjs`, `src/pantry/contact-totals.ts`, `src/pantry/report-export.ts`, `src/pantry/report-pdf.ts`, `src/pantry/package-files.ts`, `tests/api/reports.test.mjs`, `tests/app/app.test.mjs`
+**Evidence.** Covering journeys: “REPORT-007 / REPORT-002 cash or accrual: one switch reads the same books both ways, partial payments split across lines and tax” (tests/api/reports.test.mjs). Evidence: `src/pantry/basis.ts`, `src/pantry/integrations/routes.ts`, `tests/api/integrations.test.mjs`, `src/pantry/contact-totals.ts`, `src/pantry/report-export.ts`, `src/pantry/report-pdf.ts`, `src/pantry/package-files.ts`, `tests/api/reports.test.mjs`, `tests/app/app.test.mjs`
 **Gap.** None.
 
 #### REPORT-003 — Statement of cash flows
@@ -1409,7 +1409,7 @@ Core · target · **done**
 1. Copy last year's actuals plus 5% into a budget, change one month, and run budget versus actual for a quarter.
 2. See the budget, the actual and the variances tie, and see an imported Easel plan load as a second budget.
 
-**Evidence.** `src/pantry/budgets/commands.ts`, `src/pantry/budgets/report.ts`, `src/ui/budgets.tsx`, `tests/api/reports.test.mjs`, `tests/app/budgets.test.mjs`
+**Evidence.** Covering journeys: “BUDGET-001 annual account/month plans copy posted actuals plus 5%, edit a month, import CSV and mapped Easel plans, and tie quarterly variances on both bases” (tests/api/reports.test.mjs). Evidence: `src/pantry/budgets/commands.ts`, `src/pantry/budgets/report.ts`, `src/ui/budgets.tsx`, `tests/api/reports.test.mjs`, `tests/app/budgets.test.mjs`
 **Gap.** None.
 
 #### CASH-001 — Cash planner
@@ -1455,7 +1455,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 3. Lock a month and see that month's run wait in the exception queue.
 4. Create a daily schedule and every-two-weeks schedule, and see each post once on its inclusive anchored dates; prove a 13-week draft schedule and daily catch-up beyond twelve dates stays visibly missed until the next trigger.
 
-**Evidence.** `src/pantry/recurring-journals.ts`, `src/pantry/recurring-journal-runs.ts`, `src/ui/recurring-journals.tsx`, `tests/api/close.test.mjs`, `tests/app/recurring-journals.test.mjs`
+**Evidence.** Covering journeys: “CLOSE-001 recurring journals post three approved months once, edits wait for approval, and locked dates remain actionable exceptions” (tests/api/close.test.mjs); “CLOSE-001 draft schedules preserve month anchors and failed preparation waits for an explicit retry without granting posting authority” (tests/api/close.test.mjs). Evidence: `src/pantry/recurring-journals.ts`, `src/pantry/recurring-journal-runs.ts`, `src/ui/recurring-journals.tsx`, `tests/api/close.test.mjs`, `tests/app/recurring-journals.test.mjs`
 **Gap.** None.
 
 #### CLOSE-002 — Prepaid, accrual and deferred-revenue schedules
@@ -1498,7 +1498,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 4. See a $410 bill flagged and bills of $135 and $350 not flagged, and see a vendor with three earlier bills never assessed.
 5. Run 12 months of seeded routine activity for 30 vendors and see no unusual-amount or duplicate flags.
 
-**Evidence.** `src/pantry/continuous/run.ts`, `src/pantry/continuous/ledger-rules.ts`, `src/pantry/continuous/payable-rules.ts`, `src/pantry/continuous/provider-rules.ts`, `src/pantry/continuous/settings.ts`, `src/pantry/due.ts`, `migrations/core/0065_continuous_checks.sql`, `src/ui/continuous-checks.tsx`, `tests/api/close-checks.test.mjs`, `tests/api/connected.test.mjs`
+**Evidence.** Covering journeys: “CLOSE-004 each check flags its seeded case the next day, citing its lines, rule and setting; a dismissal holds until the lines change; the owner changes defaults” (tests/api/close-checks.test.mjs); “PROC-003 / CLOSE-004 omitted refund remains a named dashboard and close exception until event sync is repaired, without a balancing adjustment” (tests/api/connected.test.mjs); “REPORT-005 / CLOSE-005 / CLOSE-004 / PAYROLL-001 a Gusto payroll posts as one balanced entry (wages, employer taxes, withholdings, net pay) matched to its bank debits, once” (tests/api/connected.test.mjs); “CLOSE-004 twelve months of routine activity for 30 vendors raises no unusual-amount or duplicate flag, and a real outlier among them is still caught” (tests/api/close-checks.test.mjs). Evidence: `src/pantry/continuous/run.ts`, `src/pantry/continuous/ledger-rules.ts`, `src/pantry/continuous/payable-rules.ts`, `src/pantry/continuous/provider-rules.ts`, `src/pantry/continuous/settings.ts`, `src/pantry/due.ts`, `migrations/core/0065_continuous_checks.sql`, `src/ui/continuous-checks.tsx`, `tests/api/close-checks.test.mjs`, `tests/api/connected.test.mjs`
 **Gap.** None.
 
 #### ASSET-001 — Fixed assets and depreciation
@@ -1512,7 +1512,7 @@ Core · target · **done** · Rules D-1, D-2, D-4, D-5, D-7, D-8
 2. Dispose of the asset with $4,000 proceeds and see the gain or loss.
 3. Record the accountant's Section 179 election and see it in the tax package with the ledger unchanged.
 
-**Evidence.** `src/pantry/assets/index.ts`, `migrations/core/0101_asset_disposal_approval.sql`, `src/ui/assets.tsx`, `tests/api/assets.test.mjs`, `tests/app/app.test.mjs`, `tests/restore/restore.test.mjs`
+**Evidence.** Covering journeys: “ASSET-001 reviewed source cost depreciates through approved recurring journals, disposal posts only through approval and tax elections do not post” (tests/api/assets.test.mjs). Evidence: `src/pantry/assets/index.ts`, `migrations/core/0101_asset_disposal_approval.sql`, `src/ui/assets.tsx`, `tests/api/assets.test.mjs`, `tests/app/app.test.mjs`, `tests/restore/restore.test.mjs`
 **Gap.** None.
 
 #### CLOSE-005 — Year-end
@@ -1677,7 +1677,7 @@ Core · target · **done** · From API-001 · Cites BASE-OPS-003, BASE-OPS-004 �
 1. With a token scoped to invoices, create and read invoices, be refused on journals, and retry a create with the same idempotency key to get one invoice.
 2. INVOICE-012 discounts, delivery charges, deposits and early-payment terms behave, and are refused, the same through the API.
 
-**Evidence.** `tests/api/integrations.test.mjs`, `tests/restore/restore.test.mjs`, `tests/api/connected.test.mjs`, `tests/app/app.test.mjs`, `API.md`, `docs/integrations.md`, `tests/api/receipts.test.mjs`
+**Evidence.** Covering journeys: “API-001 OpenAPI discovery describes the implemented v1 doors and invoice-only credentials create, read, page and replay without journal access” (tests/api/integrations.test.mjs); “API-001 / INVOICE-010 / INVOICE-012 / INVOICE-013 / INVOICE-014 / INVOICE-016 scoped issuance counts the deposit toward the frozen early-payment offer and settles once like native invoices” (tests/api/integrations.test.mjs); “API-001 / INVOICE-010 / INVOICE-012 / INVOICE-013 / INVOICE-014 / INVOICE-016 scoped discount, delivery, deposit and early-term refusals match native doors without reserving failed keys” (tests/api/integrations.test.mjs). Evidence: `tests/api/integrations.test.mjs`, `tests/restore/restore.test.mjs`, `tests/api/connected.test.mjs`, `tests/app/app.test.mjs`, `API.md`, `docs/integrations.md`, `tests/api/receipts.test.mjs`
 **Gap.** None.
 
 #### API-EGRESS-001 — Webhook egress pinned to the checked address
