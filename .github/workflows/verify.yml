@@ -227,6 +227,11 @@ jobs:
 
   # Backup and restore as the docs give them, through rer on fresh clones.
   restore:
+    name: restore (${{ matrix.partition }})
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [restore, erasure]
     needs: plan
     if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-24.04
@@ -253,7 +258,9 @@ jobs:
             timeout 420 pnpm exec playwright install-deps chromium
             node scripts/ci/chromium-probe.mjs
           }
-      - run: pnpm run test:restore
+      # Each partition owns its fresh installations; together they retain every
+      # backup, restore, start-over, occupied-target and erasure assertion.
+      - run: node --test tests/restore/${{ matrix.partition }}.test.mjs
 
   # Preserve the required check name and require all work unless the plan reuses a green push.
   verify:
