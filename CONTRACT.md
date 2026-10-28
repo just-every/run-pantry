@@ -1812,23 +1812,23 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.pan.agent_preparation_15` | Agent preparation | PAN-15 | standard or commitment or sensitive | No MCP tool |
 
-| `pantry.pan.move_in_from_quickbooks_16` | Move in from QuickBooks Online or Xero exports | PAN-16 | standard or commitment or sensitive | No MCP tool |
+| `pantry.pan.move_in_from_quickbooks_16` | Move in from QuickBooks Online or Xero exports | PAN-16 | standard or external or gated or security or sensitive | No MCP tool |
 
-| `pantry.pan.receipts_caught_read_and_17` | Receipts caught, read and attached | PAN-17 | standard or commitment or sensitive | No MCP tool |
+| `pantry.pan.receipts_caught_read_and_17` | Receipts caught, read and attached | PAN-17 | standard or external or sensitive or commitment | No MCP tool |
 
 | `pantry.pan.pantry_asks_about_what_18` | Pantry asks about what doesn't add up | PAN-18 | standard or commitment or sensitive | No MCP tool |
 
-| `pantry.pan.stripe_payouts_book_themselves_19` | Stripe payouts book themselves | PAN-19 | standard or commitment or sensitive | No MCP tool |
+| `pantry.pan.stripe_payouts_book_themselves_19` | Stripe payouts book themselves | PAN-19 | standard or external or security or sensitive or commitment | No MCP tool |
 
-| `pantry.pan.gusto_payroll_books_itself_20` | Gusto payroll books itself | PAN-20 | standard or commitment or sensitive | No MCP tool |
+| `pantry.pan.gusto_payroll_books_itself_20` | Gusto payroll books itself | PAN-20 | standard or external or gated or security or sensitive or commitment | No MCP tool |
 
-| `pantry.bank.live_bank_and_credit_001` | Live bank and credit-card connections | BANK-001 | standard or sensitive | No MCP tool |
+| `pantry.bank.live_bank_and_credit_001` | Live bank and credit-card connections | BANK-001 | standard or external or accounts or gated or security or sensitive | No MCP tool |
 
 | `pantry.bank.historical_backfill_without_duplicates_002` | Historical backfill without duplicates | BANK-002 | standard or sensitive | No MCP tool |
 
 | `pantry.bank.continuous_sync_of_pending_003` | Continuous sync of pending and posted lines | BANK-003 | standard or sensitive | No MCP tool |
 
-| `pantry.bank.connection_health_and_re_004` | Connection health and re-linking | BANK-004 | standard or sensitive | No MCP tool |
+| `pantry.bank.connection_health_and_re_004` | Connection health and re-linking | BANK-004 | standard or external or gated or security or sensitive | No MCP tool |
 
 | `pantry.bank.reconciliation_from_feeds_and_005` | Reconciliation from feeds and statements | BANK-005 | standard or sensitive | No MCP tool |
 
@@ -1844,21 +1844,21 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.rule.transfers_and_card_payments_004` | Transfers and card payments recognized | RULE-004 | standard or commitment | No MCP tool |
 
-| `pantry.capture.capture_by_photo_upload_001` | Capture by photo, upload and drag-and-drop | CAPTURE-001 | standard or sensitive or commitment | No MCP tool |
+| `pantry.capture.capture_by_photo_upload_001` | Capture by photo, upload and drag-and-drop | CAPTURE-001 | standard or external or sensitive or commitment | No MCP tool |
 
-| `pantry.capture.forwarding_email_address_002` | Forwarding email address | CAPTURE-002 | standard or sensitive or commitment | No MCP tool |
+| `pantry.capture.forwarding_email_address_002` | Forwarding email address | CAPTURE-002 | standard or external or sensitive or commitment | No MCP tool |
 
-| `pantry.capture.reading_receipts_and_bills_003` | Reading receipts and bills | CAPTURE-003 | standard or sensitive or commitment | No MCP tool |
+| `pantry.capture.reading_receipts_and_bills_003` | Reading receipts and bills | CAPTURE-003 | standard or external or sensitive or commitment | No MCP tool |
 
-| `pantry.capture.receipts_matched_to_transactions_004` | Receipts matched to transactions | CAPTURE-004 | standard or sensitive or commitment | No MCP tool |
+| `pantry.capture.receipts_matched_to_transactions_004` | Receipts matched to transactions | CAPTURE-004 | standard or external or sensitive or commitment | No MCP tool |
 
-| `pantry.capture.duplicate_documents_caught_005` | Duplicate documents caught | CAPTURE-005 | standard or sensitive or commitment | No MCP tool |
+| `pantry.capture.duplicate_documents_caught_005` | Duplicate documents caught | CAPTURE-005 | standard or external or sensitive or commitment | No MCP tool |
 
-| `pantry.capture.vendor_matching_and_creation_006` | Vendor matching and creation | CAPTURE-006 | standard or sensitive or commitment | No MCP tool |
+| `pantry.capture.vendor_matching_and_creation_006` | Vendor matching and creation | CAPTURE-006 | standard or external or sensitive or commitment | No MCP tool |
 
-| `pantry.capture.bills_and_expenses_drafted_007` | Bills and expenses drafted from documents | CAPTURE-007 | standard or sensitive or commitment | No MCP tool |
+| `pantry.capture.bills_and_expenses_drafted_007` | Bills and expenses drafted from documents | CAPTURE-007 | standard or external or sensitive or commitment | No MCP tool |
 
-| `pantry.capture.missing_receipts_chased_008` | Missing receipts chased | CAPTURE-008 | standard or sensitive or commitment | No MCP tool |
+| `pantry.capture.missing_receipts_chased_008` | Missing receipts chased | CAPTURE-008 | standard or external or sensitive or commitment | No MCP tool |
 
 | `pantry.item.products_and_services_list_001` | Products and services list | ITEM-001 | standard or money | No MCP tool |
 
@@ -1876,7 +1876,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.pay.payments_from_outside_stripe_004` | Payments from outside Stripe applied for you | PAY-004 | money or external or sensitive or gated | No MCP tool |
 
-| `pantry.pay.saved_payment_methods_and_005` | Saved payment methods and autopay | PAY-005 | money or external or sensitive or gated | No MCP tool |
+| `pantry.pay.saved_payment_methods_and_005` | Saved payment methods and autopay | PAY-005 | money or external or sensitive or gated or commitment | No MCP tool |
 
 | `pantry.invoice.reminders_that_stop_once_004` | Reminders that stop once paid | INVOICE-004 | standard or external or money or commitment | No MCP tool |
 
@@ -1936,13 +1936,13 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.payroll.payroll_liabilities_reconciled_002` | Payroll liabilities reconciled | PAYROLL-002 | standard or money or sensitive | No MCP tool |
 
-| `pantry.salestax.sales_tax_rates_by_001` | Sales tax rates by address | SALESTAX-001 | standard or commitment or external | No MCP tool |
+| `pantry.salestax.sales_tax_rates_by_001` | Sales tax rates by address | SALESTAX-001 | standard or money or commitment or external | No MCP tool |
 
-| `pantry.salestax.liability_by_state_and_002` | Liability by state and filing | SALESTAX-002 | standard or commitment or external | No MCP tool |
+| `pantry.salestax.liability_by_state_and_002` | Liability by state and filing | SALESTAX-002 | standard or money or commitment or external | No MCP tool |
 
-| `pantry.salestax.exemption_certificates_003` | Exemption certificates | SALESTAX-003 | standard or commitment or external | No MCP tool |
+| `pantry.salestax.exemption_certificates_003` | Exemption certificates | SALESTAX-003 | standard or money or commitment or external | No MCP tool |
 
-| `pantry.salestax.economic_nexus_watch_004` | Economic nexus watch | SALESTAX-004 | standard or commitment or external | No MCP tool |
+| `pantry.salestax.economic_nexus_watch_004` | Economic nexus watch | SALESTAX-004 | standard or money or commitment or external | No MCP tool |
 
 | `pantry.taxform.w_9_collection_001` | W-9 collection | TAXFORM-001 | standard or external or sensitive or commitment | No MCP tool |
 
@@ -1972,7 +1972,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.dim.classes_locations_and_projects_001` | Classes, locations and projects | DIM-001 | standard | No MCP tool |
 
-| `pantry.budget.budgets_and_budget_versus_001` | Budgets and budget versus actual | BUDGET-001 | standard or money | No MCP tool |
+| `pantry.budget.budgets_and_budget_versus_001` | Budgets and budget versus actual | BUDGET-001 | standard or external | No MCP tool |
 
 | `pantry.cash.cash_planner_001` | Cash planner | CASH-001 | standard or sensitive | No MCP tool |
 
@@ -2080,7 +2080,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.agent.tax_readiness_all_year_009` | Tax readiness all year | AGENT-009 | standard or external or money or commitment or sensitive | No MCP tool |
 
-| `pantry.agent.agent_governance_010` | Agent governance | AGENT-010 | standard or external or money or commitment or sensitive | No MCP tool |
+| `pantry.agent.agent_governance_010` | Agent governance | AGENT-010 | standard or external or access or security or sensitive | No MCP tool |
 
 | `pantry.agent.tax_readiness_reminders_by_011` | Tax-readiness reminders by email and calendar | AGENT-011 | standard or external or money or commitment or sensitive | No MCP tool |
 

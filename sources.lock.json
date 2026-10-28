@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "4042513afaa5cd11b1e2e25311937438fd5642385c604348b7b98f76ff5c4778",
+      "sha256": "0bdb9d3de1298c27554b037594915f70ab1d464d19cd7c10890b05aa78b48985",
       "executable": false
     },
     "DEMO.md": {
@@ -1223,7 +1223,7 @@
       "executable": false
     },
     "RULINGS.md": {
-      "sha256": "d3247fbb506e354b9a5d644a627f0f9872aa4fdac8865ed8eff13e2b58bc060e",
+      "sha256": "1c52ba8e662d5ab0d6f9a7ea49ce576ef77bc2c72f922dbca3a5b509800e4c8a",
       "executable": false
     },
     "RUN-LOCALLY.md": {

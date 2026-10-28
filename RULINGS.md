@@ -52,7 +52,7 @@ Search does not index or count content its reader cannot see and erasure removes
 
 **Placement:** Keep this bounded filing rule and accuracy statement once in AGENT-001's own point; cite Base current-role/attribution/policy and existing open-period undo duties rather than copying them.
 
-**Current-main evidence:** CONTRACT.md:562 (clause), :824 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
+**Current main evidence:** CONTRACT.md:562 (clause), :824 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
 
 **Engineering/proof boundary:** History/document/payment/captured-bill families, wider changed-source/owner/feed and restored-authority proof stay owed. Consent to this slice grants no other automatic action or outbound send.
 
@@ -74,7 +74,7 @@ Search does not index or count content its reader cannot see and erasure removes
 
 **Placement:** State learning provenance/revocation in AGENT-006's own point and cite CLOSE-002's source-funded, dated, revision-bound independent posting door once.
 
-**Current-main evidence:** CONTRACT.md:572 (clause), :829 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
+**Current main evidence:** CONTRACT.md:572 (clause), :829 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
 
 **Engineering/proof boundary:** Rule/accrual learning, future preparation and complete back-test/source-change/authority permutations remain unproved. Broader company-policy agent disposition follows Base; this ruling extends no posting authority.
 
@@ -96,7 +96,7 @@ Search does not index or count content its reader cannot see and erasure removes
 
 **Placement:** Put promise/dispute/stop and exact-send fencing once in AGENT-008's own point, citing INVOICE-004 frequency and ERASURE-001 financial-copy controls; future tool disposition remains company policy.
 
-**Current-main evidence:** CONTRACT.md:576 (clause), :831 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
+**Current main evidence:** CONTRACT.md:576 (clause), :831 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
 
 **Engineering/proof boundary:** Live provider receipt, real inbound replies, payment-plan/write-off proposals and policy-governed recurring collection work remain gaps. No legal collection approval or status promotion.
 
@@ -118,7 +118,7 @@ Search does not index or count content its reader cannot see and erasure removes
 
 **Placement:** Use one tax-message batch door rule owned by TAXFORM-004 and cited by AGENT-011; TAXFORM-003 owns private link custody, ERASURE-001 owns deletion/cancellation, and AGENT-009 keeps accountant/solo-owner deadline-setting authority.
 
-**Current-main evidence:** CONTRACT.md:606 (clause), :834 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
+**Current main evidence:** CONTRACT.md:606 (clause), :834 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
 
 **Engineering/proof boundary:** AGENT-011 current mail goes only to the opted-in owner; vendor W-9 audiences belong to TAXFORM-004. ICS is a download, not connected Google/Microsoft calendar delivery. Provider receipt and unbuilt connections remain owed; no tax filing or legal certification.
 
@@ -141,7 +141,7 @@ Search does not index or count content its reader cannot see and erasure removes
 
 **Placement:** State shared-original audience/provenance once in CAPTURE-001's own point; cite ERASURE-001's supporting-record expiry/recompute and archive fences rather than creating a second retention schedule.
 
-**Current-main evidence:** CONTRACT.md:116 (clause), :722 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
+**Current main evidence:** CONTRACT.md:116 (clause), :722 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
 
 **Engineering/proof boundary:** The reported capture proof is not independently re-run here. Any missing mixed-audience refusal or original-retention proof remains owed; owner period is configuration, not legal sign-off.
 
@@ -164,7 +164,7 @@ Search does not index or count content its reader cannot see and erasure removes
 
 **Placement:** Keep attested worksheet provenance once in CURRENCY-001's own point; cite existing accountant role and period/posting approval duties. 'Unrestricted accountant' means the current authorized business role, never cross-business access.
 
-**Current-main evidence:** CONTRACT.md:320 (clause), :782 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
+**Current main evidence:** CONTRACT.md:320 (clause), :782 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
 
 **Engineering/proof boundary:** Foreign billing/currency records, provider rates, realized posting, approved reversing revaluation, reports and archive/scoped API remain required and unproved.
 
@@ -186,7 +186,7 @@ Search does not index or count content its reader cannot see and erasure removes
 
 **Placement:** Keep consent/quiet-hours/attempt fencing once in INVOICE-011's SMS door rule, with CONNECT-001 sender registration and ERASURE-001/restore references; MOBILE-002 cites the personal-phone handoff.
 
-**Current-main evidence:** CONTRACT.md:190 (clause), :745 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
+**Current main evidence:** CONTRACT.md:190 (clause), :745 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
 
 **Engineering/proof boundary:** TEST-only provider outcomes prove no carrier delivery. Production registration, sales receipt door, native phone control and actual outcome callbacks remain owed. Delegated future roles cannot be silently removed by the current owner-only slice.
 
@@ -208,6 +208,6 @@ Search does not index or count content its reader cannot see and erasure removes
 
 **Placement:** State mandate/revocation/uncertainty once in PAY-005's payment door rule; cite INVOICE-009 permitted methods, INVOICE-004 mail stops and ERASURE-001 restore controls. Keep the original discount/projection receiving duties.
 
-**Current-main evidence:** CONTRACT.md:160 (clause), :738 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
+**Current main evidence:** CONTRACT.md:160 (clause), :738 (Status row); `11c362664cd643dbeaf09f8b3df1f3b628e319b1`.
 
 **Engineering/proof boundary:** Held TEST ACH/due-date proof does not prove complete live card-return, three-decline retry and post-revocation journeys. Provider delivery callbacks remain INVOICE-002/CONNECT-005; owner-recorded outcomes are not verified callbacks. No live spend is authorized.
