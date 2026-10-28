@@ -61,6 +61,9 @@ export async function webhookJourney(t) {
       await shot('reloaded')
       await card.getByRole('button', { name: 'Rotate secret', exact: true }).click()
       await secret.waitFor()
+      // Rotation's secret arrives before the subscription reload finishes. Wait
+      // for the action to settle so Edit uses the refreshed revision.
+      await card.getByRole('button', { name: 'Rotate secret', exact: true }).waitFor()
       await shot('rotated')
       await card.getByRole('button', { name: 'Edit webhook', exact: true }).click()
       await card.getByRole('heading', { name: 'Edit webhook · receiver.example.test', exact: true }).waitFor()

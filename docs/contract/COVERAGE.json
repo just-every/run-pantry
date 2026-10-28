@@ -2,7 +2,7 @@
   "schema": 1,
   "seed": "pantry",
   "old": {
-    "commit": "698012f06a1f21d7a16cdd72213eee411a1d996c",
+    "commit": "ecda5cd652d8d499b39d39e4749ae7ca62fe36e1",
     "files": [
       "CONTRACT.md",
       "ACCEPTANCE.md",
@@ -483,6 +483,12 @@
       "ids": [
         "PAN-19",
         "PAN-20"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-mechanisms.md"
+        }
       ]
     },
     {
@@ -936,6 +942,12 @@
       "ids": [
         "INVOICE-006",
         "INVOICE-017"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-mechanisms.md"
+        }
       ]
     },
     {

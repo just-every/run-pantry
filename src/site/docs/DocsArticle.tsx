@@ -20,7 +20,7 @@ export function DocsArticle({ slug }: { slug: string }) {
       <DocsSidebar current={slug} />
       <main id="main" className="docs-main">
         <DocsMenu current={slug} />
-        <article aria-labelledby="docs-title">
+        <article aria-labelledby="docs-title" className={slug === 'getting-started' ? 'docs-getting-started' : undefined}>
           <header className="docs-page-head">
             <p className="eyebrow-docs">{page.section}</p>
             <h1 id="docs-title">{page.title}</h1>

@@ -1,32 +1,30 @@
+Copy this line into your terminal, then press Enter:
+
+```sh
+{{run.start}}
+```
+
+{{run.requirements}}
+
+It installs `rer`, the Run Edit Run command, gets Pantry into a `run-pantry` folder and starts it. Allow a few minutes for the first start.
+
+Already have Node 22 or later? This alternative starts the same Pantry:
+
+```sh
+{{run.alternative}}
+```
+
 Pantry runs on your own computer. This copy is free and MIT licensed. Its books stay on this computer; it sends no email, and your accountant cannot sign in from another computer. To share it online, read [Put Pantry online](/docs/hosting).
 
 ## Before you start
 
 Use a Mac, Linux computer, or Windows with [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) installed. On a Mac, open **Terminal** from Applications → Utilities. On Linux, open your terminal app. On Windows, open your installed WSL distribution, such as Ubuntu.
 
-Check that Git is installed by typing `git --version` and pressing Enter. If it reports that the command is missing, follow [Git's installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) for your system, then reopen the terminal. Choose a folder in which to keep your books; the command below creates a `run-pantry` folder there.
+Check that Git is installed by typing `git --version` and pressing Enter. If it reports that the command is missing, follow [Git's installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) for your system, then reopen the terminal. Choose a folder in which to keep your books; the launch command creates a `run-pantry` folder there.
 
 Allow several minutes for the first start to download and build everything. The time depends on your computer and connection; progress appears in the terminal. Later starts reuse the installation.
 
-## Get Pantry and start it
-
-Copy this line into the terminal, then press Enter:
-
-```sh
-curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-pantry
-```
-
-It installs `rer`, the Run Edit Run command, and starts Pantry. Git is required; the installer brings Node when needed, and rer brings pnpm. If the installer prints a command for future terminal windows, run it so `rer` stays available when you start again.
-
-Already have Node 22 or later? This alternative starts the same Pantry:
-
-```sh
-npx -y @runeditrun/rer dev just-every/run-pantry
-```
-
-`rer` gets Pantry into a `run-pantry` folder. To start it again later, run `cd run-pantry && rer dev`.
-
-This copy runs only on your computer, so invoices can't be emailed and your accountant can't sign in until it is online. [Put Pantry online](/docs/hosting), or [let Run Edit Run host it](https://runeditrun.com).
+## What happens next
 
 When it is ready, the terminal prints:
 

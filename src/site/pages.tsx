@@ -4,22 +4,28 @@
 import type { ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { contractPageHtml } from '../base/contract-page'
-import { siteNotFoundHtml, type RunData, type SiteBuild, type SiteContext } from '../base/run-site'
+import { hostingPageHtml } from '../base/hosting-page'
+import { runPageHtml, siteNotFoundHtml, type RunData, type SiteBuild, type SiteContext } from '../base/run-site'
 import { identity } from '../identity'
 import { DocsArticle } from './docs/DocsArticle'
 import { DocsIndex } from './docs/DocsIndex'
 import { docsHead, docsPages } from './docs/pages'
 import { Landing } from './landing/Landing'
 import run from './run.json'
-import { RunPage } from './RunPage'
+import { runPricing } from '../base/run-pricing'
+import { SiteHeader } from './shell/SiteHeader'
 
 // Code cards get their Copy button only when script runs; without it the command is still there to select.
 const COPY = "document.querySelectorAll('.docs-copy').forEach(b=>{b.hidden=false;b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(b.closest('.docs-code').querySelector('code').textContent);b.textContent='Copied';setTimeout(()=>{b.textContent='Copy'},1600)}catch{}})})"
 
 const SHARE_IMAGE = `${identity.runSite}/site/share.jpg`
 
-export function sitePages({ styles, contract }: SiteContext): SiteBuild {
-  const data: RunData = run
+// Pantry’s header skips to this target on Base-rendered pages too.
+const withMainTarget = (html: string) => html.replace('<main>', '<main id="main">')
+
+export function sitePages({ styles, contract, hosting }: SiteContext): SiteBuild {
+  const data: RunData = { ...run, pricing: runPricing }
+  const homepageHeader = { html: renderToStaticMarkup(<SiteHeader />), styles }
   const document = (title: string, description: string, body: ReactElement, script = '') => '<!doctype html>' + renderToStaticMarkup(
     <html lang="en">
       <head>
@@ -52,10 +58,11 @@ export function sitePages({ styles, contract }: SiteContext): SiteBuild {
   return {
     pages: [
       { path: '/', html: document('Pantry — Know where every dollar went', identity.tagline, <Landing />) },
-      { path: '/run', html: document('Run Pantry', 'Get Pantry running on your own computer.', <RunPage />, COPY) },
+      { path: '/run', html: withMainTarget(runPageHtml(identity, data, contract, homepageHeader)) },
       ...(contract ? [{ path: '/contract', html: contractPageHtml(identity, data, contract) }] : []),
       { path: '/docs', html: document(...head(), <DocsIndex />) },
-      ...docsPages.map(page => ({ path: `/docs/${page.slug}`, html: document(...head(page.slug), <DocsArticle slug={page.slug} />, COPY) })),
+      { path: '/docs/hosting', html: withMainTarget(hostingPageHtml(identity, data, hosting ?? null, contract, homepageHeader)) },
+      ...docsPages.filter(page => page.slug !== 'hosting').map(page => ({ path: `/docs/${page.slug}`, html: document(...head(page.slug), <DocsArticle slug={page.slug} />, COPY) })),
       { path: '/404', html: siteNotFoundHtml(identity, data) },
     ],
     assets: ['rer-theme.css', 'fonts', 'brand', 'site', 'favicon.ico', 'apple-touch-icon.png'],

@@ -1217,7 +1217,7 @@ Native report-backed questions use an explicit month or quarter and basis; the c
 
 ct-approved 25 Oct: owner or accountant reads readiness and packages. The accountant alone sets deadlines and estimated amounts while an accountant is assigned; otherwise the owner holds that setting authority. Every setting change is audited. Amounts are labelled estimates, never tax advice or a filing. In-app signals only; owner approval of the exact current vendor request generates a TAXFORM-003 link. No automatic outbound message, payment or tax decision. The nominal January 31 signal requires review of weekend, holiday and jurisdiction rules. The package retains fiscal-year reports, readiness and open questions. Email and calendar reminders are the named AGENT-011 gap.
 
-## Legacy acceptance projection — 698012f06a1f21d7a16cdd72213eee411a1d996c
+## Legacy acceptance projection — ecda5cd652d8d499b39d39e4749ae7ca62fe36e1
 
 This is the old acceptance projection, preserved as history. CONTRACT.md is the current acceptance source.
 
