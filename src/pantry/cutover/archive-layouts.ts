@@ -5,7 +5,10 @@ import { archiveBytes, archivePath, archiveZip } from './archive-zip'
 
 export const ARCHIVE_PROVIDERS = ['quickbooks-online', 'xero', 'freshbooks', 'hubdoc', 'dext']
 const MEDIA: Record<string, string> = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', txt: 'text/plain', csv: 'text/csv' }
-const media = (name: string) => MEDIA[name.split('.').at(-1)?.toLowerCase() ?? '']
+const media = (name: string) => {
+  const extension = name.split('.').at(-1)?.toLowerCase() ?? ''
+  return Object.hasOwn(MEDIA, extension) ? MEDIA[extension] : undefined
+}
 const key = (value: string) => value.toLowerCase().replace(/[ _-]/g, '')
 const own = (object: Data, ...names: string[]) => {
   const found = Object.entries(object).filter(([k, value]) => names.some(n => key(n) === key(k)) && value !== '' && value !== undefined && value !== null).map(([, v]) => v)
@@ -33,7 +36,8 @@ function row(value: Data, provider: string): Data {
   const system = own(value, 'sourceSystem', 'source_system') ?? provider
   const transactionId = own(value, 'transactionSourceId', 'transaction_id', 'invoice_id', 'bill_id', 'txn_id') ?? ref?.value
   const rawKind = own(value, 'kind', 'transaction_type', 'record_type', 'type') ?? ref?.type
-  const kind = rawKind ? kinds[String(rawKind).toLowerCase()] : ''
+  const kindName = String(rawKind).toLowerCase()
+  const kind = rawKind ? Object.hasOwn(kinds, kindName) ? kinds[kindName] : undefined : ''
   requireThat(!rawKind || kind, 'Manifest transaction type is unsupported; use an explicit Pantry transaction type')
   return { sourceId: sourceId === undefined ? `zip-entry:${path}` : sourceIdentity(sourceId, 'Document source ID'), name: name.split('/').at(-1), path,
     sourceSystem: text(system, 'Transaction source system', 100), transactionSourceId: transactionId === undefined ? '' : sourceIdentity(transactionId, 'Transaction source ID'), kind,

@@ -36,7 +36,7 @@ const REF_TABLES: Record<string, { table: string; revision: boolean }> = {
 async function citedRefs(db: D1Database, refs: Ref[]) {
   const out: Ref[] = []
   for (const r of refs) {
-    const t = REF_TABLES[r.kind]
+    const t = Object.hasOwn(REF_TABLES, r.kind) ? REF_TABLES[r.kind] : undefined
     requireThat(t, `Unknown cited record kind ${r.kind}`)
     const row = await one(db, `SELECT ${t.revision ? 'revision' : "'' AS revision"} FROM ${t.table} WHERE id = ?`, r.id)
     requireThat(row, `Cited ${r.kind} ${r.id} not found`, 404)
@@ -48,7 +48,8 @@ async function citedRefs(db: D1Database, refs: Ref[]) {
 
 export async function stillCurrent(db: D1Database, refs: Ref[]) {
   for (const r of refs) {
-    const t = REF_TABLES[r.kind]
+    const t = Object.hasOwn(REF_TABLES, r.kind) ? REF_TABLES[r.kind] : undefined
+    if (!t) return false
     const row = await one(db, `SELECT ${t.revision ? 'revision' : "'' AS revision"} FROM ${t.table} WHERE id = ?`, r.id)
     if (!row || (t.revision && row.revision !== r.revision)) return false
   }

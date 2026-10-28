@@ -34,7 +34,8 @@ export function parseQboSnapshot(p: Package): Parsed {
   const add = (kind: string, sourceId: string, build: () => Data) => c.attempt(kind, 'apiSnapshot', ++row, build, () => sourceId)
   const seen = new Set<string>()
   for (const a of s.Account) add('account', text(a.Id, 'Account source ID'), () => {
-    const mapped = TYPES[String(a.AccountType).replace(/\s+/g, '')], name = text(a.FullyQualifiedName ?? a.Name, 'Account name', 200)
+    const type = String(a.AccountType).replace(/\s+/g, '')
+    const mapped = Object.hasOwn(TYPES, type) ? TYPES[type] : undefined, name = text(a.FullyQualifiedName ?? a.Name, 'Account name', 200)
     requireThat(mapped, `Unsupported Intuit account type ${a.AccountType}`)
     requireThat(!accountNames.has(name.toLowerCase()), `Duplicate account name ${name}`)
     const account = { name, code: a.AcctNum ?? '', type: mapped[0], subtype: a.AccountSubType === 'RetainedEarnings' ? 'retained' : a.AccountSubType === 'GlobalTaxPayable' ? 'tax' : mapped[1], detail: a.AccountSubType ?? '', description: a.Description ?? '' }

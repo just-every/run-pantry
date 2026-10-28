@@ -53,8 +53,9 @@ function parse(p: Package): Parsed {
   const accountNames = new Map<string, Account>(), byCode = new Map<string, Account>()
   for (const r of chart.rows) attempt('account', 'accounts', r.row, () => {
     const name = text(r.cells['name'], 'Account name', 200), code = (r.cells['code'] ?? '').trim(), type = (r.cells['type'] ?? '').trim().toLowerCase()
-    const system = SYSTEM[name.toLowerCase()]
-    const mapped = system && system[0] === type ? [XERO_TYPES[type][0], system[1]] : XERO_TYPES[type]
+    const system = Object.hasOwn(SYSTEM, name.toLowerCase()) ? SYSTEM[name.toLowerCase()] : undefined
+    const accountType = Object.hasOwn(XERO_TYPES, type) ? XERO_TYPES[type] : undefined
+    const mapped = accountType && system && system[0] === type ? [accountType[0], system[1]] : accountType
     requireThat(mapped, `Account type "${r.cells['type']}" is not a Xero account type Pantry maps`)
     const a = { name, code, type: mapped[0], subtype: mapped[1], detail: r.cells['type'], description: r.cells['description'] ?? '' }
     accountNames.set(name.toLowerCase(), a)
@@ -97,7 +98,8 @@ function parse(p: Package): Parsed {
       for (const r of d.rows) for (const k of ['contactname', 'invoicedate', 'duedate', 'total', 'invoiceamountdue', 'status', 'type'])
         requireThat((r.cells[k] ?? '') === cell(k), `Row ${r.row} disagrees with row ${d.first.row} of the same ${kind} on ${k}`)
       used[kind === 'invoice' ? 'customer' : 'vendor'].add(d.party.toLowerCase())
-      const status = STATUS[cell('status').toLowerCase()]
+      const statusName = cell('status').toLowerCase()
+      const status = Object.hasOwn(STATUS, statusName) ? STATUS[statusName] : undefined
       requireThat(status, `Status "${cell('status')}" is not a Xero ${kind} status`)
       const day = exportDate(cell('invoicedate'), 'Date'), due = amount(cell('invoiceamountdue'), 'Amount due'), total = amount(cell('total'), 'Total')
       if (/credit/i.test(cell('type'))) {

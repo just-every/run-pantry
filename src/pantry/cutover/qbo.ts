@@ -37,7 +37,8 @@ function parse(p: Package): Parsed {
   const accountNames = new Map<string, Account>()
   for (const r of accounts.rows) attempt('account', 'accounts', r.row, () => {
     const name = text(r.cells['full name'] ?? r.cells['account'], 'Account name', 200)
-    const mapped = ACCOUNT_TYPES[(r.cells['type'] ?? '').toLowerCase()]
+    const type = (r.cells['type'] ?? '').toLowerCase()
+    const mapped = Object.hasOwn(ACCOUNT_TYPES, type) ? ACCOUNT_TYPES[type] : undefined
     requireThat(mapped, `Account type "${r.cells['type']}" is not a QuickBooks Online account type Pantry maps`)
     const detail = r.cells['detail type'] ?? ''
     const subtype = mapped[0] === 'equity' && /retained earnings/i.test(detail) ? 'retained' : mapped[0] === 'liability' && /sales tax payable/i.test(detail) ? 'tax' : mapped[1]

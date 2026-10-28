@@ -416,7 +416,8 @@ api.get('/api/pantry/package/:period/general-ledger.csv', async c => {
 })
 
 api.post('/api/pantry/command/:op', async c => {
-  const command = commands[c.req.param('op')]
+  const op = c.req.param('op')
+  const command = Object.hasOwn(commands, op) ? commands[op] : undefined
   requireThat(command, 'Unknown action', 404)
   const actor: Actor = await person(c.req.raw, c.env)
   must(actor, command.need)

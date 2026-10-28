@@ -19,7 +19,7 @@ export async function budgetFigure(db: D1Database, q: Query) {
   const [accountId, metric] = parseLine(q.line, [2, 2], 'Choose a budget figure')
   const report = await budgetReport(db, q.budget, q.from, q.to, q.basis,q), plan = await budget(db, q.budget)
   const row: Data | undefined = accountId === 'net-income' ? { id: 'net-income', code: '', name: 'Net income', ...report.netIncome } : report.rows.find(r => r.id === accountId)
-  requireThat(row && METRICS[metric], 'Choose a budget figure', 404)
+  requireThat(row && Object.hasOwn(METRICS, metric), 'Choose a budget figure', 404)
   const accounts = new Map<string, Data>((await all(db, "SELECT id, code, name, type FROM pt_accounts WHERE type IN ('income', 'expense')")).map(a => [a.id, a]))
   const net = accountId === 'net-income'
   const label = `${row.code ? `${row.code} · ` : ''}${row.name} · ${METRICS[metric]}${q.dimension?` · ${q.dimension} · ${q.dimensionValue==='unassigned'?'Unassigned':q.dimensionValue?.slice(6)}`:''}`

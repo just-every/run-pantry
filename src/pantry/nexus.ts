@@ -115,7 +115,7 @@ export async function runNexusAlerts(env: Bindings, db: D1Database) {
 const decide: Command = { need: 'record', async run(c, b) {
   requireThat(c.actor.kind === 'person' && c.actor.role === 'accountant', 'Whether to register is the accountant’s decision; an invited accountant records it', 403)
   const state = text(b.state, 'State', 2).toUpperCase(), decision = text(b.decision, 'Decision', 20)
-  requireThat(decision in DECISIONS, `Choose one of: ${Object.values(DECISIONS).join(', ')}`)
+  requireThat(Object.hasOwn(DECISIONS, decision), `Choose one of: ${Object.values(DECISIONS).join(', ')}`)
   const note = text(b.note, 'Reason', 2000)
   const s = (await nexusWatch(c.db)).states.find(x => x.state === state)
   requireThat(s, 'Choose a state on the economic nexus watch', 404)

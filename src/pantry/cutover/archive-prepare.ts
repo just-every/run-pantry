@@ -28,7 +28,7 @@ export async function prepareArchive(c: Context, input: Data) {
     const transactionId = f.transactionSourceId ? text(f.transactionSourceId, 'Transaction source ID', 200) : ''
     requireThat(!f.transactionSourceId || f.transactionSourceId === transactionId, 'Transaction source ID cannot have surrounding whitespace')
     const requestedKind = f.kind ? text(f.kind, 'Transaction type') : '', targetId = f.targetId ? text(f.targetId, 'Pantry transaction ID') : ''
-    requireThat(!requestedKind || ARCHIVE_TABLES[requestedKind], 'Choose a supported transaction type')
+    requireThat(!requestedKind || Object.hasOwn(ARCHIVE_TABLES, requestedKind), 'Choose a supported transaction type')
     const resolution = await archiveSource(c, system, transactionId, requestedKind)
     if (targetId) {
       requireThat(transactionId && requestedKind, 'Confirm an original transaction source ID and record type for this mapping')

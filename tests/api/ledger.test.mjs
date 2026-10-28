@@ -5,6 +5,19 @@ import { at, books, harness } from './harness.mjs'
 test('PAN-01 a business is set up with declared policies and each role is enforced by the server', async t => {
   const h = await harness(); t.after(() => h.close())
   const bea = await h.member('bea@example.test', 'bookkeeper'), vic = await h.member('vic@example.test', 'viewer')
+  // Dispatch accepts registered own names only, even for the owner. Keep
+  // response bodies out of assertion output if a refusal ever leaks bindings.
+  const unknown = await h.send('/api/pantry/command/unregistered-action', {}, { cookie: h.owner })
+  assert.equal(unknown.status, 404)
+  assert.ok(JSON.stringify(unknown.value) === JSON.stringify({ error: 'Unknown action' }), 'Unknown actions return only the public refusal')
+  for (const cookie of [h.owner, bea]) for (const op of ['constructor', '__proto__', 'hasOwnProperty']) {
+    const response = await h.send('/api/pantry/command/' + op, {}, { cookie })
+    assert.equal(response.status, unknown.status, `${op} follows the unknown-action status`)
+    assert.ok(JSON.stringify(response.value) === JSON.stringify(unknown.value), `${op} returns only the unknown-action refusal`)
+  }
+  const registered = await h.send('/api/pantry/command/contact.save', { kind: 'customer', name: 'Registered command customer' }, { cookie: bea })
+  assert.equal(registered.status, 200, 'A registered command still succeeds for a signed-in member')
+  assert.ok(registered.value.name === 'Registered command customer', 'The registered command keeps its normal result')
   await h.command('entity.save', { legalName: 'X', entityType: 'single-member-llc', state: 'NY', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2026-01-01' }, bea, 403)
   await h.command('entity.save', { legalName: 'Juniper Lane Design LLC', entityType: 'single-member-llc', state: 'ZZ', fiscalYearStart: 1, taxMethod: 'cash', booksStart: '2026-01-01' }, h.owner, 400)
   const { acct } = await books(h)

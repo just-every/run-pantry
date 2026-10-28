@@ -22,7 +22,7 @@ export async function salesTaxFigure(db: D1Database, line: string, from: string,
   const base = { ...(dimension?{context:{dimension:dimension.kind,dimensionValue:dimension.id}}:{}), report: 'sales-tax', line, basis, from, to }
   if (selected[0] === 'account') return ledgerFigure(db, r, selected[1], selected[2], base, dimension)
   const [scope, id, metric] = selected.length === 3 ? selected : [selected[0], '', selected[1]]
-  requireThat(METRICS[metric], 'Choose a figure on this sales tax report', 404)
+  requireThat(Object.hasOwn(METRICS, metric), 'Choose a figure on this sales tax report', 404)
   let keys: string[], figure: number, label: string
   if (scope === 'code') { const c = codes.find(x => x.id === id); requireThat(c, 'Choose a tax code on this report', 404); keys = [c.id]; figure = metric in c ? (c as Data)[metric] : (c.early as Data)[metric]; label = `${c.state} · ${c.name}` }
   else if (scope === 'state') { const s = r.states.find(x => x.state === id); requireThat(s, 'Choose a state on this report', 404); keys = s.codes.map(c => c.id); figure = metric in s ? (s as Data)[metric] : (s.early as Data)[metric]; label = id || 'State not set' }
@@ -47,7 +47,7 @@ export async function salesTaxFigure(db: D1Database, line: string, from: string,
 
 async function ledgerFigure(db: D1Database, r: Awaited<ReturnType<typeof salesTax>>, accountId: string, part: string, base: { report: string; line: string; basis: Basis; from: string; to: string }, dimension?: DimensionScope): Promise<Figure> {
   const a = r.ledger.accounts.find(x => x.id === accountId)
-  requireThat(a && PARTS[part], 'Choose a liability account figure', 404)
+  requireThat(a && Object.hasOwn(PARTS, part), 'Choose a liability account figure', 404)
   const label = `${a.code} · ${a.name} · ${PARTS[part]}`
   if (part === 'owed') {
     const codes = r.states.flatMap(s => s.codes).filter(c => c.accountId === accountId)

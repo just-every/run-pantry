@@ -28,7 +28,8 @@ const NAMESPACES = Object.values(SOURCES).map(s => s.namespace)
 
 /** `source` names the kit; QuickBooks Online, the first kit, when a caller sends none. */
 function sourceOf(b: Data) {
-  const s = SOURCES[b.source ?? quickbooks.key]
+  const name = b.source ?? quickbooks.key
+  const s = Object.hasOwn(SOURCES, name) ? SOURCES[name] : undefined
   requireThat(s, 'Choose QuickBooks Online, Xero or Spreadsheet')
   return s
 }

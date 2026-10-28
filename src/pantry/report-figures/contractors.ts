@@ -17,7 +17,7 @@ export async function contractorFigure(db: D1Database, q: { line: string; year?:
   const [vendorId, metric] = parseLine(q.line, [2, 2], 'Choose a 1099 figure')
   const dimension=await dimensionScope(db,q.dimension,q.dimensionValue)
   const vendor = (await vendorYear(db, year, dimension)).find(v => v.id === vendorId)
-  requireThat(vendor && METRICS[metric], 'Choose a 1099 figure', 404)
+  requireThat(vendor && Object.hasOwn(METRICS, metric), 'Choose a 1099 figure', 404)
   const labels = await recordLabels(db), docs = await attachments(db), bank = await bankMatches(db)
   const [name, counts] = METRICS[metric]
   const rows = vendor.payments.filter(counts).map(p => ({ key: p.id, date: p.date, account: null, amount: p.amount, debit: p.amount, credit: 0, description: `${p.method}${p.reference ? ` · ${p.reference}` : ''}`, lineMemo: '', entry: null, settlement: null,

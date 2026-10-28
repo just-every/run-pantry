@@ -53,7 +53,7 @@ const BRIDGE: Record<string, string> = { accrual: 'Net income on the accrual bas
 /** The four bridge figures from accrual to cash net income, each from native rows. */
 export async function bridgeFigure(db: D1Database, q: Query, startMonth: number) {
   const metric = q.line.slice('bridge:'.length)
-  requireThat(BRIDGE[metric] && q.basis === 'cash', 'Choose a figure on the accrual-to-cash bridge', 404)
+  requireThat(Object.hasOwn(BRIDGE, metric) && q.basis === 'cash', 'Choose a figure on the accrual-to-cash bridge', 404)
   const dimension = await dimensionScope(db,q.dimension,q.dimensionValue)
   const b = (await profitAndLoss(db, q.from, q.to, 'cash', dimension) as Data).bridge
   const base = { context:{dimension:q.dimension,dimensionValue:q.dimensionValue}, report: 'profit-and-loss', line: q.line, label: BRIDGE[metric], from: q.from, to: q.to }
