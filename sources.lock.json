@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "8f4592c082d685a3c3d6e955abdc3c8ac6b5bf20d9c1efd48604c00dc4b908ec",
+      "sha256": "bab69cd349865e1dee306a8c7aec88e7773b2a726d91711f18e463e078f49fb1",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "4be345abef43191c9a73d29301dbd92add5341fd5f78096017fa200eaf050dae",
+      "sha256": "faef334a19ad3844548f4d0f79d32b8aba690af51ba93ca288b9c6f3c04adf2b",
       "executable": false
     },
     "DEMO.md": {
@@ -139,7 +139,7 @@
       "executable": false
     },
     "docs/backup.md": {
-      "sha256": "a075829707edba65b64e12910472993b9cbab3672e3bda58c47ddc12aad74061",
+      "sha256": "45142577b78f38ff2b736a5eea1e35a2104fd611cf06272a090d5f94b76e80bf",
       "executable": false
     },
     "docs/bank-feeds-and-rules.md": {
@@ -4059,7 +4059,7 @@
       "executable": false
     },
     "src/pantry/cash-flow.ts": {
-      "sha256": "a653ad3f925f73953c029c71e61f1e506512a0910eb45069d12f19d38aabb118",
+      "sha256": "8ffc4bb6ca1efd6abd59f3463260a09c4c2dd28b8187748dc459766b62439533",
       "executable": false
     },
     "src/pantry/cash-planner/index.ts": {
@@ -4675,11 +4675,11 @@
       "executable": false
     },
     "src/pantry/hosted-backup.d.mts": {
-      "sha256": "cec227b9d12265e873590514b4485401a1096fc31cde5a191b77229813fcc07f",
+      "sha256": "bb6509254caf4c1dcb6b1c710bee3ab05929f20977f66d76f70702c739fbd4ba",
       "executable": false
     },
     "src/pantry/hosted-backup.mjs": {
-      "sha256": "fd67883f0d5f0e65977fa531f07d003bf575270471bb8a12be4ce38812045ac2",
+      "sha256": "493b9800ce9b3b37500c63a8d43f0aee80f636f61ae4a53039f0ea1fb3b02c56",
       "executable": false
     },
     "src/pantry/integrations/credentials.ts": {
@@ -5275,7 +5275,7 @@
       "executable": false
     },
     "src/pantry/scheduled.ts": {
-      "sha256": "c56490b74e49737478b3fa45851277864f769a5eea9d7ff086c2e8f7a4c5b3e9",
+      "sha256": "88ee54e4f15c38eb59cacf7cee0d3e6a1e3229e1a50106a54555010c0850a47e",
       "executable": false
     },
     "src/pantry/seal.ts": {
@@ -6379,7 +6379,7 @@
       "executable": false
     },
     "tests/api/close.test.mjs": {
-      "sha256": "f7bba4dedd68d0b4c5b6f5159aa1c16b752d279adfb7d0746f4013ba89253629",
+      "sha256": "1785403cf54110e7035d169a61aeea85763def6e3294d92a75f5cc338284cd04",
       "executable": false
     },
     "tests/api/collections-journey.mjs": {
@@ -6919,7 +6919,7 @@
       "executable": false
     },
     "tests/ops/hosted-scale.mjs": {
-      "sha256": "47de8ba3da8f5a15e723e02fcd5e6611c63967e34b3ca34de65917867b07c536",
+      "sha256": "46565addb9e6f41189a7afe3e33f9c2a6f687f58e58b3646124f7d6327723627",
       "executable": false
     },
     "tests/providers/autopay-card.mjs": {
