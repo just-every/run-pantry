@@ -53,6 +53,7 @@ for(const basis of ['accrual','cash'])for(const kind of kinds) {
   const value=JSON.parse(body)
   if(kind==='trial-balance')assert.deepEqual([value.debit,value.credit,value.balanced],[12500000,12500000,true])
   if(kind==='profit-and-loss')assert.equal(value.netIncome,-12500000)
+  if(kind==='cash-flow')assert.deepEqual([value.operating.find(l=>l.id==='net-income').amount,value.netChange,value.ties],[-12500000,0,true])
   if(kind==='general-ledger')assert.equal(value.accounts.reduce((n,a)=>n+a.rows.length,0),250000)
  }
  console.log(JSON.stringify(measurements.at(-1)))
