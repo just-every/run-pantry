@@ -154,8 +154,11 @@ test('BANK-005 / PAN-07 CSV and OFX statements import against the right bank acc
   assert.deepEqual(automaticTransfers[0].lines.map(l => [l.account_code, l.debit_cents, l.credit_cents]), [['1010', 200000, 0], ['1000', 0, 200000]])
   const pairedLines = (await h.view('bank/lines')).lines.filter(l => l.transfer?.status === 'paired')
   assert.equal(pairedLines.length, 2); assert.ok(pairedLines.every(l => l.match_id))
-  const doc = await h.db.prepare('SELECT CAST(content AS TEXT) AS text FROM pt_documents WHERE id = ?').bind(first.statement.document_id).first()
-  assert.equal(doc.text, csv)
+  for (const [id, original] of [[first.statement.document_id, csv], [sav.statement.document_id, ofx]]) {
+    const download = await h.send(`/api/pantry/documents/${id}`, undefined, { cookie: h.owner })
+    assert.equal(download.status, 200)
+    assert.equal(download.value, original)
+  }
   await h.command('statement.import', { ...base, fileName: 'bad.csv', content: 'When,What\n09/01/2026,x\n', confirmLast4: '4821' }, h.owner, 400)
 })
 

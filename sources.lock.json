@@ -5771,7 +5771,7 @@
       "executable": false
     },
     "tests/api/bank.test.mjs": {
-      "sha256": "87571397a691e3ee78652db326f18e8caec2ec0abdfbef0d14f17264543d3cb3",
+      "sha256": "fcbd1b28f2ccc5dbc4ec05464194349058807f2527be3845e4030c7e615ef27f",
       "executable": false
     },
     "tests/api/bill-lifecycle-scenario.mjs": {
