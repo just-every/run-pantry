@@ -171,7 +171,7 @@
       "executable": false
     },
     "docs/hosting.md": {
-      "sha256": "fad55d92baf211697dbfc0b841cc7cc121bd63a9649c2c8425ea46b8b7994c10",
+      "sha256": "3c882571f47e8b0dcbbbebc169bb6054222acf9ff52da311c4295bcc1801148b",
       "executable": false
     },
     "docs/integrations.md": {
@@ -5743,7 +5743,7 @@
       "executable": false
     },
     "src/site/pages.tsx": {
-      "sha256": "e4a076a539b3ba779947d6179bcb2de74da414103e454eae0c94e3b061842e87",
+      "sha256": "c25dce76ba286a88bad430a281042e5340260cdf0041cb1128928f194a54fa13",
       "executable": false
     },
     "src/site/run.json": {
