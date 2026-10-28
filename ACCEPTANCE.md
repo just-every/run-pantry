@@ -8,10 +8,10 @@ The primary journey: Exercise the capabilities and acceptance journeys below.
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 80 | 47 | 16 | 143 |
+| Core | 81 | 46 | 16 | 143 |
 | Agent surface | 0 | 0 | 0 | 0 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 80 | 47 | 16 | 143 |
+| Full target | 81 | 46 | 16 | 143 |
 
 Judged from the code and tests at commit `a5c876e597b8aa8bebb1ef10cd677272e5e80799` (21 October 2026). Field proof register: 0 rows; 0 passed, 0 failed, 0 not run.
 
@@ -2116,7 +2116,7 @@ Core · push-further · **partial**
 
 #### AGENT-005 — Close with only judgment calls left
 
-Core · push-further · **partial**
+Core · push-further · **done**
 
 **Requirement.** Through the month, the agent reconciles accounts whose feeds and statements agree, runs schedules, rolls accruals, drafts variance explanations citing entries, and assembles the close packet. It leaves the accountant only judgment items (materiality, estimates, reclassification choices, reopening), each with its evidence and a recommendation. The lock stays a person's act. **Data:** the whole period. **Human control:** accountant review of each judgment item, and the lock.
 
@@ -2125,7 +2125,7 @@ Core · push-further · **partial**
 2. See every mechanical check done and proposed, a judgment list of four items with evidence and recommendations, variance explanations whose citations open, and the period still unlocked until the accountant locks it.
 
 **Evidence.** `tests/api/agent.test.mjs` › “PAN-15 an agent prepares matches, entries and close work that a person approves; stale or unauthorised work never lands” (`tests/api/month-close-journey.mjs`, monthCloseJourney and typedMonthCorrections): every mechanical check completes after supported drafts, a bill, an invoice, both payment directions and reconciliation; approved recurring and accrual schedules run with their reversal; exactly four protected reviews carry evidence and recommendations; independently expected variance amounts and complete citation sets open through the record door; preparation leaves the period open until the accountant locks it. Missing evidence, ambiguous allocation, stale records, missing posting grants, restricted bank access and repeated approval are refused. Every typed correction refuses viewer decisions and retains its native record audit and exact proposal approval. `tests/app/app.test.mjs` › “CLOSE-003 custom task assignment, due dates, revision review and month locking work at 1440 and 390” (`tests/app/month-close-journey.mjs`): corrective preview, close packet, four reviews, opening citations and disabled lock.
-**Gap.** Functional seeded-month proof and four acceptance mutations pass. DONE-RIDERS metadata proof is pending: this pinned seed has no contract-docs generator or declared Lander-Regenerate command, so canonical generated-document validation cannot run. Keep the clause partial until that required tool is available and its write and check commands pass; retain the current Base pin under the refresh hold.
+**Gap.** None.
 
 #### AGENT-006 — Repeated questions become verified standing work
 
