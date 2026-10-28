@@ -1756,25 +1756,27 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 **How Pantry computes each class.**
 
+Each row declares possible classes, decided per call from its arguments, current records, destination and provider step. Compute every applicable class and retain their combination: “or” in the table means per-call computation, never a choice that drops another applicable class. An internal reversible preparation can be standard; a call that also changes authority, exposes full identifiers, binds the business or changes a running service adds the corresponding classes. The company’s policy decides the complete combination. Provider connections include creating, widening, narrowing and revoking their grants; imports include staged work, undo and the mapped accountant sign-off, and APIs retain the classes of the underlying accounting operations.
+
 - **standard:** reversible internal drafts, categories, matches and reports, measured in affected items.
 
 - **external:** any newly outside-visible document, link, message, report or connector result; recipients are internal, known for a saved customer/vendor relationship, new otherwise, or public for an open link.
 
 - **money:** moved funds or changed charges, carrying exact amount, currency and payee.
 
-- **commitment:** issued financial documents, accepted estimates, accounting sign-offs and period decisions, with value and counterparty.
+- **commitment:** issued financial documents, accepted estimates, posted accounting corrections, reconciliation decisions, opening-balance and migration sign-offs, period decisions, binding provider terms and signed transmitter authorizations, with value and counterparty. A provider-held signing step also carries gated; a financial sign-off is not exempt when it runs through an import, connector or API.
 
 - **accounts:** an outside provider account or paid resource, naming the provider.
 
 - **gated:** the provider’s consent, hosted card entry, verification or person-named terms step, including a provider response requiring a person.
 
-- **access:** staff, roles, devices and integration/agent grants, with people count and widening or narrowing direction.
+- **access:** business setup memberships, staff, roles, devices, report-sharing authority and integration/agent grants, including provider connection, re-link and disconnect calls, with affected people count and widening or narrowing direction.
 
 - **security:** factors, credentials, webhook secrets and protective settings, naming the setting.
 
 - **destructive:** irreversible voids, purges and disposal, measured in items.
 
-- **sensitive:** full bank, card, tax-identity and payroll identifiers, with record count and kind.
+- **sensitive:** reads, writes, imports and exports of full bank, card, tax-identity and payroll identifiers, including original documents, migration archives and full-TIN filing CSVs, with record count and kind. Masked-only records do not acquire this class from an agent’s claim.
 
 - **live:** changes to a running broker, hosted mail route, public service or schedule configuration, naming the service.
 
@@ -1782,7 +1784,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | --- | --- | --- | --- | --- |
 
-| `pantry.pan.set_up_the_business_01` | Set up the business | PAN-01 | standard or commitment or sensitive | No MCP tool |
+| `pantry.pan.set_up_the_business_01` | Set up the business | PAN-01 | standard or commitment or access or sensitive | No MCP tool |
 
 | `pantry.pan.chart_of_accounts_and_02` | Chart of accounts and opening balances | PAN-02 | standard or commitment or sensitive | No MCP tool |
 
@@ -1812,33 +1814,33 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.pan.agent_preparation_15` | Agent preparation | PAN-15 | standard or commitment or sensitive | No MCP tool |
 
-| `pantry.pan.move_in_from_quickbooks_16` | Move in from QuickBooks Online or Xero exports | PAN-16 | standard or external or gated or security or sensitive | No MCP tool |
+| `pantry.pan.move_in_from_quickbooks_16` | Move in from QuickBooks Online or Xero exports | PAN-16 | standard or external or commitment or gated or access or security or sensitive | No MCP tool |
 
 | `pantry.pan.receipts_caught_read_and_17` | Receipts caught, read and attached | PAN-17 | standard or external or sensitive or commitment | No MCP tool |
 
-| `pantry.pan.pantry_asks_about_what_18` | Pantry asks about what doesn't add up | PAN-18 | standard or commitment or sensitive | No MCP tool |
+| `pantry.pan.pantry_asks_about_what_18` | Pantry asks about what doesn't add up | PAN-18 | standard or external or commitment or sensitive | No MCP tool |
 
-| `pantry.pan.stripe_payouts_book_themselves_19` | Stripe payouts book themselves | PAN-19 | standard or external or security or sensitive or commitment | No MCP tool |
+| `pantry.pan.stripe_payouts_book_themselves_19` | Stripe payouts book themselves | PAN-19 | standard or external or commitment or access or security or sensitive | No MCP tool |
 
-| `pantry.pan.gusto_payroll_books_itself_20` | Gusto payroll books itself | PAN-20 | standard or external or gated or security or sensitive or commitment | No MCP tool |
+| `pantry.pan.gusto_payroll_books_itself_20` | Gusto payroll books itself | PAN-20 | standard or external or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.bank.live_bank_and_credit_001` | Live bank and credit-card connections | BANK-001 | standard or external or accounts or gated or security or sensitive | No MCP tool |
+| `pantry.bank.live_bank_and_credit_001` | Live bank and credit-card connections | BANK-001 | standard or external or commitment or accounts or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.bank.historical_backfill_without_duplicates_002` | Historical backfill without duplicates | BANK-002 | standard or sensitive | No MCP tool |
+| `pantry.bank.historical_backfill_without_duplicates_002` | Historical backfill without duplicates | BANK-002 | standard or external or sensitive | No MCP tool |
 
-| `pantry.bank.continuous_sync_of_pending_003` | Continuous sync of pending and posted lines | BANK-003 | standard or sensitive | No MCP tool |
+| `pantry.bank.continuous_sync_of_pending_003` | Continuous sync of pending and posted lines | BANK-003 | standard or external or sensitive | No MCP tool |
 
-| `pantry.bank.connection_health_and_re_004` | Connection health and re-linking | BANK-004 | standard or external or gated or security or sensitive | No MCP tool |
+| `pantry.bank.connection_health_and_re_004` | Connection health and re-linking | BANK-004 | standard or external or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.bank.reconciliation_from_feeds_and_005` | Reconciliation from feeds and statements | BANK-005 | standard or sensitive | No MCP tool |
+| `pantry.bank.reconciliation_from_feeds_and_005` | Reconciliation from feeds and statements | BANK-005 | standard or external or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.bank.direct_business_bank_and_006` | Direct business-bank and spend-platform connections | BANK-006 | standard or sensitive | No MCP tool |
+| `pantry.bank.direct_business_bank_and_006` | Direct business-bank and spend-platform connections | BANK-006 | standard or external or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.bank.undo_a_reconciliation_007` | Undo a reconciliation | BANK-007 | standard or sensitive | No MCP tool |
+| `pantry.bank.undo_a_reconciliation_007` | Undo a reconciliation | BANK-007 | standard or commitment or sensitive | No MCP tool |
 
 | `pantry.rule.one_review_queue_for_001` | One review queue for every new line | RULE-001 | standard or commitment | No MCP tool |
 
-| `pantry.rule.bank_rules_that_file_002` | Bank rules that file routine lines | RULE-002 | standard or commitment | No MCP tool |
+| `pantry.rule.bank_rules_that_file_002` | Bank rules that file routine lines | RULE-002 | standard or commitment or live | No MCP tool |
 
 | `pantry.rule.suggestions_learned_from_this_003` | Suggestions learned from this business's own history | RULE-003 | standard or commitment | No MCP tool |
 
@@ -1868,19 +1870,19 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.invoice.hosted_invoice_page_and_003` | Hosted invoice page and viewed status | INVOICE-003 | standard or external or money or commitment | No MCP tool |
 
-| `pantry.pay.card_and_ach_payment_001` | Card and ACH payment from the invoice link | PAY-001 | money or external or sensitive or gated | No MCP tool |
+| `pantry.pay.card_and_ach_payment_001` | Card and ACH payment from the invoice link | PAY-001 | standard or external or money or commitment or gated or sensitive | No MCP tool |
 
-| `pantry.pay.payment_status_follows_the_002` | Payment status follows the provider | PAY-002 | money or external or sensitive or gated | No MCP tool |
+| `pantry.pay.payment_status_follows_the_002` | Payment status follows the provider | PAY-002 | standard or external or money or commitment or gated or sensitive | No MCP tool |
 
-| `pantry.pay.payments_that_match_themselves_003` | Payments that match themselves | PAY-003 | money or external or sensitive or gated | No MCP tool |
+| `pantry.pay.payments_that_match_themselves_003` | Payments that match themselves | PAY-003 | standard or external or money or commitment or gated or sensitive | No MCP tool |
 
-| `pantry.pay.payments_from_outside_stripe_004` | Payments from outside Stripe applied for you | PAY-004 | money or external or sensitive or gated | No MCP tool |
+| `pantry.pay.payments_from_outside_stripe_004` | Payments from outside Stripe applied for you | PAY-004 | standard or external or money or commitment or gated or sensitive | No MCP tool |
 
 | `pantry.pay.saved_payment_methods_and_005` | Saved payment methods and autopay | PAY-005 | money or external or sensitive or gated or commitment | No MCP tool |
 
 | `pantry.invoice.reminders_that_stop_once_004` | Reminders that stop once paid | INVOICE-004 | standard or external or money or commitment | No MCP tool |
 
-| `pantry.invoice.recurring_invoices_005` | Recurring invoices | INVOICE-005 | standard or external or money or commitment | No MCP tool |
+| `pantry.invoice.recurring_invoices_005` | Recurring invoices | INVOICE-005 | standard or external or money or commitment or live | No MCP tool |
 
 | `pantry.invoice.estimates_deposits_and_progress_006` | Estimates, deposits and progress invoicing | INVOICE-006 | standard or external or money or commitment | No MCP tool |
 
@@ -1898,7 +1900,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.sales.in_person_card_acceptance_003` | In-person card acceptance and instant payouts | SALES-003 | money or commitment or external | No MCP tool |
 
-| `pantry.invoice.customer_records_with_the_009` | Customer records with the whole history | INVOICE-009 | standard or external or money or commitment | No MCP tool |
+| `pantry.invoice.customer_records_with_the_009` | Customer records with the whole history | INVOICE-009 | standard or external or money or commitment or sensitive | No MCP tool |
 
 | `pantry.invoice.early_payment_offers_and_012` | Early-payment offers and sourced tax treatment | INVOICE-012 | standard or external or money or commitment | No MCP tool |
 
@@ -1922,23 +1924,23 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.billpay.payment_fraud_controls_002` | Payment fraud controls | BILLPAY-002 | money or commitment or external or gated or sensitive | No MCP tool |
 
-| `pantry.check.write_and_print_checks_001` | Write and print checks | CHECK-001 | money or commitment or external | No MCP tool |
+| `pantry.check.write_and_print_checks_001` | Write and print checks | CHECK-001 | standard or external or money or commitment or destructive or sensitive | No MCP tool |
 
 | `pantry.vendor.vendor_records_with_the_001` | Vendor records with the whole history | VENDOR-001 | standard or sensitive | No MCP tool |
 
-| `pantry.proc.stripe_payouts_split_into_001` | Stripe payouts split into sales and fees | PROC-001 | standard or money or sensitive | No MCP tool |
+| `pantry.proc.stripe_payouts_split_into_001` | Stripe payouts split into sales and fees | PROC-001 | standard or external or money or commitment or sensitive | No MCP tool |
 
-| `pantry.proc.square_paypal_and_shopify_002` | Square, PayPal and Shopify | PROC-002 | standard or money or sensitive | No MCP tool |
+| `pantry.proc.square_paypal_and_shopify_002` | Square, PayPal and Shopify | PROC-002 | standard or external or money or commitment or sensitive | No MCP tool |
 
-| `pantry.proc.clearing_accounts_never_hide_003` | Clearing accounts never hide money | PROC-003 | standard or money or sensitive | No MCP tool |
+| `pantry.proc.clearing_accounts_never_hide_003` | Clearing accounts never hide money | PROC-003 | standard or external or money or commitment or sensitive | No MCP tool |
 
-| `pantry.payroll.payroll_posts_as_one_001` | Payroll posts as one balanced entry | PAYROLL-001 | standard or money or sensitive | No MCP tool |
+| `pantry.payroll.payroll_posts_as_one_001` | Payroll posts as one balanced entry | PAYROLL-001 | standard or external or money or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.payroll.payroll_liabilities_reconciled_002` | Payroll liabilities reconciled | PAYROLL-002 | standard or money or sensitive | No MCP tool |
+| `pantry.payroll.payroll_liabilities_reconciled_002` | Payroll liabilities reconciled | PAYROLL-002 | standard or external or money or commitment or sensitive | No MCP tool |
 
-| `pantry.salestax.sales_tax_rates_by_001` | Sales tax rates by address | SALESTAX-001 | standard or money or commitment or external | No MCP tool |
+| `pantry.salestax.sales_tax_rates_by_001` | Sales tax rates by address | SALESTAX-001 | standard or external or money or commitment or gated or access or security | No MCP tool |
 
-| `pantry.salestax.liability_by_state_and_002` | Liability by state and filing | SALESTAX-002 | standard or money or commitment or external | No MCP tool |
+| `pantry.salestax.liability_by_state_and_002` | Liability by state and filing | SALESTAX-002 | standard or external or money or commitment or gated or sensitive | No MCP tool |
 
 | `pantry.salestax.exemption_certificates_003` | Exemption certificates | SALESTAX-003 | standard or money or commitment or external | No MCP tool |
 
@@ -1962,9 +1964,9 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.report.every_figure_opens_to_005` | Every figure opens to its source | REPORT-005 | standard or external or sensitive | No MCP tool |
 
-| `pantry.report.custom_reports_and_management_006` | Custom reports and management packages | REPORT-006 | standard or external or sensitive | No MCP tool |
+| `pantry.report.custom_reports_and_management_006` | Custom reports and management packages | REPORT-006 | standard or external or access or sensitive | No MCP tool |
 
-| `pantry.report.export_and_scheduled_delivery_007` | Export and scheduled delivery | REPORT-007 | standard or external or sensitive | No MCP tool |
+| `pantry.report.export_and_scheduled_delivery_007` | Export and scheduled delivery | REPORT-007 | standard or external or sensitive or live | No MCP tool |
 
 | `pantry.report.a_dashboard_that_says_008` | A dashboard that says what needs doing | REPORT-008 | standard or external or sensitive | No MCP tool |
 
@@ -1978,9 +1980,9 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.currency.foreign_currency_customers_and_001` | Foreign-currency customers and vendors | CURRENCY-001 | standard or money or commitment | No MCP tool |
 
-| `pantry.close.recurring_journals_001` | Recurring journals | CLOSE-001 | standard or commitment | No MCP tool |
+| `pantry.close.recurring_journals_001` | Recurring journals | CLOSE-001 | standard or commitment or live | No MCP tool |
 
-| `pantry.close.prepaid_accrual_and_deferred_002` | Prepaid, accrual and deferred-revenue schedules | CLOSE-002 | standard or commitment | No MCP tool |
+| `pantry.close.prepaid_accrual_and_deferred_002` | Prepaid, accrual and deferred-revenue schedules | CLOSE-002 | standard or commitment or live | No MCP tool |
 
 | `pantry.close.close_workflow_with_owners_003` | Close workflow with owners and questions | CLOSE-003 | standard or commitment | No MCP tool |
 
@@ -1990,63 +1992,63 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.close.year_end_005` | Year-end | CLOSE-005 | standard or commitment | No MCP tool |
 
-| `pantry.acct.accountant_console_across_clients_001` | Accountant console across clients | ACCT-001 | standard or commitment or sensitive | No MCP tool |
+| `pantry.acct.accountant_console_across_clients_001` | Accountant console across clients | ACCT-001 | standard or commitment or access or sensitive | No MCP tool |
 
-| `pantry.acct.hand_off_to_tax_002` | Hand-off to tax software | ACCT-002 | standard or commitment or sensitive | No MCP tool |
+| `pantry.acct.hand_off_to_tax_002` | Hand-off to tax software | ACCT-002 | standard or external or commitment or sensitive | No MCP tool |
 
 | `pantry.acct.accountant_review_tools_003` | Accountant review tools | ACCT-003 | standard or commitment or sensitive | No MCP tool |
 
-| `pantry.migrate.quickbooks_online_move_in_001` | QuickBooks Online move-in through its API, with history and attachments | MIGRATE-001 | standard or external or security or gated | No MCP tool |
+| `pantry.migrate.quickbooks_online_move_in_001` | QuickBooks Online move-in through its API, with history and attachments | MIGRATE-001 | standard or external or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.migrate.xero_move_in_002` | Xero move-in | MIGRATE-002 | standard or external or security or gated | No MCP tool |
+| `pantry.migrate.xero_move_in_002` | Xero move-in | MIGRATE-002 | standard or external or money or commitment or accounts or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.migrate.freshbooks_move_in_003` | FreshBooks move-in | MIGRATE-003 | standard or external or security or gated | No MCP tool |
+| `pantry.migrate.freshbooks_move_in_003` | FreshBooks move-in | MIGRATE-003 | standard or external or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.migrate.recurring_work_carried_over_004` | Recurring work carried over, nothing sent by surprise | MIGRATE-004 | standard or external or security or gated | No MCP tool |
+| `pantry.migrate.recurring_work_carried_over_004` | Recurring work carried over, nothing sent by surprise | MIGRATE-004 | standard or external or money or commitment or gated or access or security or sensitive or live | No MCP tool |
 
-| `pantry.migrate.document_archive_move_in_005` | Document archive move-in | MIGRATE-005 | standard or external or security or gated | No MCP tool |
+| `pantry.migrate.document_archive_move_in_005` | Document archive move-in | MIGRATE-005 | standard or external or gated or security or sensitive | No MCP tool |
 
-| `pantry.migrate.leaving_is_as_easy_006` | Leaving is as easy as arriving | MIGRATE-006 | standard or external or security or gated | No MCP tool |
+| `pantry.migrate.leaving_is_as_easy_006` | Leaving is as easy as arriving | MIGRATE-006 | standard or external or gated or security or sensitive | No MCP tool |
 
-| `pantry.migrate.spreadsheet_import_of_lists_007` | Spreadsheet import of lists and open items | MIGRATE-007 | standard or external or security or gated | No MCP tool |
+| `pantry.migrate.spreadsheet_import_of_lists_007` | Spreadsheet import of lists and open items | MIGRATE-007 | standard or external or commitment or gated or security or sensitive | No MCP tool |
 
-| `pantry.api.public_record_api_001` | Public record API | API-001 | standard or external or security | No MCP tool |
+| `pantry.api.public_record_api_001` | Public record API | API-001 | standard or external or money or commitment or access or security or destructive or sensitive or live | No MCP tool |
 
-| `pantry.api.webhook_egress_pinned_to_001` | Webhook egress pinned to the checked address | API-EGRESS-001 | standard or external or security | No MCP tool |
+| `pantry.api.webhook_egress_pinned_to_001` | Webhook egress pinned to the checked address | API-EGRESS-001 | standard or external or commitment or security | No MCP tool |
 
-| `pantry.api.quickbooks_online_compatible_api_002` | QuickBooks Online-compatible API for tools whose address can be set | API-002 | standard or external or security | No MCP tool |
+| `pantry.api.quickbooks_online_compatible_api_002` | QuickBooks Online-compatible API for tools whose address can be set | API-002 | standard or external or money or commitment or security or destructive or sensitive | No MCP tool |
 
-| `pantry.integ.sibling_seeds_connected_001` | Sibling seeds connected | INTEG-001 | standard or external or money or commitment or gated | No MCP tool |
+| `pantry.integ.sibling_seeds_connected_001` | Sibling seeds connected | INTEG-001 | standard or external or money or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.integ.one_connections_page_and_002` | One connections page, and automation platforms | INTEG-002 | standard or external or money or commitment or gated | No MCP tool |
+| `pantry.integ.one_connections_page_and_002` | One connections page, and automation platforms | INTEG-002 | standard or external or money or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.integ.connector_mapping_cutover_and_003` | Connector mapping, cutover and reconciliation | INTEG-003 | standard or external or money or commitment or gated | No MCP tool |
+| `pantry.integ.connector_mapping_cutover_and_003` | Connector mapping, cutover and reconciliation | INTEG-003 | standard or external or money or commitment or gated or sensitive | No MCP tool |
 
-| `pantry.integ.payments_collected_in_connected_004` | Payments collected in connected apps post once | INTEG-004 | standard or external or money or commitment or gated | No MCP tool |
+| `pantry.integ.payments_collected_in_connected_004` | Payments collected in connected apps post once | INTEG-004 | standard or external or money or commitment or gated or sensitive | No MCP tool |
 
-| `pantry.api.signed_accounting_event_webhooks_003` | Signed accounting event webhooks | API-003 | standard or external or security | No MCP tool |
+| `pantry.api.signed_accounting_event_webhooks_003` | Signed accounting event webhooks | API-003 | standard or external or access or security | No MCP tool |
 
-| `pantry.integ.jobber_connection_005` | Jobber connection | INTEG-005 | standard or external or money or commitment or gated | No MCP tool |
+| `pantry.integ.jobber_connection_005` | Jobber connection | INTEG-005 | standard or external or money or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.integ.housecall_pro_connection_006` | Housecall Pro connection | INTEG-006 | standard or external or money or commitment or gated | No MCP tool |
+| `pantry.integ.housecall_pro_connection_006` | Housecall Pro connection | INTEG-006 | standard or external or money or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.integ.servicetitan_connection_007` | ServiceTitan connection | INTEG-007 | standard or external or money or commitment or gated | No MCP tool |
+| `pantry.integ.servicetitan_connection_007` | ServiceTitan connection | INTEG-007 | standard or external or money or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.integ.quickbooks_time_connection_008` | QuickBooks Time connection | INTEG-008 | standard or external or money or commitment or gated | No MCP tool |
+| `pantry.integ.quickbooks_time_connection_008` | QuickBooks Time connection | INTEG-008 | standard or external or money or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.integ.harvest_connection_009` | Harvest connection | INTEG-009 | standard or external or money or commitment or gated | No MCP tool |
+| `pantry.integ.harvest_connection_009` | Harvest connection | INTEG-009 | standard or external or money or commitment or gated or access or security or sensitive | No MCP tool |
 
-| `pantry.connect.every_provider_connects_in_001` | Every provider connects in production without a developer account | CONNECT-001 | standard or accounts or external or security or gated or live | No MCP tool |
+| `pantry.connect.every_provider_connects_in_001` | Every provider connects in production without a developer account | CONNECT-001 | standard or external or money or commitment or accounts or gated or access or security or sensitive or live | No MCP tool |
 
-| `pantry.connect.pantry_connect_the_connection_002` | Pantry Connect, the connection broker | CONNECT-002 | standard or accounts or external or security or gated or live | No MCP tool |
+| `pantry.connect.pantry_connect_the_connection_002` | Pantry Connect, the connection broker | CONNECT-002 | standard or external or money or commitment or accounts or gated or access or security or sensitive or live | No MCP tool |
 
-| `pantry.connect.a_1099_filing_route_003` | A 1099 filing route without a transmitter code of one's own | CONNECT-003 | standard or accounts or external or security or gated or live | No MCP tool |
+| `pantry.connect.a_1099_filing_route_003` | A 1099 filing route without a transmitter code of one's own | CONNECT-003 | standard or external or money or commitment or accounts or gated or security or sensitive or live | No MCP tool |
 
-| `pantry.connect.fees_steps_and_data_004` | Fees, steps and data shown before connecting | CONNECT-004 | standard or accounts or external or security or gated or live | No MCP tool |
+| `pantry.connect.fees_steps_and_data_004` | Fees, steps and data shown before connecting | CONNECT-004 | standard or external or money or commitment or accounts or gated or security or live | No MCP tool |
 
-| `pantry.connect.mail_without_a_mail_005` | Mail without a mail account or domain | CONNECT-005 | standard or accounts or external or security or gated or live | No MCP tool |
+| `pantry.connect.mail_without_a_mail_005` | Mail without a mail account or domain | CONNECT-005 | standard or external or money or commitment or accounts or gated or access or security or sensitive or live | No MCP tool |
 
-| `pantry.connect.an_inbound_capture_address_006` | An inbound capture address without DNS work | CONNECT-006 | standard or accounts or external or security or gated or live | No MCP tool |
+| `pantry.connect.an_inbound_capture_address_006` | An inbound capture address without DNS work | CONNECT-006 | standard or external or accounts or gated or access or security or sensitive or live | No MCP tool |
 
 | `pantry.notify.notifications_people_control_001` | Notifications people control | NOTIFY-001 | standard or external | No MCP tool |
 
@@ -2060,9 +2062,9 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.erasure.erasure_within_record_keeping_001` | Erasure within record-keeping law | ERASURE-001 | destructive or sensitive | No MCP tool |
 
-| `pantry.data.declared_data_flows_and_001` | Declared data flows and credentials | DATA-001 | security or external | No MCP tool |
+| `pantry.data.declared_data_flows_and_001` | Declared data flows and credentials | DATA-001 | standard or external or money or commitment or accounts or gated or access or security or sensitive or live | No MCP tool |
 
-| `pantry.agent.the_books_agent_keeps_001` | The books agent keeps the books current | AGENT-001 | standard or external or money or commitment or sensitive | No MCP tool |
+| `pantry.agent.the_books_agent_keeps_001` | The books agent keeps the books current | AGENT-001 | standard or external or money or commitment or access or sensitive or live | No MCP tool |
 
 | `pantry.agent.the_agent_chases_what_002` | The agent chases what doesn't add up | AGENT-002 | standard or external or money or commitment or sensitive | No MCP tool |
 
@@ -2072,7 +2074,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.agent.close_with_only_judgment_005` | Close with only judgment calls left | AGENT-005 | standard or external or money or commitment or sensitive | No MCP tool |
 
-| `pantry.agent.repeated_questions_become_source_006` | Repeated questions become source-funded plans | AGENT-006 | standard or external or money or commitment or sensitive | No MCP tool |
+| `pantry.agent.repeated_questions_become_source_006` | Repeated questions become source-funded plans | AGENT-006 | standard or external or money or commitment or access or sensitive | No MCP tool |
 
 | `pantry.agent.ask_the_books_007` | Ask the books | AGENT-007 | standard or external or money or commitment or sensitive | No MCP tool |
 
@@ -2080,9 +2082,9 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.agent.tax_readiness_all_year_009` | Tax readiness all year | AGENT-009 | standard or external or money or commitment or sensitive | No MCP tool |
 
-| `pantry.agent.agent_governance_010` | Agent governance | AGENT-010 | standard or external or access or security or sensitive | No MCP tool |
+| `pantry.agent.agent_governance_010` | Agent governance | AGENT-010 | standard or external or money or commitment or accounts or gated or access or security or destructive or sensitive or live | No MCP tool |
 
-| `pantry.agent.tax_readiness_reminders_by_011` | Tax-readiness reminders by email and calendar | AGENT-011 | standard or external or money or commitment or sensitive | No MCP tool |
+| `pantry.agent.tax_readiness_reminders_by_011` | Tax-readiness reminders by email and calendar | AGENT-011 | standard or external or money or commitment or gated or access or security or sensitive or live | No MCP tool |
 
 **Resources.** `pantry://business/{id}`, `pantry://accounts/{id}`, `pantry://contacts/{id}`, `pantry://documents/{id}`, `pantry://invoices/{id}`, `pantry://bills/{id}`, `pantry://payments/{id}`, `pantry://bank-lines/{id}`, `pantry://statements/{id}`, `pantry://reconciliations/{id}`, `pantry://journals/{id}`, `pantry://periods/{id}`, `pantry://reports/{id}`, `pantry://questions/{id}`, `pantry://proposals/{id}`, `pantry://schedules/{id}`, `pantry://assets/{id}`, `pantry://connections/{id}`.
 
