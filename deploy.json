@@ -75,24 +75,6 @@
       "binding": "GUSTO_ENV",
       "environment": "GUSTO_ENV",
       "optional": true
-    },
-    {
-      "binding": "MAIL_PROVIDER",
-      "environment": "MAIL_PROVIDER"
-    },
-    {
-      "binding": "MAIL_FROM",
-      "environment": "MAIL_FROM"
-    },
-    {
-      "binding": "MAIL_RELAY_URL",
-      "environment": "MAIL_RELAY_URL",
-      "optional": true
-    },
-    {
-      "binding": "MAIL_ACCOUNT_ID",
-      "environment": "MAIL_ACCOUNT_ID",
-      "optional": true
     }
   ],
   "crons": [
