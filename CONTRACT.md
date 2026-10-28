@@ -2113,13 +2113,13 @@ Each row declares possible classes, decided per call from its arguments, current
 
 *Tier:* Agent surface · *From:* new · *Cites:* BASE-AGENT-006, BASE-AGENT-007
 
-**Requirement.** Pantry computes its content and financial classes from the current financial records and target audience, as described above.
+**Requirement.** Pantry computes all applicable content and financial classes from the current financial records and target audience, as described above, retaining their combination with authority, custody and running-service classes for the same call.
 
 **Acceptance.**
 1. A reversible journal draft, category preparation or internal report is standard with the affected item count.
 2. Email, SMS, published links and exports to outside recipients add external with recipient count and internal, known, new or public counterparty facts; moving a document into an outside-visible record also adds it.
 3. Payment, refund, invoice charge or changed provider cost adds money with exact amount, currency and payee.
-4. A financial sign-off, issued offer, accepted estimate, posted correction or period lock adds commitment with its value and counterparty.
+4. A financial sign-off, issued offer, accepted estimate, posted correction, reconciliation decision or period lock adds commitment with its value and counterparty; this includes PAN-16 and MIGRATE-001, MIGRATE-002, MIGRATE-003 and MIGRATE-007 opening-balance sign-off/posting, API-001 financial approvals and locks, and CONNECT-003 binding transmitter authorization or filing sign-off. A call that also exports full tax identifiers keeps sensitive and external when it sends them outside; a provider-held signing step also keeps gated.
 5. Creating an outside mail, bank, broker or tax account adds accounts with its provider.
 6. A provider consent, hosted card entry, identity verification or person-named terms step adds gated with provider and step, including a provider response newly requiring that step.
 
@@ -2127,14 +2127,14 @@ Each row declares possible classes, decided per call from its arguments, current
 
 *Tier:* Agent surface · *From:* new · *Cites:* BASE-AGENT-005, BASE-AGENT-006, BASE-AGENT-007
 
-**Requirement.** Pantry computes authority and custody classes from the records and configuration its accounting call changes.
+**Requirement.** Pantry computes authority and custody classes from the records and configuration its accounting call reads or changes, retaining every applicable class alongside the call’s financial and outside-exposure classes.
 
 **Acceptance.**
-1. A member, role, device, integration or agent-grant change adds access with people count and whether authority widens or narrows.
+1. A member, role, device, integration or agent-grant change adds access with affected people count and whether authority widens or narrows; this includes PAN-01 membership/role/grant calls and provider connect, re-link and disconnect calls. A call changing both a grant and its credential keeps access and security.
 2. Credential, factor, webhook secret or protective-setting work adds security with the setting named.
 3. An irreversible void, purge or expiry disposal adds destructive with its item count.
-4. A read or change of full bank, card, tax-identity or payroll identifiers adds sensitive with record count and data kind.
-5. Changing a running hosted broker, mail route, public accounting service or scheduled service configuration adds live with the affected service.
+4. A read, change, import or export of full bank, card, tax-identity or payroll identifiers adds sensitive with record count and data kind, including original documents, migration archives and CONNECT-003 full-TIN filing CSVs. Filing, binding transmitter authorization or financial sign-off retains commitment alongside sensitive, and outside disclosure also retains external; a masked-only read does not add sensitive.
+5. Changing a running hosted broker, mail route, public accounting service or scheduled service configuration adds live with the affected service; enabling a posting rule or recurring journal/invoice schedule retains commitment for the financial authority it binds, and changing its grant also retains access.
 
 #### SURFACE-004 — Accounting records, changes and handoffs
 
