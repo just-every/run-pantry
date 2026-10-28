@@ -2260,10 +2260,10 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 *Tier:* Core · *Cites:* BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008, BASE-AGENT-004, BASE-AGENT-005, BASE-AGENT-009, BASE-AGENT-011 · *Rules:* D-1, D-2, D-4, D-5, D-7, D-8
 
-**Requirement.** Pantry’s embedded bookkeeper uses the installation’s chosen model through Base’s AI adapter, with Claude as its initial model choice; outside agents use the same accounting actions. Financial-period locks bind these accounting actions, and the seed computes financial classes from its source records as described in the Agent surface.
+**Requirement.** Pantry’s embedded bookkeeper uses the installation’s chosen model through Base’s AI adapter, with Claude as its initial model choice. Financial-period locks bind these accounting actions, and the seed computes financial classes from its source records as described in the Agent surface.
 
 **Acceptance.**
-1. Read an accounting source through the installation’s chosen model and use the same accounting actions from an outside agent.
+1. Read an accounting source through Base’s AI adapter with the installation’s chosen provider and model.
 2. Attempt a posting into a locked financial period through either embedded or outside accounting actions and see it refused with the books unchanged.
 
 
