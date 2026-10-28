@@ -30,8 +30,8 @@ export function BusinessSetup() {
   return <>
     <PageHead title={state.settings.entity ? 'Business details' : 'Set up the business'} lead="Choose your shared Business first, then confirm the accounting details for these books." />
     <Card title="Your shared Business">
-      {business ? <p><strong>{business.name}</strong> · {new URL(business.origin).host}</p> : <p>Already use a Business in another Run Edit Run app? Open that same Business here.</p>}
-      <a className="btn btn-secondary" href={business?.url ?? 'https://app.runeditrun.com/business'} target="_blank" rel="noreferrer">{business ? 'Open your Business' : 'Use your existing Business'}</a>
+      {business ? <p><strong><a href={business.url} target="_blank" rel="noreferrer">{business.name}</a></strong> · {new URL(business.origin).host}</p> : <p>Already use a Business in another Run Edit Run app? Open that same Business here.</p>}
+      <a className="btn btn-secondary" href={business ? business.origin + '/business' : 'https://app.runeditrun.com/business'} target="_blank" rel="noreferrer">Use your existing Business</a>
       <p>Business opens in a new tab and may ask you to sign in.</p>
     </Card>
     <Business />
