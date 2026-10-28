@@ -1,5 +1,12 @@
 Pantry has no built-in model. Instead, you point the agent you already use at your books: it reads what it needs, prepares matches, entries and close work, and files each one as a proposal. A person approves or rejects every proposal; agents never post, approve or lock.
 
+The shared Base agent-door and Business settings modules are retained as source,
+with additive database migrations. They are not connected to Pantry's Worker.
+Pantry does not yet serve MCP, accept signed company agent policy, bind Business
+people to accounting roles, or expose accounting records as MCP resources. Use
+the native token and proposal workflow below. A company policy cannot currently
+authorize an agent to approve, pay, lock or reopen these books.
+
 ## Give your agent a token
 
 The owner opens **People & settings** and, under **Agent access**, enters a name and chooses **Create agent token**. The token is shown once: copy it into your agent's settings straight away. Pantry keeps only its hash, and you can deactivate the agent at any time.
