@@ -53,15 +53,19 @@ async function deliver(env: Bindings, db: D1Database, to: string, subject: strin
 }
 
 function questionBody(qn: Question, link: string, replies: boolean, business: string) {
-  const choices = qn.choices.map((c, i) => `${i + 1}. ${c.label}\n   ${c.effect}${c.note ? ` Add a few words: ${c.note.toLowerCase()}.` : ''}`).join('\n')
+  const receiptReply = qn.kind === 'missing-receipt' && replies
+  const choices = [
+    ...(receiptReply ? ['1. Send the receipt attached\n   Attaches the source document to this record.'] : []),
+    ...qn.choices.map((c, i) => `${i + (receiptReply ? 2 : 1)}. ${c.label}\n   ${c.effect}${c.note ? ` Add a few words: ${c.note.toLowerCase()}.` : ''}`),
+  ].join('\n')
   const how = qn.kind === 'accountant' ? (replies ? 'Reply with your answer; Pantry keeps it with this record.' : 'Open the link to answer in Pantry.') : qn.kind === 'missing-receipt'
-    ? (replies ? 'Reply with the receipt attached and Pantry attaches it, or reply 1 and say why there is none.' : 'Open the link to upload it, or to say why there is none.')
+    ? (replies ? 'Reply 1 with the receipt attached and Pantry attaches it, or reply 2 and say why there is none.' : 'Open the link to upload it, or to say why there is none.')
     : replies ? `Reply with the number${qn.choices.some(c => c.learn) ? ' (add "always" to file the next ones from this payee the same way)' : ''}, or say in your own words what it was.` : 'Open the link to answer.'
   const facts = Object.entries(qn.facts).map(([k, v]) => `${k}: ${v}`).join('\n')
   const text = `${qn.question}\n\n${qn.why}\n\n${facts}\n\n${choices ? `${choices}\n\n` : ''}${how}\n\nOpen it in Pantry: ${link}\n\nNothing changes in the books for ${business} until you answer.\n`
   const html = `<p><strong>${escapeHtml(qn.question)}</strong></p><p>${escapeHtml(qn.why)}</p>` +
     `<table cellpadding="4">${Object.entries(qn.facts).map(([k, v]) => `<tr><td style="color:#5a6178">${escapeHtml(k)}</td><td>${escapeHtml(String(v))}</td></tr>`).join('')}</table>` +
-    (qn.choices.length ? `<ol>${qn.choices.map(c => `<li><strong>${escapeHtml(c.label)}</strong><br><span style="color:#4f5670">${escapeHtml(c.effect)}</span></li>`).join('')}</ol>` : '') +
+    (qn.choices.length ? `<ol>${receiptReply ? '<li><strong>Send the receipt attached</strong><br><span style="color:#4f5670">Attaches the source document to this record.</span></li>' : ''}${qn.choices.map(c => `<li><strong>${escapeHtml(c.label)}</strong><br><span style="color:#4f5670">${escapeHtml(c.effect)}</span></li>`).join('')}</ol>` : '') +
     `<p>${escapeHtml(how)}</p><p><a href="${escapeHtml(link)}">Open it in Pantry</a></p><p style="color:#5a6178">Nothing changes in the books for ${escapeHtml(business)} until you answer.</p>`
   return { text, html }
 }
@@ -80,11 +84,11 @@ export async function emailQuestion(env: Bindings, db: D1Database, qn: Question)
   return sent.status
 }
 
-/** After a reply Pantry read from the owner's words: what it understood, and how to say yes. */
+/** After a reply Pantry read from the recipient's words: what waits for confirmation in Pantry. */
 async function emailConfirmation(env: Bindings, db: D1Database, qn: Question, message: string) {
   const to = qn.assignee || await ownerEmail(db, env), link = questionLink(env, qn.id)
-  const text = `${message}\n\nReply YES to do it, or NO to leave it as it is. Or open it in Pantry: ${link}\n`
-  await deliver(env, db, to, `Re: ${qn.question.length <= 90 ? qn.question : qn.title} ${subjectRef(qn.ref)}`, text, `<p>${escapeHtml(message)}</p><p>Reply <strong>YES</strong> to do it, or <strong>NO</strong> to leave it as it is.</p><p><a href="${escapeHtml(link)}">Open it in Pantry</a></p>`)
+  const text = `${message}\n\nEmail replies cannot apply this change. Open it in Pantry to confirm: ${link}\n`
+  await deliver(env, db, to, `Re: ${qn.question.length <= 90 ? qn.question : qn.title} ${subjectRef(qn.ref)}`, text, `<p>${escapeHtml(message)}</p><p>Email replies cannot apply this change.</p><p><a href="${escapeHtml(link)}">Open it in Pantry to confirm</a></p>`)
 }
 
 type Parsed = { from: string | null; subject: string; text: string | null; html: string | null; attachments: { filename: string; contentType: string; content: Uint8Array }[] }
@@ -107,7 +111,7 @@ export function replyText(m: { text: string | null; html: string | null }) {
 }
 
 const RECEIPT = /^(application\/pdf|image\/(png|jpeg|webp|gif))$/
-export type ReplyOutcome = { result: 'not-mine' } | { result: 'refused'; reason: string } | { result: 'filed' | 'answered' | 'confirm' | 'unclear' | 'declined'; question: string }
+export type ReplyOutcome = { result: 'not-mine' } | { result: 'refused'; reason: string } | { result: 'filed' | 'answered' | 'confirm' | 'unclear'; question: string }
 
 /** One message delivered to the Pantry address (receipts/mail.ts asks here first). Anything without a question reference is not a reply. */
 export async function receiveReply(env: Bindings, raw: Uint8Array): Promise<ReplyOutcome> {
@@ -131,24 +135,20 @@ export async function receiveReply(env: Bindings, raw: Uint8Array): Promise<Repl
   const file = qn.kind === 'missing-receipt' ? m.attachments.find(a => RECEIPT.test(a.contentType) && a.content.length <= 1_500_000) : null
   if (file) { await answer(env, db, qn.id, { document: { name: file.filename || 'receipt', mediaType: file.contentType, bytes: file.content }, note: words.slice(0, 500) }, by); return { result: 'filed', question: qn.id } }
   if (qn.status === 'confirm' && /^(yes|y|yep|yeah|ok|okay|sure|do it|file it|approve)\b/i.test(words)) {
-    const done = await confirm(env, db, qn.id, true, by)
-    if (done.status === 'confirm') {
-      await emailConfirmation(env, db, done, `The books changed since the last preview. Review the updated effects before saying yes.${effectMessage(done.pending!.effects)}`)
-      return { result: 'confirm', question: qn.id }
-    }
-    return { result: done.status === 'filed' ? 'filed' : 'answered', question: qn.id }
+    await confirm(env, db, qn.id, true, by)
+    return { result: 'confirm', question: qn.id }
   }
-  if (qn.status === 'confirm' && /^(no|nope|not now|leave it)\b/i.test(words)) { await confirm(env, db, qn.id, false, by); return { result: 'declined', question: qn.id } }
+  if (qn.status === 'confirm' && /^(no|nope|not now|leave it)\b/i.test(words)) { await confirm(env, db, qn.id, false, by); return { result: 'confirm', question: qn.id } }
   const numbered = /^(\d{1,2})\b[.):]?\s*([\s\S]*)$/.exec(words)
   if (numbered) {
-    const choice = qn.choices[Number(numbered[1]) - 1], rest = numbered[2].trim()
+    const number = Number(numbered[1]), choice = qn.kind === 'missing-receipt' ? qn.choices[number === 1 ? 0 : number - 2] : qn.choices[number - 1], rest = numbered[2].trim()
     if (choice) {
       const remember = /\balways\b|\bfrom now on\b|\bevery time\b/i.test(rest)
       const note = rest.replace(/\balways\b|\bfrom now on\b|\bevery time\b/gi, '').replace(/^[\s,.;:—-]+/, '').trim()
       if (choice.action.type !== 'no-receipt' || note) {
         const done = await answer(env, db, qn.id, { choice: choice.id, remember, note, words }, by)
         if (done.status === 'confirm') {
-          await emailConfirmation(env, db, done, `Review this answer before saying yes: ${done.pending!.label}.${effectMessage(done.pending!.effects)}`)
+          await emailConfirmation(env, db, done, `Review this answer in Pantry before confirming it: ${done.pending!.label}.${done.pending!.effects ? effectMessage(done.pending!.effects) : ''}`)
           return { result: 'confirm', question: qn.id }
         }
         return { result: done.status === 'filed' ? 'filed' : 'answered', question: qn.id }
