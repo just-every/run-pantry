@@ -6,7 +6,7 @@
   "toolchain": {
     "id": "runeditrun/edition-authoring",
     "version": "1.1.0",
-    "sha256": "3ce2f4bc6357b80a2a744ab7572160ca73eea08c5c627402957bce492f22b6a5"
+    "sha256": "384af065c335fc7376f68262c2a5ca13134e195fa7492e30b9aa16c80d19eba2"
   },
   "components": [
     {
@@ -911,7 +911,7 @@
       "executable": false
     },
     "package.json": {
-      "sha256": "b354bfa59afa0d5e8a927a46a06f458cf99d779fbdb3b54aac5d6dade9f2d08f",
+      "sha256": "03f95f6ee82851354b83b5b7ceff20acbb8bf04031f525ddd89128ef279f51e7",
       "executable": false
     },
     "packaging.json": {
@@ -919,7 +919,7 @@
       "executable": false
     },
     "pnpm-lock.yaml": {
-      "sha256": "6351ebd33f1c8a8a3e3534475f5575a1e5fcfe931fa438137ce202470c7eefa9",
+      "sha256": "08fb9ce6d7c726e3670c37a65acdb621cda0edcbd1172e07830bd3ca19d5c9ba",
       "executable": false
     },
     "public/apple-touch-icon.png": {
