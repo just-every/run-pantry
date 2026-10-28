@@ -3,6 +3,9 @@ import { join } from 'node:path'
 import type { DocsBody, DocsSection } from '../types.ts'
 import { docsDirectory, manifestPath, readManifest } from './manifest.ts'
 import { renderMarkdown } from './render.ts'
+import { startLine, runRequirements } from '../../../base/run-site'
+import { runPricing } from '../../../base/run-pricing'
+import run from '../../run.json'
 
 // The whole docs site from the tree as it is: every page in docs/site.json rendered, every link to another docs page and
 // every anchor checked, and nothing that names a build machine's paths. Any problem fails the build with the full list.
@@ -16,10 +19,13 @@ export function buildDocs(root: string): DocsSite {
   const sections = readManifest(root)
   const pages = sections.flatMap(section => section.pages)
   const files = [join(root, manifestPath)]
+  // Markdown recipe slots read the same RunData and shared wording as /run.
+  const recipe = { start: startLine({ ...run, pricing: runPricing }), alternative: run.clone, requirements: runRequirements }
   const rendered = new Map(pages.map(page => {
     const file = join(root, docsDirectory, page.file)
     files.push(file)
-    return [page.slug, renderMarkdown(readFileSync(file, 'utf8'))] as const
+    const markdown = readFileSync(file, 'utf8').replace(/\{\{run\.(start|alternative|requirements)\}\}/g, (_, key: keyof typeof recipe) => recipe[key])
+    return [page.slug, renderMarkdown(markdown)] as const
   }))
   const problems: string[] = []
   for (const page of pages) {
