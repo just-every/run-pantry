@@ -163,15 +163,15 @@
       "executable": false
     },
     "docs/contract/COVERAGE.json": {
-      "sha256": "ae325cb06c20ff3bb72911f7308f082229ac42f3b2aea9301254453ce96397ac",
+      "sha256": "6559dfe6ee2300b7bc44b3fd27ff384b97b15370b65dcfcf00825e7987d8a165",
       "executable": false
     },
     "docs/contract/DONE-AUDIT.md": {
-      "sha256": "fc8c4e03602669b2b45778c7103675cf2a7a3ff4712e92bab735cf7405c8f18e",
+      "sha256": "bbd60d6c72d20d43d0d8a1fdc5415bf885ea55a8cc53350b4657a90dc48fe76a",
       "executable": false
     },
     "docs/contract/ID-MAP.json": {
-      "sha256": "87d84760609ef635dfaaee3a98557b732be35e1649fbb42adc0032d0d5222100",
+      "sha256": "1e88ffe4550c2f83141f8244d1fcfac2e1210c73470ca994cae56a7d54005a41",
       "executable": false
     },
     "docs/dimensions.md": {
@@ -4963,7 +4963,7 @@
       "executable": false
     },
     "src/pantry/questions/answer.ts": {
-      "sha256": "1e1560198444ac1f9d2489a6c7ab93372caa0cccb3eacc388b3b93908475ea9d",
+      "sha256": "b85d863666540c3e65c76ce98f60728cbb638492bcbe4a257f09722d50c6e409",
       "executable": false
     },
     "src/pantry/questions/checks.ts": {
@@ -4979,7 +4979,7 @@
       "executable": false
     },
     "src/pantry/questions/mail.ts": {
-      "sha256": "4bd86cd2613c224461aa4891d1c62c9c54c0f9fbf9ff74178906c02badb3a153",
+      "sha256": "bac84719362efffaad2be18e392086dea0bdd6e92eb809d02c98af870d7450e3",
       "executable": false
     },
     "src/pantry/questions/model.ts": {
@@ -6567,7 +6567,7 @@
       "executable": false
     },
     "tests/api/questions.test.mjs": {
-      "sha256": "19125ee1a17429fd4e8ce0931432c62e6b6dc6946e0987b957a4fb99ceff9a7d",
+      "sha256": "16fc043103581cf83c19a95edcd22cc4116281129401a2e235a11aad0f8af105",
       "executable": false
     },
     "tests/api/queue-journey.mjs": {

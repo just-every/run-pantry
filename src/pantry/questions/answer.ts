@@ -159,11 +159,15 @@ export async function answer(env: Bindings, db: D1Database, id: string, a: Answe
   }
   const c = await chosen(db, qn, a)
   const said = `${c.label}${note ? ` — ${note}` : ''}`
+  // A From header identifies where a proposal should wait, not who has authority to apply it.
+  if (by.via === 'email') {
+    if (c.action.type === 'no-receipt') requireThat(by.person.role === 'owner' || by.person.grants.post, 'Recording why there is no receipt needs the posting grant', 403)
+    return (await awaitYes(db, qn, a.words || said, { choice: c.id, accountId: null, remember: !!a.remember, note }, by)).question
+  }
   const base = (status: string, result: { kind?: string; id?: string } = {}) => [...settle(qn, status, by, said, result), say(qn.id, by.audit.email, by.via, a.words ? `${a.words}` : said)]
   switch (c.action.type) {
     case 'category': case 'invoice': case 'bill': case 'transfer': case 'posting': {
       const amountFences = answerAmountFence(by, qn, c)
-      if (by.via === 'email' && !a.previewToken) return (await awaitYes(db, qn, a.words || said, { choice: c.id, accountId: null, remember: !!a.remember, note }, by)).question
       const effects = await questionEffects(db, id, a, by)
       requireThat(a.previewToken === effects.token, 'The books, locks, issued reports or correction date changed; review the effects again before filing', 409)
       requireThat(!effects.locks.length, `Reopen ${effects.locks.map(l => l.name).join(', ')} before filing`, 409)
@@ -242,15 +246,16 @@ export async function awaitYes(db: D1Database, qn: Question, said: string, read:
 export async function confirm(env: Bindings, db: D1Database, id: string, yes: boolean, by: Answerer): Promise<Question> {
   const qn = await question(db, id)
   requireThat(qn.status === 'confirm' && qn.pending, 'There is nothing waiting for your yes on this question', 409)
+  if (by.via === 'email') {
+    await run(db, [by.authority('record'), say(qn.id, by.audit.email, 'email', yes ? 'Yes' : 'No'),
+      say(qn.id, AGENT.email, 'agent', 'For your security, this answer still waits for confirmation in Pantry.')])
+    return question(db, id)
+  }
   if (!yes) {
     await run(db, [by.authority('record'), q("UPDATE pt_questions SET status = 'open', pending = NULL, revision = ? WHERE id = ? AND revision = ?", uid(), qn.id, qn.revision), changed(),
       say(qn.id, by.audit.email, by.via, 'Not that.'), say(qn.id, AGENT.email, 'agent', 'Understood; nothing changed. Choose an answer, or tell Pantry in other words.')])
     return question(db, id)
   }
   const p = qn.pending
-  if (by.via === 'email' && p.effects) {
-    const current = await questionEffects(db, id, p, by)
-    if (current.token !== p.previewToken) return (await awaitYes(db, qn, p.read, { choice: p.choice, accountId: p.accountId, remember: p.remember, note: p.note }, by)).question
-  }
-  return answer(env, db, id, { choice: p.choice, accountId: p.accountId, remember: p.remember, note: p.note, date: p.date, previewToken: p.previewToken, words: by.via === 'email' ? 'Yes' : undefined }, by)
+  return answer(env, db, id, { choice: p.choice, accountId: p.accountId, remember: p.remember, note: p.note, date: p.date, previewToken: p.previewToken }, by)
 }
