@@ -14,6 +14,9 @@ assert.equal(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim
 const input=JSON.parse(await readFile(args[1],'utf8')),origin=new URL(input.origin).origin
 assert.ok(/^https:/.test(origin))
 assert.ok(input.cookie&&input.databaseId,'The disposable installation needs a native owner session and D1 identity')
+const health=await fetch(origin+'/health',{redirect:'manual',headers:{'cache-control':'no-cache'}})
+assert.equal(health.status,200,'The hosted deployment must report its identity')
+assert.equal((await health.json()).deployment?.sourceSha,head,'Measure the exact committed candidate deployed at this origin')
 const headers={authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN,'content-type':'application/json'}
 const response=await fetch('https://api.cloudflare.com/client/v4/accounts/'+process.env.CLOUDFLARE_ACCOUNT_ID+'/d1/database/'+input.databaseId+'/query',{method:'POST',headers,body:JSON.stringify({sql:"SELECT (SELECT count(*) FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id WHERE e.status='posted') AS lines,(SELECT count(*) FROM pt_documents) AS documents,min(entry_date) AS first,max(entry_date) AS last FROM pt_journal_entries WHERE status='posted'"})})
 assert.equal(response.status,200)

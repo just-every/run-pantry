@@ -1,11 +1,10 @@
-import type { DimensionScope } from '../dimensions/scope'
+import { inDimension, type DimensionScope } from '../dimensions/scope'
 // Sales by item (ITEM-001, REPORT-004): income grouped by the item each
 // invoice or credit line was sold as, on the accrual or cash basis. Income that
 // carries no item (lines typed without one, direct postings) stays visible as
 // one row, so the total ties to the profit and loss income for the same range.
 import { all } from '../db'
-import { generalLedger } from '../reports'
-import type { Basis } from '../basis'
+import { cashLines, sameOnCash, type Basis } from '../basis'
 import type { Data } from '../core'
 
 /** The item an income line was sold as; the report and its drill-through share it. */
@@ -29,8 +28,15 @@ export async function itemGrouping(db: D1Database) {
 export async function salesByItem(db: D1Database, from: string, to: string, basis: Basis, dimension?: DimensionScope) {
   const grouping = await itemGrouping(db)
   const groups = new Map<string, { id: string; name: string; sku: string | null; amount: number }>()
-  const ledger = await generalLedger(db, from, to, undefined, basis, dimension)
-  for (const account of ledger.accounts.filter(a => a.type === 'income')) for (const line of account.rows) {
+  const lines:Data[]=await all(db,`SELECT l.id,l.account_id,l.line_no,l.entry_id,l.debit_cents,l.credit_cents,e.reverses_id
+    FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id JOIN pt_accounts a ON a.id=l.account_id
+    WHERE e.status='posted' AND e.entry_date BETWEEN ? AND ? AND a.type='income' ${basis==='cash'?`AND ${sameOnCash()}`:''} ${dimension?`AND l.${dimension.kind}_name=?`:''}`,from,to,...(dimension?[dimension.value]:[]))
+  if(basis==='cash') {
+    const income=new Set((await all(db,"SELECT id FROM pt_accounts WHERE type='income'")).map(a=>a.id))
+    for(const [i,line] of (await cashLines(db,from,to)).entries())if(income.has(line.accountId)&&inDimension(line,dimension))
+      lines.push({id:`cash-${i}`,account_id:line.accountId,item_id:line.itemId??null,debit_cents:Math.max(line.net,0),credit_cents:Math.max(-line.net,0)})
+  }
+  for (const line of lines) {
     const id = grouping.of(line), it = grouping.item(id)
     const group = groups.get(id) ?? { id, name: it ? it.name : 'No item (other income)', sku: it?.sku ?? null, amount: 0 }
     group.amount += line.credit_cents - line.debit_cents

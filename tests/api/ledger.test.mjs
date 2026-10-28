@@ -54,7 +54,7 @@ test('PAN-02 a chart of accounts is configured and opening balances post only af
 })
 
 test('PAN-03 customers, vendors and source documents are kept, with document bytes returned exactly', async t => {
-  const h = await harness(); t.after(() => h.close())
+  const h = await harness({r2Buckets:{PANTRY_DOCUMENTS:'synthetic-pantry-documents'}}); t.after(() => h.close())
   await books(h)
   const vic = await h.member('vic@example.test', 'viewer')
   const cedar = await h.command('contact.save', { kind: 'customer', name: 'Cedar Studio', email: 'Billing@Cedar.example', termsDays: 15 })
@@ -72,7 +72,44 @@ test('PAN-03 customers, vendors and source documents are kept, with document byt
   const download = await fetch(`${h.origin}/api/pantry/documents/${doc.id}`, { headers: { cookie: vic } })
   assert.equal(download.status, 200)
   assert.deepEqual(Buffer.from(await download.arrayBuffer()), bytes)
+  const reader=await h.command('integration.create',{name:'synthetic-pantry-988',scopes:['documents:read']})
+  const scoped=await fetch(`${h.origin}/api/pantry/integration/v1/documents/${doc.id}`,{headers:{authorization:`Bearer ${reader.token}`}})
+  assert.equal(scoped.status,200)
+  assert.deepEqual(Buffer.from(await scoped.arrayBuffer()),bytes)
+
   assert.equal((await fetch(`${h.origin}/api/pantry/documents/${doc.id}`)).status, 401)
+  const bucket=await h.bucket('PANTRY_DOCUMENTS'),objects=await bucket.list()
+  assert.equal(objects.objects.length,1)
+  const key=objects.objects[0].key
+  assert.deepEqual(Buffer.from(await (await bucket.get(key)).arrayBuffer()),bytes)
+  await bucket.put(key,Buffer.from('synthetic-pantry-986'))
+  assert.equal((await h.send(`/api/pantry/documents/${doc.id}`,undefined,{cookie:vic})).status,500,'Corrupt object bytes are refused')
+  // Main's custody model releases D1 staging after verified promotion. A
+  // corrupt or missing committed original must stay refused until restored
+  // from independent recovery bytes, rather than rebuilding an empty mirror.
+  await bucket.put(key,bytes)
+  await h.cron(Date.parse('2026-10-01T12:00:00Z'))
+  assert.deepEqual(Buffer.from(await (await fetch(`${h.origin}/api/pantry/documents/${doc.id}`,{headers:{cookie:vic}})).arrayBuffer()),bytes,'Recovered objects retain their exact original bytes after Cron')
+  await bucket.delete(key)
+  assert.equal((await h.send(`/api/pantry/documents/${doc.id}`,undefined,{cookie:vic})).status,500,'Missing committed objects are refused')
+  await bucket.put(key,bytes)
+  await h.cron(Date.parse('2026-10-01T12:00:00Z'))
+  assert.deepEqual(Buffer.from(await (await bucket.get(key)).arrayBuffer()),bytes,'Scheduled custody preserves the recovered object')
+  // Link an unposted source to an erased enquiry: both the object and ordinary
+  // download disappear, while the source hash remains in the books.
+  const lead=await h.command('contact.save',{kind:'vendor',name:'synthetic-pantry-987'})
+  const source=await h.command('document.upload',{name:'synthetic-pantry-987.txt',mediaType:'text/plain',base64:Buffer.from('synthetic-pantry-987').toString('base64')})
+  const preview=await h.command('erasure.preview',{kind:'contact',id:lead.id})
+  await h.command('erasure.execute',{kind:'contact',id:lead.id,fingerprint:preview.fingerprint,requester:'Synthetic requester',channel:'in-person',reason:'Remove obsolete enquiry',confirm:'ERASE'})
+  assert.equal((await h.send(`/api/pantry/documents/${source.id}`,undefined,{cookie:h.owner})).status,410)
+  const withdrawn=(await bucket.list()).objects.find(o=>o.key!==key)
+  assert.ok(withdrawn)
+  assert.equal(withdrawn.size,0,'Erasure leaves no original bytes in object storage')
+  const late=await bucket.put(withdrawn.key,Buffer.from('synthetic-pantry-987'),{onlyIf:{etagDoesNotMatch:'*'}})
+  assert.equal(late,null,'An upload that began before erasure cannot recreate personal bytes')
+  assert.equal((await bucket.head(withdrawn.key)).size,0)
+  assert.deepEqual((await bucket.list()).objects.filter(o=>o.size>0).map(o=>o.key),[key])
+
   await h.command('contact.save', { id: cedar.id, revision: cedar.revision, kind: 'customer', name: 'Cedar Studio', active: false })
   const acct = at((await h.view('state')).accounts, a => a.code === '4000')
   await h.command('invoice.save-draft', { customerId: cedar.id, issueDate: '2026-09-01', lines: [{ description: 'x', quantity: '1', rate: '10.00', accountId: acct.id, taxCode: 'exempt' }] }, h.owner, 400)
