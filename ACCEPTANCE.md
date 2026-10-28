@@ -208,7 +208,7 @@ Core · published · **partial** · Cites BASE-DATA-001, BASE-BACKUP-001 · Rule
 4. Keep connection credentials installation-local and absent from the archive.
 
 **Evidence.** `src/pantry/package.ts`, `tests/api/close.test.mjs`, `tests/restore/restore.test.mjs`
-**Gap.** Asserted: Entity, close state and report agreement; Reconciled bank closing balances. Unasserted: Every listed package field, notably notes and monthly/year-to-date report distinctions, is not individually asserted. Unasserted: Exact original document bytes and move-in journal equality require separate outcome reads beyond this snapshot. Unasserted: Unbalanced archive and existing-destination refusals; exact CLI assertions are reviewed separately and are not inferred from successful restore.
+**Gap.** Asserted: Entity, close state and report agreement; Reconciled bank closing balances. Unasserted: Every listed package field, notably notes and monthly/year-to-date report distinctions, is not individually asserted. Unasserted: Fresh restored books equal original (the assertion moved to tests/restore/journey.mjs outside the old cited Evidence). Unasserted: Exact original document bytes and move-in journal equality require separate outcome reads beyond this snapshot. Unasserted: Starting over restores the same books (the assertion moved to tests/restore/journey.mjs outside the old cited Evidence). Unasserted: Unbalanced archive and existing-destination refusals; exact CLI assertions are reviewed separately and are not inferred from successful restore. Unasserted: Credential tables are excluded from the actual archive (the assertion moved to tests/restore/journey.mjs outside the old cited Evidence). Unasserted: Credential-only and pending-delivery rows absent (the assertions moved to tests/restore/journey.mjs outside the old cited Evidence).
 
 #### PAN-15 — Agent preparation
 
@@ -2098,7 +2098,7 @@ Core · target · **partial** · Cites BASE-DATA-003, BASE-DATA-006
 2. Erase a former customer with invoices and see their personal fields replaced, the books unchanged, the receipt counts, and an older archive import refusing to restore the erased fields.
 
 **Evidence.** `tests/api/security.test.mjs`, `tests/api/invoices-out.test.mjs`, `tests/api/move-in.test.mjs`, `tests/restore/restore.test.mjs`, `tests/app/app.test.mjs`, `tests/app/erasure-journey.mjs`, `tests/api/integrations.test.mjs`, `tests/api/receipts.test.mjs`
-**Gap.** Asserted: Transaction-free lead removed and receipt counts one contact; Receipt and audit retain no erased value. Unasserted: Complete receipt counts for every affected table, including the original address field, are not independently reconciled by these selected assertions.
+**Gap.** Asserted: Transaction-free lead removed and receipt counts one contact; Receipt and audit retain no erased value. Unasserted: Old archive is refused with a named erasure fence (the assertions moved to tests/restore/erasure.test.mjs outside the old cited Evidence). Unasserted: Complete receipt counts for every affected table, including the original address field, are not independently reconciled by these selected assertions.
 
 #### DATA-001 — Declared data flows and credentials
 

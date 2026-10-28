@@ -2,7 +2,7 @@
   "schema": 1,
   "seed": "pantry",
   "old": {
-    "commit": "ecda5cd652d8d499b39d39e4749ae7ca62fe36e1",
+    "commit": "c172b37968cb6593da8208b647904d6fee800c13",
     "files": [
       "CONTRACT.md",
       "ACCEPTANCE.md",
