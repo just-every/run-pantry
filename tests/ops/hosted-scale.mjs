@@ -10,6 +10,7 @@ const args=process.argv.slice(2)
 assert.equal(args.length,4,'Use --input PRIVATE.json --receipt OUTSIDE.json')
 assert.equal(args[0],'--input'); assert.equal(args[2],'--receipt')
 for(const path of [args[1],args[3]])assert.ok(relative(process.cwd(),resolve(path)).startsWith('..'),'Keep private inputs and run receipts outside the checkout')
+const runId='sx-pantry-c-f9-hosted-scale-'+new Date().toISOString()
 const head=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()
 assert.equal(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),'','Run a clean committed candidate')
 const input=JSON.parse(await readFile(args[1],'utf8')),origin=new URL(input.origin).origin
@@ -33,15 +34,21 @@ assert.deepEqual(custody,[{state:'ready',count:20000}],'All loaded originals mus
 assert.ok(input.bucketName,'Name the disposable deployment document bucket')
 const bucket=hostedR2({accountId:process.env.CLOUDFLARE_ACCOUNT_ID,token:process.env.CLOUDFLARE_API_TOKEN,bucketName:input.bucketName})
 let cursor,objectCount=0,objectBytes=0
+const actualObjects=[]
 const cursors=new Set()
 do {
  const page=await bucket.list({prefix:'documents/',cursor})
  objectCount+=page.objects.length;objectBytes+=page.objects.reduce((n,o)=>n+o.size,0)
+ actualObjects.push(...page.objects.map(o=>({key:o.key,size:o.size})))
  cursor=page.truncated?page.cursor:undefined
  if(page.truncated){assert.ok(cursor,'A truncated inventory must have a next cursor');assert.ok(!cursors.has(cursor),'The object inventory must advance');cursors.add(cursor)}
 }while(cursor)
 assert.equal(objectCount,20000,'Count actual private objects, not only document rows')
 assert.ok(objectBytes>=20000,'Each original has content')
+const expectedResponse=await fetch('https://api.cloudflare.com/client/v4/accounts/'+process.env.CLOUDFLARE_ACCOUNT_ID+'/d1/database/'+input.databaseId+'/query',{method:'POST',headers,body:JSON.stringify({sql:'SELECT o.object_key AS key,d.size FROM pt_document_objects o JOIN pt_documents d ON d.id=o.document_id ORDER BY o.object_key'})})
+assert.equal(expectedResponse.status,200)
+const expectedObjects=(await expectedResponse.json()).result[0].results
+assert.deepEqual(actualObjects.sort((a,b)=>a.key<b.key?-1:a.key>b.key?1:0),expectedObjects,'The private object keys and sizes must match the independently stored document custody')
 const measurements=[],failures=[]
 for(const basis of ['accrual','cash'])for(const kind of kinds) {
  try {
@@ -62,5 +69,5 @@ for(const basis of ['accrual','cash'])for(const kind of kinds) {
  }
 }
 assert.equal(execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),head)
-await writeFile(args[3],JSON.stringify({head,inventory,custody,objectCount,objectBytes,measurements,failures,status:failures.length?'failed':'passed'},null,2)+'\n',{mode:0o600})
+await writeFile(args[3],JSON.stringify({runId,head,inventory,custody,objectCount,objectBytes,measurements,failures,status:failures.length?'failed':'passed'},null,2)+'\n',{mode:0o600})
 assert.deepEqual(failures,[],'Every hosted report must complete under three seconds')
