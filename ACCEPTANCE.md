@@ -2067,8 +2067,7 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-SIGNIN-001, BASE-SIGN
 
 **Acceptance.**
 1. Try to grant post to an accountant without a passkey and be refused until one is added.
-2. Sign in through an OIDC provider and revoke a session from another device.
-3. Attempt to connect a bank without step-up and be asked to sign in again.
+2. Attempt to connect a bank without step-up and be asked to sign in again.
 
 **Evidence.** `src/auth.server.ts`, `src/pantry/access.ts`
 **Gap.** Native email sign-in with server-checked sessions and origin checks ships. A same-session email step-up guards the native TIN reveal door; passkey and MFA requirements, SSO, session list and the other sensitive-action gates remain open.
@@ -2092,7 +2091,7 @@ Core · target · **partial** · Cites BASE-AUDIT-001, BASE-OPS-005, BASE-AGENT-
 
 Core · target · **partial** · Cites BASE-DATA-003, BASE-DATA-006
 
-**Requirement.** The owner can erase a person's personal data. A customer, vendor or person with no posted transactions is removed. One with posted transactions keeps the legal name and amounts the books need. Their email, phone, address, notes and contacts are replaced by an erasure marker, and the retention reason is shown. The detailed accounting and custody rules in [the capability record](docs/contract-mechanisms.md#erasure-001) govern the same workflow.
+**Requirement.** A customer, vendor or person with no posted transactions is removed. One with posted transactions keeps the legal name and amounts the books need. Their email, phone, address, notes and contacts are replaced by an erasure marker, and the retention reason is shown. The detailed accounting and custody rules in [the capability record](docs/contract-mechanisms.md#erasure-001) govern the same workflow.
 
 **Acceptance.**
 1. Erase a lead with no transactions and see it gone.
@@ -2255,15 +2254,14 @@ Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 
 #### AGENT-010 — Agent governance
 
-Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008 · Rules D-1, D-2, D-4, D-5, D-7, D-8
+Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008, BASE-AGENT-004, BASE-AGENT-005, BASE-AGENT-009, BASE-AGENT-011 · Rules D-1, D-2, D-4, D-5, D-7, D-8
 
-**Requirement.** Pantry’s embedded bookkeeper uses the installation’s chosen model through Base’s AI adapter, with Claude as its initial model choice; outside agents use the same accounting actions. The company policy decides standard preparations, external contact, money movement, commitment decisions, access changes, security changes, destructive voids and sensitive bank or tax reads. Period locks bind accounting actions regardless of actor. The seed’s financial activity records classes and the policy decision. Provider cost is charged to the configured policy cap.
+**Requirement.** Pantry’s embedded bookkeeper uses the installation’s chosen model through Base’s AI adapter, with Claude as its initial model choice; outside agents use the same accounting actions. Financial-period locks bind these accounting actions, and the seed computes financial classes from its source records as described in the Agent surface.
 
 **Acceptance.**
 1. Under a company policy with a $20 monthly model-spend cap, reach the cap and see further spending refused while non-spending work remains available.
 2. Place an instruction in a source document and see the accounting result use only its evidence, with no widened grant or changed class.
 3. Under policies that authorize and refuse the same financial classes, see the corresponding accounting actions follow each decision without using a person’s identity.
-4. Pause agents and see no further agent effect while the browser accounting workflow remains available.
 
 **Evidence.** `src/pantry/access.ts`, `src/pantry/proposals.ts`, `src/pantry/questions/model.ts`, `src/pantry/receipts/settings.ts`, `tests/api/agent.test.mjs`
 **Gap.** Existing held-company-policy evidence: Owner-issued, revocable tokens can only read context and file proposals; Pantry's own reading uses the installation's sealed Anthropic or OpenAI-compatible key and treats documents and replies as untrusted; Base's ai module, per-agent permissions and data scope, the USD spending limit, rate limits, a full agent read log and the stop switch do not exist. The company’s policy must decide future tool calls by their declared classes; the current bounded behavior supplies no product disposition.

@@ -3878,7 +3878,43 @@
     {
       "file": "CONTRACT.md",
       "line": 526,
-      "text": "**OWN-001 \u2014 Owned, free and open source.** Pantry is free software under the MIT license. The business runs it on its own computer with one line, `npx -y @runeditrun/rer dev just-every/run-pantry`, or deploys it to its own Cloudflare account. The books live in the business's own database, documents are kept byte for byte, and everything leaves at any time (PAN-14). No Pantry account or subscription stands between the business and its books. The only fees are those of the providers the business chooses to connect, each listed on DATA-001's page. **Acceptance evidence:** Read `LICENSE`. From a fresh clone, install, set up and run through the `rer` verbs, record books, export them and restore them into a second installation (`tests/restore/restore.test.mjs`).",
+      "text": "**OWN-001 \u2014 Owned, free and open source.** Pantry is free software under the MIT license. ",
+      "to": "clause",
+      "ids": [
+        "OWN-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 526,
+      "text": "The business runs it on its own computer with one line, `npx -y @runeditrun/rer dev just-every/run-pantry`, or deploys it to its own Cloudflare account.",
+      "to": "base",
+      "ids": [
+        "BASE-INSTALL-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 526,
+      "text": " The books live in the business's own database, documents are kept byte for byte, and everything leaves at any time (PAN-14). ",
+      "to": "clause",
+      "ids": [
+        "OWN-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 526,
+      "text": "No Pantry account or subscription stands between the business and its books.",
+      "to": "base",
+      "ids": [
+        "BASE-DATA-005"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 526,
+      "text": " The only fees are those of the providers the business chooses to connect, each listed on DATA-001's page. **Acceptance evidence:** Read `LICENSE`. From a fresh clone, install, set up and run through the `rer` verbs, record books, export them and restore them into a second installation (`tests/restore/restore.test.mjs`).",
       "to": "clause",
       "ids": [
         "OWN-001"
@@ -4040,7 +4076,70 @@
     {
       "file": "CONTRACT.md",
       "line": 547,
-      "text": "**ACCESS-002 \u2014 Sign-in security.** People sign in with an email link or a passkey, and a passkey or MFA is required for anyone holding post, lock, payment or connection grants. Single sign-on works through Auth or any OIDC or SAML provider. Each person can see and revoke their sessions. Step-up sign-in is required before releasing a payment, connecting a bank, revealing a TIN or issuing an agent token. **Acceptance evidence:** Try to grant post to an accountant without a passkey and be refused until one is added. Sign in through an OIDC provider and revoke a session from another device. Attempt to connect a bank without step-up and be asked to sign in again.",
+      "text": "**ACCESS-002 \u2014 Sign-in security.** ",
+      "to": "clause",
+      "ids": [
+        "ACCESS-002"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 547,
+      "text": "People sign in with an email link or a passkey, and ",
+      "to": "base",
+      "ids": [
+        "BASE-ACCESS-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 547,
+      "text": "a passkey or MFA is required for anyone holding post, lock, payment or connection grants. ",
+      "to": "clause",
+      "ids": [
+        "ACCESS-002"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 547,
+      "text": "Single sign-on works through Auth or any OIDC or SAML provider.",
+      "to": "base",
+      "ids": [
+        "BASE-SIGNIN-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 547,
+      "text": "Each person can see and revoke their sessions.",
+      "to": "base",
+      "ids": [
+        "BASE-ACCESS-002"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 547,
+      "text": " Step-up sign-in is required before releasing a payment, connecting a bank, revealing a TIN or issuing an agent token. **Acceptance evidence:** Try to grant post to an accountant without a passkey and be refused until one is added. ",
+      "to": "clause",
+      "ids": [
+        "ACCESS-002"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 547,
+      "text": "Sign in through an OIDC provider and revoke a session from another device.",
+      "to": "base",
+      "ids": [
+        "BASE-SIGNIN-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 547,
+      "text": " Attempt to connect a bank without step-up and be asked to sign in again.",
       "to": "clause",
       "ids": [
         "ACCESS-002"
@@ -4067,7 +4166,31 @@
     {
       "file": "CONTRACT.md",
       "line": 552,
-      "text": "**ERASURE-001 \u2014 Erasure within record-keeping law.** The owner can erase a person's personal data. A customer, vendor or person with no posted transactions is removed. One with posted transactions keeps the legal name and amounts the books need. Their email, phone, address, notes and contacts are replaced by an erasure marker, and the retention reason is shown. TINs and documents that support posted entries are kept until the retention period the owner sets (default 7 years) and are then erasable. Each erasure returns a receipt with per-table counts. A later archive import cannot bring erased data back. Erasure policy (ct, 22 Oct 2026). Only the owner, in a native session, erases; admins, accountants, agents and API tokens cannot, and there is no self-service door: a person's request reaches the owner, who records requester, channel and reason. Subjects are customers, vendors, leads and their contacts, and deactivated non-owner members; the owner cannot be erased. A dry-run preview lists every record class with its action (removed, replaced, or retained with its reason and expiry date); execution needs the previewed revisions, a reason and typed ERASE, runs in one atomic batch with the erasure journal, and returns the receipt and one audit event. Erasure is refused, naming the records, while the subject has an unposted draft, an open balance, a pending provider payment or an active recurring template. Without posted transactions the subject's rows are removed. With them, the legal name, amounts, numbers, dates, coding and every posted entry are kept unchanged; email, phone, address, notes and contacts are replaced by the erasure marker; hosted invoice links are revoked; a member's sign-in identity, sessions and passkeys are removed and their name and email become one random `Former member <8 hex>` label wherever they appear. TINs and documents that support posted entries, including issued invoice PDFs, are kept until the owner's retention period in whole years (default 7, minimum 1; below 7 the setting shows IRS Publication 583's periods) has passed since the latest posted transaction they support, corrections and reversals included. A changed period applies to every record not yet erased, recomputed from its own clock, and never revives an erased one. Expired items appear in a Ready to erase list; once the owner confirms, their bytes or TIN are removed, keeping the record, number, totals, revision and SHA-256. AUDIT-001 entries are never removed: erasure replaces only the subject's declared personal values in before/after snapshots, and those exact values in free text, with the marker, keeping each entry's actor, time, action, record, revision and approval; Activity shows \"values removed by erasure <id> on <date>\", and nothing rebuilds them. The journal and receipt hold no erased value. The receipt gives per-table counts of rows removed, fields replaced, audit values replaced, links revoked, webhook attempts cancelled and items retained with expiry dates, and names what Pantry does not erase: posted-entry free text, connected services that already received the data (DATA-001), downloaded files and earlier backups. Restoring an archive made before the erasure is refused, naming the erasure, when the destination knows it or the later archive is supplied with `rer import --journal`; a fresh destination given no later archive restores it labelled 'erasure history unverified: supply your latest archive as the journal', after first asking for that journal. No legal adequacy is asserted. **Acceptance evidence:** Erase a lead with no transactions and see it gone. Erase a former customer with invoices and see their personal fields replaced, the books unchanged, the receipt counts, and an older archive import refusing to restore the erased fields.",
+      "text": "**ERASURE-001 \u2014 Erasure within record-keeping law.** ",
+      "to": "clause",
+      "ids": [
+        "ERASURE-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-mechanisms.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 552,
+      "text": "The owner can erase a person's personal data.",
+      "to": "base",
+      "ids": [
+        "BASE-DATA-003"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 552,
+      "text": " A customer, vendor or person with no posted transactions is removed. One with posted transactions keeps the legal name and amounts the books need. Their email, phone, address, notes and contacts are replaced by an erasure marker, and the retention reason is shown. TINs and documents that support posted entries are kept until the retention period the owner sets (default 7 years) and are then erasable. Each erasure returns a receipt with per-table counts. A later archive import cannot bring erased data back. Erasure policy (ct, 22 Oct 2026). Only the owner, in a native session, erases; admins, accountants, agents and API tokens cannot, and there is no self-service door: a person's request reaches the owner, who records requester, channel and reason. Subjects are customers, vendors, leads and their contacts, and deactivated non-owner members; the owner cannot be erased. A dry-run preview lists every record class with its action (removed, replaced, or retained with its reason and expiry date); execution needs the previewed revisions, a reason and typed ERASE, runs in one atomic batch with the erasure journal, and returns the receipt and one audit event. Erasure is refused, naming the records, while the subject has an unposted draft, an open balance, a pending provider payment or an active recurring template. Without posted transactions the subject's rows are removed. With them, the legal name, amounts, numbers, dates, coding and every posted entry are kept unchanged; email, phone, address, notes and contacts are replaced by the erasure marker; hosted invoice links are revoked; a member's sign-in identity, sessions and passkeys are removed and their name and email become one random `Former member <8 hex>` label wherever they appear. TINs and documents that support posted entries, including issued invoice PDFs, are kept until the owner's retention period in whole years (default 7, minimum 1; below 7 the setting shows IRS Publication 583's periods) has passed since the latest posted transaction they support, corrections and reversals included. A changed period applies to every record not yet erased, recomputed from its own clock, and never revives an erased one. Expired items appear in a Ready to erase list; once the owner confirms, their bytes or TIN are removed, keeping the record, number, totals, revision and SHA-256. AUDIT-001 entries are never removed: erasure replaces only the subject's declared personal values in before/after snapshots, and those exact values in free text, with the marker, keeping each entry's actor, time, action, record, revision and approval; Activity shows \"values removed by erasure <id> on <date>\", and nothing rebuilds them. The journal and receipt hold no erased value. The receipt gives per-table counts of rows removed, fields replaced, audit values replaced, links revoked, webhook attempts cancelled and items retained with expiry dates, and names what Pantry does not erase: posted-entry free text, connected services that already received the data (DATA-001), downloaded files and earlier backups. Restoring an archive made before the erasure is refused, naming the erasure, when the destination knows it or the later archive is supplied with `rer import --journal`; a fresh destination given no later archive restores it labelled 'erasure history unverified: supply your latest archive as the journal', after first asking for that journal. No legal adequacy is asserted. **Acceptance evidence:** Erase a lead with no transactions and see it gone. Erase a former customer with invoices and see their personal fields replaced, the books unchanged, the receipt counts, and an older archive import refusing to restore the erased fields.",
       "to": "clause",
       "ids": [
         "ERASURE-001"
@@ -4091,7 +4214,25 @@
     {
       "file": "CONTRACT.md",
       "line": 556,
-      "text": "**OPS-001 \u2014 Hosted operation, backups and scale.** The hosted Cloudflare deployment keeps documents in object storage and the ledger in D1, takes scheduled backups of both and restores them in a drill. It handles a business with 250,000 posted lines, 20,000 documents and five years of history, with any report under three seconds. A hosted restore, when built, passes through ERASURE-001's journal fence. **Acceptance evidence:** Load five years at that size into a hosted deployment, run every report and measure under three seconds. Take a backup, restore it into a fresh deployment and compare snapshots.",
+      "text": "**OPS-001 \u2014 Hosted operation, backups and scale.** The hosted Cloudflare deployment keeps documents in object storage and the ledger in D1, ",
+      "to": "clause",
+      "ids": [
+        "OPS-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 556,
+      "text": "takes scheduled backups of both and restores them in a drill.",
+      "to": "base",
+      "ids": [
+        "BASE-BACKUP-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 556,
+      "text": " It handles a business with 250,000 posted lines, 20,000 documents and five years of history, with any report under three seconds. A hosted restore, when built, passes through ERASURE-001's journal fence. **Acceptance evidence:** Load five years at that size into a hosted deployment, run every report and measure under three seconds. Take a backup, restore it into a fresh deployment and compare snapshots.",
       "to": "clause",
       "ids": [
         "OPS-001"
@@ -4211,10 +4352,82 @@
     {
       "file": "CONTRACT.md",
       "line": 580,
-      "text": "**AGENT-010 \u2014 Agent governance.** Built-in agents run through Base's ai module with the owner's chosen model provider, with Anthropic Claude as the default. The owner's own agents use tokens (PAN-15). The owner sets each agent's permissions, data scope, monthly spending limit in USD and rate limits. Every document an agent reads is treated as untrusted data. Every agent read and action is logged. A switch stops all agents at once. No agent can post into a locked period, approve, release a payment, lock, reopen or move money. **Acceptance evidence:** Set a $20 monthly limit and see agent work pause when it is reached. Plant an instruction in a document and see it ignored. Try each forbidden action with an agent token and be refused. Flip the stop switch and see no further agent action.",
+      "text": "**AGENT-010 \u2014 Agent governance.** Built-in agents run through Base's ai module with the owner's chosen model provider, with Anthropic Claude as the default. ",
       "to": "clause",
       "ids": [
         "AGENT-010"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 580,
+      "text": "The owner's own agents use tokens (PAN-15).",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-004"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 580,
+      "text": "The owner sets each agent's permissions, data scope,",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-005"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 580,
+      "text": "monthly spending limit in USD and rate limits.",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-011"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 580,
+      "text": "Every document an agent reads is treated as untrusted data.",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-005"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 580,
+      "text": "Every agent read and action is logged.",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-009"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 580,
+      "text": "A switch stops all agents at once.",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-011"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 580,
+      "text": " No agent can post into a locked period, approve, release a payment, lock, reopen or move money. **Acceptance evidence:** Set a $20 monthly limit and see agent work pause when it is reached. Plant an instruction in a document and see it ignored. Try each forbidden action with an agent token and be refused. ",
+      "to": "clause",
+      "ids": [
+        "AGENT-010"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 580,
+      "text": "Flip the stop switch and see no further agent action.",
+      "to": "base",
+      "ids": [
+        "BASE-AGENT-011"
       ]
     },
     {

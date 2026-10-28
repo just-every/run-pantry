@@ -76,14 +76,14 @@ Pantry keeps every record the category runs on: the chart, ledger, bank and card
 | BASE-AGENT-001 | One MCP door per seed | SURFACE-001 | not run |
 | BASE-AGENT-002 | The seed's jobs are tools, through the UI's own actions | AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009, AGENT-010, AGENT-011, SURFACE-001 | not run |
 | BASE-AGENT-003 | Records are resources | PAN-15, SURFACE-004 | not run |
-| BASE-AGENT-004 | Business identity and short-lived, audience-bound tokens | PAN-15 | not run |
-| BASE-AGENT-005 | An agent acts as a person in a role, never more | PAN-15, AGENT-007, SURFACE-003 | not run |
+| BASE-AGENT-004 | Business identity and short-lived, audience-bound tokens | PAN-15, AGENT-010 | not run |
+| BASE-AGENT-005 | An agent acts as a person in a role, never more | PAN-15, AGENT-007, AGENT-010, SURFACE-003 | not run |
 | BASE-AGENT-006 | Every action declares its risk class | AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009, AGENT-010, AGENT-011, SURFACE-001, SURFACE-002, SURFACE-003 | not run |
 | BASE-AGENT-007 | The company's policy decides, at one chokepoint | PAN-15, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009, AGENT-010, AGENT-011, SURFACE-002, SURFACE-003, SURFACE-005 | not run |
 | BASE-AGENT-008 | Truthful attribution | PAN-15, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009, AGENT-010, AGENT-011 | not run |
-| BASE-AGENT-009 | Every agent action is audited with its class and decision | AUDIT-001 | not run |
+| BASE-AGENT-009 | Every agent action is audited with its class and decision | AUDIT-001, AGENT-010 | not run |
 | BASE-AGENT-010 | Agents can follow changes | SURFACE-004 | not run |
-| BASE-AGENT-011 | Limits are policy, and Pause stops everything | none | not run |
+| BASE-AGENT-011 | Limits are policy, and Pause stops everything | AGENT-010 | not run |
 | BASE-AGENT-012 | Writes are idempotent and conflict-safe | PAN-15, SURFACE-004 | not run |
 | BASE-AGENT-013 | Manifest, docs and the conformance journey | SURFACE-001, SURFACE-005 | not run |
 
@@ -1702,8 +1702,7 @@ Pantry keeps every record the category runs on: the chart, ledger, bank and card
 
 **Acceptance.**
 1. Try to grant post to an accountant without a passkey and be refused until one is added.
-2. Sign in through an OIDC provider and revoke a session from another device.
-3. Attempt to connect a bank without step-up and be asked to sign in again.
+2. Attempt to connect a bank without step-up and be asked to sign in again.
 
 #### AUDIT-001 — Who, what and when
 
@@ -1721,7 +1720,7 @@ Pantry keeps every record the category runs on: the chart, ledger, bank and card
 
 *Tier:* Core · *Cites:* BASE-DATA-003, BASE-DATA-006
 
-**Requirement.** The owner can erase a person's personal data. A customer, vendor or person with no posted transactions is removed. One with posted transactions keeps the legal name and amounts the books need. Their email, phone, address, notes and contacts are replaced by an erasure marker, and the retention reason is shown. The detailed accounting and custody rules in [the capability record](docs/contract-mechanisms.md#erasure-001) govern the same workflow.
+**Requirement.** A customer, vendor or person with no posted transactions is removed. One with posted transactions keeps the legal name and amounts the books need. Their email, phone, address, notes and contacts are replaced by an erasure marker, and the retention reason is shown. The detailed accounting and custody rules in [the capability record](docs/contract-mechanisms.md#erasure-001) govern the same workflow.
 
 **Acceptance.**
 1. Erase a lead with no transactions and see it gone.
@@ -2259,15 +2258,14 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 #### AGENT-010 — Agent governance
 
-*Tier:* Core · *Cites:* BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008 · *Rules:* D-1, D-2, D-4, D-5, D-7, D-8
+*Tier:* Core · *Cites:* BASE-AGENT-002, BASE-AGENT-006, BASE-AGENT-007, BASE-AGENT-008, BASE-AGENT-004, BASE-AGENT-005, BASE-AGENT-009, BASE-AGENT-011 · *Rules:* D-1, D-2, D-4, D-5, D-7, D-8
 
-**Requirement.** Pantry’s embedded bookkeeper uses the installation’s chosen model through Base’s AI adapter, with Claude as its initial model choice; outside agents use the same accounting actions. The company policy decides standard preparations, external contact, money movement, commitment decisions, access changes, security changes, destructive voids and sensitive bank or tax reads. Period locks bind accounting actions regardless of actor. The seed’s financial activity records classes and the policy decision. Provider cost is charged to the configured policy cap.
+**Requirement.** Pantry’s embedded bookkeeper uses the installation’s chosen model through Base’s AI adapter, with Claude as its initial model choice; outside agents use the same accounting actions. Financial-period locks bind these accounting actions, and the seed computes financial classes from its source records as described in the Agent surface.
 
 **Acceptance.**
 1. Under a company policy with a $20 monthly model-spend cap, reach the cap and see further spending refused while non-spending work remains available.
 2. Place an instruction in a source document and see the accounting result use only its evidence, with no widened grant or changed class.
 3. Under policies that authorize and refuse the same financial classes, see the corresponding accounting actions follow each decision without using a person’s identity.
-4. Pause agents and see no further agent effect while the browser accounting workflow remains available.
 
 #### AGENT-011 — Tax-readiness reminders by email and calendar
 
