@@ -184,7 +184,9 @@ jobs:
           - name: app-journeys-4
             shards: app-2 app-8
           - name: app-journeys-5
-            shards: app-3 app-4
+            shards: app-3
+          - name: app-journeys-6
+            shards: app-4
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'

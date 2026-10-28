@@ -71,7 +71,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "feb4279ba26b17dd21e7f8db33653651d16c8aba5b0d88c9d8b55b7f53dea359",
+      "sha256": "fba1a1e6d45c830362ce29d204c2daf59feb26099c48c5e22d0d16d0d16c994f",
       "executable": false
     },
     ".gitignore": {
@@ -6431,7 +6431,7 @@
       "executable": false
     },
     "VERIFY-WORKFLOW.md": {
-      "sha256": "68c93f72bf3e881098767f101274ec2410ae5bda94ef65923aad4e6347be8374",
+      "sha256": "8425bdd209845e9fbd6e13a43717f787c22996b300eb443a657f91dece9d1b9f",
       "executable": false
     },
     "vite.config.ts": {
