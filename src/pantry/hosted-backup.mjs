@@ -29,17 +29,17 @@ async function storeArchive(bucket, key, source) {
 }
 
 /** A private R2 binding opts a hosted installation into daily complete archives.
- * Each minute tick advances a bounded portion of the durable D1 snapshot.
+ * A half-hour tick starts the snapshot; minute ticks only resume saved work.
  * The archive contains ledger and document bytes under the ordinary erasure
  * fence and credential exclusions. No automatic retention deletion is done.
  */
-export async function runHostedBackup(env, scheduledTime) {
+export async function runHostedBackup(env, scheduledTime, {resumeOnly=false}={}) {
   if (!env.PANTRY_BACKUPS) return
   if (await drainDocumentObjects(env.DB,env.PANTRY_DOCUMENTS)) return
   const db=env.DB, today=new Date(scheduledTime).toISOString().slice(0,10)
   const lease=crypto.randomUUID(), stamp=Date.now()
-  await db.prepare('INSERT OR IGNORE INTO pt_hosted_backup_runs(day) VALUES(?)').bind(today).run()
-  const pending=await db.prepare("SELECT day FROM pt_hosted_backup_runs WHERE status<>'complete' ORDER BY day LIMIT 1").first()
+  if (!resumeOnly) await db.prepare('INSERT OR IGNORE INTO pt_hosted_backup_runs(day) VALUES(?)').bind(today).run()
+  const pending=await db.prepare(`SELECT day FROM pt_hosted_backup_runs WHERE status<>'complete' ${resumeOnly?"AND job_id IS NOT NULL":""} ORDER BY day LIMIT 1`).first()
   if (!pending) return
   const day=pending.day
   const claim=await db.prepare("UPDATE pt_hosted_backup_runs SET lease_id=?,lease_until=? WHERE day=? AND status<>'complete' AND lease_until<? RETURNING *").bind(lease,stamp+10*60_000,day,stamp).first()
@@ -51,6 +51,12 @@ export async function runHostedBackup(env, scheduledTime) {
     if (job) {
       const saved=await db.prepare('SELECT phase FROM rer_portability_jobs WHERE id=?').bind(job).first()
       if (!saved || !['building','complete'].includes(saved.phase)) job=null
+    }
+    if (resumeOnly && !job) {
+      // An erasure can invalidate this snapshot. A minute tick must not start
+      // another large snapshot while the business is using the database.
+      await db.prepare("UPDATE pt_hosted_backup_runs SET job_id=NULL,status='pending' WHERE day=? AND lease_id=?").bind(day,lease).run()
+      return
     }
     // Recover a crash between snapshot creation and saving its id.
     if (!job) job=(await db.prepare("SELECT id FROM rer_portability_jobs WHERE actor=? AND kind='export' AND phase IN ('building','complete') ORDER BY rowid DESC LIMIT 1").bind('pantry:backup:'+day).first())?.id

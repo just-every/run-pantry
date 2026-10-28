@@ -38,28 +38,44 @@ type Contribution = { key: string; lineId: string; accountId: string; entryId: s
 type FlowLine = { id: string; code: string; name: string; amount: number; rows: Contribution[] }
 const sum = (rows: { amount: number }[]) => rows.reduce((n, r) => n + r.amount, 0)
 
-export async function cashFlow(db: D1Database, from: string, to: string, dimension?: DimensionScope) {
+export async function cashFlow(db: D1Database, from: string, to: string, dimension?: DimensionScope, includeRows = false) {
   requireThat(from <= to, 'From must be on or before To')
   const accounts = await flowAccounts(db), byId = new Map(accounts.map(a => [a.id, a]))
-  const posted = await all(db, `SELECT l.id, l.account_id, l.debit_cents, l.credit_cents,l.class_name,l.location_name,l.project_name, e.id AS entry_id, e.number, e.entry_date, e.memo
-    FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? ORDER BY e.entry_date, e.number, l.line_no`, from, to)
   const cashIds = new Set(accounts.filter(a => a.flowClass === 'cash').map(a => a.id))
+  // Summary readers need the account contributions, not every source row.
+  // Keep cash presence per entry before applying a dimension, just as the
+  // detailed calculation does when a transaction spans several dimensions.
+  const posted = includeRows ? await all(db, `SELECT l.id, l.account_id, l.debit_cents, l.credit_cents,l.class_name,l.location_name,l.project_name, e.id AS entry_id, e.number, e.entry_date, e.memo
+    FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id WHERE e.status = 'posted' AND e.entry_date BETWEEN ? AND ? ORDER BY e.entry_date, e.number, l.line_no`, from, to) : await all(db, `WITH cash AS (
+      SELECT l.entry_id,SUM(l.debit_cents-l.credit_cents) AS amount
+      FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id
+      WHERE e.status='posted' AND e.entry_date BETWEEN ? AND ?
+        AND l.account_id IN (SELECT value FROM json_each(?)) GROUP BY l.entry_id
+    ) SELECT l.account_id,COALESCE(cash.amount,0)<>0 AS has_cash,
+      SUM(l.debit_cents) AS debit_cents,SUM(l.credit_cents) AS credit_cents,
+      MIN(e.entry_date||':'||printf('%020d:%010d',e.number,l.line_no)) AS first_posting
+    FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id=l.entry_id
+    LEFT JOIN cash ON cash.entry_id=e.id
+    WHERE e.status='posted' AND e.entry_date BETWEEN ? AND ?
+      ${dimension ? `AND l.${dimension.kind}_name=?` : ''}
+    GROUP BY l.account_id,has_cash ORDER BY first_posting`, from, to, JSON.stringify([...cashIds]), from, to, ...(dimension ? [dimension.value] : []))
   const cashByEntry = new Map<string, number>()
-  for (const l of posted) if (cashIds.has(l.account_id)) cashByEntry.set(l.entry_id, (cashByEntry.get(l.entry_id) ?? 0) + l.debit_cents - l.credit_cents)
+  if (includeRows) for (const l of posted) if (cashIds.has(l.account_id)) cashByEntry.set(l.entry_id, (cashByEntry.get(l.entry_id) ?? 0) + l.debit_cents - l.credit_cents)
   const lines = new Map<string, FlowLine>()
   const add = (id: string, name: string, l: Data, amount: number, code = '') => {
     if (!lines.has(id)) lines.set(id, { id, code, name, amount: 0, rows: [] })
     const line = lines.get(id)!
-    line.rows.push({ key: `${id}:${l.id}`, lineId: l.id, accountId: l.account_id, entryId: l.entry_id, number: l.number, date: l.entry_date, description: l.memo, amount })
+    if (includeRows) line.rows.push({ key: `${id}:${l.id}`, lineId: l.id, accountId: l.account_id, entryId: l.entry_id, number: l.number, date: l.entry_date, description: l.memo, amount })
     line.amount += amount
   }
   lines.set('net-income', { id: 'net-income', code: '', name: 'Net income (accrual)', amount: 0, rows: [] })
   for (const l of posted) {
-    if(!inDimension(l,dimension))continue
+    if(includeRows && !inDimension(l,dimension))continue
+    const hasCash = includeRows ? !!cashByEntry.get(l.entry_id) : !!l.has_cash
     const a = byId.get(l.account_id)!, amount = l.credit_cents - l.debit_cents
     if (a.type === 'income' || a.type === 'expense') {
       add('net-income', 'Net income (accrual)', l, amount)
-      if (a.flowClass !== 'operating' && (cashByEntry.get(l.entry_id) ?? 0)) {
+      if (a.flowClass !== 'operating' && hasCash) {
         add(a.id, `Cash activity · ${a.name}`, l, amount, a.code)
         add(`reclass:${a.id}`, `Remove ${a.name} from operating activities`, l, -amount, a.code)
       }
@@ -67,7 +83,7 @@ export async function cashFlow(db: D1Database, from: string, to: string, dimensi
       // Transactions with no net cash (depreciation, equipment financed directly,
       // transfers between cash accounts) are excluded from investing/financing.
       // Their offset to earnings/working capital is an explicit noncash adjustment.
-      const noncash = a.flowClass !== 'operating' && !(cashByEntry.get(l.entry_id) ?? 0)
+      const noncash = a.flowClass !== 'operating' && !hasCash
       add(noncash ? `noncash:${a.id}` : a.id, noncash ? `Noncash adjustment · ${a.name}` : `Change in ${a.name}`, l, amount, a.code)
     }
   }
@@ -83,7 +99,7 @@ export async function cashFlow(db: D1Database, from: string, to: string, dimensi
 }
 
 export async function cashFlowDetail(db: D1Database, from: string, to: string, id: string, dimension?: DimensionScope) {
-  const r = await cashFlow(db, from, to, dimension), allLines = [...r.operating, ...r.investing, ...r.financing]
+  const r = await cashFlow(db, from, to, dimension, true), allLines = [...r.operating, ...r.investing, ...r.financing]
   const totals: Record<string, [string, FlowLine[]]> = { operating: ['Net cash from operating activities', r.operating], investing: ['Net cash from investing activities', r.investing], financing: ['Net cash from financing activities', r.financing], 'net-change': ['Net change in cash', allLines] }
   const total = totals[id], line = allLines.find(l => l.id === id)
   const detail = async (label: string, figure: number, rows: Contribution[], sourceFrom: string, sourceTo: string) => {

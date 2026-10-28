@@ -37,7 +37,7 @@ For an owner-controlled scheduler, run the same command from the exact deployed 
 cd ./run-pantry && node scripts/hosted-backup.mjs --env-file ./pantry-deploy.env --environment production
 ```
 
-New own-account hosted deploys provision a private `PANTRY_BACKUPS` R2 binding. The half-hour Cron starts one complete archive per UTC day and advances at most 32 archive parts per tick. Minute ticks drain original-document custody work without advancing the larger database snapshot. A durable lease prevents overlapping ticks from publishing duplicates. Multipart uploads keep memory bounded; failed uploads are aborted. Failed work retries on a later tick, and erasure invalidates an unfinished snapshot before a fresh snapshot is taken. No archive is deleted automatically.
+New own-account hosted deploys provision a private `PANTRY_BACKUPS` R2 binding. The half-hour Cron starts one complete archive per UTC day. Minute ticks resume an existing snapshot, advancing at most 32 archive parts per tick without starting a new large database snapshot. If erasure invalidates a snapshot, only the next half-hour tick may replace it. A durable lease prevents overlapping ticks from publishing duplicates. Multipart uploads keep memory bounded; failed uploads are aborted. Failed work retries on a later tick, and erasure invalidates an unfinished snapshot before a fresh snapshot is taken. No archive is deleted automatically.
 
 A saved archive job can disappear when an owner erases personal data. The next scheduled tick replaces that missing job with a fresh snapshot through the same erasure fence, finishes the oldest incomplete day, then continues later days. A provider upload failure retains a valid completed snapshot for retry.
 
@@ -48,6 +48,8 @@ Uploaded originals move from transactional D1 staging into verified private R2 o
 ## Restore into a fresh hosted deployment
 
 Reserve a new hosted environment at the same Pantry revision, apply its normal migrations, and keep its writers and Cron paused during recovery. The destination must contain only its unchanged migration defaults. The restore refuses existing books and never merges or replaces them.
+
+Provision the new environment through `rer deploy` with configured production sign-in mail or an approved Auth SSO installation. Cloudflare resource permissions alone do not configure sign-in. A deployment refused at this prerequisite has no fresh hosted destination to restore into; local or simulated-provider recovery does not establish a hosted drill.
 
 Run from the deployed checkout with its mode-0600 Cloudflare deploy file and a mode-0600 archive:
 
