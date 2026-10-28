@@ -2066,7 +2066,16 @@
     {
       "file": "CONTRACT.md",
       "line": 304,
-      "text": "Privacy policy (ct, 23 Oct 2026): the search index never holds text the reader may not see; counts and snippets reveal nothing suppressed, and erasure removes index entries. The current search reads authorized live records without retaining a separate text index. Results come grouped by type with date, number, contact, amount and status, and each result opens its record. Results respect the searcher's role, the bank accounts they may see and masking (ACCESS-001): a record a person may not open is never listed or counted. The same search works at 390 pixels and in MOBILE-002, and the API offers it under API-001's scopes. At OPS-001's scale (250,000 posted lines and 20,000 documents) a search answers within one second. **Acceptance evidence:** Seed the scenario's year of activity. Search `1234.56` and see the $1,234.56 invoice, its payment and its feed line. Search the range $1,200 to $1,300 and see those three among the results. Search check number `1047` and get the check. Search a memo word and a vendor alias, and see the matching bill and bank lines. As a sales role, search an amount that exists only on a bank line in a restricted account and get no result. Open each result to its record. Repeat the amount and check searches at 390 pixels and in the MOBILE-002 app. At OPS-001's load, measure each search under one second.",
+      "text": "Privacy policy (ct, 23 Oct 2026): ",
+      "to": "rulings",
+      "ids": [
+        "RL-5"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 304,
+      "text": "the search index never holds text the reader may not see; counts and snippets reveal nothing suppressed, and erasure removes index entries. The current search reads authorized live records without retaining a separate text index. Results come grouped by type with date, number, contact, amount and status, and each result opens its record. Results respect the searcher's role, the bank accounts they may see and masking (ACCESS-001): a record a person may not open is never listed or counted. The same search works at 390 pixels and in MOBILE-002, and the API offers it under API-001's scopes. At OPS-001's scale (250,000 posted lines and 20,000 documents) a search answers within one second. **Acceptance evidence:** Seed the scenario's year of activity. Search `1234.56` and see the $1,234.56 invoice, its payment and its feed line. Search the range $1,200 to $1,300 and see those three among the results. Search check number `1047` and get the check. Search a memo word and a vendor alias, and see the matching bill and bank lines. As a sales role, search an amount that exists only on a bank line in a restricted account and get no result. Open each result to its record. Repeat the amount and check searches at 390 pixels and in the MOBILE-002 app. At OPS-001's load, measure each search under one second.",
       "to": "clause",
       "ids": [
         "SEARCH-001"
@@ -2105,7 +2114,25 @@
     {
       "file": "CONTRACT.md",
       "line": 312,
-      "text": "**CASH-001 — Cash planner.** Forecast policy (ct, 23 Oct 2026): forecasts are labeled estimates with their assumptions listed; what-if items remain local to their URL, and alerts are in-app only. A 13-week cash projection starts from bank balances. It adds open receivables by expected payment date, open bills by scheduled payment date or else due date, recurring invoices and bills, and payroll from the provider's schedule. People can add what-if items. A projected low balance alerts the owner. Each week's figure lists the items it contains. An invoice's expected payment date is set this way:",
+      "text": "**CASH-001 — Cash planner.** ",
+      "to": "clause",
+      "ids": [
+        "CASH-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 312,
+      "text": "Forecast policy (ct, 23 Oct 2026): ",
+      "to": "rulings",
+      "ids": [
+        "RL-6"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 312,
+      "text": "forecasts are labeled estimates with their assumptions listed; what-if items remain local to their URL, and alerts are in-app only. A 13-week cash projection starts from bank balances. It adds open receivables by expected payment date, open bills by scheduled payment date or else due date, recurring invoices and bills, and payroll from the provider's schedule. People can add what-if items. A projected low balance alerts the owner. Each week's figure lists the items it contains. An invoice's expected payment date is set this way:",
       "to": "clause",
       "ids": [
         "CASH-001"
@@ -2372,7 +2399,25 @@
     {
       "file": "CONTRACT.md",
       "line": 345,
-      "text": "**ASSET-001 — Fixed assets and depreciation.** Asset policy (ct, 23 Oct 2026): the owner sets a versioned capitalization threshold; disposal gain/loss and depreciation post only through CLOSE-001 approval; rounding remainder belongs in the final period; every schedule names its method; tax schedules are accountant-entered. A bill line over the capitalization threshold the owner sets (with the de minimis safe-harbor election recorded) is proposed as an asset. The register holds cost, placed-in-service date, life and method. Monthly book depreciation (straight line or declining balance) posts through CLOSE-001. A disposal records proceeds and the gain or loss. Tax depreciation (MACRS, Section 179 and bonus elections chosen by the accountant) is kept as a separate schedule for the tax package and never posted to the ledger. **Acceptance evidence:** Capitalize a $7,200 vehicle bill and post 12 months of straight-line depreciation. Dispose of the asset with $4,000 proceeds and see the gain or loss. Record the accountant's Section 179 election and see it in the tax package with the ledger unchanged.",
+      "text": "**ASSET-001 — Fixed assets and depreciation.** ",
+      "to": "clause",
+      "ids": [
+        "ASSET-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 345,
+      "text": "Asset policy (ct, 23 Oct 2026): ",
+      "to": "rulings",
+      "ids": [
+        "RL-5"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 345,
+      "text": "the owner sets a versioned capitalization threshold; disposal gain/loss and depreciation post only through CLOSE-001 approval; rounding remainder belongs in the final period; every schedule names its method; tax schedules are accountant-entered. A bill line over the capitalization threshold the owner sets (with the de minimis safe-harbor election recorded) is proposed as an asset. The register holds cost, placed-in-service date, life and method. Monthly book depreciation (straight line or declining balance) posts through CLOSE-001. A disposal records proceeds and the gain or loss. Tax depreciation (MACRS, Section 179 and bonus elections chosen by the accountant) is kept as a separate schedule for the tax package and never posted to the ledger. **Acceptance evidence:** Capitalize a $7,200 vehicle bill and post 12 months of straight-line depreciation. Dispose of the asset with $4,000 proceeds and see the gain or loss. Record the accountant's Section 179 election and see it in the tax package with the ledger unchanged.",
       "to": "clause",
       "ids": [
         "ASSET-001"

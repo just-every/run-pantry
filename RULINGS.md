@@ -32,6 +32,12 @@ Carry the existing webhook destination, signing, retry, cancellation and inert-r
 
 Search does not index or count content its reader cannot see and erasure removes searchable personal data. Assets use a versioned capitalization threshold, source-funded reviewed depreciation/disposal, final-period rounding remainder, named methods and accountant-entered tax schedules. Detailed rules remain in the capability records.
 
+### RL-6 — Forecast estimates and local scenarios
+
+**Date:** 2026-10-23 · **Ruled by:** ct · **Clauses governed:** CASH-001.
+
+Forecasts are labeled estimates with their assumptions listed; what if items remain local to their URL, and alerts are in app only. This records the forecast policy carried from the old CASH-001 body and changes no status or proof.
+
 ## ct ruling pass, read at the start and at the main-carry pass
 
 ### RL-101 — Revocable rule-bound filing and truthful sampling
