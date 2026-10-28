@@ -124,8 +124,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: api-import-report
-            shards: api-1 api-2
+          - name: api-import
+            shards: api-1
+          - name: api-report
+            shards: api-2
           - name: api-browser
             shards: api-3 api-4
           - name: api-ledger
