@@ -617,7 +617,7 @@ Core · target · **partial** · Cites BASE-MAIL-001 · Rules D-1, D-2, D-4, D-5
 
 #### INVOICE-003 — Hosted invoice page and viewed status
 
-Core · target · **partial** · Cites BASE-PUBLIC-001 · Rules D-1, D-2, D-4, D-5, D-7, D-8 · Register R-1, R-2
+Core · target · **partial** · Cites BASE-PUBLIC-001, BASE-ACCESSIBILITY-001 · Rules D-1, D-2, D-4, D-5, D-7, D-8 · Register R-1, R-2
 
 **Requirement.** Each sent invoice has an unguessable link that shows the invoice, its PDF, its payment options and its payment history, without the customer signing in. The link can be revoked and expires a set number of days after payment. The first opening of the page is recorded as "viewed" with its time. Email open pixels are not used.
 
@@ -1225,7 +1225,7 @@ Core · target · **partial** · Register R-6
 
 #### TAXFORM-003 — W-9 requests by secure link
 
-Core · target · **partial** · Cites BASE-ROLE-001, BASE-PUBLIC-001 · Register R-1, R-2
+Core · target · **partial** · Cites BASE-ROLE-001, BASE-PUBLIC-001, BASE-ACCESSIBILITY-001 · Register R-1, R-2
 
 **Requirement.** A person requests a W-9 from a vendor through a secure link. The vendor completes the IRS form fields and its certification online, or uploads a signed PDF. The TIN is encrypted at rest. Only the owner or accountant, after step-up sign-in (ACCESS-002), exports the 1099 filing files that carry the full TIN. Vendors paid without a W-9 on file are listed throughout the year. Each vendor record (VENDOR-001) shows its W-9 status. An expired request can be reissued only as a new link; the old link stays dead. Replacement, revocation and restore disable old links. Explicit electronic consent and encrypted certification originals inherit existing tax-record retention and owner-confirmed expiry under ERASURE-001. W-9 originals open only to the owner after native same-session step-up; TINs never enter logs, ordinary exports, mail bodies or URLs. Online certification satisfies the clause alternative. No automatic email is sent; automated requests and reminders are the named TAXFORM-004 gap.
 
@@ -1950,9 +1950,9 @@ Core · target · **partial** · Cites BASE-MAIL-001
 
 #### MOBILE-001 — Every screen works on a phone browser
 
-Core · target · **partial** · Register R-1, R-2
+Core · target · **partial** · Cites BASE-ACCESSIBILITY-001 · Register R-1, R-2
 
-**Requirement.** Every screen works at 390 pixels wide with keyboard and touch, with no horizontal page scroll.
+**Requirement.** Every screen works at 390 pixels wide with no horizontal page scroll.
 
 **Acceptance.**
 1. Open every hosted screen at 390 pixels without sideways scrolling and use each report through tabs at 1440 and the report picker at 390.

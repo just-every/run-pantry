@@ -71,7 +71,7 @@ Pantry keeps every record the category runs on: the chart, ledger, bank and card
 | BASE-SIGNIN-002 | Native multi-factor authentication | ACCESS-002 | not run |
 | BASE-INSTALL-001 | Free self-host and removal | OWN-001, OWN-002 | not run |
 | BASE-MAIL-001 | Truthful mail outcomes | CAPTURE-002, INVOICE-002, PAY-002, INVOICE-004, REPORT-007, CONNECT-005, CONNECT-006, NOTIFY-001 | not run |
-| BASE-ACCESSIBILITY-001 | One accessibility bar | none | not run |
+| BASE-ACCESSIBILITY-001 | One accessibility bar | INVOICE-003, TAXFORM-003, MOBILE-001 | not run |
 | BASE-DOCS-001 | On-site docs from one contract | none | not run |
 | BASE-AGENT-001 | One MCP door per seed | SURFACE-001 | not run |
 | BASE-AGENT-002 | The seed's jobs are tools, through the UI's own actions | AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009, AGENT-010, AGENT-011, SURFACE-001 | not run |
@@ -546,7 +546,7 @@ Pantry keeps every record the category runs on: the chart, ledger, bank and card
 
 #### INVOICE-003 — Hosted invoice page and viewed status
 
-*Tier:* Core · *Cites:* BASE-PUBLIC-001 · *Rules:* D-1, D-2, D-4, D-5, D-7, D-8 · *Register:* R-1, R-2
+*Tier:* Core · *Cites:* BASE-PUBLIC-001, BASE-ACCESSIBILITY-001 · *Rules:* D-1, D-2, D-4, D-5, D-7, D-8 · *Register:* R-1, R-2
 
 **Requirement.** Each sent invoice has an unguessable link that shows the invoice, its PDF, its payment options and its payment history, without the customer signing in. The link can be revoked and expires a set number of days after payment. The first opening of the page is recorded as "viewed" with its time. Email open pixels are not used.
 
@@ -1031,7 +1031,7 @@ Pantry keeps every record the category runs on: the chart, ledger, bank and card
 
 #### TAXFORM-003 — W-9 requests by secure link
 
-*Tier:* Core · *Cites:* BASE-ROLE-001, BASE-PUBLIC-001 · *Register:* R-1, R-2
+*Tier:* Core · *Cites:* BASE-ROLE-001, BASE-PUBLIC-001, BASE-ACCESSIBILITY-001 · *Register:* R-1, R-2
 
 **Requirement.** A person requests a W-9 from a vendor through a secure link. The vendor completes the IRS form fields and its certification online, or uploads a signed PDF. The TIN is encrypted at rest. Only the owner or accountant, after step-up sign-in (ACCESS-002), exports the 1099 filing files that carry the full TIN. Vendors paid without a W-9 on file are listed throughout the year. Each vendor record (VENDOR-001) shows its W-9 status. An expired request can be reissued only as a new link; the old link stays dead. Replacement, revocation and restore disable old links. Explicit electronic consent and encrypted certification originals inherit existing tax-record retention and owner-confirmed expiry under ERASURE-001. W-9 originals open only to the owner after native same-session step-up; TINs never enter logs, ordinary exports, mail bodies or URLs. Online certification satisfies the clause alternative. No automatic email is sent; automated requests and reminders are the named TAXFORM-004 gap.
 
@@ -1606,9 +1606,9 @@ Pantry keeps every record the category runs on: the chart, ledger, bank and card
 
 #### MOBILE-001 — Every screen works on a phone browser
 
-*Tier:* Core · *Register:* R-1, R-2
+*Tier:* Core · *Cites:* BASE-ACCESSIBILITY-001 · *Register:* R-1, R-2
 
-**Requirement.** Every screen works at 390 pixels wide with keyboard and touch, with no horizontal page scroll.
+**Requirement.** Every screen works at 390 pixels wide with no horizontal page scroll.
 
 **Acceptance.**
 1. Open every hosted screen at 390 pixels without sideways scrolling and use each report through tabs at 1440 and the report picker at 390.
@@ -1788,7 +1788,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | `pantry.pan.customers_vendors_and_documents_03` | Customers, vendors and documents | PAN-03 | standard or commitment or sensitive | No MCP tool |
 
-| `pantry.pan.invoices_and_credits_04` | Invoices and credits | PAN-04 | standard or commitment or sensitive | No MCP tool |
+| `pantry.pan.invoices_and_credits_04` | Invoices and credits | PAN-04 | standard or external or money or commitment or destructive or sensitive | No MCP tool |
 
 | `pantry.pan.bills_and_evidence_05` | Bills and evidence | PAN-05 | standard or commitment or sensitive | No MCP tool |
 

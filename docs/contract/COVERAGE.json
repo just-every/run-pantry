@@ -3857,7 +3857,31 @@
     {
       "file": "CONTRACT.md",
       "line": 518,
-      "text": "**MOBILE-001 \u2014 Every screen works on a phone browser.** Every screen works at 390 pixels wide with keyboard and touch, with no horizontal page scroll. **Acceptance evidence:** `tests/app/app.test.mjs` opens every report by its tabs at 1440 and its picker at 390 on the built app; the stranger journey of 17 Oct 2026 found no sideways scroll at 390 on any hosted screen.",
+      "text": "**MOBILE-001 \u2014 Every screen works on a phone browser.** Every screen works at 390 pixels wide ",
+      "to": "clause",
+      "ids": [
+        "MOBILE-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-mechanisms.md"
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 518,
+      "text": "with keyboard and touch,",
+      "to": "base",
+      "ids": [
+        "BASE-ACCESSIBILITY-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 518,
+      "text": " with no horizontal page scroll. **Acceptance evidence:** `tests/app/app.test.mjs` opens every report by its tabs at 1440 and its picker at 390 on the built app; the stranger journey of 17 Oct 2026 found no sideways scroll at 390 on any hosted screen.",
       "to": "clause",
       "ids": [
         "MOBILE-001"
