@@ -76,8 +76,11 @@ jobs:
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
+      PLAYWRIGHT_SKIP_BROWSER_GC: '1'
       VERIFY_SHARD: source
     steps:
+      - name: Set runner-owned browser cache
+        run: printf 'PLAYWRIGHT_BROWSERS_PATH=%s/ms-playwright\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
         with:
           persist-credentials: false
@@ -91,6 +94,18 @@ jobs:
         if: ${{ hashFiles('edition.json', 'sources.lock.json') != '' }}
         run: node scripts/edition-authoring/cli.mjs check
       - run: npm install --global pnpm@10.12.4
+      - name: Set runner-owned pnpm store
+        run: pnpm config set store-dir "$RUNNER_TEMP/pnpm-store"
+      - name: Prepare runner-owned browser and apt caches
+        run: mkdir -p "$PLAYWRIGHT_BROWSERS_PATH" "$RUNNER_TEMP/rer-apt/archives"
+      - name: Cache frozen dependencies and Chromium
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: |
+            ${{ runner.temp }}/pnpm-store
+            ${{ runner.temp }}/ms-playwright
+            ${{ runner.temp }}/rer-apt/archives/*.deb
+          key: pantry-ubuntu24-temp-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium
         run: |
@@ -98,7 +113,7 @@ jobs:
           pnpm exec playwright install chromium
           # Hosted ubuntu-24.04 already carries Chromium's libraries. Use apt only when a real launch fails.
           node scripts/ci/chromium-probe.mjs || {
-            timeout 420 pnpm exec playwright install-deps chromium
+            sudo env "PATH=$PATH" "APT_ARCHIVES=$RUNNER_TEMP/rer-apt/archives" python3 scripts/install-chromium-deps.py
             node scripts/ci/chromium-probe.mjs
           }
       # rer verify builds once, then checks the emitted runtime, hosted output and hydration.
@@ -135,8 +150,11 @@ jobs:
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
+      PLAYWRIGHT_SKIP_BROWSER_GC: '1'
       VERIFY_SHARDS: ${{ matrix.shards }}
     steps:
+      - name: Set runner-owned browser cache
+        run: printf 'PLAYWRIGHT_BROWSERS_PATH=%s/ms-playwright\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
         with:
           persist-credentials: false
@@ -145,6 +163,18 @@ jobs:
           node-version: '22.20.0'
           package-manager-cache: false
       - run: npm install --global pnpm@10.12.4
+      - name: Set runner-owned pnpm store
+        run: pnpm config set store-dir "$RUNNER_TEMP/pnpm-store"
+      - name: Prepare runner-owned browser and apt caches
+        run: mkdir -p "$PLAYWRIGHT_BROWSERS_PATH" "$RUNNER_TEMP/rer-apt/archives"
+      - name: Cache frozen dependencies and Chromium
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: |
+            ${{ runner.temp }}/pnpm-store
+            ${{ runner.temp }}/ms-playwright
+            ${{ runner.temp }}/rer-apt/archives/*.deb
+          key: pantry-ubuntu24-temp-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium
         if: ${{ matrix.name == 'api-browser' }}
@@ -153,7 +183,7 @@ jobs:
           pnpm exec playwright install chromium
           # Hosted ubuntu-24.04 already carries Chromium's libraries. Use apt only when a real launch fails.
           node scripts/ci/chromium-probe.mjs || {
-            timeout 420 pnpm exec playwright install-deps chromium
+            sudo env "PATH=$PATH" "APT_ARCHIVES=$RUNNER_TEMP/rer-apt/archives" python3 scripts/install-chromium-deps.py
             node scripts/ci/chromium-probe.mjs
           }
       - name: Verify API partitions
@@ -190,9 +220,12 @@ jobs:
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
+      PLAYWRIGHT_SKIP_BROWSER_GC: '1'
       VERIFY_SHARDS: ${{ matrix.shards }}
       VERIFY_PREBUILT: 'true'
     steps:
+      - name: Set runner-owned browser cache
+        run: printf 'PLAYWRIGHT_BROWSERS_PATH=%s/ms-playwright\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
         with:
           persist-credentials: false
@@ -201,6 +234,18 @@ jobs:
           node-version: '22.20.0'
           package-manager-cache: false
       - run: npm install --global pnpm@10.12.4
+      - name: Set runner-owned pnpm store
+        run: pnpm config set store-dir "$RUNNER_TEMP/pnpm-store"
+      - name: Prepare runner-owned browser and apt caches
+        run: mkdir -p "$PLAYWRIGHT_BROWSERS_PATH" "$RUNNER_TEMP/rer-apt/archives"
+      - name: Cache frozen dependencies and Chromium
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: |
+            ${{ runner.temp }}/pnpm-store
+            ${{ runner.temp }}/ms-playwright
+            ${{ runner.temp }}/rer-apt/archives/*.deb
+          key: pantry-ubuntu24-temp-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
       - run: pnpm install --frozen-lockfile
       - name: Download the verified build
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -215,7 +260,7 @@ jobs:
           pnpm exec playwright install chromium
           # Hosted ubuntu-24.04 already carries Chromium's libraries. Use apt only when a real launch fails.
           node scripts/ci/chromium-probe.mjs || {
-            timeout 420 pnpm exec playwright install-deps chromium
+            sudo env "PATH=$PATH" "APT_ARCHIVES=$RUNNER_TEMP/rer-apt/archives" python3 scripts/install-chromium-deps.py
             node scripts/ci/chromium-probe.mjs
           }
       - name: Verify browser partitions
@@ -234,7 +279,10 @@ jobs:
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
+      PLAYWRIGHT_SKIP_BROWSER_GC: '1'
     steps:
+      - name: Set runner-owned browser cache
+        run: printf 'PLAYWRIGHT_BROWSERS_PATH=%s/ms-playwright\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
         with:
           persist-credentials: false
@@ -243,6 +291,18 @@ jobs:
           node-version: '22.20.0'
           package-manager-cache: false
       - run: npm install --global pnpm@10.12.4
+      - name: Set runner-owned pnpm store
+        run: pnpm config set store-dir "$RUNNER_TEMP/pnpm-store"
+      - name: Prepare runner-owned browser and apt caches
+        run: mkdir -p "$PLAYWRIGHT_BROWSERS_PATH" "$RUNNER_TEMP/rer-apt/archives"
+      - name: Cache frozen dependencies and Chromium
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: |
+            ${{ runner.temp }}/pnpm-store
+            ${{ runner.temp }}/ms-playwright
+            ${{ runner.temp }}/rer-apt/archives/*.deb
+          key: pantry-ubuntu24-temp-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium
         run: |
@@ -250,7 +310,7 @@ jobs:
           pnpm exec playwright install chromium
           # Hosted ubuntu-24.04 already carries Chromium's libraries. Use apt only when a real launch fails.
           node scripts/ci/chromium-probe.mjs || {
-            timeout 420 pnpm exec playwright install-deps chromium
+            sudo env "PATH=$PATH" "APT_ARCHIVES=$RUNNER_TEMP/rer-apt/archives" python3 scripts/install-chromium-deps.py
             node scripts/ci/chromium-probe.mjs
           }
       - run: pnpm run test:restore

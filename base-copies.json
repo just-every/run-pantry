@@ -13,6 +13,26 @@
       }
     },
     {
+      "path": ".github/workflows/verify.yml",
+      "originPath": "export/verify.yml",
+      "revision": "c002f7e2119ec7acbb39c749e322717c43b57bf1",
+      "files": {
+        ".github/workflows/verify.yml": "505449ea03c74507a502224086aefa69ec51e8e06a9706dac53c7135146f9325"
+      },
+      "modes": {
+        ".github/workflows/verify.yml": "100644"
+      },
+      "adapted": {
+        ".github/workflows/verify.yml": "c002f7e2119ec7acbb39c749e322717c43b57bf1"
+      },
+      "acknowledged": {
+        ".github/workflows/verify.yml": {
+          "sha256": "7c54a19b8f34ae8cff3f01c2fdec8cd411e01633a676411ec3ef72e9557aacbe",
+          "mode": "100644"
+        }
+      }
+    },
+    {
       "path": "migrations/core/0002_outbox.sql",
       "originPath": "default-seed/migrations/core/0004_development_outbox.sql",
       "revision": "c002f7e2119ec7acbb39c749e322717c43b57bf1",
@@ -793,6 +813,17 @@
       }
     },
     {
+      "path": "src/base/hosting-page.ts",
+      "originPath": "foundation/runtime/hosting-page.ts",
+      "revision": "c002f7e2119ec7acbb39c749e322717c43b57bf1",
+      "files": {
+        "src/base/hosting-page.ts": "f8c00b4a1d4f21dc36971b784da747ffffc6428c28b15fc7d35f6ab2317d2cf5"
+      },
+      "modes": {
+        "src/base/hosting-page.ts": "100644"
+      }
+    },
+    {
       "path": "src/base/hydration/intro-guard.ts",
       "originPath": "foundation/runtime/hydration/intro-guard.ts",
       "revision": "c002f7e2119ec7acbb39c749e322717c43b57bf1",
@@ -889,6 +920,28 @@
       },
       "modes": {
         "src/base/rejected-response.ts": "100644"
+      }
+    },
+    {
+      "path": "src/base/run-chooser-style.ts",
+      "originPath": "foundation/runtime/run-chooser-style.ts",
+      "revision": "c002f7e2119ec7acbb39c749e322717c43b57bf1",
+      "files": {
+        "src/base/run-chooser-style.ts": "62cd0b43762dbe406958d929ee6d27440658ffaead40bb51229eca7c4aea0756"
+      },
+      "modes": {
+        "src/base/run-chooser-style.ts": "100644"
+      }
+    },
+    {
+      "path": "src/base/run-pricing.ts",
+      "originPath": "foundation/runtime/run-pricing.ts",
+      "revision": "c002f7e2119ec7acbb39c749e322717c43b57bf1",
+      "files": {
+        "src/base/run-pricing.ts": "f95bdf9b5e62c7d302e97a57ae4dcb580846197fa4cf2222e17a5e1b2c0a02fd"
+      },
+      "modes": {
+        "src/base/run-pricing.ts": "100644"
       }
     },
     {
@@ -1965,36 +2018,14 @@
       }
     },
     {
-      "path": "src/base/run-pricing.ts",
-      "originPath": "foundation/runtime/run-pricing.ts",
+      "path": "scripts/install-chromium-deps.py",
+      "originPath": "export/install-chromium-deps.py",
       "revision": "c002f7e2119ec7acbb39c749e322717c43b57bf1",
       "files": {
-        "src/base/run-pricing.ts": "f95bdf9b5e62c7d302e97a57ae4dcb580846197fa4cf2222e17a5e1b2c0a02fd"
+        "scripts/install-chromium-deps.py": "d3027108ad8e08ceeddb0ed477d967b1207e40bb6bf5ae941854c534c2cf4004"
       },
       "modes": {
-        "src/base/run-pricing.ts": "100644"
-      }
-    },
-    {
-      "path": "src/base/hosting-page.ts",
-      "originPath": "foundation/runtime/hosting-page.ts",
-      "revision": "c002f7e2119ec7acbb39c749e322717c43b57bf1",
-      "files": {
-        "src/base/hosting-page.ts": "f8c00b4a1d4f21dc36971b784da747ffffc6428c28b15fc7d35f6ab2317d2cf5"
-      },
-      "modes": {
-        "src/base/hosting-page.ts": "100644"
-      }
-    },
-    {
-      "path": "src/base/run-chooser-style.ts",
-      "originPath": "foundation/runtime/run-chooser-style.ts",
-      "revision": "c002f7e2119ec7acbb39c749e322717c43b57bf1",
-      "files": {
-        "src/base/run-chooser-style.ts": "62cd0b43762dbe406958d929ee6d27440658ffaead40bb51229eca7c4aea0756"
-      },
-      "modes": {
-        "src/base/run-chooser-style.ts": "100644"
+        "scripts/install-chromium-deps.py": "100644"
       }
     }
   ]
