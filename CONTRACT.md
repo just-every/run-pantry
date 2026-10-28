@@ -579,6 +579,14 @@ Agents serve the whole bookkeeping job, beyond what Digits and Puzzle sell today
 
 - **AGENT-010 — Agent governance.** Built-in agents run through Base's ai module with the owner's chosen model provider, with Anthropic Claude as the default. The owner's own agents use tokens (PAN-15). The owner sets each agent's permissions, data scope, monthly spending limit in USD and rate limits. Every document an agent reads is treated as untrusted data. Every agent read and action is logged. A switch stops all agents at once. No agent can post into a locked period, approve, release a payment, lock, reopen or move money. **Acceptance evidence:** Set a $20 monthly limit and see agent work pause when it is reached. Plant an instruction in a document and see it ignored. Try each forbidden action with an agent token and be refused. Flip the stop switch and see no further agent action.
 
+Shared-door preparation retains Base's agent-door and Business settings source at
+`d555e789cffb744a9f83d76ebe42a2e3bdd7a055`, recorded in `base-copies.json`, with
+new migrations `0121_business_settings.sql`, `0122_business_people.sql` and
+`0123_agent_door.sql`. This is source and schema preparation only. No shared
+door is mounted, no Business sponsorship is admitted, and no MCP registry or
+conformance journey is claimed. PAN-15's native proposal approvals and this
+clause's agent authority restrictions still apply. AGENT-010 remains partial.
+
 ## Honest boundaries
 
 - **Money stays with providers.** Pantry is not a bank, card processor or money transmitter. It reads bank data through Plaid and direct bank APIs, collects through the buyer's Stripe account (PAY-001) and pays through Melio or BILL (BILLPAY-001). Funds, card data and vendor bank details stay with those providers under their terms and eligibility rules.
