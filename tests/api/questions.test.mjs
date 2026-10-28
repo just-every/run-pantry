@@ -7,6 +7,44 @@ import { importStatements, matchSeptember, september } from './scenario.mjs'
 const reply = (from, to, subject, words) => [`From: Olivia Owner <${from}>`, `To: ${to}`, `Subject: Re: ${subject}`, `Message-ID: <${crypto.randomUUID()}@mail.example.test>`, `Date: ${new Date().toUTCString()}`,
   'MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', '', words, '', 'On Sat, Oct 17, 2026, Juniper Lane Design books wrote:', '> What was the $1,250.00 ...', ''].join('\r\n')
 
+test('emailed financial answers wait for authenticated native confirmation', async t => {
+  const h = await harness(); t.after(() => h.close())
+  const s = await september(h), st = await importStatements(h, s)
+  await matchSeptember(h, s, st)
+  const october = (await fixture('bank/operating-checking-2026-10.csv')).split('\n').slice(0, 4).join('\n') + '\nCREDIT,10/06/2026,"STRIPE TRANSFER ST-X7Y2",1250.00,ACH_CREDIT,28885.64,\n'
+  await h.command('statement.import', { bankAccountId: s.checking.id, fileName: 'operating-checking-2026-10a.csv', content: october, opening: '27797.02', closing: '28885.64', start: '2026-10-01', end: '2026-10-08', confirmLast4: '4821' })
+  const settings = (await h.view('questions')).agent.settings
+  await h.command('books-agent.save', { ...settings, emailOn: true, perDay: 20, depositDays: 0, fileDays: 0, receiptAmount: '75.00' })
+  const box = (await h.command('receipt-address.create', { mailbox: 'books@example.test' })).address
+  await h.command('books-agent.run', {})
+
+  let view = await h.view('questions')
+  const missing = at(view.open, q => q.kind === 'missing-receipt' && q.subject_id === s.bills.harbor.id)
+  const missingMail = h.mail.find(m => m.subject.includes(missing.ref))
+  await h.email(reply('owner@example.test', box, missingMail.subject, '2 lost it'), { from: 'owner@example.test', to: box })
+  view = await h.view('questions')
+  let pending = at(view.open, q => q.id === missing.id)
+  assert.equal(pending.status, 'confirm')
+  assert.equal(pending.pending.choice, 'no-receipt')
+  assert.equal((await h.view('sales')).bills.find(b => b.id === s.bills.harbor.id).evidence_waived, null)
+  await h.command('question.confirm', { id: missing.id, yes: true })
+  assert.equal(at((await h.view('questions')).settled, q => q.id === missing.id).status, 'filed')
+  assert.match((await h.view('sales')).bills.find(b => b.id === s.bills.harbor.id).evidence_waived, /lost it/)
+
+  view = await h.view('questions')
+  const category = at(view.open, q => q.subject_kind === 'bank-line' && q.choices[0]?.action.type === 'category')
+  const categoryMail = h.mail.find(m => m.subject.includes(category.ref))
+  const posted = (await h.view('journal')).entries.filter(e => e.status === 'posted').length
+  await h.email(reply('owner@example.test', box, categoryMail.subject, '1'), { from: 'owner@example.test', to: box })
+  await h.email(reply('owner@example.test', box, categoryMail.subject, 'yes'), { from: 'owner@example.test', to: box })
+  pending = at((await h.view('questions')).open, q => q.id === category.id)
+  assert.equal(pending.status, 'confirm')
+  assert.equal((await h.view('journal')).entries.filter(e => e.status === 'posted').length, posted)
+  await h.command('question.confirm', { id: category.id, yes: true })
+  assert.equal(at((await h.view('questions')).settled, q => q.id === category.id).status, 'filed')
+  assert.equal((await h.view('journal')).entries.filter(e => e.status === 'posted').length, posted + 1)
+})
+
 test('BOOKS-AGENT the agent asks the owner what does not add up, by email first; the answer files it and the agent learns the rule only when told', async t => {
   const model = []
   // The install's AI model at its network edge: it reads the owner's words into one of the offered answers.
@@ -77,13 +115,17 @@ test('BOOKS-AGENT the agent asks the owner what does not add up, by email first;
   assert.equal(q.pending.effects.bases.accrual.after.cashFlow.ties, true)
   assert.equal(await entries(), posted, 'nothing is filed before the yes')
   const confirmMail = h.mail.findLast(m => m.subject.includes(stripe.ref))
-  assert.match(confirmMail.text, /Reply YES/)
+  assert.ok(confirmMail)
 
-  // "Yes" by email files it: the deposit is matched to a posted entry in Service revenue, and the rule is learned.
+  // A From header cannot confirm the change. The signed-in owner confirms it in Pantry.
   await h.email(reply('owner@example.test', box, confirmMail.subject, 'Yes'), { from: 'owner@example.test', to: box })
   view = await h.view('questions')
-  q = at(view.settled, x => x.id === stripe.id)
-  assert.deepEqual([q.status, q.answered_via, q.answered_by, q.result_kind], ['filed', 'email', 'owner@example.test', 'match'])
+  q = at(view.open, x => x.id === stripe.id)
+  assert.equal(q.status, 'confirm')
+  assert.equal(await entries(), posted)
+  await h.command('question.confirm', { id: stripe.id, yes: true })
+  q = at((await h.view('questions')).settled, x => x.id === stripe.id)
+  assert.deepEqual([q.status, q.answered_via, q.answered_by, q.result_kind], ['filed', 'app', 'owner@example.test', 'match'])
   assert.equal(await entries(), posted + 1)
   const line = at((await h.view('bank/lines')).lines, l => l.description.includes('STRIPE TRANSFER'))
   assert.deepEqual(line.filed_to, ['Service revenue'])
