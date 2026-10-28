@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {execFileSync} from 'node:child_process'
 import {readFile,writeFile} from 'node:fs/promises'
 import {resolve,relative} from 'node:path'
+import {hostedR2} from '../../scripts/hosted-r2.mjs'
 
 const args=process.argv.slice(2)
 assert.equal(args.length,4,'Use --input PRIVATE.json --receipt OUTSIDE.json')
@@ -23,8 +24,27 @@ assert.equal(response.status,200)
 const inventory=(await response.json()).result[0].results[0]
 assert.deepEqual(inventory,{lines:250000,documents:20000,first:'2021-01-01',last:'2025-12-31'},'The hosted books must contain exactly the promised five-year scale')
 const kinds=['trial-balance','general-ledger','profit-and-loss','balance-sheet','cash-flow','sales-tax','sales-by-customer','sales-by-item','expenses-by-vendor','receivables','payables','receivables-summary','payables-summary','open-invoices','unpaid-bills','customer-balances','vendor-balances','transactions','journal','deposits','check-detail','reconciliations','audit-log','contractor-summary','adjusting-entries']
+// Count the real private objects as well as D1 metadata. A row-only load does
+// not establish the hosted document-storage acceptance point.
+const custodyResponse=await fetch('https://api.cloudflare.com/client/v4/accounts/'+process.env.CLOUDFLARE_ACCOUNT_ID+'/d1/database/'+input.databaseId+'/query',{method:'POST',headers,body:JSON.stringify({sql:"SELECT state,count(*) AS count FROM pt_document_objects GROUP BY state ORDER BY state"})})
+assert.equal(custodyResponse.status,200)
+const custody=(await custodyResponse.json()).result[0].results
+assert.deepEqual(custody,[{state:'ready',count:20000}],'All loaded originals must be durably stored, with no pending staging')
+assert.ok(input.bucketName,'Name the disposable deployment document bucket')
+const bucket=hostedR2({accountId:process.env.CLOUDFLARE_ACCOUNT_ID,token:process.env.CLOUDFLARE_API_TOKEN,bucketName:input.bucketName})
+let cursor,objectCount=0,objectBytes=0
+const cursors=new Set()
+do {
+ const page=await bucket.list({prefix:'documents/',cursor})
+ objectCount+=page.objects.length;objectBytes+=page.objects.reduce((n,o)=>n+o.size,0)
+ cursor=page.truncated?page.cursor:undefined
+ if(page.truncated){assert.ok(cursor,'A truncated inventory must have a next cursor');assert.ok(!cursors.has(cursor),'The object inventory must advance');cursors.add(cursor)}
+}while(cursor)
+assert.equal(objectCount,20000,'Count actual private objects, not only document rows')
+assert.ok(objectBytes>=20000,'Each original has content')
 const measurements=[],failures=[]
 for(const basis of ['accrual','cash'])for(const kind of kinds) {
+ try {
  const started=performance.now(),r=await fetch(origin+'/api/pantry/reports/'+kind+'?from=2021-01-01&to=2025-12-31&basis='+basis,{headers:{cookie:input.cookie},redirect:'manual'})
  const body=await r.text(),milliseconds=performance.now()-started
  measurements.push({kind,basis,http:r.status,milliseconds:Math.round(milliseconds),bytes:Buffer.byteLength(body)})
@@ -36,7 +56,10 @@ for(const basis of ['accrual','cash'])for(const kind of kinds) {
   if(kind==='general-ledger')assert.equal(value.accounts.reduce((n,a)=>n+a.rows.length,0),250000)
  }
  console.log(JSON.stringify(measurements.at(-1)))
+ } catch(error) {
+  failures.push({kind,basis,failure:error instanceof assert.AssertionError ? error.message : 'hosted_report_request_failed'})
+ }
 }
 assert.equal(execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),head)
-await writeFile(args[3],JSON.stringify({head,inventory,measurements,failures,status:failures.length?'failed':'passed'},null,2)+'\n',{mode:0o600})
+await writeFile(args[3],JSON.stringify({head,inventory,custody,objectCount,objectBytes,measurements,failures,status:failures.length?'failed':'passed'},null,2)+'\n',{mode:0o600})
 assert.deepEqual(failures,[],'Every hosted report must complete under three seconds')
