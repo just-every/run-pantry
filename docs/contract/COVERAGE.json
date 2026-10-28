@@ -813,6 +813,12 @@
       "to": "clause",
       "ids": [
         "INVOICE-001"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-mechanisms.md"
+        }
       ]
     },
     {
@@ -1833,6 +1839,12 @@
       "to": "clause",
       "ids": [
         "REPORT-007"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-mechanisms.md"
+        }
       ]
     },
     {
@@ -5315,6 +5327,12 @@
       "to": "gap",
       "ids": [
         "REPORT-007"
+      ],
+      "also": [
+        {
+          "to": "docs",
+          "path": "docs/contract-mechanisms.md"
+        }
       ]
     },
     {
