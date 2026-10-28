@@ -6995,7 +6995,7 @@
       "executable": false
     },
     "tests/restore/restore.test.mjs": {
-      "sha256": "97564210369c41d533fc363b4f3d6a233d0b331d77a054fec7dda2fc266a86a5",
+      "sha256": "1f88061234e11069006edc349533f05e5bc4b7a639619abf702a256ddbe6475e",
       "executable": false
     },
     "tests/runtime.mjs": {
@@ -7023,7 +7023,7 @@
       "executable": false
     },
     "VERIFY-WORKFLOW.md": {
-      "sha256": "8425bdd209845e9fbd6e13a43717f787c22996b300eb443a657f91dece9d1b9f",
+      "sha256": "f7f6e1cae93e3aa0ad282c360b9b0489c16beba89e861721bff8d7c1ca8331da",
       "executable": false
     },
     "vite.config.ts": {

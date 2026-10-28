@@ -44,3 +44,5 @@ Browser partitions app-3 and app-4 run in separate jobs: their combined successf
 Files within each API/browser file group run sequentially. This prevents concurrent test processes from racing their local Worker proxy port reservations; independent jobs remain parallel. Server startup errors fail the job, with no assertion retry.
 
 The shared API and provider-backed browser harnesses bind Miniflare to port 0 and keep that socket while setting AUTH_ORIGIN to its assigned origin. They no longer release a reserved port before Worker startup. Startup failure still fails the test without retrying assertions.
+
+Restore runs in two independent jobs: the documented backup/fresh-restore/start-over journey and the erasure-fence journey. Each creates its own full source books and archive, and the erasure journey starts from restored source books and resets a populated destination. All original restore assertions and the 15-minute limit remain; the required `verify` job waits for both partitions. `pnpm test:restore` runs both locally. Lifecycle timing lines report command names and elapsed time without sign-in links or command output.
