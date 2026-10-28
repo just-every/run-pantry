@@ -20,7 +20,7 @@ Pantry runs on your own computer. This copy is free and MIT licensed. Its books 
 
 Use a Mac, Linux computer, or Windows with [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) installed. On a Mac, open **Terminal** from Applications → Utilities. On Linux, open your terminal app. On Windows, open your installed WSL distribution, such as Ubuntu.
 
-Check that Git is installed by typing `git --version` and pressing Enter. If it reports that the command is missing, follow [Git's installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) for your system, then reopen the terminal. Choose a folder in which to keep your books; the command below creates a `run-pantry` folder there.
+Check that Git is installed by typing `git --version` and pressing Enter. If it reports that the command is missing, follow [Git's installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) for your system, then reopen the terminal. Choose a folder in which to keep your books; the launch command creates a `run-pantry` folder there.
 
 Allow several minutes for the first start to download and build everything. The time depends on your computer and connection; progress appears in the terminal. Later starts reuse the installation.
 

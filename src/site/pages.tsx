@@ -20,6 +20,9 @@ const COPY = "document.querySelectorAll('.docs-copy').forEach(b=>{b.hidden=false
 
 const SHARE_IMAGE = `${identity.runSite}/site/share.jpg`
 
+// Pantry’s header skips to this target on Base-rendered pages too.
+const withMainTarget = (html: string) => html.replace('<main>', '<main id="main">')
+
 export function sitePages({ styles, contract, hosting }: SiteContext): SiteBuild {
   const data: RunData = { ...run, pricing: runPricing }
   const homepageHeader = { html: renderToStaticMarkup(<SiteHeader />), styles }
@@ -55,10 +58,10 @@ export function sitePages({ styles, contract, hosting }: SiteContext): SiteBuild
   return {
     pages: [
       { path: '/', html: document('Pantry — Know where every dollar went', identity.tagline, <Landing />) },
-      { path: '/run', html: runPageHtml(identity, data, contract, homepageHeader) },
+      { path: '/run', html: withMainTarget(runPageHtml(identity, data, contract, homepageHeader)) },
       ...(contract ? [{ path: '/contract', html: contractPageHtml(identity, data, contract) }] : []),
       { path: '/docs', html: document(...head(), <DocsIndex />) },
-      { path: '/docs/hosting', html: hostingPageHtml(identity, data, hosting ?? null, contract, homepageHeader) },
+      { path: '/docs/hosting', html: withMainTarget(hostingPageHtml(identity, data, hosting ?? null, contract, homepageHeader)) },
       ...docsPages.filter(page => page.slug !== 'hosting').map(page => ({ path: `/docs/${page.slug}`, html: document(...head(page.slug), <DocsArticle slug={page.slug} />, COPY) })),
       { path: '/404', html: siteNotFoundHtml(identity, data) },
     ],
