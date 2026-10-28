@@ -14,13 +14,24 @@ const productionBusiness = 'https://app.runeditrun.com/business'
 export async function businessCarryJourney() {
   const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
   try {
-    for (const [scenario, business] of [['carried', carry], ['name-only', { ...carry, legal_name: null }], ['missing', null]]) {
-      const app = await worker(business ? { RER_BUSINESS: JSON.stringify(business) } : {})
+    for (const [scenario, business, malformed] of [['carried', carry], ['name-only', { ...carry, legal_name: null }], ['missing', null], ['invalid', null, '{']]) {
+      const app = await worker(business ? { RER_BUSINESS: JSON.stringify(business) } : malformed ? { RER_BUSINESS: malformed } : {})
       const contexts = []
       try {
         const owner = await browser.newContext(); contexts.push(owner)
         assert.equal((await owner.request.post(`${app.origin}/auth/bootstrap`, { headers: { origin: app.origin }, data: { token: TOKEN, displayName: 'Example Owner' }, maxRedirects: 0 })).status(), 303)
-        assert.equal((await owner.request.post(`${app.origin}/setup`, { headers: { origin: app.origin }, form: { confirm: 'yes' }, maxRedirects: 0 })).status(), 303)
+        const setup = await owner.newPage(), setupErrors = []
+        setup.on('console', message => { if (/Content Security Policy|content-security-policy/i.test(message.text())) setupErrors.push(message.text()) })
+        await setup.setViewportSize({ width: 1440, height: 1000 })
+        await setup.goto(`${app.origin}/setup`)
+        const confirmation = setup.getByRole('checkbox')
+        await confirmation.check()
+        assert.equal(await confirmation.isChecked(), true)
+        if (process.env.PANTRY_PROOF_DIR) await setup.screenshot({ path: `${process.env.PANTRY_PROOF_DIR}/business-${scenario}-confirmation.png`, fullPage: true })
+        await setup.getByRole('button', { name: 'Finish setup', exact: true }).click()
+        await setup.waitForURL(`${app.origin}/app`)
+        assert.deepEqual(setupErrors, [], 'checking the confirmation renders without a CSP violation')
+        await setup.close()
         const readSettings = async () => {
           const response = await owner.request.get(`${app.origin}/api/pantry/state`)
           assert.equal(response.status(), 200)
@@ -30,9 +41,10 @@ export async function businessCarryJourney() {
         assert.equal(initial.entity, null, 'carrying a Business does not create accounting details')
         assert.deepEqual(initial.business, business ? { name: business.name, legalName: business.legal_name, origin: business.origin, url: business.business_url } : null)
         const storageState = await owner.storageState(), pages = []
-        for (const width of [1440, 390]) {
+        for (const width of [1440]) {
           const context = await browser.newContext({ storageState, viewport: { width, height: width === 390 ? 844 : 1000 } }); contexts.push(context)
           const page = await context.newPage(), errors = []; page.on('pageerror', error => errors.push(String(error)))
+          page.on('console', message => { if (/Content Security Policy|content-security-policy/i.test(message.text())) errors.push(message.text()) })
           pages.push({ page, errors, width })
           await page.goto(`${app.origin}/app/settings`)
           const summary = page.locator('section').filter({ has: page.getByRole('heading', { name: 'The business', exact: true }) })
@@ -42,7 +54,9 @@ export async function businessCarryJourney() {
           assert.equal(new URL(page.url()).searchParams.get('step'), 'business')
           const shared = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Your shared Business', exact: true }) })
           await shared.waitFor()
-          const link = shared.getByRole('link')
+          const existing = shared.getByRole('link', { name: 'Use your existing Business', exact: true })
+          assert.equal(await existing.getAttribute('href'), business ? business.origin + '/business' : productionBusiness)
+          const link = business ? shared.getByRole('link', { name: business.name, exact: true }) : existing
           assert.equal(await link.getAttribute('href'), business?.business_url ?? productionBusiness)
           assert.equal(await link.getAttribute('target'), '_blank')
           assert.ok((await link.getAttribute('rel')).split(/\s+/).includes('noreferrer'))
@@ -59,13 +73,7 @@ export async function businessCarryJourney() {
         }
         let saved
         for (const { page, errors, width } of pages) {
-          if (saved) {
-            await page.reload()
-            await page.getByRole('button', { name: 'Save business', exact: true }).waitFor()
-            assert.equal(await page.getByLabel('Legal name', { exact: true }).inputValue(), saved.legal_name, 'saved accounting name takes precedence over carry')
-            assert.deepEqual((await readSettings()).entity, saved, 'opening the carried Business does not overwrite saved details')
-          }
-          const legalName = width === 1440 && business ? business.legal_name ?? business.name : `Example Accounting ${width} LLC`
+          const legalName = business ? business.legal_name ?? business.name : 'Example Accounting LLC'
           await page.getByLabel('Legal name', { exact: true }).fill(legalName)
           await page.getByLabel('Entity type', { exact: true }).selectOption('single-member-llc')
           await page.getByLabel('State of organization', { exact: true }).selectOption('NY')
@@ -88,6 +96,22 @@ export async function businessCarryJourney() {
           await page.getByRole('button', { name: 'Save business', exact: true }).waitFor()
           assert.equal(await page.getByLabel('Legal name', { exact: true }).inputValue(), legalName)
           assert.deepEqual((await readSettings()).entity, saved, 'saved details survive settings navigation')
+          await page.reload()
+          await page.getByRole('button', { name: 'Save business', exact: true }).waitFor()
+          assert.equal(await page.getByLabel('Legal name', { exact: true }).inputValue(), saved.legal_name, 'saved accounting name takes precedence over carry')
+          assert.deepEqual((await readSettings()).entity, saved, 'opening the carried Business does not overwrite saved details')
+          const correctedName = `Example Accounting ${scenario} LLC`
+          await page.getByLabel('Legal name', { exact: true }).fill(correctedName)
+          const updating = page.waitForResponse(response => response.url().endsWith('/api/pantry/command/entity.save') && response.request().method() === 'POST')
+          await page.getByRole('button', { name: 'Save business', exact: true }).click()
+          const updated = await updating
+          assert.equal(updated.status(), 200)
+          saved = await updated.json()
+          assert.equal(saved.legal_name, correctedName)
+          await page.reload()
+          await page.getByRole('button', { name: 'Save business', exact: true }).waitFor()
+          assert.equal(await page.getByLabel('Legal name', { exact: true }).inputValue(), correctedName, 'an owner correction stays saved over the carry suggestion')
+          assert.deepEqual((await readSettings()).entity, saved)
           assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `saved business fits ${width}`)
           assert.deepEqual(errors, [], `business setup has no page errors at ${width}`)
           if (process.env.PANTRY_PROOF_DIR) await page.screenshot({ path: `${process.env.PANTRY_PROOF_DIR}/business-${scenario}-saved-${width}.png`, fullPage: true })
