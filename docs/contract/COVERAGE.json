@@ -5160,6 +5160,17 @@
       "to": "gap",
       "ids": [
         "INVOICE-002"
+      ],
+      "also": [
+        {
+          "to": "register",
+          "ids": [
+            "R-12"
+          ]
+        },
+        {
+          "to": "changelog"
+        }
       ]
     },
     {
@@ -5208,6 +5219,15 @@
           "ids": [
             "RL-108"
           ]
+        },
+        {
+          "to": "register",
+          "ids": [
+            "R-14"
+          ]
+        },
+        {
+          "to": "changelog"
         }
       ]
     },
@@ -5264,6 +5284,15 @@
           "ids": [
             "RL-107"
           ]
+        },
+        {
+          "to": "register",
+          "ids": [
+            "R-13"
+          ]
+        },
+        {
+          "to": "changelog"
         }
       ]
     },
@@ -5457,7 +5486,19 @@
       "line": 769,
       "cell": "gap",
       "text": "ct-approved 25 Oct: owner-only explicit audited sharing of the exact vendor revision; one-use hashed random links expire after fourteen days. An expired request can be reissued only as a new link; the old link stays dead. Replacement, revocation and restore disable old links. Explicit electronic consent and encrypted certification originals inherit existing tax-record retention and owner-confirmed expiry under ERASURE-001. W-9 originals open only to the owner after native same-session step-up; TINs never enter logs, ordinary exports, mail bodies or URLs. Online certification satisfies the clause alternative. No automatic email is sent; automated requests and reminders are the named TAXFORM-004 gap.",
-      "to": "changelog"
+      "to": "changelog",
+      "also": [
+        {
+          "to": "register",
+          "ids": [
+            "R-1",
+            "R-2"
+          ]
+        },
+        {
+          "to": "changelog"
+        }
+      ]
     },
     {
       "file": "CONTRACT.md",
@@ -5472,6 +5513,15 @@
         {
           "to": "docs",
           "path": "docs/contract-mechanisms.md"
+        },
+        {
+          "to": "register",
+          "ids": [
+            "R-6"
+          ]
+        },
+        {
+          "to": "changelog"
         }
       ]
     },
@@ -5494,6 +5544,15 @@
           "ids": [
             "RL-104"
           ]
+        },
+        {
+          "to": "register",
+          "ids": [
+            "R-12"
+          ]
+        },
+        {
+          "to": "changelog"
         }
       ]
     },
@@ -5545,6 +5604,15 @@
         {
           "to": "docs",
           "path": "docs/contract-mechanisms.md"
+        },
+        {
+          "to": "register",
+          "ids": [
+            "R-12"
+          ]
+        },
+        {
+          "to": "changelog"
         }
       ]
     },
@@ -5693,6 +5761,17 @@
       "to": "gap",
       "ids": [
         "MIGRATE-002"
+      ],
+      "also": [
+        {
+          "to": "register",
+          "ids": [
+            "R-9"
+          ]
+        },
+        {
+          "to": "changelog"
+        }
       ]
     },
     {
@@ -5826,6 +5905,18 @@
       "to": "gap",
       "ids": [
         "CONNECT-001"
+      ],
+      "also": [
+        {
+          "to": "register",
+          "ids": [
+            "R-5",
+            "R-13"
+          ]
+        },
+        {
+          "to": "changelog"
+        }
       ]
     },
     {
@@ -5841,6 +5932,15 @@
         {
           "to": "docs",
           "path": "docs/contract-mechanisms.md"
+        },
+        {
+          "to": "register",
+          "ids": [
+            "R-5"
+          ]
+        },
+        {
+          "to": "changelog"
         }
       ]
     },
@@ -6058,6 +6158,15 @@
           "ids": [
             "RL-103"
           ]
+        },
+        {
+          "to": "register",
+          "ids": [
+            "R-12"
+          ]
+        },
+        {
+          "to": "changelog"
         }
       ]
     },
@@ -6097,6 +6206,15 @@
           "ids": [
             "RL-104"
           ]
+        },
+        {
+          "to": "register",
+          "ids": [
+            "R-12"
+          ]
+        },
+        {
+          "to": "changelog"
         }
       ]
     },

@@ -699,7 +699,7 @@ Core · target · **partial** · Rules D-1, D-2, D-4, D-5, D-7, D-8, D-11, D-6 �
 3. autopay takes an INVOICE-012 early-payment discount only inside the window.
 
 **Evidence.** `tests/api/payment-messaging.test.mjs`, `tests/api/autopay-journey.mjs`, `tests/restore/restore.test.mjs`, `tests/app/customer-record.test.mjs`, `tests/app/autopay-journey.mjs`, `tests/providers/autopay.mjs`
-**Gap.** signed-in unscoped owner only, off by default, explicit approval of the exact recurring revision and schedule and retry email wording, separate customer authorization bound to purpose and billing address and email, current owner authority rechecked, audited changes, existing issued-invoice links reused with no new approval bearer links, private saved-method details withheld from the public summary, explicit recipient time zones with email permitted only during 08:00–18:00 in both the recipient and business zones, owner-recorded bounce and complaint stops that survive schedule reapproval, and no replay of uncertain attempts. Clearing a mail stop needs an explicit owner confirmation and reason and permits future notices only. Ordinary reminder handoff inherits these saved hours and stops. Restored charge authority is disabled; negative mail preferences survive restore, and erasure removes private recipient controls. Hosted ACH authorization and due-date settlement are proven with held Stripe TEST access. A retained successful live card-return, three-decline-retry and post-revocation receipt is required before DONE. Automatic provider delivery callbacks remain INVOICE-002 and CONNECT-005 obligations; these controls record an outcome observed by the owner, never a provider-verified event. The adopted ct ruling changes no status; remaining engineering and provider-outcome proof is owed.
+**Gap.** signed-in unscoped owner only, off by default, explicit approval of the exact recurring revision and schedule and retry email wording, separate customer authorization bound to purpose and billing address and email, current owner authority rechecked, audited changes, existing issued-invoice links reused with no new approval bearer links, private saved-method details withheld from the public summary, explicit recipient time zones with email permitted only during 08:00–18:00 in both the recipient and business zones, owner-recorded bounce and complaint stops that survive schedule reapproval, and no replay of uncertain attempts. Clearing a mail stop needs an explicit owner confirmation and reason and permits future notices only. Ordinary reminder handoff inherits these saved hours and stops. Restored charge authority is disabled; negative mail preferences survive restore, and erasure removes private recipient controls. Hosted ACH authorization and due-date settlement are proven with held Stripe TEST access. Card-return, three-decline retry and post-revocation journeys remain acceptance gates through the provider sandbox or official-schema fake. Live provider receipts belong to R-14 and do not block DONE. Automatic provider delivery callbacks remain INVOICE-002 and CONNECT-005 obligations; these controls record an outcome observed by the owner, never a provider-verified event. The adopted ct ruling changes no status; remaining engineering and provider-outcome proof is owed.
 
 #### INVOICE-004 — Reminders that stop once paid
 
@@ -801,7 +801,7 @@ Core · target · **partial** · Rules D-1, D-2, D-4, D-5, D-7, D-8, D-10 · Reg
 5. Schedule a reminder for 6:30 in the customer's time zone and see it held until 8:00.
 
 **Evidence.** `tests/api/payment-messaging.test.mjs`, `tests/api/texting-journey.mjs`, `tests/app/customer-record.test.mjs`, `tests/app/texting-journey.mjs`, `tests/providers/texting.mjs`
-**Gap.** signed-in unscoped owner approves exact templates and schedules, off by default, separately recorded number-bound consent per purpose with source and time and wording, audited changes, customer-local 08:00–21:00 intersected with business-local 08:00–18:00, immediate STOP and no replay of uncertain attempts. Restored consent is inactive and erasure cancels held messages. Only Twilio TEST credentials and its magic sender are supported; production delivery and sender registration remain with CONNECT-001. Sales-receipt sharing and sending inherit the absent SALES-001 hosted receipt door; MOBILE-002 inherits the native phone control. No real carrier delivery is claimed. The adopted ct ruling changes no status; remaining engineering and provider-outcome proof is owed.
+**Gap.** signed-in unscoped owner approves exact templates and schedules, off by default, separately recorded number-bound consent per purpose with source and time and wording, audited changes, customer-local 08:00–21:00 intersected with business-local 08:00–18:00, immediate STOP and no replay of uncertain attempts. Restored consent is inactive and erasure cancels held messages. Only Twilio TEST credentials and its magic sender are supported; production carrier delivery and sender registration are R-13 field proof; callback and outcome fixtures remain owed under CONNECT-001. Sales-receipt sharing and sending inherit the absent SALES-001 hosted receipt door; MOBILE-002 inherits the native phone control. No real carrier delivery is claimed. The adopted ct ruling changes no status; remaining engineering and provider-outcome proof is owed.
 
 #### SALES-001 — Sales receipts for sales paid on the spot
 
@@ -1597,7 +1597,7 @@ Core · target · **partial** · Rules D-1, D-2, D-4, D-5, D-7, D-8 · Register 
 2. See tracking categories as classes, open items equal receivables and payables, and attachments linked with hashes.
 
 **Evidence.** `src/pantry/cutover/xero.ts`, `src/pantry/cutover/xero-api.ts`, `src/pantry/cutover/xero-attachments.ts`, `src/ui/move-in-xero.tsx`, `tests/api/move-in.test.mjs`
-**Gap.** Xero's six standard exports are previewed, tied out, imported as staged records, undone and signed off to Xero's trial balance to the cent, and open items' attachments come over Xero's API through the installation's own Xero app (PAN-16); OAuth through Pantry Connect's certified app or a custom connection for the whole move-in, items, tracking categories as classes and locations, tax rates, credit notes, manual journals and history over the API, and a run against a live Xero organization do not exist. Live demo proof is BLOCKED on main and the accounts lane providing reusable expanded read consent; the held Xero app pair and the owner’s separate invoice-and-attachment grant do not authorize this isolated installation’s full move-in.
+**Gap.** Xero's six standard exports are previewed, tied out, imported as staged records, undone and signed off to Xero's trial balance to the cent, and open items' attachments come over Xero's API through the installation's own Xero app (PAN-16); OAuth through Pantry Connect's certified app or a custom connection for the whole move-in, items, tracking categories as classes and locations, tax rates, credit notes, manual journals and history over the API, remain unbuilt. The complete provider-schema move-in fixture remains owed. Real Xero tenant proof and expanded consent are R-9 field receipts, not DONE gates.
 
 #### MIGRATE-003 — FreshBooks move-in
 
@@ -1793,7 +1793,7 @@ Core · target · **missing** · From INTEG-003 · Rules D-1, D-2, D-4, D-5, D-7
 3. Replay without duplication, then edit the provider invoice and see a linked credit and reissue.
 
 **Evidence.** None.
-**Gap.** This provider connector has no delivered end-to-end workflow; all old production, mapping, import, correction and reconciliation obligations remain.
+**Gap.** This provider connector has no delivered end-to-end workflow; all old provider-fixture, mapping, import, correction and reconciliation obligations remain.
 
 #### INTEG-006 — Housecall Pro connection
 
@@ -1818,7 +1818,7 @@ Core · target · **missing** · From INTEG-003 · Rules D-1, D-2, D-4, D-5, D-7
 1. Connect through ServiceTitan’s integration environment and see an invoice and payment arrive once.
 
 **Evidence.** None.
-**Gap.** This provider connector has no delivered end-to-end workflow; all old production, mapping, import, correction and reconciliation obligations remain.
+**Gap.** This provider connector has no delivered end-to-end workflow; all old provider-fixture, mapping, import, correction and reconciliation obligations remain.
 
 #### INTEG-008 — QuickBooks Time connection
 
@@ -1860,7 +1860,7 @@ Core · target · **partial** · Register R-5, R-13
 5. Repeat the run with one own-account path (a Stripe restricted key), one file path (a Gusto payroll journal report) and the mailbox mail route (the owner's Gmail through OAuth).
 
 **Evidence.** `src/ui/provider-guides.tsx`, `src/pantry/feeds/commands.ts`, `src/pantry/stripe.ts`, `src/pantry/gusto/commands.ts`, `src/pantry/cutover/xero-api.ts`, `tests/api/feeds.test.mjs`, `tests/api/invoices-out.test.mjs`, `tests/api/connected.test.mjs`, `tests/api/move-in.test.mjs`
-**Gap.** Own-account Plaid, Stripe-key, Gusto and Xero attachment connections and QBO/Xero report-file paths exist, with owner setup guidance and provider-edge tests; Plaid sandbox and Stripe test acceptance do not prove production. Pantry Connect, its partner approvals and the remaining named provider/file paths do not exist. The fresh-installation production journeys without developer accounts, recorded ten-minute/eight-step limits, and complete path/fee disclosure remain unproven; Gusto consent remains unproven despite successful demo company-token reads.
+**Gap.** Own-account Plaid, Stripe-key, Gusto and Xero attachment connections and QBO/Xero report-file paths exist, with owner setup guidance and provider-edge tests; Real production receipts are R-5 field proof, independent of the fixture gate. Pantry Connect and the remaining named provider/file paths do not exist; actual partner approvals are in R-5. The fresh-installation provider-fixture journeys without developer accounts, recorded ten-minute/eight-step limits, and complete path/fee disclosure remain unproven; Gusto consent remains unproven despite successful demo company-token reads.
 
 #### CONNECT-002 — Pantry Connect, the connection broker
 
@@ -1879,7 +1879,7 @@ Core · target · **missing** · Cites BASE-OPS-003, BASE-OPS-004 · Register R-
 8. Send 100 invoices and receive 20 receipts through the test broker's mail, then inspect its storage and logs once the carrier has accepted and the installation has acknowledged them, and find no message body, attachment or plain recipient address.
 
 **Evidence.** None.
-**Gap.** No implementation; no Pantry Connect broker, partner approvals or relay exist.
+**Gap.** No Pantry Connect broker or relay workflow is implemented. Partner approval receipts belong to R-5; provider-schema fake broker and relay journeys remain acceptance gates.
 
 #### CONNECT-003 — A 1099 filing route without a transmitter code of one's own
 
@@ -1895,7 +1895,7 @@ Core · target · **partial** · Register R-6
 5. See a state that needs its own filing listed with its file.
 
 **Evidence.** `src/pantry/contractors.ts`, `tests/api/reports.test.mjs`
-**Gap.** A 1099-NEC filing CSV with full TINs is produced after year end in Pantry's own columns; the IRS IRIS Taxpayer Portal template, Pantry Connect as an IRIS transmitter with annual ATS, acknowledgments, corrections and state filings do not exist.
+**Gap.** A 1099-NEC filing CSV with full TINs is produced after year end in Pantry's own columns; the IRS IRIS Taxpayer Portal template, the Pantry Connect IRIS transmitter adapter, acknowledgments, corrections and state filings do not exist. Actual transmitter/annual ATS certification and agency receipts belong to R-6; official-schema filing, acknowledgment and correction fixtures remain acceptance gates.
 
 #### CONNECT-004 — Fees, steps and data shown before connecting
 
@@ -2237,7 +2237,7 @@ Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-006, BAS
 3. A changed source or authority invalidates the pending send; an uncertain attempt reconciles without a replacement attempt.
 
 **Evidence.** `src/pantry/collections/index.ts`, `src/pantry/delivery.ts`, `tests/api/agent.test.mjs`, `tests/app/app.test.mjs`
-**Gap.** Existing held-company-policy evidence: Five overdue invoice drafts show native payment/correspondence evidence, editable voice, exact owner approval and native PDF mail claims; promises, dispute/owner stop, processing and paid refusals, per-business-day shared reminder limit and explicit outcome history. Other-app invoices excluded. Gap: live SendGrid receipt, real inbound reply threading, proposed payment plans/write-offs and policy-governed recurring sends. owner-only explicit per-draft send, no automatic resend or guessed promise date; promises/stops pause ordinary reminders, and resumption needs owner review; private correspondence follows existing financial-copy erasure with approval invalidation. The company’s policy must decide future tool calls by their declared classes; the current bounded behavior supplies no product disposition. The adopted ct ruling changes no status; remaining engineering and provider-outcome proof is owed.
+**Gap.** Existing held-company-policy evidence: Five overdue invoice drafts show native payment/correspondence evidence, editable voice, exact owner approval and native PDF mail claims; promises, dispute/owner stop, processing and paid refusals, per-business-day shared reminder limit and explicit outcome history. Other-app invoices excluded. Gap: provider-adapter outcome and inbound reply threading fixtures, proposed payment plans/write-offs and policy-governed recurring sends. owner-only explicit per-draft send, no automatic resend or guessed promise date; promises/stops pause ordinary reminders, and resumption needs owner review; private correspondence follows existing financial-copy erasure with approval invalidation. The company’s policy must decide future tool calls by their declared classes; the current bounded behavior supplies no product disposition. Real outside-recipient receipts are recorded in R-12 and do not block DONE. The adopted ct ruling changes no status; remaining engineering and provider-outcome proof is owed.
 
 #### AGENT-009 — Tax readiness all year
 
