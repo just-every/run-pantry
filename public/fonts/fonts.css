@@ -206,9 +206,10 @@ html.rer-themed dt { border-radius: 12px 0 0 12px; color: var(--lavender-ink); f
 html.rer-themed dd { border-radius: 0 12px 12px 0; color: var(--ink); font-size: 16px; font-weight: 500; }
 /* The confirmation checkbox is a round control that fills green with a tick. */
 html.rer-themed input[type=checkbox] {
-  appearance: none; flex: none; width: 24px; height: 24px; margin: 0; border: 1.5px solid var(--field); border-radius: 50%; background: var(--surface); cursor: pointer;
+  appearance: none; display: inline-grid; place-content: center; flex: none; width: 24px; height: 24px; margin: 0; border: 1.5px solid var(--field); border-radius: 50%; background: var(--surface); cursor: pointer;
 }
-html.rer-themed input[type=checkbox]:checked { border-color: var(--green); background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M6.5 11.2l3 3 6-6.4' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat, var(--green); }
+html.rer-themed input[type=checkbox]:checked { border-color: var(--green); background: var(--green); }
+html.rer-themed input[type=checkbox]:checked::after { content: ""; width: 9px; height: 4px; border: solid white; border-width: 0 0 2px 2px; transform: translateY(-1px) rotate(-45deg); }
 html.rer-themed input[type=checkbox]:focus-visible { outline: none; box-shadow: var(--ring); }
 html.rer-themed label:has(input[type=checkbox]) { align-items: center; gap: 12px; color: var(--muted); font-size: 15px; font-weight: 400; }
 @media (max-width: 480px) {

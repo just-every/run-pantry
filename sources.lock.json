@@ -975,7 +975,7 @@
       "executable": false
     },
     "public/fonts/fonts.css": {
-      "sha256": "94ad0630a13350c653ef322c4ec278d410a5456b8b9dbab533a16dee794aec1e",
+      "sha256": "53a262cf83d28565db22a837f88198e395c51f71dd0ce78e73d15c6fa075eae6",
       "executable": false
     },
     "public/fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2": {
@@ -1003,7 +1003,7 @@
       "executable": false
     },
     "public/pantry.css": {
-      "sha256": "0b609d088a5293cfd9e04cb8a201776d51a5fbd6662604aae67b83c0fd829891",
+      "sha256": "889999db8c898ccc94a6155533d21289ec1914865589f4667d990bbf9a23b909",
       "executable": false
     },
     "public/rer-theme.css": {
@@ -5311,7 +5311,7 @@
       "executable": false
     },
     "src/ui/business-settings.tsx": {
-      "sha256": "ce0bf7a9763d985003b7d05134fbeea9a6bc5f51dad55a407c9fc5a2b1944a0d",
+      "sha256": "d8ee97d75eb23b9f9ba0372ffe9bc49438450229710a6a785e0c2f069cf81a93",
       "executable": false
     },
     "src/ui/capture-approval-rules.tsx": {
@@ -6123,7 +6123,7 @@
       "executable": false
     },
     "tests/app/business-carry-journey.mjs": {
-      "sha256": "57a081033e9457dfbc735417443ce365efb1d019723b7c9e6a02899bf5f6a4b6",
+      "sha256": "1a21a512845464b9abdff4521c520631cd309e5b32742dcc989c0d4d320b4146",
       "executable": false
     },
     "tests/app/capture-fixtures.mjs": {
