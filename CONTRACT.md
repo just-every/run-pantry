@@ -1870,7 +1870,7 @@ Each row declares possible classes, decided per call from its arguments, current
 
 | `pantry.invoice.hosted_invoice_page_and_003` | Hosted invoice page and viewed status | INVOICE-003 | standard or external or money or commitment | No MCP tool |
 
-| `pantry.pay.card_and_ach_payment_001` | Card and ACH payment from the invoice link | PAY-001 | standard or external or money or commitment or gated or sensitive | No MCP tool |
+| `pantry.pay.card_and_ach_payment_001` | Card and ACH payment from the invoice link | PAY-001 | standard or external or money or commitment or gated or access or security or sensitive | No MCP tool |
 
 | `pantry.pay.payment_status_follows_the_002` | Payment status follows the provider | PAY-002 | standard or external or money or commitment or gated or sensitive | No MCP tool |
 
@@ -1914,13 +1914,13 @@ Each row declares possible classes, decided per call from its arguments, current
 
 | `pantry.invoice.estimate_acceptance_custody_and_017` | Estimate acceptance custody and validity | INVOICE-017 | standard or external or money or commitment | No MCP tool |
 
-| `pantry.bill.bill_inbox_and_lifecycle_001` | Bill inbox and lifecycle | BILL-001 | standard or commitment or money | No MCP tool |
+| `pantry.bill.bill_inbox_and_lifecycle_001` | Bill inbox and lifecycle | BILL-001 | standard or commitment or money or live | No MCP tool |
 
 | `pantry.bill.bill_approval_workflow_002` | Bill approval workflow | BILL-002 | standard or commitment or money | No MCP tool |
 
 | `pantry.bill.bills_paid_by_credit_003` | Bills paid by credit card or line of credit | BILL-003 | standard or commitment or money | No MCP tool |
 
-| `pantry.billpay.pay_bills_through_a_001` | Pay bills through a provider | BILLPAY-001 | money or commitment or external or gated or sensitive | No MCP tool |
+| `pantry.billpay.pay_bills_through_a_001` | Pay bills through a provider | BILLPAY-001 | money or commitment or external or gated or access or security or sensitive | No MCP tool |
 
 | `pantry.billpay.payment_fraud_controls_002` | Payment fraud controls | BILLPAY-002 | money or commitment or external or gated or sensitive | No MCP tool |
 
@@ -1986,7 +1986,7 @@ Each row declares possible classes, decided per call from its arguments, current
 
 | `pantry.close.close_workflow_with_owners_003` | Close workflow with owners and questions | CLOSE-003 | standard or commitment | No MCP tool |
 
-| `pantry.close.continuous_checks_004` | Continuous checks | CLOSE-004 | standard or commitment | No MCP tool |
+| `pantry.close.continuous_checks_004` | Continuous checks | CLOSE-004 | standard or commitment or live | No MCP tool |
 
 | `pantry.asset.fixed_assets_and_depreciation_001` | Fixed assets and depreciation | ASSET-001 | standard or commitment | No MCP tool |
 
@@ -1996,7 +1996,7 @@ Each row declares possible classes, decided per call from its arguments, current
 
 | `pantry.acct.hand_off_to_tax_002` | Hand-off to tax software | ACCT-002 | standard or external or commitment or sensitive | No MCP tool |
 
-| `pantry.acct.accountant_review_tools_003` | Accountant review tools | ACCT-003 | standard or commitment or sensitive | No MCP tool |
+| `pantry.acct.accountant_review_tools_003` | Accountant review tools | ACCT-003 | standard or money or commitment or sensitive | No MCP tool |
 
 | `pantry.migrate.quickbooks_online_move_in_001` | QuickBooks Online move-in through its API, with history and attachments | MIGRATE-001 | standard or external or commitment or gated or access or security or sensitive | No MCP tool |
 
@@ -2054,7 +2054,7 @@ Each row declares possible classes, decided per call from its arguments, current
 
 | `pantry.access.narrower_roles_and_approval_001` | Narrower roles and approval limits | ACCESS-001 | access or security or sensitive or commitment | No MCP tool |
 
-| `pantry.access.issuing_limits_for_invoices_003` | Issuing limits for invoices, credits and sales | ACCESS-003 | access or security or sensitive or commitment | No MCP tool |
+| `pantry.access.issuing_limits_for_invoices_003` | Issuing limits for invoices, credits and sales | ACCESS-003 | access or security or sensitive or commitment or money | No MCP tool |
 
 | `pantry.access.sign_in_security_002` | Sign-in security | ACCESS-002 | access or security or sensitive or commitment | No MCP tool |
 
