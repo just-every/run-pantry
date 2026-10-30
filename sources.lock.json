@@ -6319,7 +6319,7 @@
       "executable": false
     },
     "src/ui/stripe-clearing.tsx": {
-      "sha256": "22b4408c0798b4ad1bf97d2258e9cff0d95f17683ff45d6ab5b25a3507df80e5",
+      "sha256": "7e92824f428b593e5dd56f8248c6ddf9ce5f77105fc9f1abf588bd494b69d284",
       "executable": false
     },
     "src/ui/tax-readiness.tsx": {
@@ -6779,7 +6779,7 @@
       "executable": false
     },
     "tests/app/dashboard.test.mjs": {
-      "sha256": "5f086af47244e2cfaee6f8691b9f11dd097c43f18a3e4d41987d3acc8a6619f7",
+      "sha256": "e395b9d031b7e3ee7a8c52cda34cf185edec7607912c9cbb10c38e79a1b529e1",
       "executable": false
     },
     "tests/app/data001-journey.mjs": {
@@ -6903,7 +6903,7 @@
       "executable": false
     },
     "tests/app/stripe-clearing.test.mjs": {
-      "sha256": "a9d94bf0fec67d3e0a9af001d6f91a7678eae8a5c02391d2d8b79e6287f6275f",
+      "sha256": "ebfc9afbe70019325aa6dc67d9b60559e86137a05c5a6ea330124de85963f62e",
       "executable": false
     },
     "tests/app/taxform-journey.mjs": {

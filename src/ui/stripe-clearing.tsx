@@ -10,7 +10,7 @@ export function StripeClearing({ value }: { value: D | null | undefined }) {
     <Table heads={['Ledger clearing', 'Stripe available + pending', 'Difference']} figures={[0, 1, 2]}>
       <tr><td className="fig">{usd(value.ledgerCents)}</td><td className="fig">{value.providerCents === null ? 'Not observed' : usd(value.providerCents)}</td><td className="fig">{value.differenceCents === null ? 'Not compared' : usd(value.differenceCents)}</td></tr>
     </Table>
-    <p className="hint">{value.observedAt ? <>Stripe balance observed {timeText(value.observedAt)}.</> : 'No Stripe balance has been observed.'} This is the latest provider comparison, independent of the report date and cash/accrual display.</p>
+    <p className="hint">{value.observedAt ? <>Stripe balance observed <time dateTime={value.observedAt}>{timeText(value.observedAt)}</time>.</> : 'No Stripe balance has been observed.'} This is the latest provider comparison, independent of the report date and cash/accrual display.</p>
     {value.reason && <p role="status">{value.reason}</p>}
     {!value.complete && <p role="status">The provider read is incomplete; this comparison cannot establish a tie.</p>}
     <Table heads={['Provider item', 'Date', 'Activity', 'Net', 'Status', 'Reason']} figures={[3]} caption="Stripe clearing evidence" empty="No unmatched provider items.">
