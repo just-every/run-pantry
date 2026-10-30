@@ -83,7 +83,7 @@ export async function signedInForward(request: Request, original: Bindings): Pro
 
 export async function authResponse(request: Request, original: Bindings): Promise<Response | null> {
  const env = runtimeBindings(original), url = new URL(request.url)
- if (url.pathname === '/' && ['GET', 'HEAD'].includes(request.method) && await operatorAuth(env).getSession(request)) {
+ if (url.pathname === '/' && ['GET', 'HEAD'].includes(request.method) && request.headers.has('cookie') && await operatorAuth(env).getSession(request)) {
   return new Response(null, { status: 303, headers: { ...privateHeaders, location: '/app' } })
  }
  if (url.pathname.startsWith('/.well-known/rer-') || url.pathname.startsWith('/auth/dependencies/')) {
