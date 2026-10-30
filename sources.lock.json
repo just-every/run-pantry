@@ -5851,7 +5851,7 @@
       "executable": false
     },
     "src/ui/activity.tsx": {
-      "sha256": "7351c944c940a6111ea591303ae31b65488f727147e7e9da5d3216cfc0963cf2",
+      "sha256": "a5148926302277de22199237271065bcb42595870aafe498b5ccaf4bf1219ace",
       "executable": false
     },
     "src/ui/adjusting-report.tsx": {
@@ -5887,7 +5887,7 @@
       "executable": false
     },
     "src/ui/bank-lines.tsx": {
-      "sha256": "c25e1a07571c86be592264cad96884d3611b8a2cc7aca8ca4fd46d11d9611512",
+      "sha256": "07e333291864a8474a2cc3bb2bab93c99e24bad359486370266bc690b1db505d",
       "executable": false
     },
     "src/ui/bank-opening.tsx": {
@@ -5907,7 +5907,7 @@
       "executable": false
     },
     "src/ui/bills.tsx": {
-      "sha256": "bf4cf9e2c9360808ec2aabaa0dbfb204d8a7c56d40044e0d6107fda65e1432fd",
+      "sha256": "562673abd17834c1b3ace6d4234fc47acc0a0caea1d91086d48f15dd2598c012",
       "executable": false
     },
     "src/ui/books.tsx": {
@@ -5923,7 +5923,7 @@
       "executable": false
     },
     "src/ui/capture-approval-rules.tsx": {
-      "sha256": "205a3e3af344ec1e2816d83a1dc4c03b9bce2e38fd20182f5a41095cceb90df9",
+      "sha256": "ee5c454d3dc53b928191c5238e30134128e28e5294c1e7ebe0538fd447e36238",
       "executable": false
     },
     "src/ui/capture/api.ts": {
@@ -5983,7 +5983,7 @@
       "executable": false
     },
     "src/ui/currency.tsx": {
-      "sha256": "6ddd043e665e0c01652439a7c3cf0e789edcb4244a6d46b043dd3343eee53084",
+      "sha256": "74c911a68f49d7f8606d1f8fc55051425fc00a4730f33c591ab9433c41f83169",
       "executable": false
     },
     "src/ui/custom-report-drill.tsx": {
@@ -6019,7 +6019,7 @@
       "executable": false
     },
     "src/ui/dashboard-summary.tsx": {
-      "sha256": "d1fbfec1190692ed36164125dee2908850d4ff61e3f0bdae92c35747358a3368",
+      "sha256": "92057b6fb3a28167a49911062ed139f88bc3725e1d3d486593f83e0a5f5eeeab",
       "executable": false
     },
     "src/ui/data-flows.tsx": {
@@ -6135,7 +6135,7 @@
       "executable": false
     },
     "src/ui/learned-recognition.tsx": {
-      "sha256": "2f7059a93d0f07f64283fce3cfdd44761e4701ef7c62aa0692b8508620a69c87",
+      "sha256": "00ad6bbd98527c3a0d46131a06313c1125eae4f136dc399c5d3444bbb44aef54",
       "executable": false
     },
     "src/ui/line-suggestions.tsx": {
@@ -6227,7 +6227,7 @@
       "executable": false
     },
     "src/ui/receipts.tsx": {
-      "sha256": "b2126233dbb5bfbbfe75dfe35ce2fac026c6fbb0a57fa0ca792956931cbae61d",
+      "sha256": "4f68d820458e96ba4caac0b367b31e58dd2c664f0dbea210c2bc54c96b23f561",
       "executable": false
     },
     "src/ui/recognition-schedules.tsx": {
@@ -6299,7 +6299,7 @@
       "executable": false
     },
     "src/ui/search.tsx": {
-      "sha256": "e96fc570f4617a39ae8c42275ce9c0f2f91ea7bba2c9147ad0250fdc86d317c4",
+      "sha256": "2c6f190bfc09decd5ea3afe25e6a6af15fe3b5190bb7b7b591c45fe00cdd6b18",
       "executable": false
     },
     "src/ui/settings.tsx": {
@@ -6327,7 +6327,7 @@
       "executable": false
     },
     "src/ui/texting.tsx": {
-      "sha256": "97b66b66f0471bfb601069baf06bfc49cba0cb945e3e348acffa67a8f6e64cf5",
+      "sha256": "0e24c1846c2571bc5aca0c775ed0d6b252c08899cffa3fff8e2b595f40cec4c6",
       "executable": false
     },
     "src/ui/time.tsx": {
@@ -6687,7 +6687,7 @@
       "executable": false
     },
     "tests/app/access003-journey.mjs": {
-      "sha256": "60f271d46578e9afb6f4c58bfd5d868aab83d59ab1784d86fec12c4f90918635",
+      "sha256": "cce1cc8ce7871710fedfbea3f4f258668474d8d664d2a9c39d6d9168562af058",
       "executable": false
     },
     "tests/app/app.test.mjs": {
@@ -6823,7 +6823,7 @@
       "executable": false
     },
     "tests/app/learning-journey.mjs": {
-      "sha256": "b4d72621e05d161eff0f89052a653634c2a1ce271c30bb3bd1a80fcdb41cc833",
+      "sha256": "8fd5acf5d241ce959e7ff669914563d168d3dfa29e7baab5ac08ce1e47b996f5",
       "executable": false
     },
     "tests/app/managed-mail-journey.mjs": {
