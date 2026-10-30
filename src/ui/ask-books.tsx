@@ -1,13 +1,14 @@
+import { Help } from './help'
 import { useState } from 'react'
 import { Action, api, Card, command, Field, Form, usd, type D } from './kit'
 export function AskBooks() {
   const [answer, setAnswer] = useState<D | null>(null)
   return (
     <Card title="Ask the books">
-      <p>
+      <Help label="What you can ask"><p>
         Ask about contractor spending or net income. Name a month or quarter; an omitted year means the current UTC
         year. Figures use posted reports; contractor spending means expense accounts containing “contract”.
-      </p>
+      </p></Help>
       <Form
         label="Ask the books"
         submit={async (b) => {
@@ -22,7 +23,7 @@ export function AskBooks() {
           name="question"
           maxLength={160}
           required
-          hint="Why is net income down in October 2026?"
+          placeholder="Why is net income down in October 2026?"
         />
         <Field
           label="Answer basis"

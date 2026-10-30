@@ -1,3 +1,4 @@
+import { Help } from './help'
 import { Card,Field,Form,Table,command,day,usd,useShared,useView,type D } from './kit'
 export function AgentPermissions(){const {state}=useShared();return state.actor.can.owner?<OwnerPermissions/>:null}
 function OwnerPermissions(){
@@ -12,7 +13,7 @@ function OwnerPermissions(){
  <label><input name="confirm" type="checkbox" required/> I authorize these automatic postings within this exact scope.</label>
  </Form>
  <Form label="Run permitted work now" submit={()=>command('agent-permission.run',{})} onDone={reload} children={null}/>
- <p>{data.sampleMethod} Week beginning {data.week}.</p>
+ <Help label="How reviews are sampled"><p>{data.sampleMethod} Week beginning {data.week}.</p></Help>
  {data.permissions.map((p:D)=><section key={p.id} className="stack"><h3>{p.name}</h3><p>{p.active?'Active':'Revoked'} · {p.payee} · up to {usd(p.max_cents)}. Rule edits require a new permission.</p>
  <p>{p.metrics.actions} actions · {p.metrics.undone} undone · {p.metrics.reviewed} reviewed. Review accuracy: {p.metrics.accuracy===null?'No reviewed sample yet':`${p.metrics.correct}/${p.metrics.reviewed} correct (${Math.round(p.metrics.accuracy*100)}%)`}.</p>
  {p.active===1&&<Form label={'Revoke '+p.name} submit={()=>command('agent-permission.revoke',{id:p.id,revision:p.revision})} onDone={reload} children={null}/>}
