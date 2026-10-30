@@ -6007,7 +6007,7 @@
       "executable": false
     },
     "src/ui/customer-history.tsx": {
-      "sha256": "1f56fa17ae13c1319c5da858d67771af64a71e8407b0de03a9a22f1286d01fda",
+      "sha256": "8652faaead0278ec2baa3df01d92eec0d20a192e5052be240aa1f3dd5003c304",
       "executable": false
     },
     "src/ui/customer-refunds.tsx": {
@@ -6775,7 +6775,7 @@
       "executable": false
     },
     "tests/app/customer-record.test.mjs": {
-      "sha256": "28e234bd0c8ce69f75f381de3b33f9241b33d651398565a044866102a6bb7bf9",
+      "sha256": "ef419117fd82576d97a88ca017744dc60c09792019f9664412b0a4d27c59cf88",
       "executable": false
     },
     "tests/app/dashboard.test.mjs": {
