@@ -552,3 +552,20 @@ details.setup-steps summary { width: fit-content; margin-bottom: 8px; color: var
 /* Transaction search shares the existing form and ledger components. */
 .transaction-search{display:flex;align-items:center;gap:.6rem;margin:0 0 1.25rem;flex-wrap:wrap}.transaction-search label{font-size:.85rem}.transaction-search input{min-width:0;flex:1;max-width:28rem}.transaction-search button{flex-shrink:0}
 @media(max-width:600px){.transaction-search label{width:100%}.transaction-search input{width:50%}}
+
+/* The named list views reveal secondary work with their row. */
+.list-filters { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin-bottom: 16px; }
+.card-actions .list-filters { margin-bottom: 0; }
+.list-filters summary { list-style: none; cursor: pointer; }
+.list-filters summary::-webkit-details-marker { display: none; }
+.filter-fields { padding-top: 12px; display: flex; gap: 12px; flex-wrap: wrap; }
+.filter-chip { background: var(--lavender); }
+.quiet-row .row-reveal, .quiet-row > td > .record-questions { opacity: 0; pointer-events: none; }
+.quiet-row:hover .row-reveal, .quiet-row:focus-within .row-reveal,
+.quiet-row:hover > td > .record-questions, .quiet-row:focus-within > td > .record-questions,
+.quiet-row .row-reveal:has(details[open]), .quiet-row > td > .record-questions:has([aria-expanded='true']) { opacity: 1; pointer-events: auto; }
+@media (max-width: 720px) {
+  .quiet-row .row-reveal .btn, .quiet-row > td > .record-questions > .btn,
+  .quiet-row .row-reveal > a, .quiet-row .row-reveal summary { min-height: 44px; display: inline-flex; align-items: center; }
+  .filter-fields { flex-direction: column; }
+}

@@ -37,8 +37,8 @@ export function Bills({ data, reload, initialBillId }: { data: D; reload: () => 
     <div className="stack"><Card title="Bills">
       <Table caption="Bill inbox" heads={['Vendor', 'Reference / evidence', 'Due', 'Amount', 'Open', 'State / next actor']} figures={[3, 4]} empty="No bills yet.">
         {(data.bills as D[]).map(b => <tr key={b.id} className={selected === b.id ? 'selected' : ''} tabIndex={0} onClick={() => { setSelected(b.id); setEditing(false) }} onKeyDown={k => { if (k.key === 'Enter') setSelected(b.id) }}>
-          <td>{b.vendor_name}</td><td><span>{b.reference}</span><small className="sub block">{b.documents.length ? <Chip tone="good">Attached</Chip> : b.evidence_waived ? <Chip>Reason recorded</Chip> : <Chip tone="warn">Missing</Chip>}</small></td><td>{day(b.due_date)}</td><td className="fig">{usd(b.total_cents)}</td><td className="fig">{usd(b.open_cents)}</td>
-          <td><Chip tone={['Paid', 'Reconciled'].includes(b.lifecycle.stage) ? 'good' : 'neutral'}>{b.lifecycle.stage}</Chip><small className="sub block">Next: {b.lifecycle.nextActor}</small></td></tr>)}
+          <td>{b.vendor_name}</td><td><span>{b.reference}</span>{!b.documents.length && <small className="sub"> · {b.evidence_waived ? 'Reason recorded' : 'Missing evidence'}</small>}</td><td>{day(b.due_date)}</td><td className="fig">{usd(b.total_cents)}</td><td className="fig">{usd(b.open_cents)}</td>
+          <td><span>{b.lifecycle.stage}</span>{b.lifecycle.nextActor !== 'None' && <small className="sub"> · Next: {b.lifecycle.nextActor}</small>}</td></tr>)}
       </Table>
     </Card>
     {current && <VendorHistory key={current.vendor_id + current.revision} vendorId={current.vendor_id} />}

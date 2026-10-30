@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Card, Chip, Field, Form, Loading, PageHead, Table, useView, useWho, type D } from './kit'
+import { ListFilters } from './list-filters'
 import { actionLabel, approvalLabel, detailFacts, recordLabel } from './activity-labels'
 
 function Evidence({ event }: { event: D }) {
@@ -20,11 +21,11 @@ export function Activity() {
   useEffect(() => { if (data?.people) setPeople(data.people) }, [data?.people])
   return <>
     <PageHead title="Activity" lead="Who changed the books, the revision they changed, and the approval or standing authority they relied on." />
-    <Card title="Find history"><Form label="Filter activity" className="grid-form" submit={async b => { setQuery(new URLSearchParams(Object.entries(b).filter(([, v]) => v !== '') as [string, string][]).toString()) }}>
-      <Field label="Person or connection" name="person" options={people.map((email: string) => ({ value: email, label: who(email) }))} empty="Everyone" />
-      <Field label="From date" name="from" type="date" /><Field label="Through date" name="to" type="date" />
-      <Field label="Record ID" name="record" hint="Copy the record ID from Inspect history." />
-    </Form></Card>
+    <ListFilters active={[...new URLSearchParams(query)].map(([key, value]) => ({ label: `${({ person: 'Person', from: 'From', to: 'Through', record: 'Record' } as Record<string, string>)[key]}: ${key === 'person' ? who(value) : value}`, clear: () => { const next = new URLSearchParams(query); next.delete(key); setQuery(next.toString()) } }))}><Form label="Filter activity" className="grid-form" submit={async b => { setQuery(new URLSearchParams(Object.entries(b).filter(([, v]) => v !== '') as [string, string][]).toString()) }}>
+      <Field label="Person or connection" name="person" key={query + 'person'} defaultValue={new URLSearchParams(query).get('person') ?? ''} options={people.map((email: string) => ({ value: email, label: who(email) }))} empty="Everyone" />
+      <Field label="From date" name="from" key={query + 'from'} defaultValue={new URLSearchParams(query).get('from') ?? ''} type="date" /><Field label="Through date" name="to" key={query + 'to'} defaultValue={new URLSearchParams(query).get('to') ?? ''} type="date" />
+      <Field label="Record ID" name="record" key={query + 'record'} defaultValue={new URLSearchParams(query).get('record') ?? ''} hint="Copy the record ID from Inspect history." />
+    </Form></ListFilters>
     {!data ? <Loading error={error} what="activity" /> : <>
       <Card title="Activity"><Table heads={['When', 'Who', 'Action', 'Record']} empty="No activity matches these filters.">
         {data.audit.map((e: D) => <tr key={e.id}><td>{new Date(e.at).toLocaleString()}</td><td><div>{who(e.actor_email)}</div><small className="sub">{e.origin_kind || e.actor_kind}</small></td><td>{actionLabel(e.action)}</td><td>{recordLabel(e.subject_kind, e.subject_id)}<Evidence event={e} /></td></tr>)}
