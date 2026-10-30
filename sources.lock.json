@@ -5883,7 +5883,7 @@
       "executable": false
     },
     "src/ui/bank-feeds.tsx": {
-      "sha256": "b79f6ced9a6107caebe3fa5c879dee6a9a5df91c39db7ce03e0185a9600eaddf",
+      "sha256": "496319c6d30422066ef4761036d9e462bd9cd532c9728824e5bc34e78ac8f058",
       "executable": false
     },
     "src/ui/bank-lines.tsx": {
@@ -6007,7 +6007,7 @@
       "executable": false
     },
     "src/ui/customer-history.tsx": {
-      "sha256": "d7f32bcb83d2ca40c1918d88a11dca29e12cb210911a13b3d9672006eec4ea14",
+      "sha256": "1f56fa17ae13c1319c5da858d67771af64a71e8407b0de03a9a22f1286d01fda",
       "executable": false
     },
     "src/ui/customer-refunds.tsx": {
@@ -6111,7 +6111,7 @@
       "executable": false
     },
     "src/ui/invoicing-settings.tsx": {
-      "sha256": "4037cbe00fc29385067144949ed64b785a8a0494c2e94195e763ac324dd37daa",
+      "sha256": "d22b6b5b5f2e47df978bdd3daee7baa990a2aa50f042d3546311be846fcb3d96",
       "executable": false
     },
     "src/ui/issuing-limits.tsx": {

@@ -14,7 +14,7 @@ function Sending({ s, onDone }: { s: D; onDone: () => Promise<void> }) {
   const days = (s.reminder_days as number[]).map(d => d < 0 ? `${-d} day${d === -1 ? '' : 's'} before` : d === 0 ? 'on the due date' : `${d} day${d === 1 ? '' : 's'} after`).join(', ')
   return <Card title="Sending invoices and reminders">
     {s.mail === 'ready' ? <p>Invoices and reminders are emailed from <strong>{s.from}</strong>, with replies going to {s.reply_to || s.ownerEmail}.</p>
-      : <><div className="callout callout-warn" role="status"><strong>{s.mail === 'local' ? 'This computer sends no email' : 'No mail provider is set up'}</strong><span>{s.mail === 'local' ? 'Pantry on your own computer records each send as "Not sent: local run". Invoices, reminders and sign-in links are emailed once Pantry is online with a mail provider account of your own.' : 'Invoices and reminders are recorded but not emailed until this Pantry has a mail provider account of its own.'}</span></div>
+      : <>{s.mail !== 'local' && <div className="callout callout-warn" role="status"><strong>No mail provider is set up</strong><span>Invoices and reminders are recorded but not emailed until this Pantry has a mail provider account of its own.</span></div>}
         <SetupSteps provider="mail" reason="" summary="Set up email for a hosted Pantry" owner={owner} /></>}
     <p>{s.reminders_on ? <>Reminders go {days || 'never (no days set)'}, and stop as soon as the invoice is paid.</> : 'Reminders are off.'} Days follow {ZONE_LABEL[s.time_zone] ?? s.time_zone} time.</p>
     {owner && <details className="details"><summary>Payment receipt preference</summary><PaymentReceiptPreference enabled={!!s.payment_receipts_on} onChange={onDone} /></details>}

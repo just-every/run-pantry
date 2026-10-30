@@ -54,7 +54,7 @@ export function FeedHealthNotices({ notices, onDone }: { notices: D[]; onDone: (
   const can = useShared().state.actor.can.record
   return <>{notices.map(n => <div key={n.itemId} className="callout callout-warn relink" role="status"><Icon name="alert" />
     <div><strong>{n.message}</strong><span>{n.name}. Last successful sync: {n.lastSyncedAt ? new Date(n.lastSyncedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'never'}.</span>
-      {n.notification?.detail && <small>{n.notification.detail}</small>}</div>
+      {n.notification?.detail && n.notification.status !== 'local' && <small>{n.notification.detail}</small>}</div>
     {can && <Action tone="primary" run={async () => { if (n.requiresRelink) await relink({ id: n.itemId }); else await command('feed.sync', { itemId: n.itemId }); await onDone() }}>{n.requiresRelink ? 'Re-link' : 'Sync now'}</Action>}</div>)}</>
 }
 
