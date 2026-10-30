@@ -42,7 +42,7 @@ test('REPORT-005 / PROC-003 missing Stripe refund is named on dashboard, close a
           if(!repaired){await card.getByRole('cell',{name:/txn_refund/}).waitFor();await card.getByText('refund',{exact:true}).waitFor()}
           else assert.equal(await card.getByRole('cell',{name:/txn_refund/}).count(),0)
           const response=await context.request.get(new URL(await card.getByRole('link',{name:'Download comparison and item evidence',exact:true}).getAttribute('href'),app.origin).href)
-          assert.equal(response.status(),200);const data=await response.json();assert.equal(data.ok,repaired);assert.equal(data.differenceCents,repaired?0:10000);assert.ok((await card.innerText()).includes(data.observedAt));assert.ok(!(await card.innerText()).includes('[object Object]'))
+          assert.equal(response.status(),200);const data=await response.json();assert.equal(data.ok,repaired);assert.equal(data.differenceCents,repaired?0:10000);const observed = card.locator('time').filter({ hasText: /at/ });assert.equal(await observed.getAttribute('datetime'),data.observedAt);assert.equal(await observed.innerText(),await page.evaluate(iso=>new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',year:'numeric'}).format(new Date(iso))+' at '+new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit'}).format(new Date(iso)),data.observedAt));assert.ok(!(await card.innerText()).includes(data.observedAt));assert.ok(!(await card.innerText()).includes('[object Object]'))
         }
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${name} ${width} fits`)
         if(name==='settings'){
