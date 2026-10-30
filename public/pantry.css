@@ -40,6 +40,8 @@ p { margin: 0 0 10px; text-wrap: pretty; }
 .profile { justify-self: end; line-height: 1.25; text-align: right; }
 .profile-name { display: block; font-weight: 600; font-size: 14px; }
 .profile small { display: block; color: var(--soft); font-size: var(--app-text-small, 12.5px); }
+/* The app column is a solid surface; surrounding chrome keeps the paper tone. */
+.app > .workspace { background: var(--surface); min-height: calc(100vh - 68px); }
 .workspace { max-width: 1440px; margin: 0 auto; padding: 36px 40px 72px; }
 
 /* Page structure */
@@ -318,6 +320,7 @@ blockquote.evidence footer { color: var(--soft); font-size: 13px; }
   .more-menu { position: fixed; top: auto; bottom: 80px; right: 8px; left: auto; }
   .profile-name { font-size: 13.5px; }
   .workspace { padding: 24px 16px 104px; }
+  .app > .workspace { min-height: calc(100vh - 60px); }
   .page-head { align-items: flex-start; margin-bottom: 18px; }
   .page-head h1 .chip { font-size: var(--app-text-small, 12.5px); padding: 4px 10px; }
   .lead { font-size: 15.5px; }
