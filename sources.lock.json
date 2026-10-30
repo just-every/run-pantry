@@ -5851,7 +5851,7 @@
       "executable": false
     },
     "src/ui/activity.tsx": {
-      "sha256": "a5148926302277de22199237271065bcb42595870aafe498b5ccaf4bf1219ace",
+      "sha256": "5b260b3906f9d0a83ef848a19bc4b0ada62c99fad52a20f4dd0fa507252c9d17",
       "executable": false
     },
     "src/ui/adjusting-report.tsx": {
@@ -5883,7 +5883,7 @@
       "executable": false
     },
     "src/ui/bank-feeds.tsx": {
-      "sha256": "496319c6d30422066ef4761036d9e462bd9cd532c9728824e5bc34e78ac8f058",
+      "sha256": "0c364855142b76abe988499337457f7ca8cbcdb1efa7de8bda23f7fdeaac354c",
       "executable": false
     },
     "src/ui/bank-lines.tsx": {
@@ -5959,7 +5959,7 @@
       "executable": false
     },
     "src/ui/close.tsx": {
-      "sha256": "6d8d3a1837c98a13d84d5825f0eab2943f90d3961086d3d12ccda9b115173da3",
+      "sha256": "2f6e8945f25e9b21b0ad7e734d417eff0111e0f0fcbdd658db46c7af3bd04146",
       "executable": false
     },
     "src/ui/collections.tsx": {
@@ -6019,11 +6019,11 @@
       "executable": false
     },
     "src/ui/dashboard-summary.tsx": {
-      "sha256": "92057b6fb3a28167a49911062ed139f88bc3725e1d3d486593f83e0a5f5eeeab",
+      "sha256": "cd84cbbf5c2825d7b3019baef2a3a0c82b945a1577a720f6aaac723f37a24d4f",
       "executable": false
     },
     "src/ui/data-flows.tsx": {
-      "sha256": "b1c0713f862d7f279fdf1a35e7f669cd35190e8e466994d76717f6411d2759b4",
+      "sha256": "f60f327624759f8ed52ac4f018299afa1e955e5001c7348e1713014f4f3b95fd",
       "executable": false
     },
     "src/ui/deposit-proposal.tsx": {
@@ -6036,6 +6036,10 @@
     },
     "src/ui/dimensions.tsx": {
       "sha256": "f0a0c3318eefd00afe32a158a386d0d6650a446531dbddc3e5f86ac5524d51bf",
+      "executable": false
+    },
+    "src/ui/display-time.tsx": {
+      "sha256": "248d12a56e4d59077c4a45aa5f3ca1bf9f2ab19b59be4f7c2f8a9d1440994d83",
       "executable": false
     },
     "src/ui/document-archives.tsx": {
@@ -6315,7 +6319,7 @@
       "executable": false
     },
     "src/ui/stripe-clearing.tsx": {
-      "sha256": "4f5ec6e914e0a953c9bc80c12e3c2c79251c56db720c957ac448a2676a2e204e",
+      "sha256": "22b4408c0798b4ad1bf97d2258e9cff0d95f17683ff45d6ab5b25a3507df80e5",
       "executable": false
     },
     "src/ui/tax-readiness.tsx": {
@@ -6327,7 +6331,7 @@
       "executable": false
     },
     "src/ui/texting.tsx": {
-      "sha256": "0e24c1846c2571bc5aca0c775ed0d6b252c08899cffa3fff8e2b595f40cec4c6",
+      "sha256": "4937f97ec51052b5652bbd2a4a8fea5ab5feff959761fb907243ed84f82e95ff",
       "executable": false
     },
     "src/ui/time.tsx": {
@@ -6907,7 +6911,7 @@
       "executable": false
     },
     "tests/app/texting-journey.mjs": {
-      "sha256": "8d9770e4ee875f216bae6354b7ae385e3ffee720f0fef705541128e6b6d19fad",
+      "sha256": "283bc899c2b3465cabf8824108785021a6daab16708723c0dbcf3a1350af13a5",
       "executable": false
     },
     "tests/app/transfers.test.mjs": {
