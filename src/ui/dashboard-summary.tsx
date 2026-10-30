@@ -1,3 +1,4 @@
+import { shortMonth } from './display-time'
 import { StripeClearing } from './stripe-clearing'
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
@@ -28,7 +29,7 @@ export function DashboardSummary() {
     <div className="split split-wide-left">
       <Card title="Profit and loss trend" actions={<Field label="Dashboard basis" name="dashboard-basis" value={basis || d.basis} onChange={(e: any) => setBasis(e.target.value)} options={[{ value: 'cash', label: 'Cash basis' }, { value: 'accrual', label: 'Accrual basis' }]} />}>
         <p className="hint">{d.basis === 'cash' ? 'Cash basis' : 'Accrual basis'} · This month runs through {day(d.asOf)}.</p>
-        <Table heads={['Month', 'Income', 'Expenses', 'Net income']} figures={[1, 2, 3]}>{d.trend.map((m: D) => <tr key={m.month}><td><Link to="/app/reports" search={{ report: 'profit-and-loss', from: m.from, to: m.to, basis: d.basis }}>{m.month}</Link></td><td className="fig">{usd(m.income)}</td><td className="fig">{usd(m.expenses)}</td><td className="fig">{usd(m.netIncome)}</td></tr>)}</Table>
+        <Table heads={['Month', 'Income', 'Expenses', 'Net income']} figures={[1, 2, 3]}>{d.trend.map((m: D) => <tr key={m.month}><td><Link to="/app/reports" search={{ report: 'profit-and-loss', from: m.from, to: m.to, basis: d.basis }}>{shortMonth(m.month)}</Link></td><td className="fig">{usd(m.income)}</td><td className="fig">{usd(m.expenses)}</td><td className="fig">{usd(m.netIncome)}</td></tr>)}</Table>
       </Card>
       <Card title="Balances and evidence waiting">
         <Table heads={['Overdue balance', 'Amount', 'Items']} figures={[1, 2]}>
@@ -40,7 +41,7 @@ export function DashboardSummary() {
           <li><Link to="/app/bank"><strong>{d.work.brokenConnections}</strong><span>Connections needing attention</span></Link></li>
         </ul>
         <p>Missing receipts and bill documents: <strong>{d.work.missingReceipts}</strong></p>
-        <ul>{d.work.missingByMonth.map((m: D) => <li key={m.month}><Link to="/app/close" search={{ period: m.month }}>{m.month} · {m.count} missing source document{m.count === 1 ? '' : 's'}</Link></li>)}</ul>
+        <ul>{d.work.missingByMonth.map((m: D) => <li key={m.month}><Link to="/app/close" search={{ period: m.month }}>{shortMonth(m.month)} · {m.count} missing source document{m.count === 1 ? '' : 's'}</Link></li>)}</ul>
       </Card>
     </div>
   </>
