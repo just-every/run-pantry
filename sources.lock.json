@@ -5851,7 +5851,7 @@
       "executable": false
     },
     "src/ui/activity.tsx": {
-      "sha256": "5b260b3906f9d0a83ef848a19bc4b0ada62c99fad52a20f4dd0fa507252c9d17",
+      "sha256": "ff75f6e8e663b4acbe2a0120094ba5f0f5586ac51f7e7eb78ca2013ede250683",
       "executable": false
     },
     "src/ui/adjusting-report.tsx": {
