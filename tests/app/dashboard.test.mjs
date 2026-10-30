@@ -41,14 +41,14 @@ test('REPORT-008 dashboard shows calculated balances and every waiting-work link
       [/Unmatched statement lines/, 'Transactions'], [/Questions from Pantry/, 'Questions from Pantry'],
       [/Bills to approve/, 'Bills'], [/Connections needing attention/, 'Transactions'],
       [/Overdue receivables/, 'Receivables aging'], [/Overdue payables/, 'Payables aging'],
-      [/2026-09 · \d+ missing source document/, 'Receipts'],
+      [/Sep 2026 · \d+ missing source document/, 'Receipts'],
       [/Invoice drafts to review/, 'Invoices'],
     ]
     for (const [name, heading] of destinations) {
       await home(); await page.getByRole('link', { name }).click()
       await page.getByRole('heading', { name: new RegExp('^' + heading) }).waitFor()
     }
-    await home(); await page.getByRole('link', { name: '2026-10', exact: true }).click()
+    await home(); await page.getByRole('link', { name: 'Oct 2026', exact: true }).click()
     await page.getByRole('heading', { name: /Profit and loss/ }).waitFor()
     assert.equal(new URL(page.url()).searchParams.get('to'), '2026-10-31')
     await home()
