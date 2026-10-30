@@ -20,10 +20,22 @@ export async function searchJourney(t) {
  await cmd('check.issue',{bankAccountId:bank.id,revision:settings.revision,date:'2026-03-20',items:[{kind:'expense',contactId:vendor.id,amount:'25.00',accountId:acct['6200'],description:'Office supplies',memo:'Printer paper'}]})
  for(const width of [1440,390]) {
   const page=await context.newPage();await page.setViewportSize({width,height:1000});const errors=[];page.on('pageerror',e=>errors.push(String(e)))
+  if (width === 1440) {
+   const reads=[]
+   const record=request=>{if(new URL(request.url()).pathname==='/api/pantry/search')reads.push(request.url())}
+   page.on('request',record)
+   await page.goto(app.origin+'/app/search')
+   await page.getByRole('heading',{name:'Search your books',exact:true}).waitFor()
+   assert.equal(await page.locator('input[name="q"]').count(),1)
+   assert.equal(await page.locator('table').count(),0)
+   assert.deepEqual(reads,[],'opening search does not request unfiltered records')
+   page.off('request',record)
+  }
   await page.goto(app.origin+'/app')
   await page.getByRole('search').getByLabel('Find a transaction').fill('$1,234.56')
   await page.getByRole('search').getByRole('button',{name:'Search',exact:true}).click()
   await page.getByRole('link',{name:invoice.number,exact:true}).waitFor()
+  if(width===1440)assert.equal(await page.locator('input[name="q"]').count(),1)
   await page.getByRole('link',{name:invoice.number,exact:true}).click()
   await page.getByRole('heading',{name:'Transaction record',exact:true}).waitFor()
   await page.getByText('Brand consultation',{exact:true}).waitFor()

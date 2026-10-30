@@ -6303,7 +6303,7 @@
       "executable": false
     },
     "src/ui/search.tsx": {
-      "sha256": "2c6f190bfc09decd5ea3afe25e6a6af15fe3b5190bb7b7b591c45fe00cdd6b18",
+      "sha256": "f32da91c519db35050b1e3828d5b69110076e4c4d645acee80c8f6aa017a6878",
       "executable": false
     },
     "src/ui/settings.tsx": {
@@ -6311,7 +6311,7 @@
       "executable": false
     },
     "src/ui/shell.tsx": {
-      "sha256": "a18b102292a78a6c664373c39ff8ecd0ac9097ddda388b995db487738bfe0fe7",
+      "sha256": "a314a4ea3623546ea628f76e09a4ff14f22b1dd30728fcfa3ced076e7fd7046d",
       "executable": false
     },
     "src/ui/statement-columns.tsx": {
@@ -6891,7 +6891,7 @@
       "executable": false
     },
     "tests/app/search-journey.mjs": {
-      "sha256": "44fb5760634d921dfd90f1d08fbe100dedf06c8451f4e204dcdfb3f33214f3a7",
+      "sha256": "198b98b3155c84c8dd630af9fb92c5e24c94b7b8f96e348fa3ccf08b5aa7de3a",
       "executable": false
     },
     "tests/app/standing-journey.mjs": {
