@@ -12,6 +12,51 @@ async function invoice(h,acct,customer,date='2026-09-02') {
 }
 async function bank(h,acct,date='2026-01-01') {return h.command('bank-account.save',{name:'Operating checking',institution:'Community Bank',accountId:acct['1000'],numberLast4:'4821',openingDate:date,openingBalance:'0.00'})}
 
+// Reconcile the receipt against persisted changes, independently of the erasure
+// compiler. Commands still enter through native authenticated HTTP routes.
+async function receiptSnapshot(h) {
+  const tables=(await h.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB 'pt_*'").all()).results
+  const snapshot={}
+  for(const {name:table} of tables) {
+    if(table.startsWith('pt_erasure_')||table.startsWith('pt_retained_'))continue
+    const columns=(await h.db.prepare(`PRAGMA table_info(${table})`).all()).results
+    snapshot[table]={keys:columns.filter(c=>c.pk).map(c=>c.name),rows:(await h.db.prepare(`SELECT * FROM ${table}`).all()).results}
+  }
+  return snapshot
+}
+function changedValues(before,after) {
+  if(typeof before==='string')return Number(before!==after)
+  if(before&&typeof before==='object')return Object.entries(before).reduce((n,[key,value])=>n+changedValues(value,after?.[key]),0)
+  return 0
+}
+function reconcileReceipt(receipt,before,after) {
+  for(const [table,{keys,rows}] of Object.entries(before)) {
+    let removed=0,replaced=0,fields=0,values=0,links=0
+    for(const row of rows) {
+      const kept=after[table].rows.find(r=>keys.every(key=>r[key]===row[key]))
+      if(!kept){removed++;continue}
+      if(table==='pt_audit') {
+        values+=changedValues(JSON.parse(row.detail),JSON.parse(kept.detail))
+        values+=Number(row.actor_email!==kept.actor_email)+Number(row.subject_id!==kept.subject_id)
+      } else if(table==='pt_approvals') {
+        values+=['note','actor_email','subject_id'].filter(k=>row[k]!==kept[k]).length
+      } else {
+        const metadata=['revision','erased_at','revoked_at','autopay_revoked_at',...(table==='pt_contacts'?['active']:[]),...(table==='pt_invoices'?['reminders_paused','link_token']:[])]
+        const changed=Object.keys(row).filter(k=>JSON.stringify(row[k])!==JSON.stringify(kept[k])&&!metadata.includes(k))
+        fields+=changed.length
+        if(changed.length)replaced++
+        if(table==='pt_invoices'&&row.link_token&&!kept.link_token)links++
+      }
+    }
+    const counts=receipt.counts[table]??{}
+    assert.equal(counts.rowsRemoved??0,removed,`${table} removed rows`)
+    assert.equal(counts.fieldsReplaced??0,fields,`${table} replaced fields`)
+    if(table!=='pt_contacts')assert.equal((counts.rowsReplaced??0)+(counts.rowsRedacted??0),replaced,`${table} replaced rows`)
+    if(table==='pt_audit'||table==='pt_approvals')assert.equal(counts.valuesReplaced??0,values,`${table} replaced history values`)
+    if(table==='pt_invoices')assert.equal(counts.linksRevoked??0,links,'revoked invoice links')
+  }
+}
+
 test('ERASURE-001 owner previews and confirms removal or personal-field markers, refuses active obligations, and keeps posted books and immutable history',async t=>{
   const h=await harness();t.after(h.close);const {acct}=await books(h),checking=await bank(h,acct)
   const lead=await h.command('contact.save',{kind:'customer',name:'Unused enquiry',email:'lead@example.test',phone:'555-0101',internalNotes:'Follow up in December'})
@@ -35,14 +80,16 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
   const p=await h.command('erasure.preview',{kind:'contact',id:lead.id})
   assert.equal(p.classes.find(r=>r.table==='pt_contacts').action,'removed')
   await h.command('erasure.execute',request(p,{confirm:'erase'}),h.owner,400)
+  const leadBefore=await receiptSnapshot(h)
   const removal=await h.command('erasure.execute',request(p))
+  reconcileReceipt(removal,leadBefore,await receiptSnapshot(h))
   assert.equal(removal.counts.pt_contacts.rowsRemoved,1)
   assert.equal(removal.counts.pt_time_projects.rowsRemoved,1)
   assert.equal((await h.view('time')).projects.some(p=>p.id===unusedProject.id),false)
   assert.equal((await h.view('state')).contacts.some(r=>r.id===lead.id),false)
   assert.ok(!JSON.stringify(removal).includes(lead.email))
   assert.ok(!JSON.stringify((await h.view('activity')).audit).includes(lead.name),'a transaction-free lead’s name has no bookkeeping retention reason')
-  let i=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-09-02',lines:[{description:'Design consultation',accountId:acct['4000'],quantity:'1',rate:'100.00',taxCode:'exempt'}]})
+  let i=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-09-02',memo:customer.phone,lines:[{description:'Design consultation',accountId:acct['4000'],quantity:'1',rate:'100.00',taxCode:'exempt'}]})
   let preview=await h.command('erasure.preview',{kind:'contact',id:customer.id})
   assert.ok(preview.blockers.some(r=>r.id===i.id&&r.reason==='unposted draft'))
   await h.command('erasure.execute',request(preview),h.owner,409)
@@ -67,9 +114,11 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
   const stale=await h.command('contact.save',{...customer,kind:'customer',id:customer.id,revision:customer.revision,name:customer.name,email:customer.email,internalNotes:'Updated privacy note'})
   await h.command('erasure.execute',request(preview),h.owner,409)
   preview=await h.command('erasure.preview',{kind:'contact',id:customer.id})
+  const copiesBefore=await receiptSnapshot(h)
   const receipt=await h.command('erasure.execute',request(preview))
+  reconcileReceipt(receipt,copiesBefore,await receiptSnapshot(h))
   const retained=(await h.view('state')).contacts.find(r=>r.id===customer.id)
-  assert.equal(retained.name,'Cedar Studio LLC');assert.equal(retained.email,'[erased]');assert.equal(retained.phone,'[erased]');assert.equal(retained.internal_notes,'[erased]');assert.deepEqual(JSON.parse(retained.contacts_json),[])
+  assert.equal(retained.name,'Cedar Studio LLC');assert.equal(retained.email,'[erased]');assert.equal(retained.phone,'[erased]');assert.equal(retained.billing_address,'[erased]');assert.equal(retained.service_address,'[erased]');assert.equal(retained.internal_notes,'[erased]');assert.deepEqual(JSON.parse(retained.contacts_json),[])
   assert.deepEqual(await h.view('reports/trial-balance?to=2026-12-31&basis=accrual'),before)
   const after=(await h.view('activity')).audit
   for(const entry of history){const kept=after.find(e=>e.id===entry.id);assert.ok(kept);for(const key of ['at','action','subject_revision','approval_id'])assert.equal(kept[key],entry[key])}
@@ -78,7 +127,11 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
   assert.ok(after.some(e=>JSON.parse(e.detail).erasure?.id===receipt.id))
   assert.equal((await h.view(`invoice-documents/${i.id}/preview`)).sha256,pdf.sha256)
   assert.equal((await h.view('sales')).invoices.find(r=>r.id===i.id).link_token,null)
+  assert.equal((await h.view('sales')).invoices.find(r=>r.id===i.id).memo,'[erased]')
   assert.equal(receipt.counts.pt_invoices.linksRevoked,1)
+  assert.deepEqual(receipt.retained.map(r=>[r.table,r.id,r.expires]),[['pt_invoice_documents',i.id,'2033-09-05']])
+  assert.match(receipt.retained[0].reason,/Supports posted entries/)
+  assert.equal((await h.view('erasure')).receipts.find(r=>r.id===receipt.id).id,receipt.id)
   for(const path of [customerLink,customerLink+'/invoice.pdf'])assert.equal((await h.send(path)).status,404)
   assert.equal((await h.send(customerLink+'/pay',undefined,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},raw:'method=card'})).status,404)
   await h.command('contact.save',{kind:'customer',id:customer.id,revision:retained.revision,name:retained.name,email:'restore@example.test'},h.owner,409)
@@ -163,7 +216,7 @@ test('ERASURE-001 retention recomputes unerased supporting items, requires confi
   const i=await invoice(h,acct,customer,'2018-09-01')
   await h.command('payment.record',{direction:'received',contactId:customer.id,date:'2018-09-05',amount:'100.00',bankAccountId:checking.id,allocations:[{targetId:i.id,amount:'100.00'}]})
   const pdf=await h.view(`invoice-documents/${i.id}/preview`)
-  const vendor=await h.command('contact.save',{kind:'vendor',name:'Archive Vendor LLC'})
+  const vendor=await h.command('contact.save',{kind:'vendor',name:'Archive Vendor LLC',address:'14 Vendor Road',phone:'555-0173'})
   await h.command('contractor.save',{contactId:vendor.id,is1099:true,legalName:'Archive Vendor LLC',tinKind:'ein',tin:'111223333',address:'14 Vendor Road',city:'Albany',state:'NY',zip:'12207'})
   const requestW9=await h.command('w9.request',{contactId:vendor.id,contactRevision:(await h.view(`vendor-w9/${vendor.id}`)).contactRevision,consent:true})
   const certification=await h.send(new URL(requestW9.url).pathname,undefined,{raw:new URLSearchParams({legalName:'Archive Vendor LLC',tinKind:'ein',tin:'111223333',classification:'individual',address:'14 Vendor Road',city:'Albany',state:'NY',zip:'12207',signature:'Archive Vendor',certify:'yes'}).toString(),headers:{'content-type':'application/x-www-form-urlencoded'}})
@@ -178,7 +231,20 @@ test('ERASURE-001 retention recomputes unerased supporting items, requires confi
   const retainedPreview=await h.command('erasure.preview',{kind:'contact',id:vendor.id})
   assert.equal(retainedPreview.retained.find(r=>r.table==='pt_contractor_tax').clock,'2020-09-07','latest financial event includes reversal and correction lineage')
   const source=await h.command('document.upload',{name:'archive-consulting.txt',mediaType:'text/plain',base64:Buffer.from('Archive Vendor invoice ARCHIVE-18').toString('base64'),linkedKind:'bill',linkedId:bill.id})
-  for(const id of [customer.id,vendor.id]) {const p=await h.command('erasure.preview',{kind:'contact',id});await h.command('erasure.execute',request(p))}
+  for(const subject of [customer,vendor]) {
+    const p=await h.command('erasure.preview',{kind:'contact',id:subject.id}),before=await receiptSnapshot(h)
+    const receipt=await h.command('erasure.execute',request(p))
+    reconcileReceipt(receipt,before,await receiptSnapshot(h))
+    const retained=(await h.view('state')).contacts.find(c=>c.id===subject.id)
+    for(const field of ['email','phone','address','billing_address','service_address','internal_notes','bank_reference','external_ref'])assert.equal(retained[field],'[erased]',field)
+    assert.equal(retained.contacts_json,'[]');assert.equal(retained.name,subject.name)
+    const evidence=receipt.retained.map(r=>[r.table,r.id,r.clock,r.expires])
+    if(subject.id===vendor.id) {
+      assert.ok(evidence.some(r=>r[0]==='pt_contractor_tax'&&r[1]===vendor.id&&r[2]==='2020-09-07'&&r[3]==='2027-09-07'))
+      assert.ok(evidence.some(r=>r[0]==='pt_documents'&&r[1]===source.id))
+      for(const field of ['address','city','state','zip'])assert.equal((await h.db.prepare('SELECT * FROM pt_contractor_tax WHERE contact_id=?').bind(vendor.id).first())[field],'[erased]')
+    }
+  }
   let view=await h.view('erasure');assert.ok(view.ready.length>=1)
   await h.command('retention.save',{years:0,revision:view.revision},h.owner,400)
   await h.command('retention.save',{years:10,revision:view.revision});view=await h.view('erasure');assert.equal(view.ready.length,0)

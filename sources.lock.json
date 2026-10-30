@@ -4483,11 +4483,11 @@
       "executable": false
     },
     "src/pantry/erasure/commands.ts": {
-      "sha256": "089d56913a96b989cd323f52781d228866a1836d83af8df5789832173eca959a",
+      "sha256": "af73678573075e9db53d7baf4cf32fcdc002b8474c84a4f820a0aa16f2bd751a",
       "executable": false
     },
     "src/pantry/erasure/copies.ts": {
-      "sha256": "19a576dd0dc7a0357165cbd51454efe81308895fe8e93bed692e9fe449354996",
+      "sha256": "f61eeac87f48ad1626fefb9e6c2041a148922f777c4bec5aef42ebfcd842e7e8",
       "executable": false
     },
     "src/pantry/erasure/custody.ts": {
@@ -6627,7 +6627,7 @@
       "executable": false
     },
     "tests/api/security.test.mjs": {
-      "sha256": "27b59d3fa7a60f5e901a3702f361ab47dbc84af660916542e0a85d5209616d35",
+      "sha256": "7c81472b4b6329f8b0868bb53d9c0e863cce8ddb7947c363fa94c93a9bf06761",
       "executable": false
     },
     "tests/api/standing-journey.mjs": {
@@ -6795,7 +6795,7 @@
       "executable": false
     },
     "tests/app/erasure-journey.mjs": {
-      "sha256": "2a1164cecabb933bf572c43d0bf36940ed8f07aa79942840d163c82c919d9a41",
+      "sha256": "16f1d6628515124d64b4185c9e32839415fdbafd2ed8eb7d47afc7d68f2601b9",
       "executable": false
     },
     "tests/app/estimate-siblings.mjs": {

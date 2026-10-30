@@ -31,7 +31,12 @@ const execute: Command = {need:'owner',async run(c,b) {
   const cancelled=await cancelErased(c.db,p.id,copies.affectedRecordIds)
   const counts: Record<string,Data> = {pt_webhook_deliveries:{attemptsCancelled:cancelled.count},pt_audit:{valuesReplaced:history.counts.pt_audit},pt_approvals:{valuesReplaced:history.counts.pt_approvals}}
   const immutable = await immutableCopies(c.db,{values,marker:label,member,erasureId:id})
-  for (const [table,count] of Object.entries({...copies.counts,...immutable.counts})) counts[table]={...counts[table],...count}
+  // A table can have both ordinary personal copies and immutable identity
+  // copies. Keep both contributions in the owner's receipt.
+  for (const group of [copies.counts,immutable.counts]) for (const [table,fields] of Object.entries(group)) {
+    counts[table]??={}
+    for (const [field,count] of Object.entries(fields)) counts[table][field]=(counts[table][field]??0)+count
+  }
   const writes: Sql[] = [], removed: {table:string;key:Record<string,unknown>}[] = []
   if(person) {
     const people=JSON.parse(p.parent.contacts_json)
@@ -39,7 +44,7 @@ const execute: Command = {need:'owner',async run(c,b) {
     const set:Data={contacts_json:JSON.stringify(people),revision:uid()}
     for(const key of CONTACT_PERSONAL)if(typeof p.parent[key]==='string')set[key]=scrub(p.parent[key],values)
     writes.push(q(`UPDATE pt_contacts SET ${Object.keys(set).map(k=>`${k}=?`).join(',')} WHERE id=? AND revision=?`,...Object.values(set),p.id,p.parent.revision),changed())
-    counts.pt_contacts={fieldsReplaced:1,contactPeopleRemoved:1}
+    counts.pt_contacts={fieldsReplaced:Object.keys(set).filter(k=>k!=='revision'&&set[k]!==p.parent[k]).length,contactPeopleRemoved:1}
   } else if (member) {
     const result = await memberStatements(c.db,p.subject,label)
     writes.push(...result.statements);Object.assign(counts,result.counts); counts.pt_members={...counts.pt_members,fieldsReplaced:(counts.pt_members?.fieldsReplaced??0)+2+(p.subject.time_people!=='[]'?1:0),delegationsRemoved:(counts.pt_members?.delegationsRemoved??0)+JSON.parse(p.subject.time_people).length}; counts.oa_operators={identitiesRemoved:result.operators}
@@ -48,7 +53,7 @@ const execute: Command = {need:'owner',async run(c,b) {
     writes.push(guard('EXISTS (SELECT 1 FROM pt_contacts WHERE id=? AND revision=?)',p.id,p.subject.revision))
     if (p.posted) {
       writes.push(q(`UPDATE pt_contacts SET ${CONTACT_PERSONAL.map(k=>`${k}=?`).join(',')},contacts_json='[]',vendor_ein_hash='',active=0,erased_at=?,revision=? WHERE id=?`,...CONTACT_PERSONAL.map(()=>MARKER),at,uid(),p.id),changed())
-      counts.pt_contacts={fieldsReplaced:CONTACT_PERSONAL.length+2}
+      counts.pt_contacts={fieldsReplaced:CONTACT_PERSONAL.filter(k=>p.subject[k]!==MARKER).length+Number(p.subject.contacts_json!=='[]')+Number(p.subject.vendor_ein_hash!=='')}
     } else {
       const dependents=await unpostedDependents(c.db,p.id);writes.push(...dependents.statements);Object.assign(counts,dependents.counts);removed.push(...dependents.removed)
       for (const [table,column] of [['pt_vendor_aliases','vendor_id'],['pt_integration_contacts','contact_id'],['pt_contractor_tax','contact_id']] as const) {
@@ -58,7 +63,7 @@ const execute: Command = {need:'owner',async run(c,b) {
       writes.push(q('DELETE FROM pt_contacts WHERE id=?',p.id),changed()); removed.push({table:'pt_contacts',key:{id:p.id}}); counts.pt_contacts={rowsRemoved:1}
     }
     const links = (await one(c.db,'SELECT count(*) AS n FROM pt_invoices WHERE customer_id=? AND link_token IS NOT NULL',p.id))!.n
-    writes.push(q('UPDATE pt_invoices SET link_token=NULL,reminders_paused=1 WHERE customer_id=?',p.id)); counts.pt_invoices={linksRevoked:links}
+    writes.push(q('UPDATE pt_invoices SET link_token=NULL,reminders_paused=1 WHERE customer_id=?',p.id)); counts.pt_invoices={...counts.pt_invoices,linksRevoked:links}
 
   }
   const receipt = {id,at,subject:await sha256(`${p.kind}:${p.id}:${p.personIndex??''}`),request:{requesterDigest:await sha256(requester),channel,reason:scrub(reason,values,label)},counts,retained:p.retained,

@@ -5,7 +5,7 @@ import {worker,TOKEN} from './worker.mjs'
 
 export async function erasureJourney(t) {
   const app=await worker();t.after(()=>app.close())
-  const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});t.after(()=>browser.close())
+  const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']});t.after(()=>browser.close())
   const dir=process.env.PANTRY_SCREENSHOTS??'/tmp/sx-pantry-c29';await mkdir(dir,{recursive:true})
   for(const width of [1440,390]) {
     const context=await browser.newContext({viewport:{width,height:width===390?844:1000}}),page=await context.newPage()

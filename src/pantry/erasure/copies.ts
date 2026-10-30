@@ -101,7 +101,7 @@ export async function eraseCopies(db: D1Database, input: Input) {
     if(table==='pt_invoices') statements.push(q("INSERT INTO pt_erasure_scope(erasure_id,table_name,row_id,operation) VALUES(?,'pt_invoices',?,'redact')",input.erasureId,row.id))
     if(table==='pt_tax_reminder_batches') statements.push(q("INSERT INTO pt_erasure_scope(erasure_id,table_name,row_id,operation) VALUES(?,'pt_tax_reminder_batches',?,'redact')",input.erasureId,row.id))
     statements.push(q(`UPDATE ${quote(table)} SET ${fields.map(k => `${quote(k)}=?`).join(',')} WHERE ${before.map(k => `${quote(k)} IS ?`).join(' AND ')}`, ...fields.map(k => set[k]), ...before.map(k => row[k])), changed())
-    note(table, 'rowsReplaced', 1); note(table, 'fieldsReplaced', fields.length)
+    note(table, 'rowsReplaced', 1); note(table, 'fieldsReplaced', fields.filter(k=>k!=='revision').length)
   }
 
   for (const { name: table } of tables) {
