@@ -6775,7 +6775,7 @@
       "executable": false
     },
     "tests/app/customer-record.test.mjs": {
-      "sha256": "ef419117fd82576d97a88ca017744dc60c09792019f9664412b0a4d27c59cf88",
+      "sha256": "28e234bd0c8ce69f75f381de3b33f9241b33d651398565a044866102a6bb7bf9",
       "executable": false
     },
     "tests/app/dashboard.test.mjs": {
