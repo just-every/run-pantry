@@ -6719,7 +6719,7 @@
       "executable": false
     },
     "tests/app/bank-rules.test.mjs": {
-      "sha256": "fa2c1a0271a3d28f228a19b7ae4388c566963bc6039d98d01c0a1433261cf393",
+      "sha256": "a2e3f1f4bb7c869ff64ce54333e4f970675b9fab121f1f10000f2acb54938b87",
       "executable": false
     },
     "tests/app/bill-lifecycle.test.mjs": {
