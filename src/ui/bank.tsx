@@ -84,7 +84,7 @@ export function Bank() {
   // Importing lives on Statements: open it and bring the import card into view.
   const importStatement = () => { go('Statements'); requestAnimationFrame(() => document.getElementById('import')?.scrollIntoView({ block: 'start' })) }
   return <>
-    <PageHead title="Bank" lead="Transactions arrive from your bank and card feeds or statement files. Rules file the routine ones; you file the rest and reconcile to the statement." />
+    <PageHead title="Bank" />
     <RelinkNotices data={feeds.data} onDone={refresh} />
     <Tabs tabs={TABS.filter(t => t !== 'Accountant review' || ['owner', 'accountant'].includes(shared.state.actor.role))} current={tab} onChange={go} />
     {tab === 'Transactions' && <div className="split split-wide-left split-bank">

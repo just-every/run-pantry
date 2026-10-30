@@ -1,3 +1,4 @@
+import { Help } from './help'
 import { useRef, useState } from 'react'
 import { FileInput, Card, command, Field, Form, readFileBase64, type D } from './kit'
 
@@ -17,7 +18,7 @@ export function InvoiceTemplateEditor({ template, onSaved, onCancel }: { templat
         <Field label="Text color" name="textColor" type="color" defaultValue={template?.textColor ?? '#202234'} required />
         <Field label="Default invoice terms (days)" name="termsDays" type="number" min={0} max={365} defaultValue={template?.termsDays ?? 30} required hint="Used unless the customer has its own payment terms. Zero means due on receipt." />
       </div>
-      <div className="field"><label htmlFor="invoice-logo">Logo · JPEG, up to 100 KB</label><FileInput id="invoice-logo" ref={logo} type="file" accept="image/jpeg,.jpg,.jpeg" /><p className="hint">RGB or grayscale, up to 4000 × 4000 pixels. The image is kept inside each issued PDF.</p></div>
+      <div className="field"><label htmlFor="invoice-logo">Logo · JPEG, up to 100 KB</label><FileInput id="invoice-logo" ref={logo} type="file" accept="image/jpeg,.jpg,.jpeg" /><Help label="Logo requirements"><p>RGB or grayscale, up to 4000 × 4000 pixels. The image is kept inside each issued PDF.</p></Help></div>
       {template?.logo && <><img src={`data:image/jpeg;base64,${template.logo.base64}`} alt={`${template.name} logo`} width="100" /><label className="check"><input type="checkbox" checked={removeLogo} onChange={e => setRemoveLogo(e.target.checked)} />Remove saved logo</label></>}
       <div className="grid-form">
         <Field label="Business address on invoices" name="address" type="textarea" defaultValue={template?.address} />

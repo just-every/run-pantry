@@ -1,3 +1,4 @@
+import { Help } from './help'
 import { CloseBoard, ReviewTasks } from './close-workflow'
 // Close: calculated checks, reviewed tasks, the lock, and reopening by request and approval.
 import { useState } from 'react'
@@ -40,12 +41,12 @@ export function Close() {
   const pending = s?.requests.find((r: D) => r.status === 'pending')
   return <>
     <PageHead title={<>Close — {monthName(period)}</>} chip={s && (s.status === 'locked' ? <Chip tone="info"><Icon name="lock" /> Locked</Chip> : s.ready ? <Chip tone="good">Ready to lock</Chip> : <Chip tone="warn">In progress</Chip>)}
-      lead="Every check must pass and every review task be done before the period locks. A lock stops all changes dated in the period, by people and agents alike."
       actions={<div className="field inline"><label htmlFor="close-period">Period</label><input id="close-period" type="month" value={period} onChange={e => e.target.value && setPeriod(e.target.value)} /></div>} />
     {board && <CloseBoard board={board} period={period} select={setPeriod} />}
     {!s ? <Loading error={error} what="the close" /> : <div className="split split-wide-left">
       <div className="stack">
         <Card title="Close checklist" actions={s.checks.every((c: D) => c.ok) ? <Chip tone="good">All checks passed</Chip> : <Chip tone="warn">{s.checks.filter((c: D) => !c.ok).length} to resolve</Chip>}>
+          <Help label="Before locking"><p>Every check must pass and every review task be done before the period locks. A lock stops all changes dated in the period, by people and agents alike.</p></Help>
           <Table heads={['Check', 'Status', 'Details']}>
             {s.checks.map((c: D) => <tr key={c.key}><td><strong>{c.title}</strong></td><td>{c.ok ? <Chip tone="good">Passed</Chip> : <Chip tone="bad">Not yet</Chip>}</td><td>{c.detail} {!c.ok && (c.key === 'recognition' ? <a href="#recognition">Open</a> : <Link to={LINK[c.key]}>Open</Link>)}</td></tr>)}
           </Table>
