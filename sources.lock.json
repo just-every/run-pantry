@@ -6791,7 +6791,7 @@
       "executable": false
     },
     "tests/app/dimension-completion.mjs": {
-      "sha256": "e095c8011d685cf89a216949ecbbbea7dac214f7e65cfbded289d7b9e13fb078",
+      "sha256": "9fa1840a4f00a730d0a1af608767909212e2e5c597b8b9aabbaa43fce46cbc6a",
       "executable": false
     },
     "tests/app/dimensions-journey.mjs": {
