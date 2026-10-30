@@ -2,17 +2,21 @@ import { DimensionFormFields } from './dimensions'
 import { useState } from 'react'
 import { Action, Card, Chip, command, contactOptions, Field, Form, Table, accountOptions, day, today, usd, useShared, type D } from './kit'
 
+export function nextBillStep(actor: string) {
+  return ({ Preparer: 'Prepare bill', 'Payment recorder': 'Record payment', Reconciler: 'Reconcile payment', 'Posting grant holder': 'Post bill', 'Owner or another posting grant holder': 'Approve bill', Owner: 'Owner approval', None: 'Complete', 'None — settled by credit': 'Complete' } as Record<string, string>)[actor] ?? actor
+}
+
 export function CapturedBills({ documents }: { documents: D[] }) {
   if (!documents.length) return null
   return <Card title="Captured documents awaiting bill preparation"><p className="hint">Captured documents have not posted to payables. Confirm the vendor and prepare a bill in Receipts.</p>
-    <Table heads={['Vendor / document', 'Reference', 'Amount', 'Due', 'State', 'Next actor']} figures={[2]}>{documents.map(d => <tr key={d.id}><td><a href={`/app/receipts#receipt-${d.id}`}>{d.vendor} · {d.name}</a></td><td>{d.reference}</td><td className="fig">{d.total_cents == null ? 'Not read' : usd(d.total_cents)}</td><td>{d.due_date ? day(d.due_date) : 'Needs preparation'}</td><td><Chip>Captured</Chip></td><td>Preparer</td></tr>)}</Table>
+    <Table heads={['Vendor / document', 'Reference', 'Amount', 'Due', 'State', 'Next step']} figures={[2]}>{documents.map(d => <tr key={d.id}><td><a href={`/app/receipts#receipt-${d.id}`}>{d.vendor} · {d.name}</a></td><td>{d.reference}</td><td className="fig">{d.total_cents == null ? 'Not read' : usd(d.total_cents)}</td><td>{d.due_date ? day(d.due_date) : 'Needs preparation'}</td><td><Chip>Captured</Chip></td><td>Prepare bill</td></tr>)}</Table>
   </Card>
 }
 
 export function BillWorkflow({ bill: b, reload }: { bill: D; reload: () => Promise<void> }) {
   const { state } = useShared(), flow = b.lifecycle
   return <>
-    <p><strong>{flow.stage}</strong> · Next: {flow.nextActor}</p>
+    <p><strong>{flow.stage}</strong> · Next step: {nextBillStep(flow.nextActor)}</p>
     {flow.stage === 'Draft' && state.actor.can.record && <Action run={async () => { await command('bill.submit', { id: b.id, revision: b.revision, captureRevision: flow.captureRevision }); await reload() }}>Submit bill for approval</Action>}
     {b.status === 'posted' && b.open_cents > 0 && state.actor.can.record && <Form label="Save payment plan" submit={v => command('bill.schedule', { id: b.id, revision: b.revision, ...v })} onDone={reload}>
       <p className="hint">A plan to pay outside Pantry. Saving this date sends no payment instruction and moves no money.</p>
