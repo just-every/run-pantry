@@ -17,7 +17,7 @@ export function DashboardSummary() {
       <Card title="Cash across accounts">
         <p><strong>{d.cash.observed ? usd(d.cash.total) : 'No feed cash balance yet'}</strong> · {d.cash.observed} of {d.cash.expected} cash accounts reporting</p>
         <p className="hint">Bank-reported balances at each account's last sync. Credit-card debt is shown separately and is not included in cash.</p>
-        <Table heads={['Account', 'Bank balance', 'Last sync']} figures={[1]} empty="No bank accounts yet.">{d.cash.accounts.map((a: D) => <tr key={a.id}><td><Link to="/app/bank">{a.name}</Link>{a.type === 'liability' && <small className="sub">Card or credit line · owed</small>}</td><td className="fig">{a.balance_cents === null ? 'No feed balance' : usd(a.balance_cents)}</td><td>{a.balance_cents === null ? '—' : day(a.last_synced_at)}</td></tr>)}</Table>
+        <Table heads={['Account', 'Bank balance', 'Last sync']} figures={[1]} empty="No bank accounts yet.">{d.cash.accounts.map((a: D) => <tr key={a.id}><td><Link to="/app/bank">{a.name}</Link>{a.type === 'liability' && <small className="sub block">Card or credit line · owed</small>}</td><td className="fig">{a.balance_cents === null ? 'No feed balance' : usd(a.balance_cents)}</td><td>{a.balance_cents === null ? '—' : day(a.last_synced_at)}</td></tr>)}</Table>
       </Card>
       <Card title="This month's bank movements">
         <p>{day(d.from)} to {day(d.asOf)} · Bank and statement lines, including transfers; card charges are separate.</p>

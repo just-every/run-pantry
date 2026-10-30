@@ -20,8 +20,8 @@ export function Search() {
     </form></Card>
     {!data ? <Loading error={error} what="search results" /> : <div aria-live="polite">
       {data.groups.length===0&&<Card title="No matching records"><p>No records available to your role match these filters.</p></Card>}
-      {data.groups.map((g:any)=><Card key={g.type} title={g.type.replaceAll('-',' ')}><Table heads={['Date','Number or file','Contact','Description','Amount','Status']} figures={[4]}>
-        {g.records.map((r:any)=><tr key={r.id}><td>{day(r.date)}</td><td>{query.has('record')?<strong>{r.number||g.type}</strong>:<a href={r.href}>{r.number||g.type}</a>}</td><td>{r.contact||'—'}</td><td>{r.description||'—'}</td><td>{usd(r.amount)}</td><td><Chip>{r.status}</Chip></td></tr>)}
+      {data.groups.map((g:any)=><Card key={g.type} title={g.type === 'bank-line' ? 'Bank transactions' : g.type.replaceAll('-',' ')}><Table heads={['Date','Number or file','Contact','Description','Amount','Status']} figures={[4]}>
+        {g.records.map((r:any)=><tr key={r.id}><td>{day(r.date)}</td><td>{query.has('record')?<strong>{r.number || (g.type === 'bank-line' ? 'View transaction' : g.type.replaceAll('-', ' '))}</strong>:<a href={r.href}>{r.number || (g.type === 'bank-line' ? 'View transaction' : g.type.replaceAll('-', ' '))}</a>}</td><td>{r.contact||'—'}</td><td>{r.description||'—'}</td><td>{usd(r.amount)}</td><td><Chip>{g.type === 'bank-line' && r.status === 'matched' ? 'In the books' : r.status}</Chip></td></tr>)}
       </Table></Card>)}
       {query.has('record')&&<p><a href="/app/search">Back to search</a></p>}
       {data.nextCursor&&<p><a href={'/app/search?'+new URLSearchParams({...Object.fromEntries(query),cursor:data.nextCursor})}>Next results</a></p>}
