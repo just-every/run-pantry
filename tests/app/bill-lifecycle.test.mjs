@@ -31,7 +31,9 @@ test('BILL-001 use the bill list, next actor, payment plan and recurring drafts 
           else {
             const row = page.getByRole('row').filter({ has: page.getByText('HARBOR-SEPT', { exact: true }) })
             await row.getByText(stage === 'Approved draft' ? 'Approved' : stage === 'Recurring drafts' ? 'Reconciled' : stage, { exact: true }).waitFor()
-            await row.click(); await page.getByText(`Next: ${bill.lifecycle.nextActor}`, { exact: false }).first().waitFor()
+            const nextStep = ({ Preparer: 'Prepare bill', 'Payment recorder': 'Record payment', Reconciler: 'Reconcile payment', 'Posting grant holder': 'Post bill', 'Owner or another posting grant holder': 'Approve bill', Owner: 'Owner approval', None: 'Complete', 'None — settled by credit': 'Complete' })[bill.lifecycle.nextActor]
+            assert.ok(nextStep, 'every bill stage has a named next step')
+            await row.click(); await page.getByText(`Next step: ${nextStep}`, { exact: true }).first().waitFor()
             await page.screenshot({ path: `/tmp/sx-pantry-r15-bill-${stage.replaceAll(' ', '-')}-${viewport}.png`, fullPage: true })
             if (stage === 'Draft' && viewport === 390) await page.getByRole('button', { name: 'Submit bill for approval', exact: true }).click()
             if (stage === 'Approved' && viewport === 390) {
