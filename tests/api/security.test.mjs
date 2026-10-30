@@ -23,6 +23,8 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
     for(const bearer of [token.token,agent.token]) assert.equal((await h.send('/api/pantry/command/'+op,{kind:'contact',id:lead.id},{headers:{authorization:`Bearer ${bearer}`}})).status,401)
   }
   await h.view('erasure',viewer,403)
+  await h.command('integration.revoke',{id:token.id})
+  assert.equal((await h.send('/api/pantry/command/erasure.preview',{kind:'contact',id:lead.id},{headers:{authorization:`Bearer ${token.token}`}})).status,401)
   const multi=await h.command('contact.save',{kind:'customer',name:'Shared customer LLC',phone:'555-0107',contacts:[{name:'Departed buyer',email:'departed@example.test',phone:'555-0107',roles:['primary']},{name:'Current buyer',email:'current@example.test',phone:'555-0108',roles:['billing']}]})
   const personPreview=await h.command('erasure.preview',{kind:'contact-person',id:multi.id,personIndex:0})
   const personReceipt=await h.command('erasure.execute',request(personPreview,{personIndex:0}))
@@ -79,6 +81,7 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
   preview=await h.command('erasure.preview',{kind:'contact',id:customer.id})
   await h.command('erasure.execute',request(preview),accountant,403)
   assert.deepEqual(await snapshot(),receiptBefore,'a non-owner cannot change records or receipts')
+  assert.equal(preview.classes.find(row=>row.table==='pt_documents').counts.bytesRemovalQueued,privateDoc.size,'preview includes the unposted document cleanup')
   const receipt=await h.command('erasure.execute',request(preview))
   const retained=(await h.view('state')).contacts.find(r=>r.id===customer.id)
   assert.equal(retained.name,'Cedar Studio LLC');assert.equal(retained.email,'[erased]');assert.equal(retained.phone,'[erased]');assert.equal(retained.internal_notes,'[erased]');assert.deepEqual(JSON.parse(retained.contacts_json),[])
@@ -225,10 +228,15 @@ test('ERASURE-001 retention recomputes unerased supporting items, requires confi
   assert.equal(retainedPreview.retained.find(r=>r.table==='pt_contractor_tax').clock,'2020-09-07','latest financial event includes reversal and correction lineage')
   const source=await h.command('document.upload',{name:'archive-consulting.txt',mediaType:'text/plain',base64:Buffer.from('Archive Vendor invoice ARCHIVE-18').toString('base64'),linkedKind:'bill',linkedId:bill.id})
   for(const id of [customer.id,vendor.id]) {
-    const p=await h.command('erasure.preview',{kind:'contact',id}),receipt=await h.command('erasure.execute',request(p))
+    const p=await h.command('erasure.preview',{kind:'contact',id})
+    const priorContact=(await h.view('state')).contacts.find(row=>row.id===id)
+    const receipt=await h.command('erasure.execute',request(p))
     if(id===vendor.id) {
       const retained=(await h.view('state')).contacts.find(row=>row.id===id)
       assert.equal(retained.address,'[erased]','the original vendor address is erased')
+      const changedPersonal=Object.keys(priorContact).filter(key=>!['revision','erased_at','active','autopay_revoked_at'].includes(key)&&JSON.stringify(priorContact[key])!==JSON.stringify(retained[key]))
+      assert.ok(changedPersonal.includes('address'))
+      assert.equal(receipt.counts.pt_contacts.fieldsReplaced,changedPersonal.length)
       assert.equal(receipt.counts.pt_contractor_tax.rowsReplaced,1)
       assert.equal(receipt.counts.pt_contractor_tax.fieldsReplaced,5,'four address columns and the revision change')
       assert.equal(receipt.counts.pt_contractor_tax.rowsRetained,1)
