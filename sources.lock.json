@@ -2099,7 +2099,7 @@
       "executable": false
     },
     "src/base/run-site.ts": {
-      "sha256": "e4f46696b55a049756e1a22707c432da689dcca10fed8a354b7e92f1b23ed4f3",
+      "sha256": "7e015536ae02b8fe0796e98e201c994b5171169523a07336c0a50f72ac240630",
       "executable": false
     },
     "src/base/seed-contract.d.mts": {
