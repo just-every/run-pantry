@@ -132,10 +132,17 @@ export function Details({ facts, code = [] }: { facts: D; code?: string[] }) {
 }
 
 /** Tabs wrap onto a second row on a phone. With `pick`, a phone shows a select with that label instead. */
-export function Tabs({ tabs, current, onChange, pick }: { tabs: string[]; current: string; onChange: (t: string) => void; pick?: string }) {
-  const id = useId()
+export function Tabs({ tabs, current, onChange, pick, revealCurrent = false }: { tabs: string[]; current: string; onChange: (t: string) => void; pick?: string; revealCurrent?: boolean }) {
+  const id = useId(), strip = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const list = strip.current, active = list?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (!revealCurrent || !list || !active) return
+    const outer = list.getBoundingClientRect(), inner = active.getBoundingClientRect()
+    if (inner.left < outer.left) list.scrollLeft += inner.left - outer.left
+    else if (inner.right > outer.right) list.scrollLeft += inner.right - outer.right
+  }, [current, revealCurrent])
   return <>
-    <div className={`tabs${pick ? ' tabs-pickable' : ''}`} role="tablist">{tabs.map(t => <button key={t} type="button" role="tab" aria-selected={current === t} className={current === t ? 'active' : ''} onClick={() => onChange(t)}>{t}</button>)}</div>
+    <div ref={strip} className={`tabs${pick ? ' tabs-pickable' : ''}`} role="tablist">{tabs.map(t => <button key={t} type="button" role="tab" aria-selected={current === t} className={current === t ? 'active' : ''} onClick={() => onChange(t)}>{t}</button>)}</div>
     {pick && <div className="field tabs-pick"><label htmlFor={id}>{pick}</label><select id={id} value={current} onChange={e => onChange(e.target.value)}>{tabs.map(t => <option key={t} value={t}>{t}</option>)}</select></div>}
   </>
 }
