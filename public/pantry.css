@@ -455,7 +455,11 @@ ul.plain li:last-child { border-bottom: 0; }
 .capture { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; margin-bottom: 12px; }
 .capture label.btn { cursor: pointer; white-space: nowrap; }
 .capture label.btn[aria-disabled='true'] { opacity: .55; pointer-events: none; }
-.capture input:focus-visible + label, .capture label:focus-within { outline: 2px solid var(--green-ink); outline-offset: 2px; box-shadow: var(--ring); }
+/* Each hidden picker focuses its own preceding button, never the next one. */
+.capture label.btn:has(+ input:focus-visible) { border-color: var(--green-ink); }
+.capture .choice input[type='radio'] { appearance: none; display: inline-grid; place-content: center; border: 1.5px solid var(--field); border-radius: 50%; background: var(--surface); }
+.capture .choice input[type='radio']:checked::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+.capture .choice input[type='radio']:focus-visible { outline: none; border-color: var(--green-ink); box-shadow: none; }
 .capture-compact { margin: 0; gap: 6px; }
 .capture-compact .hint, .capture-compact .error { flex-basis: 100%; }
 .receipt-body { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 24px; align-items: start; }
