@@ -87,7 +87,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "43e0376177fe57d4cd812f8a25c57eb44e2d2d0f0131c953f57826be4bd2b650",
+      "sha256": "8d43324fc68f1b2395189789fc3d7edaeefd583bc7f82b1289c99e3945a2c19b",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -115,7 +115,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "4c4331b7dd60b204f7ba8b6d5042ded48608425ba3239cf6cc643b1766580074",
+      "sha256": "e0e1c9c0871197f53f2b5d003eefd531462ed1d3cba02180e53899108f1d2051",
       "executable": false
     },
     "DEMO.md": {
@@ -4483,7 +4483,7 @@
       "executable": false
     },
     "src/pantry/erasure/commands.ts": {
-      "sha256": "af73678573075e9db53d7baf4cf32fcdc002b8474c84a4f820a0aa16f2bd751a",
+      "sha256": "8b8b22beb8330d9a71342773a5039a8d0159879bb1bc5ca4416798f61089f415",
       "executable": false
     },
     "src/pantry/erasure/copies.ts": {
@@ -4523,7 +4523,7 @@
       "executable": false
     },
     "src/pantry/erasure/preview.ts": {
-      "sha256": "e690a31be13b9f2740cebc30f443843ac194f9a9d6c2b3dc3d450d6132036818",
+      "sha256": "fa5549ccab48a3a9d9524fa71312740a75ca28c580c07f44974320dd898f58b1",
       "executable": false
     },
     "src/pantry/erasure/retention-clock.ts": {
@@ -6627,7 +6627,7 @@
       "executable": false
     },
     "tests/api/security.test.mjs": {
-      "sha256": "7c81472b4b6329f8b0868bb53d9c0e863cce8ddb7947c363fa94c93a9bf06761",
+      "sha256": "ec01b476e553799d723b126112301be3e5d0f85b35bcb08d75b11d12cf94cc13",
       "executable": false
     },
     "tests/api/standing-journey.mjs": {

@@ -62,6 +62,11 @@ const execute: Command = {need:'owner',async run(c,b) {
       }
       writes.push(q('DELETE FROM pt_contacts WHERE id=?',p.id),changed()); removed.push({table:'pt_contacts',key:{id:p.id}}); counts.pt_contacts={rowsRemoved:1}
     }
+    const requests = await all(c.db,'SELECT id,token_hash FROM pt_w9_requests WHERE contact_id=?',p.id)
+    if(requests.length) {
+      counts.pt_w9_requests=p.posted?{linksRevoked:requests.filter(r=>r.token_hash!==null).length}:{rowsRemoved:requests.length}
+      if(!p.posted)removed.push(...requests.map(r=>({table:'pt_w9_requests',key:{id:r.id}})))
+    }
     const links = (await one(c.db,'SELECT count(*) AS n FROM pt_invoices WHERE customer_id=? AND link_token IS NOT NULL',p.id))!.n
     writes.push(q('UPDATE pt_invoices SET link_token=NULL,reminders_paused=1 WHERE customer_id=?',p.id)); counts.pt_invoices={...counts.pt_invoices,linksRevoked:links}
 

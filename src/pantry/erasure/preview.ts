@@ -63,6 +63,10 @@ export async function erasurePreview(c: Context, input: Data) {
     classes.push({table:'pt_contacts',action:posted?'replaced':'removed',count:1,reason:posted?'Legal name and posted bookkeeping retained':'No posted transactions'},
       {table:'pt_journal_entries',action:'retained',count:entries.filter(e=>e.status==='posted').length,reason:'Posted accounting entries, amounts, numbers, dates and coding are unchanged'})
   } else classes.push({table:'pt_members',action:'replaced',count:1,reason:'One random Former member label preserves attribution'}, {table:'oa_operators',action:'removed',reason:'Sign-in identity, sessions, links and passkeys removed'})
+  if(!member&&!person) {
+    const requests=await all(c.db,'SELECT id FROM pt_w9_requests WHERE contact_id=?',id)
+    if(requests.length)classes.push({table:'pt_w9_requests',action:posted?'replaced':'removed',count:requests.length,reason:posted?'Private W-9 links revoked; request history retained':'No posted transactions; private W-9 requests removed'})
+  }
   const retained = member ? [] : await retentionItems(c.db,id)
   if(person) {classes.splice(0,1,{table:'pt_contacts.contacts_json',action:'removed',count:1,reason:'Only this contact person is removed; the business and other contacts remain'})}
   classes.push(...retained.map((item: Data)=>({...item,action:'retained'})), {table:'pt_audit',action:'replaced',reason:'Entries and bookkeeping retained; declared personal values replaced'},

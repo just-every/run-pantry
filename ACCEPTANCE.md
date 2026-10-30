@@ -8,10 +8,10 @@ The primary journey: Set up the business, bring in its books, connect bank and p
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 21 | 114 | 21 | 156 |
+| Core | 22 | 113 | 21 | 156 |
 | Agent surface | 0 | 0 | 5 | 5 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 21 | 114 | 26 | 161 |
+| Full target | 22 | 113 | 26 | 161 |
 
 Judged from the code and tests at commit `a5c876e597b8aa8bebb1ef10cd677272e5e80799` (21 October 2026). Field proof register: 18 rows; 0 passed, 0 failed, 18 not run.
 
@@ -2089,7 +2089,7 @@ Core · target · **partial** · Cites BASE-AUDIT-001, BASE-OPS-005, BASE-AGENT-
 
 #### ERASURE-001 — Erasure within record-keeping law
 
-Core · target · **partial** · Cites BASE-DATA-003, BASE-DATA-006
+Core · target · **done** · Cites BASE-DATA-003, BASE-DATA-006
 
 **Requirement.** A customer, vendor or person with no posted transactions is removed. One with posted transactions keeps the legal name and amounts the books need. Their email, phone, address, notes and contacts are replaced by an erasure marker, and the retention reason is shown. The detailed accounting and custody rules in [the capability record](docs/contract-mechanisms.md#erasure-001) govern the same workflow.
 
@@ -2097,8 +2097,8 @@ Core · target · **partial** · Cites BASE-DATA-003, BASE-DATA-006
 1. Erase a lead with no transactions and see it gone.
 2. Erase a former customer with invoices and see their personal fields replaced, the books unchanged, the receipt counts, and an older archive import refusing to restore the erased fields.
 
-**Evidence.** `tests/api/security.test.mjs`, `tests/api/invoices-out.test.mjs`, `tests/api/move-in.test.mjs`, `tests/restore/restore.test.mjs`, `tests/app/app.test.mjs`, `tests/app/erasure-journey.mjs`, `tests/api/integrations.test.mjs`, `tests/api/receipts.test.mjs`
-**Gap.** Asserted: Transaction-free lead removed and receipt counts one contact; Receipt and audit retain no erased value. Unasserted: Old archive is refused with a named erasure fence (the assertions moved to tests/restore/erasure.test.mjs outside the old cited Evidence). Unasserted: Complete receipt counts for every affected table, including the original address field, are not independently reconciled by these selected assertions.
+**Evidence.** `tests/api/security.test.mjs` — “ERASURE-001 owner previews and confirms removal or personal-field markers, refuses active obligations, and keeps posted books and immutable history” proves lead removal, personal-field markers, independently reconciled receipt counts, unchanged books and refused unsafe erasure; “ERASURE-001 a deactivated member loses identity and sessions while a stable Former member label preserves approvals and Activity” proves member custody; “ERASURE-001 retention recomputes unerased supporting items, requires confirmation, keeps hashes and never regenerates expired bytes or TINs” proves original address redaction, W-9 link revocation and supporting-record retention. `tests/restore/erasure.test.mjs` — “ERASURE-001 restored books retain redactions and known erasures fence older archives” proves same-store and journal-supplied archive refusals and redacted restore. `tests/app/app.test.mjs` — “ERASURE-001 owner preview, receipt, retention confirmation and Activity at 1440 and 390” proves the owner screens. `tests/api/integrations.test.mjs` — “API-003 webhook retries persist every delay, stop after six attempts, rotate for 24 hours and honour disable, delete and erasure” proves cancellation counts and no replay. `tests/api/receipts.test.mjs` — “CAPTURE-001 / ERASURE-001 split captures preserve provenance, scoped custody and shared-source retention” proves source custody and no revival.
+**Gap.** None.
 
 #### DATA-001 — Declared data flows and credentials
 

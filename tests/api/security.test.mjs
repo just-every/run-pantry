@@ -41,11 +41,12 @@ function reconcileReceipt(receipt,before,after) {
       } else if(table==='pt_approvals') {
         values+=['note','actor_email','subject_id'].filter(k=>row[k]!==kept[k]).length
       } else {
-        const metadata=['revision','erased_at','revoked_at','autopay_revoked_at',...(table==='pt_contacts'?['active']:[]),...(table==='pt_invoices'?['reminders_paused','link_token']:[])]
+        const metadata=['revision','erased_at','revoked_at','autopay_revoked_at',...(table==='pt_contacts'?['active']:[]),...(table==='pt_invoices'?['reminders_paused','link_token']:[]),...(table==='pt_w9_requests'?['token_hash']:[])]
         const changed=Object.keys(row).filter(k=>JSON.stringify(row[k])!==JSON.stringify(kept[k])&&!metadata.includes(k))
         fields+=changed.length
         if(changed.length)replaced++
         if(table==='pt_invoices'&&row.link_token&&!kept.link_token)links++
+        if(table==='pt_w9_requests'&&row.token_hash&&!kept.token_hash)links++
       }
     }
     const counts=receipt.counts[table]??{}
@@ -53,7 +54,7 @@ function reconcileReceipt(receipt,before,after) {
     assert.equal(counts.fieldsReplaced??0,fields,`${table} replaced fields`)
     if(table!=='pt_contacts')assert.equal((counts.rowsReplaced??0)+(counts.rowsRedacted??0),replaced,`${table} replaced rows`)
     if(table==='pt_audit'||table==='pt_approvals')assert.equal(counts.valuesReplaced??0,values,`${table} replaced history values`)
-    if(table==='pt_invoices')assert.equal(counts.linksRevoked??0,links,'revoked invoice links')
+    if(table==='pt_invoices'||table==='pt_w9_requests')assert.equal(counts.linksRevoked??0,links,`${table} revoked links`)
   }
 }
 
@@ -69,8 +70,10 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
   }
   await h.view('erasure',viewer,403)
   const multi=await h.command('contact.save',{kind:'customer',name:'Shared customer LLC',contacts:[{name:'Departed buyer',email:'departed@example.test',phone:'555-0107',roles:['primary']},{name:'Current buyer',email:'current@example.test',phone:'555-0108',roles:['billing']}]})
+  const personBefore=await receiptSnapshot(h)
   const personPreview=await h.command('erasure.preview',{kind:'contact-person',id:multi.id,personIndex:0})
-  await h.command('erasure.execute',request(personPreview,{personIndex:0}))
+  const personReceipt=await h.command('erasure.execute',request(personPreview,{personIndex:0}))
+  reconcileReceipt(personReceipt,personBefore,await receiptSnapshot(h))
   const remaining=JSON.parse((await h.view('state')).contacts.find(c=>c.id===multi.id).contacts_json)
   assert.deepEqual(remaining.map(p=>p.email),['current@example.test'])
   assert.ok(!JSON.stringify(await h.view('activity')).includes('departed@example.test'))
@@ -231,6 +234,9 @@ test('ERASURE-001 retention recomputes unerased supporting items, requires confi
   const retainedPreview=await h.command('erasure.preview',{kind:'contact',id:vendor.id})
   assert.equal(retainedPreview.retained.find(r=>r.table==='pt_contractor_tax').clock,'2020-09-07','latest financial event includes reversal and correction lineage')
   const source=await h.command('document.upload',{name:'archive-consulting.txt',mediaType:'text/plain',base64:Buffer.from('Archive Vendor invoice ARCHIVE-18').toString('base64'),linkedKind:'bill',linkedId:bill.id})
+  const pendingW9=await h.command('w9.request',{contactId:vendor.id,contactRevision:(await h.view(`vendor-w9/${vendor.id}`)).contactRevision,consent:true})
+  const privatePath=new URL(pendingW9.url).pathname
+  assert.equal((await h.send(privatePath)).status,200)
   for(const subject of [customer,vendor]) {
     const p=await h.command('erasure.preview',{kind:'contact',id:subject.id}),before=await receiptSnapshot(h)
     const receipt=await h.command('erasure.execute',request(p))
@@ -240,6 +246,9 @@ test('ERASURE-001 retention recomputes unerased supporting items, requires confi
     assert.equal(retained.contacts_json,'[]');assert.equal(retained.name,subject.name)
     const evidence=receipt.retained.map(r=>[r.table,r.id,r.clock,r.expires])
     if(subject.id===vendor.id) {
+      assert.equal(receipt.counts.pt_w9_requests.linksRevoked,1)
+      assert.equal((await h.send(privatePath)).status,404)
+      assert.ok(p.classes.some(r=>r.table==='pt_w9_requests'&&r.reason))
       assert.ok(evidence.some(r=>r[0]==='pt_contractor_tax'&&r[1]===vendor.id&&r[2]==='2020-09-07'&&r[3]==='2027-09-07'))
       assert.ok(evidence.some(r=>r[0]==='pt_documents'&&r[1]===source.id))
       for(const field of ['address','city','state','zip'])assert.equal((await h.db.prepare('SELECT * FROM pt_contractor_tax WHERE contact_id=?').bind(vendor.id).first())[field],'[erased]')
