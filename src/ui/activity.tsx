@@ -23,11 +23,11 @@ export function Activity() {
     <Card title="Find history"><Form label="Filter activity" className="grid-form" submit={async b => { setQuery(new URLSearchParams(Object.entries(b).filter(([, v]) => v !== '') as [string, string][]).toString()) }}>
       <Field label="Person or connection" name="person" options={people.map((email: string) => ({ value: email, label: who(email) }))} empty="Everyone" />
       <Field label="From date" name="from" type="date" /><Field label="Through date" name="to" type="date" />
-      <Field label="Record ID" name="record" hint="Copy the record ID from Inspect history." />
+      <Field label="Record reference" name="record" placeholder="Copy from Inspect history" />
     </Form></Card>
     {!data ? <Loading error={error} what="activity" /> : <>
       <Card title="Activity"><Table heads={['When', 'Who', 'Action', 'Record']} empty="No activity matches these filters.">
-        {data.audit.map((e: D) => <tr key={e.id}><td>{new Date(e.at).toLocaleString()}</td><td><div>{who(e.actor_email)}</div><small className="sub">{e.origin_kind || e.actor_kind}</small></td><td>{actionLabel(e.action)}</td><td>{recordLabel(e.subject_kind, e.subject_id)}<Evidence event={e} /></td></tr>)}
+        {data.audit.map((e: D) => <tr key={e.id}><td>{new Date(e.at).toLocaleString()}</td><td><div>{who(e.actor_email)}</div><small className="sub">{({ person: 'Person', rule: 'Rule', agent: 'Books agent' } as Record<string, string>)[e.origin_kind || e.actor_kind] ?? 'Person'}</small></td><td>{actionLabel(e.action)}</td><td>{recordLabel(e.subject_kind, e.subject_id)}<Evidence event={e} /></td></tr>)}
       </Table></Card>
       <Card title="Approvals"><Table heads={['When', 'Who', 'What', 'Decision', 'History']} empty="No approvals match these filters.">
         {data.approvals.map((a: D) => <tr key={a.id}><td>{new Date(a.at).toLocaleString()}</td><td>{who(a.actor_email)}</td><td>{approvalLabel(a.subject_kind, a.action)}</td><td><Chip tone={a.decision === 'approved' ? 'good' : 'warn'}>{a.decision === 'approved' ? 'Approved' : 'Declined'}</Chip>{a.note && <small className="sub">{a.note}</small>}</td><td><details><summary>Inspect approval</summary><dl><dt>Record</dt><dd>{recordLabel(a.subject_kind, a.subject_id)} · {a.subject_id}</dd><dt>Revision</dt><dd>{a.subject_revision}</dd><dt>Action</dt><dd>{a.action}</dd></dl></details></td></tr>)}

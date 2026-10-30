@@ -35,10 +35,10 @@ export function Bills({ data, reload, initialBillId }: { data: D; reload: () => 
   const current = (data.bills as D[]).find(b => b.id === selected)
   return <>{state.actor.role !== 'payables-clerk' && <CapturedBills documents={data.capturedBills ?? []} />}<CaptureApprovalRules rules={data.approvalRules ?? []} accounts={state.accounts} onChange={reload} /><div className="split split-wide-left">
     <div className="stack"><Card title="Bills">
-      <Table caption="Bill inbox" heads={['Vendor', 'Reference / evidence', 'Due', 'Amount', 'Open', 'State / next actor']} figures={[3, 4]} empty="No bills yet.">
+      <Table caption="Bill inbox" heads={['Vendor', 'Reference / evidence', 'Due', 'Amount', 'Open', 'State', 'Next step']} figures={[3, 4]} empty="No bills yet.">
         {(data.bills as D[]).map(b => <tr key={b.id} className={selected === b.id ? 'selected' : ''} tabIndex={0} onClick={() => { setSelected(b.id); setEditing(false) }} onKeyDown={k => { if (k.key === 'Enter') setSelected(b.id) }}>
           <td>{b.vendor_name}</td><td><span>{b.reference}</span><small className="sub block">{b.documents.length ? <Chip tone="good">Attached</Chip> : b.evidence_waived ? <Chip>Reason recorded</Chip> : <Chip tone="warn">Missing</Chip>}</small></td><td>{day(b.due_date)}</td><td className="fig">{usd(b.total_cents)}</td><td className="fig">{usd(b.open_cents)}</td>
-          <td><Chip tone={['Paid', 'Reconciled'].includes(b.lifecycle.stage) ? 'good' : 'neutral'}>{b.lifecycle.stage}</Chip><small className="sub block">Next: {b.lifecycle.nextActor}</small></td></tr>)}
+          <td><Chip tone={['Paid', 'Reconciled'].includes(b.lifecycle.stage) ? 'good' : 'neutral'}>{b.lifecycle.stage}</Chip></td><td>{({ Preparer: 'Prepare bill', 'Payment recorder': 'Record payment', Reconciler: 'Reconcile payment', 'Posting grant holder': 'Post bill', 'Owner or another posting grant holder': 'Approve bill', Owner: 'Owner approval', None: 'Complete', 'None — settled by credit': 'Complete' } as Record<string, string>)[b.lifecycle.nextActor] ?? b.lifecycle.nextActor}</td></tr>)}
       </Table>
     </Card>
     {current && <VendorHistory key={current.vendor_id + current.revision} vendorId={current.vendor_id} />}

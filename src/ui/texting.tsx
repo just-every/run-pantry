@@ -25,7 +25,7 @@ export function TextingSettings() {
    <label className="check"><input type="checkbox" name="approve" required />I approve these exact templates and reminder days for the consented purposes.</label>
   </Form>
   {s.connected&&<Action tone="danger" run={async()=>{await command('texting.disconnect',{});await reload()}}>Disconnect Twilio</Action>}
-  <p className="hint">{s.updatedAt?<>Last changed {day(s.updatedAt)} by {s.updatedBy}.</>:'No provider connected.'} Test-account callbacks shown in history are synthetic signed test events, not evidence of real carrier delivery.</p>
+  <p className="hint">{s.updatedAt?<>Last changed {day(s.updatedAt)} by {s.updatedBy}.</>:'No provider connected.'} Test messages in history show how texting works; they do not confirm delivery to a phone.</p>
  </Card>
 }
 
