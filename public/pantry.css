@@ -569,3 +569,15 @@ details.setup-steps summary { width: fit-content; margin-bottom: 8px; color: var
   .quiet-row .row-reveal > a, .quiet-row .row-reveal summary { min-height: 44px; display: inline-flex; align-items: center; }
   .filter-fields { flex-direction: column; }
 }
+
+/* A new invoice gives the account and tax decisions enough room to read. */
+.invoice-editor .lines-editor td[data-label='Income account'] select,
+.invoice-editor .lines-editor td[data-label='Sales tax code'] select { min-width: 240px; field-sizing: content; }
+@media (max-width: 720px) {
+  .invoice-editor .lines-editor td[data-label='Income account'],
+  .invoice-editor .lines-editor td[data-label='Sales tax code'] { display: flex; flex-direction: column; align-items: stretch; text-align: left; gap: 6px; }
+  .invoice-editor .lines-editor td[data-label='Income account']::before,
+  .invoice-editor .lines-editor td[data-label='Sales tax code']::before { float: none; }
+  .invoice-editor .lines-editor td[data-label='Income account'] select,
+  .invoice-editor .lines-editor td[data-label='Sales tax code'] select { min-width: 0; width: 100%; max-width: 100%; }
+}
