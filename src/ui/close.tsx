@@ -33,11 +33,13 @@ const LINK: Record<string, string> = { 'stripe-clearing': '/app/settings', bank:
 
 export function Close() {
   const shared = useShared(), who = useWho(), [period, setPeriod] = useState(() => new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('period') ?? shared.state.overview.closing ?? thisMonth())
-  const { data: s, error, reload } = useView<D>(`close/${period}`)
+  const validPeriod = /^\d{4}-(0[1-9]|1[0-2])$/.test(period)
+  const { data: s, error, reload } = useView<D>(validPeriod ? `close/${period}` : null)
   const can = shared.state.actor.can
-  const { data: board, reload: reloadBoard } = useView<D>(`close-board?year=${period.slice(0, 4)}`)
+  const { data: board, reload: reloadBoard } = useView<D>(validPeriod ? `close-board?year=${period.slice(0, 4)}` : null)
   const refresh = async () => { await reload(); await reloadBoard(); await shared.reload() }
   const pending = s?.requests.find((r: D) => r.status === 'pending')
+  if (!validPeriod) return <><PageHead title="Close — period not found" /><Card title="Period not found"><p>This address does not name a close period. Use a month in YYYY-MM format, such as {thisMonth()}, or open the current close.</p><a className="btn btn-primary" href="/app/close">Open current close</a></Card></>
   return <>
     <PageHead title={<>Close — {monthName(period)}</>} chip={s && (s.status === 'locked' ? <Chip tone="info"><Icon name="lock" /> Locked</Chip> : s.ready ? <Chip tone="good">Ready to lock</Chip> : <Chip tone="warn">In progress</Chip>)}
       lead="Every check must pass and every review task be done before the period locks. A lock stops all changes dated in the period, by people and agents alike."

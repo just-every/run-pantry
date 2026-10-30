@@ -87,7 +87,7 @@ export async function queueBrowser(t){
   await bulk(20);await bulk(26)
   const queued=(await view('bank/lines')).lines.filter(l=>l.bank_account_id===bank.id)
   assert.equal(queued.length,50);assert.equal(queued.filter(l=>l.match_id).length,49);assert.equal(queued.filter(l=>l.excluded_at).length,1)
-  const one=row(vendor.name).first();await one.getByRole('button',{name:'Undo',exact:true}).click();await expect(one.getByRole('button',{name:'File it',exact:true})).toBeVisible()
+  const one=row(vendor.name).first();await one.focus();await one.getByRole('button',{name:'Undo',exact:true}).click();await expect(one.getByRole('button',{name:'File it',exact:true})).toBeVisible()
   const after=(await view('bank/lines')).lines.filter(l=>l.bank_account_id===bank.id)
   assert.equal(after.filter(l=>l.match_id).length,48);assert.equal(after.filter(l=>!l.match_id&&!l.excluded_at).length,1)
   assert.equal((await view(`reports/trial-balance?to=${day}&basis=accrual`)).balanced,true)

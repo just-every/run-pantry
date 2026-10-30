@@ -70,7 +70,7 @@ export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCan
         {invoice?.id && <InvoiceDocumentPreview invoiceId={invoice.id} />}
         {certificate && <div className="callout" role="status"><strong>{state.actor.role === 'sales' ? 'Customer certificate' : `Certificate ${certificate.certificate_number}`} applies in {destination}</strong><span>Exempt through {certificate.expires_on}. {state.actor.role !== 'sales' && <><a href={`/api/pantry/documents/${certificate.document_id}`}>View certificate</a>. </>}Your line tax choices below are kept for when the certificate no longer applies.</span></div>}
         {invoice?.exemption && !certificate && <div className="callout callout-warn" role="status"><strong>Review tax treatment</strong><span>The earlier certificate no longer applies to these details. Saving uses your original line tax choices.</span></div>}
-        <ServiceLines lines={lines} setLines={setLines} validateTax={!!invoice} />
+        <ServiceLines lines={lines} setLines={setLines} validateTax={!!invoice} taxPrompt="Choose tax code" />
         <Card title="Memo"><Field label="Memo on the invoice" name="memo" type="textarea" defaultValue={invoice?.memo} wide /></Card>
       </div>
       <Card title={kind === 'credit' ? 'Credit summary' : 'Invoice summary'}>
@@ -91,7 +91,7 @@ export function lineTotals(lines: Line[], taxCodes: D[]) {
 }
 
 /** The service lines table, shared by invoices and recurring invoices. */
-export function ServiceLines({ lines, setLines, validateTax = true }: { lines: Line[]; setLines: (f: (ls: Line[]) => Line[]) => void; validateTax?: boolean }) {
+export function ServiceLines({ lines, setLines, validateTax = true, taxPrompt = 'Tax treatment needed' }: { lines: Line[]; setLines: (f: (ls: Line[]) => Line[]) => void; validateTax?: boolean; taxPrompt?: string }) {
   const { state } = useShared()
   const income = accountOptions(state.accounts, a => a.type === 'income')
   const { amounts } = lineTotals(lines, state.taxCodes)
@@ -111,7 +111,7 @@ export function ServiceLines({ lines, setLines, validateTax = true }: { lines: L
         <td data-label="Rate"><input aria-label={`Line ${i + 1} rate`} className="fig narrow" inputMode="decimal" value={l.rate} onChange={e => set(i, { rate: e.target.value })} required /></td>
         <td data-label="Amount" className="fig">{usd(amounts[i])}</td>
         <td data-label="Income account"><select aria-label={`Line ${i + 1} income account`} disabled={!!l.itemId} value={l.accountId} onChange={e => set(i, { accountId: e.target.value })} required><option value="">Choose…</option>{income.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></td>
-        <td data-label="Sales tax code"><select aria-label={`Line ${i + 1} sales tax code`} disabled={items.find(it => it.id === l.itemId)?.tax_category === 'non-taxable'} className={!l.taxCode && (validateTax || l.description.trim() || l.rate.trim() || l.itemId) ? 'needs-decision' : ''} aria-invalid={!l.taxCode && (validateTax || !!l.description.trim() || !!l.rate.trim() || !!l.itemId) || undefined} value={l.taxCode} onChange={e => set(i, { taxCode: e.target.value })}><option value="">Choose tax code</option><option value="exempt">Exempt / not taxable</option>{state.taxCodes.map((t: D) => <option key={t.id} value={t.id}>{t.name} ({(t.rate_milli_percent / 1000).toFixed(3)}%)</option>)}</select></td>
+        <td data-label="Sales tax code"><select aria-label={`Line ${i + 1} sales tax code`} disabled={items.find(it => it.id === l.itemId)?.tax_category === 'non-taxable'} className={!l.taxCode && (validateTax || l.description.trim() || l.rate.trim() || l.itemId) ? 'needs-decision' : ''} aria-invalid={!l.taxCode && (validateTax || !!l.description.trim() || !!l.rate.trim() || !!l.itemId) || undefined} value={l.taxCode} onChange={e => set(i, { taxCode: e.target.value })}><option value="">{taxPrompt}</option><option value="exempt">Exempt / not taxable</option>{state.taxCodes.map((t: D) => <option key={t.id} value={t.id}>{t.name} ({(t.rate_milli_percent / 1000).toFixed(3)}%)</option>)}</select></td>
         <td>{lines.length > 1 && <button type="button" className="btn btn-link" onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}>Remove</button>}</td>
       </tr>)}</tbody></table></div>
   </Card>

@@ -42,6 +42,7 @@ test('RULE-002 ordered suggest and automatic rules preview six charges and retai
     assert.ok((await view('bank/lines')).lines.filter(l => l.description === description).every(l => !l.match_id))
     await page.screenshot({ path: `/tmp/sx-pantry-r7-rule-suggest-${width}.png`, fullPage: true })
     const ruleRow = page.getByRole('row').filter({ hasText: `Adobe software ${width}` })
+    await ruleRow.focus()
     await ruleRow.getByRole('button', { name: 'Edit', exact: true }).click()
     await editor.getByLabel('Mode', { exact: true }).selectOption('automatic')
     await editor.getByRole('button', { name: 'Preview', exact: true }).click()
