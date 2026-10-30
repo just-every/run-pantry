@@ -133,7 +133,7 @@ export function Questions({ focus }: { focus?: string }) {
   const rest = data.open.filter((x: D) => x.id !== current?.id)
   return <>
     <PageHead title="Questions from Pantry" chip={data.open.length ? <Chip tone="warn">{data.open.length} open</Chip> : <Chip tone="good">All answered</Chip>}
-      lead="Pantry checks your books for what doesn’t add up and asks you, by email first. Your answer files it." />
+ />
     <AgentPermissions/>
     <LearnedRecognition/>
     <div className="split split-wide-left">

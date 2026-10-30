@@ -1019,7 +1019,7 @@
       "executable": false
     },
     "public/pantry.css": {
-      "sha256": "992da4034a19432aeaa1ce86c823cada9978b7c432c80db04d79198c11bbfe8b",
+      "sha256": "889999db8c898ccc94a6155533d21289ec1914865589f4667d990bbf9a23b909",
       "executable": false
     },
     "public/rer-theme.css": {
@@ -5859,7 +5859,7 @@
       "executable": false
     },
     "src/ui/agent-permissions.tsx": {
-      "sha256": "3ac9073c05242e37c06da7b0b3358a51f727fba203cdf486783147d414b5e75b",
+      "sha256": "082ebe062e666358e0d68313a2944342dce14777c867c5398332bfaede39d462",
       "executable": false
     },
     "src/ui/ask-accountant.tsx": {
@@ -5867,7 +5867,7 @@
       "executable": false
     },
     "src/ui/ask-books.tsx": {
-      "sha256": "faafd5884f9dfa37600db6f6ed4e1624462477c455865d04ef08f786a339999f",
+      "sha256": "d05b7356175500a649e2d1e8c8a6353bf49867f0f5271cce0953d2fad3a1b103",
       "executable": false
     },
     "src/ui/assets.tsx": {
@@ -5887,7 +5887,7 @@
       "executable": false
     },
     "src/ui/bank-lines.tsx": {
-      "sha256": "aefc66cb71b408193b7a932761e50472bf6725d8a8f44d0554d44a9d82bbb875",
+      "sha256": "c25e1a07571c86be592264cad96884d3611b8a2cc7aca8ca4fd46d11d9611512",
       "executable": false
     },
     "src/ui/bank-opening.tsx": {
@@ -5899,7 +5899,7 @@
       "executable": false
     },
     "src/ui/bank.tsx": {
-      "sha256": "6fbbacd5f846a5450bd397ab0cc945d7d5a564566a2a0515067f1a3519d70042",
+      "sha256": "5cb6fc5100ece57862d5b740773282b88b451a458521c98b1e7cb2f6e5918746",
       "executable": false
     },
     "src/ui/bill-workflow.tsx": {
@@ -5911,7 +5911,7 @@
       "executable": false
     },
     "src/ui/books.tsx": {
-      "sha256": "5b7faeba2bffcb85817c993772eb7f83831657e0c4818d7713fad80a3dfd38b0",
+      "sha256": "87583370b71640e510de9b8f072acb673bc45688c048bf57549b65a7108ff159",
       "executable": false
     },
     "src/ui/budgets.tsx": {
@@ -5959,7 +5959,7 @@
       "executable": false
     },
     "src/ui/close.tsx": {
-      "sha256": "e7e831be67d07dd39db2942ff9f4c50d9b7efa44825d400368bbea98549994b0",
+      "sha256": "6d8d3a1837c98a13d84d5825f0eab2943f90d3961086d3d12ccda9b115173da3",
       "executable": false
     },
     "src/ui/collections.tsx": {
@@ -6082,6 +6082,10 @@
       "sha256": "0000008942df68c9b54f9f7e041077a40da68b99ef6a66aabfa387a5f69f7f7c",
       "executable": false
     },
+    "src/ui/help.tsx": {
+      "sha256": "60f568ab2f8ec61c8d23944cf4ab5a1b989dcad04fe576ec96532c674bb096f5",
+      "executable": false
+    },
     "src/ui/icons.tsx": {
       "sha256": "28ca2c2f0c635fe7cecb2a81fba6371a9a7555553b0c45cc65d38af52d869b06",
       "executable": false
@@ -6091,7 +6095,7 @@
       "executable": false
     },
     "src/ui/invoice-delivery.tsx": {
-      "sha256": "5d27246f11ee20e3825c479f7e76a8570fd22942493bebe368a6b1acd8fce954",
+      "sha256": "61c19ece1677a33fb6f3bf5acfda2d24103b20d0e5d9c56b31079ad6a8b5e6c4",
       "executable": false
     },
     "src/ui/invoice-editor.tsx": {
@@ -6099,7 +6103,7 @@
       "executable": false
     },
     "src/ui/invoice-template-editor.tsx": {
-      "sha256": "4cfa23542f0dde86e5051c83d3a2061cf92e94ea8fa663fc0c56bc9805f99300",
+      "sha256": "076d249643f7e169b26736a3984b3965434c66194de3affb4d52ea5da4988efd",
       "executable": false
     },
     "src/ui/invoice-templates.tsx": {
@@ -6123,7 +6127,7 @@
       "executable": false
     },
     "src/ui/kit.tsx": {
-      "sha256": "012a43d5445a9c261b46651c7941ddc3a58e622a01295b1a9a094214575d6549",
+      "sha256": "0a4bc4e4dbb72fcd39822121590dbbb4d2e85d500fc0d48ec5505eb245dac7dc",
       "executable": false
     },
     "src/ui/late-fees.tsx": {
@@ -6139,7 +6143,7 @@
       "executable": false
     },
     "src/ui/more.tsx": {
-      "sha256": "dd9eaaf63a9f0dda7fea69645d55a724b62713c7d6ea2a41edc233b2ba39a03f",
+      "sha256": "8e8e487318d5871af151a6b13e87e0695132f9b9e9391b58a95fcf2b845cd0bd",
       "executable": false
     },
     "src/ui/move-in-sources.ts": {
@@ -6199,7 +6203,7 @@
       "executable": false
     },
     "src/ui/questions.tsx": {
-      "sha256": "960e8addd045af09e5f68a49333c0491c10ddd9a37bfe31fd907236c52cb9657",
+      "sha256": "34649e2a5247b4f52ea95bb1885df52eb847d228bca0566bc5128a1ce6bae66e",
       "executable": false
     },
     "src/ui/receipt-capture.tsx": {
@@ -6275,7 +6279,7 @@
       "executable": false
     },
     "src/ui/reports.tsx": {
-      "sha256": "558f10aa70873ce0b197a529abd94313afc875faab08b4af4cc8c3d169d01dd8",
+      "sha256": "ba6f24d7e73c8d65da6f056cac369ff4fbcaa5335e673f22e68bf711ad50f4e3",
       "executable": false
     },
     "src/ui/review.tsx": {
