@@ -1,3 +1,4 @@
+import { dateText } from './display-time'
 import { Action, Card, Chip, Loading, useView, type D } from './kit'
 
 export function DataFlows() {
@@ -5,7 +6,7 @@ export function DataFlows() {
   if(!data)return <Loading error={error} what="service data flows" />
   return <div id="data-flows"><Card title="Data & connections" actions={<Action run={reload}>Refresh connections</Action>}>
     <p>Optional services receive data only after you set up their connection. Each authenticates with its own credential; no other service’s credentials are sent. Saved keys stay encrypted in this installation and are excluded from archives. One-use Inkwell and Platter preview tokens are never saved. Restore the books, then reconnect services with fresh credentials. Pantry charges no software or connection fee.</p>
-    <p className="hint">Provider prices checked {data.pricesChecked}. Your provider’s plan, usage, taxes and agreement determine its bill. No Pantry Connect broker is available in this edition.</p>
+    <p className="hint">Provider prices checked {dateText(data.pricesChecked)}. Your provider’s plan, usage, taxes and agreement determine its bill. No Pantry Connect broker is available in this edition.</p>
     {data.services.map((s:D)=><details className="details" key={s.id} data-service={s.id}>
       <summary>{s.name} · {s.connected?'Connected':'Off'}</summary>
       <p><Chip tone={s.connected?'good':'info'}>{s.connected?'Connected':'Off'}</Chip> {s.detail}</p>

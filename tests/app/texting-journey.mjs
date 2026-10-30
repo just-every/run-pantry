@@ -57,7 +57,7 @@ export async function textingBrowser(t) {
     await page.goto(`${app.origin}/app/sales?tab=contacts&customer=${customer.id}`)
     const consent=page.locator('section.card').filter({has:page.getByRole('heading',{name:'Customer text consent',exact:true})})
     await consent.getByLabel('Consented mobile number',{exact:true}).fill('+15005550006')
-    await consent.getByLabel('Customer time zone',{exact:true}).fill('America/New_York')
+    await consent.getByLabel('Customer time zone',{exact:true}).selectOption('America/New_York')
     await consent.getByRole('checkbox',{name:'Estimate links',exact:true}).check()
     await consent.getByLabel('Consent source',{exact:true}).fill('Signed studio agreement')
     await consent.getByLabel('Exact consent wording',{exact:true}).fill('I consent to invoice links and reminders. Reply STOP to stop.')

@@ -1,3 +1,4 @@
+import { timeText } from './display-time'
 import { useEffect, useState } from 'react'
 import { Card, Chip, Field, Form, Loading, PageHead, Table, useView, useWho, type D } from './kit'
 import { actionLabel, approvalLabel, detailFacts, recordLabel } from './activity-labels'
@@ -27,10 +28,10 @@ export function Activity() {
     </Form></Card>
     {!data ? <Loading error={error} what="activity" /> : <>
       <Card title="Activity"><Table heads={['When', 'Who', 'Action', 'Record']} empty="No activity matches these filters.">
-        {data.audit.map((e: D) => <tr key={e.id}><td>{new Date(e.at).toLocaleString()}</td><td><div>{who(e.actor_email)}</div><small className="sub">{({ person: 'Person', rule: 'Rule', agent: 'Books agent' } as Record<string, string>)[e.origin_kind || e.actor_kind] ?? 'Person'}</small></td><td>{actionLabel(e.action)}</td><td>{recordLabel(e.subject_kind, e.subject_id)}<Evidence event={e} /></td></tr>)}
+        {data.audit.map((e: D) => <tr key={e.id}><td>{timeText(e.at)}</td><td><div>{who(e.actor_email)}</div><small className="sub">{({ person: 'Person', rule: 'Rule', agent: 'Books agent' } as Record<string, string>)[e.origin_kind || e.actor_kind] ?? 'Person'}</small></td><td>{actionLabel(e.action)}</td><td>{recordLabel(e.subject_kind, e.subject_id)}<Evidence event={e} /></td></tr>)}
       </Table></Card>
       <Card title="Approvals"><Table heads={['When', 'Who', 'What', 'Decision', 'History']} empty="No approvals match these filters.">
-        {data.approvals.map((a: D) => <tr key={a.id}><td>{new Date(a.at).toLocaleString()}</td><td>{who(a.actor_email)}</td><td>{approvalLabel(a.subject_kind, a.action)}</td><td><Chip tone={a.decision === 'approved' ? 'good' : 'warn'}>{a.decision === 'approved' ? 'Approved' : 'Declined'}</Chip>{a.note && <small className="sub">{a.note}</small>}</td><td><details><summary>Inspect approval</summary><dl><dt>Record</dt><dd>{recordLabel(a.subject_kind, a.subject_id)} · {a.subject_id}</dd><dt>Revision</dt><dd>{a.subject_revision}</dd><dt>Action</dt><dd>{a.action}</dd></dl></details></td></tr>)}
+        {data.approvals.map((a: D) => <tr key={a.id}><td>{timeText(a.at)}</td><td>{who(a.actor_email)}</td><td>{approvalLabel(a.subject_kind, a.action)}</td><td><Chip tone={a.decision === 'approved' ? 'good' : 'warn'}>{a.decision === 'approved' ? 'Approved' : 'Declined'}</Chip>{a.note && <small className="sub">{a.note}</small>}</td><td><details><summary>Inspect approval</summary><dl><dt>Record</dt><dd>{recordLabel(a.subject_kind, a.subject_id)} · {a.subject_id}</dd><dt>Revision</dt><dd>{a.subject_revision}</dd><dt>Action</dt><dd>{a.action}</dd></dl></details></td></tr>)}
       </Table></Card>
     </>}
   </>
