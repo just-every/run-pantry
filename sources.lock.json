@@ -6723,7 +6723,7 @@
       "executable": false
     },
     "tests/app/bill-lifecycle.test.mjs": {
-      "sha256": "3684fe849b450f2b146a547f8c1c55a3269bda5c48c12ff5cc98b44bf562ddb0",
+      "sha256": "b35ad033350f9f4762d353ca5dd1a852740b204d60c41875c126db30e8d0c53d",
       "executable": false
     },
     "tests/app/books.mjs": {
