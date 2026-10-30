@@ -558,3 +558,17 @@ details.setup-steps summary { width: fit-content; margin-bottom: 8px; color: var
 /* Transaction search shares the existing form and ledger components. */
 .transaction-search{display:flex;align-items:center;gap:.6rem;margin:0 0 1.25rem;flex-wrap:wrap}.transaction-search label{font-size:.85rem}.transaction-search input{min-width:0;flex:1;max-width:28rem}.transaction-search button{flex-shrink:0}
 @media(max-width:600px){.transaction-search label{width:100%}.transaction-search input{width:50%}}
+
+/* Phone controls keep a full tap area, including links, disclosures and checkbox rows. */
+@media (max-width: 720px) {
+  .app :is(button, .btn, select, textarea, input:not([type='checkbox'], [type='radio'], .sr-only)) { min-height: 44px; min-width: 44px; }
+  .app a { min-height: 44px; min-width: 44px; }
+  .app a:not(.queue a, .btn, .nav-link, .brand, .file-link) { display: inline-flex; align-items: center; max-width: 100%; }
+  .app summary { min-height: 44px; min-width: 44px; align-content: center; cursor: pointer; }
+  .app label:has(> input[type='checkbox']) { display: flex; align-items: center; gap: 10px; min-height: 44px; width: 100%; cursor: pointer; }
+  /* Unlabelled table selectors keep an 18px box inside their 44px control. */
+  .app input[type='checkbox']:not(label > input) { width: 44px; height: 44px; padding: 13px; border: 0; background: none; }
+  .app input[type='checkbox']:not(label > input)::before { content: ''; grid-area: 1 / 1; width: 18px; height: 18px; border: 1.5px solid var(--field); border-radius: 5px; background: var(--surface); }
+  .app input[type='checkbox']:not(label > input):checked::before { border-color: var(--ink); background: var(--ink); }
+  .app input[type='checkbox']:not(label > input):checked::after { grid-area: 1 / 1; justify-self: center; align-self: center; }
+}
