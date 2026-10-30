@@ -1,6 +1,6 @@
 // Shared screen pieces: API calls, money, status chips, forms and tables that
 // stack into label/value blocks on a phone.
-import { Children, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { Children, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useId, useRef, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react'
 import { Icon } from './icons'
 
 export type D = Record<string, any>
@@ -107,6 +107,16 @@ export function Field({ label, name, type = 'text', defaultValue, required = fal
     : type === 'textarea' ? <textarea id={id} name={name} {...initial} required={required} {...rest} />
     : <input id={id} name={name} type={type} {...initial} required={required} aria-invalid={error ? true : undefined} {...rest} />
   return <div className={`field${wide ? ' field-wide' : ''}`}><label htmlFor={id}>{label}</label>{control}{hint && <small className="hint">{hint}</small>}{error && <small className="error">{error}</small>}</div>
+}
+
+/** A single app-styled file field; the native input keeps picker, labels and validation. */
+export function FileInput({ onChange, ...props }: ComponentProps<'input'>) {
+  const [names, setNames] = useState('')
+  return <div className="file-field">
+    <input {...props} type="file" onChange={event => { setNames(Array.from(event.currentTarget.files ?? []).map(file => file.name).join(', ')); onChange?.(event) }} />
+    <span className="file-prompt" aria-hidden="true">Choose a file</span>
+    <span className="file-name" aria-hidden="true">{names || 'No file selected'}</span>
+  </div>
 }
 
 /** A form that sends its fields (plus `extra`) and shows the server's refusal beside its action. */

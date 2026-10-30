@@ -572,3 +572,11 @@ details.setup-steps summary { width: fit-content; margin-bottom: 8px; color: var
   .app input[type='checkbox']:not(label > input):checked::before { border-color: var(--ink); background: var(--ink); }
   .app input[type='checkbox']:not(label > input):checked::after { grid-area: 1 / 1; justify-self: center; align-self: center; }
 }
+
+/* One visible border around a file field; the real picker covers the whole control. */
+.file-field { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; min-width: 0; padding: 5px 12px 5px 6px; border: 1px solid var(--field); border-radius: var(--radius-field); background: var(--surface); }
+.file-field:hover { border-color: var(--ink); }
+.file-field:focus-within { border-color: var(--green-ink); }
+.file-field input[type='file'] { position: absolute; inset: -1px; z-index: 1; width: calc(100% + 2px); height: calc(100% + 2px); min-height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; }
+.file-prompt { flex: none; padding: 5px 12px; border-radius: var(--radius-chip); background: var(--pill); color: var(--ink); font-size: 13.5px; font-weight: 600; }
+.file-name { min-width: 0; color: var(--soft); overflow-wrap: anywhere; }
