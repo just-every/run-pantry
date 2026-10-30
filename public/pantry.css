@@ -236,6 +236,9 @@ fieldset.allocations { gap: 12px; }
 .summary .total dd { padding-bottom: 6px; background: linear-gradient(var(--ink), var(--ink)) left bottom / 100% 1.5px no-repeat, linear-gradient(var(--ink), var(--ink)) left calc(100% - 4px) / 100% 1.5px no-repeat; }
 .details { margin-top: 10px; color: var(--soft); font-size: 13px; }
 .details summary { width: fit-content; color: var(--body); font-weight: 600; cursor: pointer; }
+@media (max-width: 640px) {
+  .reference-help > summary { min-height: 44px; padding: 12px 0; box-sizing: border-box; }
+}
 .details dl { display: grid; gap: 2px; margin: 6px 0 0; }
 .details dl div { display: flex; gap: 8px; min-width: 0; }
 .details dt { min-width: 90px; }

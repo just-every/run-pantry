@@ -1019,7 +1019,7 @@
       "executable": false
     },
     "public/pantry.css": {
-      "sha256": "889999db8c898ccc94a6155533d21289ec1914865589f4667d990bbf9a23b909",
+      "sha256": "014e3ef0584ef8fadf7baa5e1e32da0b3b20ac503098eea143f47bb140ac4edf",
       "executable": false
     },
     "public/rer-theme.css": {
@@ -6087,7 +6087,7 @@
       "executable": false
     },
     "src/ui/help.tsx": {
-      "sha256": "60f568ab2f8ec61c8d23944cf4ab5a1b989dcad04fe576ec96532c674bb096f5",
+      "sha256": "1383182a539f150caa70f762868e5dce6392e4946faec7a6c09ded5616fe45d0",
       "executable": false
     },
     "src/ui/icons.tsx": {
