@@ -78,7 +78,12 @@ export async function erasurePreview(c: Context, input: Data) {
   const immutable=await immutableCopies(c.db,{values,marker:MARKER,member,erasureId:'preview'})
   if(!member&&!person&&!posted)for(const [table,counts] of Object.entries((await unpostedDependents(c.db,id)).counts))classes.push({table,action:'removed',reason:'Dormant records without posted transactions',counts})
   const listed=new Set(classes.map(r=>r.table))
-  for(const [table,counts] of Object.entries({...copies.counts,...immutable.counts}))if(!listed.has(table)&&Object.values(counts).some(v=>Number(v)>0))classes.push({table,action:table==='pt_time_entries'&&!counts.fieldsReplaced?'retained':'replaced',reason:table==='pt_time_entries'?'Invoiced hours, dates, services and invoice links retained; personal identities and notes replaced':'Declared personal copies removed; accounting fields retained',counts})
+  const combined:Record<string,Data>={}
+  for(const source of [copies.counts,immutable.counts])for(const [table,counts] of Object.entries(source)) {
+    combined[table]??={}
+    for(const [field,n] of Object.entries(counts))combined[table][field]=(combined[table][field]??0)+n
+  }
+  for(const [table,counts] of Object.entries(combined))if(!listed.has(table)&&Object.values(counts).some(v=>Number(v)>0))classes.push({table,action:table==='pt_time_entries'&&!counts.fieldsReplaced?'retained':'replaced',reason:table==='pt_time_entries'?'Invoiced hours, dates, services and invoice links retained; personal identities and notes replaced':'Declared personal copies removed; accounting fields retained',counts})
   const fingerprint = await sha256(JSON.stringify({kind,id,personIndex,parent,subject,auditCount,blockers,retained,classes}))
   return {kind,id,personIndex,parent,subject,posted,auditCount,classes,retained,blockers,fingerprint}
 }

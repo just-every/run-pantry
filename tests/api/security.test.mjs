@@ -23,9 +23,10 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
     for(const bearer of [token.token,agent.token]) assert.equal((await h.send('/api/pantry/command/'+op,{kind:'contact',id:lead.id},{headers:{authorization:`Bearer ${bearer}`}})).status,401)
   }
   await h.view('erasure',viewer,403)
-  const multi=await h.command('contact.save',{kind:'customer',name:'Shared customer LLC',contacts:[{name:'Departed buyer',email:'departed@example.test',phone:'555-0107',roles:['primary']},{name:'Current buyer',email:'current@example.test',phone:'555-0108',roles:['billing']}]})
+  const multi=await h.command('contact.save',{kind:'customer',name:'Shared customer LLC',phone:'555-0107',contacts:[{name:'Departed buyer',email:'departed@example.test',phone:'555-0107',roles:['primary']},{name:'Current buyer',email:'current@example.test',phone:'555-0108',roles:['billing']}]})
   const personPreview=await h.command('erasure.preview',{kind:'contact-person',id:multi.id,personIndex:0})
-  await h.command('erasure.execute',request(personPreview,{personIndex:0}))
+  const personReceipt=await h.command('erasure.execute',request(personPreview,{personIndex:0}))
+  assert.equal(personReceipt.counts.pt_contacts.fieldsReplaced,2,'the parent phone and contact list both change')
   const remaining=JSON.parse((await h.view('state')).contacts.find(c=>c.id===multi.id).contacts_json)
   assert.deepEqual(remaining.map(p=>p.email),['current@example.test'])
   assert.ok(!JSON.stringify(await h.view('activity')).includes('departed@example.test'))
@@ -34,15 +35,20 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
   const unusedProject=await h.command('time-project.save',{customerId:lead.id,name:'synthetic-pantry-41'})
   const p=await h.command('erasure.preview',{kind:'contact',id:lead.id})
   assert.equal(p.classes.find(r=>r.table==='pt_contacts').action,'removed')
+  const beforeRefusal=await h.view('state'),receiptsBeforeRefusal=(await h.view('erasure')).receipts
   await h.command('erasure.execute',request(p,{confirm:'erase'}),h.owner,400)
+  assert.deepEqual(await h.view('state'),beforeRefusal,'an unconfirmed erasure changes nothing')
+  assert.deepEqual((await h.view('erasure')).receipts,receiptsBeforeRefusal)
   const removal=await h.command('erasure.execute',request(p))
   assert.equal(removal.counts.pt_contacts.rowsRemoved,1)
   assert.equal(removal.counts.pt_time_projects.rowsRemoved,1)
+  assert.equal(removal.counts.pt_recurring.rowsRemoved,1)
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM pt_recurring WHERE id=?').bind(dormant.id).first()).n,0)
   assert.equal((await h.view('time')).projects.some(p=>p.id===unusedProject.id),false)
   assert.equal((await h.view('state')).contacts.some(r=>r.id===lead.id),false)
   assert.ok(!JSON.stringify(removal).includes(lead.email))
   assert.ok(!JSON.stringify((await h.view('activity')).audit).includes(lead.name),'a transaction-free lead’s name has no bookkeeping retention reason')
-  let i=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-09-02',lines:[{description:'Design consultation',accountId:acct['4000'],quantity:'1',rate:'100.00',taxCode:'exempt'}]})
+  let i=await h.command('invoice.save-draft',{customerId:customer.id,issueDate:'2026-09-02',memo:customer.phone,lines:[{description:'Design consultation',accountId:acct['4000'],quantity:'1',rate:'100.00',taxCode:'exempt'}]})
   let preview=await h.command('erasure.preview',{kind:'contact',id:customer.id})
   assert.ok(preview.blockers.some(r=>r.id===i.id&&r.reason==='unposted draft'))
   await h.command('erasure.execute',request(preview),h.owner,409)
@@ -66,10 +72,50 @@ test('ERASURE-001 owner previews and confirms removal or personal-field markers,
   assert.ok(preview.classes.some(r=>r.table==='pt_invoice_documents'&&r.expires&&r.reason))
   const stale=await h.command('contact.save',{...customer,kind:'customer',id:customer.id,revision:customer.revision,name:customer.name,email:customer.email,internalNotes:'Updated privacy note'})
   await h.command('erasure.execute',request(preview),h.owner,409)
+  const privateDoc=await h.command('document.upload',{name:customer.phone+'.txt',mediaType:'text/plain',base64:Buffer.from('synthetic-pantry-701').toString('base64'),note:customer.phone})
+  const tables=['pt_contacts','pt_invoices','pt_recurring','pt_deliveries','pt_documents','pt_document_parts','pt_audit','pt_approvals']
+  const snapshot=async()=>Object.fromEntries(await Promise.all(tables.map(async table=>[table,(await h.db.prepare('SELECT * FROM '+table).all()).results])))
+  const receiptBefore=await snapshot()
   preview=await h.command('erasure.preview',{kind:'contact',id:customer.id})
+  await h.command('erasure.execute',request(preview),accountant,403)
+  assert.deepEqual(await snapshot(),receiptBefore,'a non-owner cannot change records or receipts')
   const receipt=await h.command('erasure.execute',request(preview))
   const retained=(await h.view('state')).contacts.find(r=>r.id===customer.id)
   assert.equal(retained.name,'Cedar Studio LLC');assert.equal(retained.email,'[erased]');assert.equal(retained.phone,'[erased]');assert.equal(retained.internal_notes,'[erased]');assert.deepEqual(JSON.parse(retained.contacts_json),[])
+  const receiptAfter=await snapshot()
+  const changedFields=(before,after,ignored=[])=>Object.keys(before).filter(key=>!ignored.includes(key)&&JSON.stringify(before[key])!==JSON.stringify(after[key])).length
+  const originalContact=receiptBefore.pt_contacts.find(row=>row.id===customer.id)
+  assert.equal(receipt.counts.pt_contacts.fieldsReplaced,changedFields(originalContact,retained,['revision','active','erased_at','autopay_revoked_at']))
+  for(const field of ['email','phone','address','billing_address','service_address','internal_notes','bank_reference','external_ref'])assert.equal(retained[field],'[erased]',field)
+  assert.equal(retained.vendor_ein_hash,'')
+  for(const table of ['pt_invoices','pt_recurring','pt_deliveries']) {
+    let fields=0,rows=0
+    for(const prior of receiptBefore[table]) {
+      const current=receiptAfter[table].find(row=>row.id===prior.id)
+      const n=changedFields(prior,current,['link_token','reminders_paused'])
+      fields+=n;if(n)rows++
+    }
+    assert.equal(receipt.counts[table]?.fieldsReplaced??0,fields,table+' replacement fields reconcile')
+    assert.equal(receipt.counts[table]?.rowsReplaced??0,rows,table+' replacement rows reconcile')
+  }
+  assert.equal(receipt.counts.pt_documents.rowsReplaced,1,'unposted document removal survives immutable-copy receipt merging')
+  assert.equal(receipt.counts.pt_documents.bytesRemovalQueued,privateDoc.size)
+  assert.equal((await h.send('/api/pantry/documents/'+privateDoc.id,undefined,{cookie:h.owner})).status,410)
+  assert.equal(receipt.counts.pt_document_parts.rowsRemoved,receiptBefore.pt_document_parts.length-receiptAfter.pt_document_parts.length)
+  const changedValues=(before,after)=>typeof before==='string'?Number(before!==after):before&&typeof before==='object'?Object.entries(before).reduce((n,[key,value])=>n+changedValues(value,after[key]),0):0
+  let auditValues=0
+  for(const prior of receiptBefore.pt_audit) {
+    const current=receiptAfter.pt_audit.find(row=>row.id===prior.id)
+    assert.ok(current,'every financial event survives')
+    auditValues+=changedValues(JSON.parse(prior.detail),JSON.parse(current.detail))
+  }
+  assert.ok(auditValues>0)
+  assert.equal(receipt.counts.pt_audit.valuesReplaced,auditValues)
+  assert.equal(receipt.counts.pt_approvals.valuesReplaced,receiptBefore.pt_approvals.reduce((n,prior)=>n+changedFields(prior,receiptAfter.pt_approvals.find(row=>row.id===prior.id)),0))
+  assert.equal(receipt.counts.pt_invoice_documents.rowsRetained,1)
+  const retainedPdf=receipt.retained.find(row=>row.table==='pt_invoice_documents'&&row.id===i.id)
+  assert.equal(retainedPdf.expires,'2033-09-05');assert.match(retainedPdf.reason,/Supports posted entries/)
+  assert.equal((await h.view('erasure')).receipts.find(row=>row.id===receipt.id).counts.pt_contacts.fieldsReplaced,receipt.counts.pt_contacts.fieldsReplaced)
   assert.deepEqual(await h.view('reports/trial-balance?to=2026-12-31&basis=accrual'),before)
   const after=(await h.view('activity')).audit
   for(const entry of history){const kept=after.find(e=>e.id===entry.id);assert.ok(kept);for(const key of ['at','action','subject_revision','approval_id'])assert.equal(kept[key],entry[key])}
@@ -156,14 +202,14 @@ test('ERASURE-001 a deactivated member loses identity and sessions while a stabl
 })
 
 test('ERASURE-001 retention recomputes unerased supporting items, requires confirmation, keeps hashes and never regenerates expired bytes or TINs',async t=>{
-  const h=await harness();t.after(h.close)
+  const h=await harness({clock:'2026-10-30T12:00:00Z'});t.after(h.close)
   await h.command('entity.save',{legalName:'Cedar Archive LLC',entityType:'single-member-llc',state:'NY',fiscalYearStart:1,taxMethod:'cash',booksStart:'2010-01-01',policies:''});await h.command('chart.start',{})
   const acct=Object.fromEntries((await h.view('state')).accounts.map(a=>[a.code,a.id])),checking=await bank(h,acct,'2010-01-01')
   const customer=await h.command('contact.save',{kind:'customer',name:'Archive Customer LLC',email:'archive@example.test',billingAddress:'8 Archive Road'})
   const i=await invoice(h,acct,customer,'2018-09-01')
   await h.command('payment.record',{direction:'received',contactId:customer.id,date:'2018-09-05',amount:'100.00',bankAccountId:checking.id,allocations:[{targetId:i.id,amount:'100.00'}]})
   const pdf=await h.view(`invoice-documents/${i.id}/preview`)
-  const vendor=await h.command('contact.save',{kind:'vendor',name:'Archive Vendor LLC'})
+  const vendor=await h.command('contact.save',{kind:'vendor',name:'Archive Vendor LLC',address:'14 Vendor Road',phone:'555-0140'})
   await h.command('contractor.save',{contactId:vendor.id,is1099:true,legalName:'Archive Vendor LLC',tinKind:'ein',tin:'111223333',address:'14 Vendor Road',city:'Albany',state:'NY',zip:'12207'})
   const requestW9=await h.command('w9.request',{contactId:vendor.id,contactRevision:(await h.view(`vendor-w9/${vendor.id}`)).contactRevision,consent:true})
   const certification=await h.send(new URL(requestW9.url).pathname,undefined,{raw:new URLSearchParams({legalName:'Archive Vendor LLC',tinKind:'ein',tin:'111223333',classification:'individual',address:'14 Vendor Road',city:'Albany',state:'NY',zip:'12207',signature:'Archive Vendor',certify:'yes'}).toString(),headers:{'content-type':'application/x-www-form-urlencoded'}})
@@ -178,7 +224,20 @@ test('ERASURE-001 retention recomputes unerased supporting items, requires confi
   const retainedPreview=await h.command('erasure.preview',{kind:'contact',id:vendor.id})
   assert.equal(retainedPreview.retained.find(r=>r.table==='pt_contractor_tax').clock,'2020-09-07','latest financial event includes reversal and correction lineage')
   const source=await h.command('document.upload',{name:'archive-consulting.txt',mediaType:'text/plain',base64:Buffer.from('Archive Vendor invoice ARCHIVE-18').toString('base64'),linkedKind:'bill',linkedId:bill.id})
-  for(const id of [customer.id,vendor.id]) {const p=await h.command('erasure.preview',{kind:'contact',id});await h.command('erasure.execute',request(p))}
+  for(const id of [customer.id,vendor.id]) {
+    const p=await h.command('erasure.preview',{kind:'contact',id}),receipt=await h.command('erasure.execute',request(p))
+    if(id===vendor.id) {
+      const retained=(await h.view('state')).contacts.find(row=>row.id===id)
+      assert.equal(retained.address,'[erased]','the original vendor address is erased')
+      assert.equal(receipt.counts.pt_contractor_tax.rowsReplaced,1)
+      assert.equal(receipt.counts.pt_contractor_tax.fieldsReplaced,5,'four address columns and the revision change')
+      assert.equal(receipt.counts.pt_contractor_tax.rowsRetained,1)
+      assert.equal(receipt.counts.pt_documents.rowsRetained,1)
+      const tax=await h.db.prepare('SELECT address,city,state,zip,tin FROM pt_contractor_tax WHERE contact_id=?').bind(id).first()
+      for(const field of ['address','city','state','zip'])assert.equal(tax[field],'[erased]')
+      assert.ok(tax.tin,'the tax original survives until explicit expiry')
+    }
+  }
   let view=await h.view('erasure');assert.ok(view.ready.length>=1)
   await h.command('retention.save',{years:0,revision:view.revision},h.owner,400)
   await h.command('retention.save',{years:10,revision:view.revision});view=await h.view('erasure');assert.equal(view.ready.length,0)
