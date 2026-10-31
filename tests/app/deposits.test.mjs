@@ -41,6 +41,7 @@ test('PAY-004 payment-reference deposits clear, amount-only deposits confirm, an
     for (const invoice of [automatic, wire]) await page.getByRole('row', { name: new RegExp(invoice.number) }).getByText('Paid', { exact: true }).waitFor()
     await page.screenshot({ path: `/tmp/sx-pantry-r5-pay004-paid-${width}.png`, fullPage: true })
     await page.goto(`${app.origin}/app/bank`)
+    await page.getByRole('row', { name: new RegExp(`ZELLE CEDAR DESIGN ${width}`) }).focus()
     await page.getByRole('row', { name: new RegExp(`ZELLE CEDAR DESIGN ${width}`) }).getByRole('button', { name: 'Undo', exact: true }).click()
     await page.getByRole('row', { name: new RegExp(`ZELLE CEDAR DESIGN ${width}`) }).getByRole('button', { name: 'Confirm payment', exact: true }).waitFor()
     await page.goto(`${app.origin}/app/sales`)

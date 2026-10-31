@@ -6,6 +6,7 @@ import { RefundCustomerBalance } from './customer-refunds'
 // Pantry, every delivery, and the customers and vendors behind them.
 import { DimensionFormFields } from './dimensions'
 import { useEffect, useState } from 'react'
+import { useAddressTab } from './address-tabs'
 import { useLocation } from '@tanstack/react-router'
 import { Action, Card, Chip, command, contactOptions, Details, Field, Form, Loading, Metrics, PageHead, Table, Tabs, accountOptions, day, today, usd, useShared, useView, useWho, type D } from './kit'
 import { canSelfApprove } from './issuing-limits'
@@ -227,12 +228,7 @@ function VendorCredits({ data, reload }: { data: D; reload: () => Promise<void> 
 export function Sales({ billId }: { billId?: string } = {}) {
   // Overview's Customers and vendors step opens this page at ?tab=contacts.
   const location=useLocation()
-  const initialTab=(()=>{
-    const requested = new URLSearchParams(location.searchStr).get('tab')
-    return ({ templates: 'Invoice templates', contacts: 'Customers & vendors', bills: 'Bills', payments: 'Payments', estimates: 'Estimates', deposits: 'Customer deposits' } as Record<string, string>)[requested ?? ''] ?? (billId || /^#?bill-/.test(location.hash) ? 'Bills' : 'Invoices')
-  })()
-  const [requestedTab,setTab]=useState(initialTab)
-  useEffect(()=>{setTab(initialTab)},[initialTab])
+  const [requestedTab, setTab] = useAddressTab('/app/sales', [['Invoices', 'invoices'], ['Invoice templates', 'templates'], ['Customers & vendors', 'contacts'], ['Bills', 'bills'], ['Payments', 'payments'], ['Estimates', 'estimates'], ['Customer deposits', 'deposits'], ['Recurring', 'recurring'], ['Deliveries', 'deliveries'], ['Products & services', 'items']], billId || /^#?bill-/.test(location.hash) ? 'Bills' : undefined)
   const { data, error, reload } = useView<D>('sales'), shared = useShared()
   const role = shared.state.actor.role
   const tabs = role === 'sales' ? ['Invoices', 'Estimates', 'Recurring', 'Deliveries', 'Customers & vendors'] : role === 'payables-clerk' ? ['Bills', 'Customers & vendors'] : ['Invoices', 'Invoice templates', ...(['owner', 'bookkeeper', 'accountant', 'viewer'].includes(role) ? ['Estimates'] : []), 'Recurring', 'Bills', 'Payments', ...(mayRecordDeposits(shared.state) ? ['Customer deposits'] : []), 'Deliveries', 'Customers & vendors', 'Products & services']

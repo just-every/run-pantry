@@ -86,6 +86,7 @@ export async function closeOpeningJourney() {
       await capture('bank-statements')
       await page.goto(`${origin}/app/bank`)
       const deposit = page.getByRole('row').filter({ hasText: 'Customer deposit' })
+      await deposit.focus()
       await deposit.getByRole('button', { name: 'Ask a person', exact: true }).click()
       await deposit.getByLabel('Mention a person', { exact: true }).selectOption('@owner@example.test')
       await deposit.getByLabel('Your question', { exact: true }).fill('Which customer paid this deposit?')

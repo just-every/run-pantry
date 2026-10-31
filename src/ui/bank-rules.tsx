@@ -91,10 +91,10 @@ export function Rules({ data, draft, setDraft, onDone }: { data: D | undefined; 
     <Card title="Bank rules" actions={can && !draft && <button type="button" className="btn btn-primary btn-small" onClick={() => setDraft(blank)}>New rule</button>}>
       <p className="hint">Rules file routine lines as they arrive, from a feed or a statement file. A line filed by a rule says so and can be undone. Rules never touch a locked month or a reconciled statement.</p>
       <div className="table-wrap"><table className="ledger"><thead><tr><th>Rule</th><th>When</th><th>Files as</th><th className="fig">Filed</th><th><span className="sr-only">Actions</span></th></tr></thead>
-        <tbody>{data.rules.length ? data.rules.map((r: D) => <tr key={r.id}>
-          <td data-label="Rule"><strong>{r.name}</strong><small className="sub"> · Priority {r.priority} · {r.mode === 'suggest' ? 'Suggest only' : 'Add automatically'}</small></td><td data-label="When">{when(r, state.bankAccounts)}</td><td data-label="Files as">{fileAs(r, state)}</td>
+        <tbody>{data.rules.length ? data.rules.map((r: D) => <tr key={r.id} className="quiet-row" tabIndex={0}>
+          <td data-label="Rule"><strong>{r.name}</strong><small className="sub">{r.priority > 0 && <> · Priority {r.priority}</>} · {r.mode === 'suggest' ? 'Suggest only' : 'Add automatically'}</small></td><td data-label="When">{when(r, state.bankAccounts)}</td><td data-label="Files as">{fileAs(r, state)}</td>
           <td data-label="Filed" className="fig">{r.filed}</td>
-          <td data-label="Actions">{can && <div className="row-actions"><button type="button" className="btn btn-secondary btn-small" onClick={() => setDraft(fromRule(r))}>Edit</button>
+          <td data-label="Actions">{can && <div className="row-actions row-reveal"><button type="button" className="btn btn-secondary btn-small" onClick={() => setDraft(fromRule(r))}>Edit</button>
             <Action tone="danger" run={async () => { if (window.confirm(`Retire the rule ${r.name}? Lines it filed stay filed.`)) { await command('bank-rule.retire', { id: r.id, revision: r.revision }); await onDone() } }}>Retire</Action></div>}</td>
         </tr>) : <tr className="empty"><td colSpan={5}>No rules yet. File a payee the same way a few times and Pantry suggests one.</td></tr>}</tbody></table></div>
     </Card>

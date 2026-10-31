@@ -555,6 +555,38 @@ details.setup-steps summary { width: fit-content; margin-bottom: 8px; color: var
 .report-library .card-head h2 .chip { white-space: normal; }
 
 
+/* The named list views reveal secondary work with their row. */
+.list-filters { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin-bottom: 16px; }
+.card-actions .list-filters { margin-bottom: 0; }
+.list-filters summary { list-style: none; cursor: pointer; }
+.list-filters summary::-webkit-details-marker { display: none; }
+.filter-fields { padding-top: 12px; display: flex; gap: 12px; flex-wrap: wrap; }
+.filter-chip { background: var(--lavender); }
+.quiet-row .row-reveal, .quiet-row > td > .record-questions { opacity: 0; pointer-events: none; }
+.quiet-row:hover .row-reveal, .quiet-row:focus-within .row-reveal,
+.quiet-row:hover > td > .record-questions, .quiet-row:focus-within > td > .record-questions,
+.quiet-row .row-reveal:has(details[open]), .quiet-row > td > .record-questions:has([aria-expanded='true']) { opacity: 1; pointer-events: auto; }
+@media (max-width: 720px) {
+  .quiet-row .row-reveal .btn, .quiet-row > td > .record-questions > .btn,
+  .quiet-row .row-reveal > a, .quiet-row .row-reveal summary { min-height: 44px; display: inline-flex; align-items: center; }
+  .filter-fields { flex-direction: column; }
+}
+
+/* Stack the account and tax decisions so the line stays inside its card. */
+.service-lines .line-account-tax { min-width: 240px; }
+.service-lines .line-account-tax select { min-width: 0; width: 100%; }
+.service-lines .line-account-tax .field > span { font-size: 13px; color: var(--soft); }
+.service-lines td[data-label='Rate'] input { min-width: 90px; }
+.service-lines td[data-label='Quantity'] input { min-width: 64px; }
+.service-lines td[data-label='Amount'] { white-space: nowrap; }
+@media (max-width: 1380px) {
+  .invoice-editor > .split.split-wide-left { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .service-lines .line-account-tax { min-width: 0; text-align: left; }
+  .service-lines .line-account-tax::before { display: none; }
+}
+
 /* Phone controls keep a full tap area, including links, disclosures and checkbox rows. */
 @media (max-width: 720px) {
   .app :is(button, .btn, select, textarea, input:not([type='checkbox'], [type='radio'], .sr-only)) { min-height: 44px; min-width: 44px; }

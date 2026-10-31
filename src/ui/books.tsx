@@ -2,6 +2,7 @@ import { Help } from './help'
 // Books: the chart of accounts with current balances, the journal, entry
 // review (post by a second person), reversal of posted entries, and the
 // accountant's review: bulk reclassification, notes and changes since review.
+import { useAddressTab } from './address-tabs'
 import { useState } from 'react'
 import { Action, Card, Chip, command, Details, Field, Form, PageHead, Table, Tabs, Loading, accountOptions, day, today, usd, useShared, useView, useWho, type D } from './kit'
 import { JournalEditor } from './journal-editor'
@@ -105,7 +106,7 @@ function Journal() {
 }
 
 export function Books() {
-  const [tab, setTab] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'journal' ? 'Journal entries' : 'Chart of accounts'), { state } = useShared()
+  const [tab, setTab] = useAddressTab('/app/books', [['Chart of accounts', 'chart'], ['Journal entries', 'journal'], ['Sales tax', 'sales-tax'], ['Review', 'review']]), { state } = useShared()
   const tb = useView<D>(`reports/trial-balance?to=${today()}`)
   const balances = new Map<string, number>((tb.data?.rows ?? []).map((r: D) => [r.id, r.net]))
   return <>

@@ -70,12 +70,12 @@ export function InvoiceEditor({ invoice, creditFor, invoices = [], onDone, onCan
         {invoice?.id && <InvoiceDocumentPreview invoiceId={invoice.id} />}
         {certificate && <div className="callout" role="status"><strong>{state.actor.role === 'sales' ? 'Customer certificate' : `Certificate ${certificate.certificate_number}`} applies in {destination}</strong><span>Exempt through {certificate.expires_on}. {state.actor.role !== 'sales' && <><a href={`/api/pantry/documents/${certificate.document_id}`}>View certificate</a>. </>}Your line tax choices below are kept for when the certificate no longer applies.</span></div>}
         {invoice?.exemption && !certificate && <div className="callout callout-warn" role="status"><strong>Review tax treatment</strong><span>The earlier certificate no longer applies to these details. Saving uses your original line tax choices.</span></div>}
-        <ServiceLines lines={lines} setLines={setLines} />
+        <ServiceLines lines={lines} setLines={setLines} validateTax={!!invoice} taxPrompt="Choose tax code" />
         <Card title="Memo"><Field label="Memo on the invoice" name="memo" type="textarea" defaultValue={invoice?.memo} wide /></Card>
       </div>
       <Card title={kind === 'credit' ? 'Credit summary' : 'Invoice summary'}>
         <dl className="summary"><div><dt>Subtotal</dt><dd>{usd(subtotal)}</dd></div><div><dt>Sales tax</dt><dd>{usd(tax)}</dd></div><div className="total"><dt>Total</dt><dd>{usd(subtotal + tax)}</dd></div></dl>
-        {missing > 0 && <div className="callout callout-warn" role="status"><strong>Tax treatment needed before approval</strong><span>{missing} line{missing === 1 ? ' is' : 's are'} missing a sales tax code. Choose a code or mark the line exempt.</span></div>}
+        {missing > 0 && (invoice || lines.some(l => l.description.trim() || l.rate.trim() || l.itemId)) && <div className="callout callout-warn" role="status"><strong>Tax treatment needed before approval</strong><span>{missing} line{missing === 1 ? ' is' : 's are'} missing a sales tax code. Choose a code or mark the line exempt.</span></div>}
         <div className="form-end column"><button className="btn btn-primary btn-block" disabled={busy || !documents}>{busy ? 'Saving…' : 'Save draft'}</button><button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={onCancel}>Cancel</button>{error && <p role="alert" className="error">{error}</p>}</div>
       </Card>
     </div>
@@ -91,7 +91,7 @@ export function lineTotals(lines: Line[], taxCodes: D[]) {
 }
 
 /** The service lines table, shared by invoices and recurring invoices. */
-export function ServiceLines({ lines, setLines }: { lines: Line[]; setLines: (f: (ls: Line[]) => Line[]) => void }) {
+export function ServiceLines({ lines, setLines, validateTax = true, taxPrompt = 'Tax treatment needed' }: { lines: Line[]; setLines: (f: (ls: Line[]) => Line[]) => void; validateTax?: boolean; taxPrompt?: string }) {
   const { state } = useShared()
   const income = accountOptions(state.accounts, a => a.type === 'income')
   const { amounts } = lineTotals(lines, state.taxCodes)
@@ -103,15 +103,14 @@ export function ServiceLines({ lines, setLines }: { lines: Line[]; setLines: (f:
     set(i, it ? { itemId: it.id, description: it.description || it.name, rate: (it.rate_cents / 100).toFixed(2), accountId: it.income_account_id, taxCode: it.tax_category === 'non-taxable' ? 'exempt' : it.tax_code ?? '' } : { itemId: undefined })
   }
   return <Card title="Service lines" actions={<button type="button" className="btn btn-secondary" onClick={() => setLines(ls => [...ls, blank(income[0]?.value)])}>Add line</button>}>
-    <div className="table-wrap"><table className="ledger lines-editor"><thead><tr><th>#</th><th>Item and description</th><th className="fig">Quantity</th><th className="fig">Rate</th><th className="fig">Amount</th><th>Income account</th><th>Sales tax code</th><th /></tr></thead>
+    <div className="table-wrap"><table className="ledger lines-editor service-lines"><thead><tr><th>#</th><th>Item and description</th><th className="fig">Quantity</th><th className="fig">Rate</th><th className="fig">Amount</th><th>Account and tax</th><th /></tr></thead>
       <tbody>{lines.map((l, i) => <tr key={i}>
         <td data-label="#">{i + 1}</td>
         <td data-label="Item and description"><div className="stack" style={{ gap: 6 }}><select aria-label={`Line ${i + 1} product or service`} value={l.itemId ?? ''} onChange={e => pick(i, e.target.value)}><option value="">No item</option>{items.filter(it => it.active || it.id === l.itemId).map(it => <option key={it.id} value={it.id}>{it.name}{it.sku ? ` · ${it.sku}` : ''}{it.active ? '' : ' (inactive)'}</option>)}</select><input aria-label={`Line ${i + 1} description`} value={l.description} onChange={e => set(i, { description: e.target.value })} required /><DimensionFields line={l} index={i} onChange={patch=>set(i,patch)} /></div></td>
         <td data-label="Quantity"><input aria-label={`Line ${i + 1} quantity`} className="fig narrow" inputMode="decimal" value={l.quantity} onChange={e => set(i, { quantity: e.target.value })} required /></td>
         <td data-label="Rate"><input aria-label={`Line ${i + 1} rate`} className="fig narrow" inputMode="decimal" value={l.rate} onChange={e => set(i, { rate: e.target.value })} required /></td>
         <td data-label="Amount" className="fig">{usd(amounts[i])}</td>
-        <td data-label="Income account"><select aria-label={`Line ${i + 1} income account`} disabled={!!l.itemId} value={l.accountId} onChange={e => set(i, { accountId: e.target.value })} required><option value="">Choose…</option>{income.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></td>
-        <td data-label="Sales tax code"><select aria-label={`Line ${i + 1} sales tax code`} disabled={items.find(it => it.id === l.itemId)?.tax_category === 'non-taxable'} className={l.taxCode ? '' : 'needs-decision'} aria-invalid={!l.taxCode || undefined} value={l.taxCode} onChange={e => set(i, { taxCode: e.target.value })}><option value="">Tax treatment needed</option><option value="exempt">Exempt / not taxable</option>{state.taxCodes.map((t: D) => <option key={t.id} value={t.id}>{t.name} ({(t.rate_milli_percent / 1000).toFixed(3)}%)</option>)}</select></td>
+        <td data-label="Account and tax" className="line-account-tax"><div className="stack" style={{ gap: 6 }}><label className="field"><span>Income account</span><select aria-label={`Line ${i + 1} income account`} disabled={!!l.itemId} value={l.accountId} onChange={e => set(i, { accountId: e.target.value })} required><option value="">Choose…</option>{income.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></label><label className="field"><span>Sales tax code</span><select aria-label={`Line ${i + 1} sales tax code`} disabled={items.find(it => it.id === l.itemId)?.tax_category === 'non-taxable'} className={!l.taxCode && (validateTax || l.description.trim() || l.rate.trim() || l.itemId) ? 'needs-decision' : ''} aria-invalid={!l.taxCode && (validateTax || !!l.description.trim() || !!l.rate.trim() || !!l.itemId) || undefined} value={l.taxCode} onChange={e => set(i, { taxCode: e.target.value })}><option value="">{taxPrompt}</option><option value="exempt">Exempt / not taxable</option>{state.taxCodes.map((t: D) => <option key={t.id} value={t.id}>{t.name} ({(t.rate_milli_percent / 1000).toFixed(3)}%)</option>)}</select></label></div></td>
         <td>{lines.length > 1 && <button type="button" className="btn btn-link" onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}>Remove</button>}</td>
       </tr>)}</tbody></table></div>
   </Card>

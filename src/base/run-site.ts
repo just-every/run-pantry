@@ -68,7 +68,7 @@ export const PATHS = {
   heading: (n: string) => `Run ${n}.`,
   meta: (n: string) => `Three ways to run ${n}: on your own computer, Assisted or Managed.`,
   self: {
-    badge: '100% free', title: 'Run it yourself',
+    badge: 'Self-hosted', title: 'Run it yourself',
     body: (n: string) => `One line in your terminal gets ${n} running on your computer, with you as its owner.`,
     command: (repo: string) => `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev ${shellArgument(repo)}`,
     copy: { idle: 'Copy', done: 'Copied', ms: 1600 },
@@ -192,7 +192,7 @@ export function runPageHtml(identity: EditionIdentity, run: RunData, contract?: 
   const doors = (['assisted', 'managed'] as const).map(id => {
     const path = PATHS[id], closed = PATHS.signups === 'request' || run.paths.product === null || run.paths[id]?.open === false
     return `<section class="door ${id}" aria-labelledby="${id}"><div class="door-heading"><h2 id="${id}">${escape(path.title)}</h2>${closed ? `<span class="chip">${escape(PATHS.closed.chip)}</span>` : ''}</div>`
-      + `<p class="door-body">${escape(path.lead + ' ' + (closed ? PATHS.closed.line : path.rest))}</p><p class="price">${escape(path.price(run))} · ${escape(PATHS.priceNote(run))}</p><p class="door-action">${action(PATHS.entry(id, product), closed ? PATHS.closed.action : path.action)}</p></section>`
+      + `<p class="door-body">${escape(path.lead + ' ' + path.rest)}</p><p class="price">${escape(path.price(run))} · ${escape(PATHS.priceNote(run))}</p><p class="door-action">${action(PATHS.entry(id, product), closed ? PATHS.closed.action : path.action)}</p></section>`
   }).join('')
   const body = `${homepage?.html ?? header(identity, run, contract)}<main><div class="intro"><h1>${escape(PATHS.heading(run.name))}</h1></div><div class="chooser">`
     + `<section class="self" aria-labelledby="self"><div class="self-heading"><span class="badge">${escape(self.badge)}</span><h2 id="self">${escape(self.title)}</h2><p class="self-body">${escape(self.body(run.name))}</p></div>`

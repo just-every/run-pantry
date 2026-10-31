@@ -10,7 +10,7 @@ export function Closing() {
       <h2 id="closing-title">Close the month with your coffee hot.</h2>
       <p className="closing-sub">Open source accounting for US small businesses.</p>
       <Actions demo={false} />
-      <p className="closing-small">Free and open source, MIT licensed.</p>
+      <p className="closing-small">Your books stay yours.</p>
     </div>
     <SiteFooter tone="on-art" />
   </section>

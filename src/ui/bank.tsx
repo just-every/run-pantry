@@ -2,6 +2,8 @@ import { BankOpening } from './bank-opening'
 import { FeedStatement } from './feed-statement'
 // Bank: transactions from feeds and statement files, the rules that file them,
 // and accounts, statement imports (CSV or OFX) and the statements waiting to reconcile.
+import { useAddressTab } from './address-tabs'
+import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { FileInput, Card, Chip, command, Field, Form, Loading, PageHead, Table, Tabs, accountOptions, day, readFileText, usd, useShared, useView, type D } from './kit'
 import { Checks } from './checks'
@@ -71,14 +73,12 @@ function Statements({ data, connections, refresh, open }: { connections: D[]; da
 
 export function Bank() {
   const { data, error, reload } = useView<D>('bank'), lines = useView<D>('bank/lines'), rules = useView<D>('bank/rules'), feeds = useView<D>('bank/feeds'), shared = useShared()
-  const query = () => typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search)
+  const location = useLocation(), navigate = useNavigate(), statement = new URLSearchParams(location.searchStr).get('statement')
   // The tab and the statement being reconciled live in the address, so a reload or a shared link returns to them.
-  const [statement, setStatement] = useState<string | null>(() => query().get('statement'))
-  const [tab, setTab] = useState<string>(() => TABS.find(t => t.toLowerCase() === query().get('tab')) ?? 'Transactions')
+  const [tab, go] = useAddressTab('/app/bank', TABS.map(label => [label, label.toLowerCase().replaceAll(' ', '-')] as const))
   const [draft, setDraft] = useState<Draft | null>(null)
-  const go = (t: string) => { window.history.replaceState(null, '', t === 'Transactions' ? window.location.pathname : `?tab=${t.toLowerCase()}`); setTab(t) }
-  const reconcile = (id: string | null) => { window.history.replaceState(null, '', id ? `?statement=${encodeURIComponent(id)}` : '?tab=statements'); setStatement(id) }
-  if (statement) return <Reconcile statementId={statement} back={async () => { reconcile(null); setTab('Statements'); await reload() }} />
+  const reconcile = (id: string | null) => { void navigate({ to: '/app/bank', search: id ? { statement: id } : { tab: 'statements' }, resetScroll: false }) }
+  if (statement) return <Reconcile statementId={statement} back={async () => { reconcile(null); await reload() }} />
   if (!data) return <Loading error={error} what="bank accounts" />
   const refresh = async () => { await Promise.all([reload(), lines.reload(), rules.reload(), feeds.reload(), shared.reload()]) }
   // Importing lives on Statements: open it and bring the import card into view.

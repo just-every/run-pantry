@@ -57,11 +57,11 @@ export function Estimates({ onChange }: { onChange: () => Promise<void> }) {
   const { state } = useShared(), { data, error, reload } = useView<D>('estimates')
   const [selected, setSelected] = useState<string | null>(() => new URLSearchParams(search).get('estimate'))
   useEffect(()=>{setSelected(new URLSearchParams(search).get('estimate'))},[search])
-  const [editing, setEditing] = useState<D | null>(null)
+  const [editing, setEditing] = useState<D | null>(null), [emptyDismissed, setEmptyDismissed] = useState(false)
   const { data: detail, error: detailError, reload: reloadDetail } = useView<D>(selected ? `estimates/${encodeURIComponent(selected)}` : null)
   const refresh = async () => { await Promise.all([reload(), reloadDetail(), onChange()]) }
-  if (editing) return <EstimateEditor estimate={editing.id ? editing : undefined} onCancel={() => setEditing(null)} onDone={async saved => { setSelected(saved.id); setEditing(null); await refresh() }} />
   if (!data) return <Loading error={error} what="estimates" />
+  if (editing || (!selected && !data.estimates.length && state.actor.can.record && !emptyDismissed)) return <EstimateEditor estimate={editing?.id ? editing : undefined} onCancel={() => { setEditing(null); setEmptyDismissed(true) }} onDone={async saved => { setSelected(saved.id); setEditing(null); await refresh() }} />
   const estimates = data.estimates as D[]
   if (selected) return <div className="stack">
     <div className="row-actions"><button type="button" className="btn btn-secondary" onClick={() => setSelected(null)}>Back to estimates</button><Action run={refresh}>Refresh estimate</Action></div>
@@ -74,7 +74,7 @@ export function Estimates({ onChange }: { onChange: () => Promise<void> }) {
     <Metrics items={['draft', 'sent', 'accepted'].map(status => { const rows = estimates.filter(e => e.status === status); return { label: status === 'draft' ? 'Draft estimates' : status === 'sent' ? 'Awaiting acceptance' : 'Accepted estimates', value: usd(rows.reduce((sum, e) => sum + e.total_cents, 0)), note: `${rows.length} estimate${rows.length === 1 ? '' : 's'}` } })} />
     <div className="stack">
       <Card title="Estimates" actions={state.actor.can.record && <button type="button" className="btn btn-primary" onClick={() => setEditing({})}>Create estimate</button>}>
-        <Table heads={['Customer', 'Estimate', 'Date', 'Total', 'Previously billed', 'Remaining', 'Status']} figures={[3, 4, 5]} empty="No estimates yet. Add a customer, then create an estimate.">
+        <Table heads={['Customer', 'Estimate', 'Date', 'Total', 'Previously billed', 'Remaining', 'Status']} figures={[3, 4, 5]} empty="No estimates yet.">
           {estimates.map(e => <tr key={e.id} className={selected === e.id ? 'selected' : ''} tabIndex={0} onClick={() => setSelected(e.id)} onKeyDown={event => { if (event.key === 'Enter') setSelected(e.id) }}><td>{e.customer_name}</td><td><button type="button" className="btn btn-link" onClick={() => setSelected(e.id)}>{e.number}</button></td><td>{day(e.issue_date)}</td><td className="fig">{usd(e.total_cents)}</td><td className="fig">{usd(e.billed_cents)}</td><td className="fig">{usd(e.remaining_cents)}</td><td><Chip tone={e.status === 'accepted' ? 'good' : e.status === 'sent' ? 'info' : 'neutral'}>{e.status}</Chip></td></tr>)}
         </Table>
       </Card>
