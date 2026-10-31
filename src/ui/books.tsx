@@ -1,3 +1,4 @@
+import { Help } from './help'
 // Books: the chart of accounts with current balances, the journal, entry
 // review (post by a second person), reversal of posted entries, and the
 // accountant's review: bulk reclassification, notes and changes since review.
@@ -108,8 +109,8 @@ export function Books() {
   const tb = useView<D>(`reports/trial-balance?to=${today()}`)
   const balances = new Map<string, number>((tb.data?.rows ?? []).map((r: D) => [r.id, r.net]))
   return <>
-    <PageHead title="Books" lead="Your chart of accounts and journal. Posted entries never change: corrections are reversals." />
-    <p>Post opening balances as one journal entry dated the day before your first bank statement starts. The owner can post it, or leave the draft for the accountant. <a href="/app/books?tab=journal">Open journal entries</a>.</p>
+    <PageHead title="Books" />
+    <Help label="Opening balances"><p>Post opening balances as one journal entry dated the day before your first bank statement starts. The owner can post it, or leave the draft for the accountant. <a href="/app/books?tab=journal">Open journal entries</a>.</p></Help>
     <Tabs tabs={['Chart of accounts', 'Journal entries', 'Sales tax', 'Review']} current={tab} onChange={setTab} />
     {tab === 'Chart of accounts' && <div className="split"><Chart balances={balances} />{state.actor.can.record && <NewAccount />}</div>}
     {tab === 'Journal entries' && <Journal />}

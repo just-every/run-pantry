@@ -87,7 +87,7 @@ export async function access003Browser(t) {
     await expect(limits.getByRole('row').filter({ hasText: over.number })).toHaveCount(0)
     await limits.screenshot({ path: `${evidence}/access003-daily-${width}.png` })
     await page.goto(`${origin}/app/activity`)
-    await page.getByLabel('Record ID', { exact: true }).fill(d.id)
+    await page.getByLabel('Record reference', { exact: true }).fill(d.id)
     await Promise.all([page.waitForResponse(r => r.url().includes('/api/pantry/activity?') && r.status() === 200), page.getByRole('button', { name: 'Filter activity', exact: true }).click()])
     await page.getByText('Inspect history', { exact: true }).first().waitFor()
     await page.getByRole('row').filter({ hasText: 'Approved an invoice' }).getByText('Inspect history', { exact: true }).click()

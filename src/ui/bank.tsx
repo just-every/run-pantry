@@ -3,7 +3,7 @@ import { FeedStatement } from './feed-statement'
 // Bank: transactions from feeds and statement files, the rules that file them,
 // and accounts, statement imports (CSV or OFX) and the statements waiting to reconcile.
 import { useRef, useState } from 'react'
-import { Card, Chip, command, Field, Form, Loading, PageHead, Table, Tabs, accountOptions, day, readFileText, usd, useShared, useView, type D } from './kit'
+import { FileInput, Card, Chip, command, Field, Form, Loading, PageHead, Table, Tabs, accountOptions, day, readFileText, usd, useShared, useView, type D } from './kit'
 import { Checks } from './checks'
 import { Reconcile } from './reconcile'
 import { ReconciliationReview } from './reconciliation-review'
@@ -18,7 +18,7 @@ function Import({ accounts, onDone }: { accounts: D[]; onDone: () => Promise<voi
     {!accounts.length ? <p>First add the bank or card account the statement is from, below; then choose the file here.</p> : <Form label="Import statement" submit={async b => { const f = await readFileText(file.current); return command('statement.import', { ...b, fileName: f.name, content: f.content }) }} onDone={async r => { setResult(r); await onDone() }}>
       <div className="grid-form">
         <Field label="Bank account" name="bankAccountId" required options={accounts.map(a => ({ value: a.id, label: `${a.name} (…${a.number_last4})` }))} />
-        <div className="field"><label htmlFor="statement-file">Statement file</label><input id="statement-file" ref={file} type="file" accept=".csv,.ofx,.qfx,.qbo" required /></div>
+        <div className="field"><label htmlFor="statement-file">Statement file</label><FileInput id="statement-file" ref={file} type="file" accept=".csv,.ofx,.qfx,.qbo" required /></div>
         <Field label="Opening balance on the statement" name="opening" inputMode="decimal" hint="Required for CSV; OFX files carry the closing balance" />
         <Field label="Closing balance on the statement" name="closing" inputMode="decimal" />
         <Field label="Statement start" name="start" type="date" /><Field label="Statement end" name="end" type="date" />
@@ -84,7 +84,7 @@ export function Bank() {
   // Importing lives on Statements: open it and bring the import card into view.
   const importStatement = () => { go('Statements'); requestAnimationFrame(() => document.getElementById('import')?.scrollIntoView({ block: 'start' })) }
   return <>
-    <PageHead title="Bank" lead="Transactions arrive from your bank and card feeds or statement files. Rules file the routine ones; you file the rest and reconcile to the statement." />
+    <PageHead title="Bank" />
     <RelinkNotices data={feeds.data} onDone={refresh} />
     <Tabs tabs={TABS.filter(t => t !== 'Accountant review' || ['owner', 'accountant'].includes(shared.state.actor.role))} current={tab} onChange={go} />
     {tab === 'Transactions' && <div className="split split-wide-left split-bank">

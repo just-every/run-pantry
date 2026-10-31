@@ -1,3 +1,4 @@
+import { CustomerTimeZone, timeText } from './display-time'
 import { useState } from 'react'
 import { Action, Card, Chip, Field, Form, Loading, Table, command, day, useShared, useView, type D } from './kit'
 
@@ -25,7 +26,7 @@ export function TextingSettings() {
    <label className="check"><input type="checkbox" name="approve" required />I approve these exact templates and reminder days for the consented purposes.</label>
   </Form>
   {s.connected&&<Action tone="danger" run={async()=>{await command('texting.disconnect',{});await reload()}}>Disconnect Twilio</Action>}
-  <p className="hint">{s.updatedAt?<>Last changed {day(s.updatedAt)} by {s.updatedBy}.</>:'No provider connected.'} Test-account callbacks shown in history are synthetic signed test events, not evidence of real carrier delivery.</p>
+  <p className="hint">{s.updatedAt?<>Last changed {day(s.updatedAt)} by {s.updatedBy}.</>:'No provider connected.'} Test messages in history show how texting works; they do not confirm delivery to a phone.</p>
  </Card>
 }
 
@@ -37,14 +38,14 @@ export function CustomerTextConsent({customer}:{customer:D}) {
   <p>Record the customer’s permission for each number and purpose before Pantry sends a text. Sharing from your own phone is recorded separately.</p>
   <Form label="Record text consent" submit={b=>command('texting.consent',{customerId:customer.id,phone:b.phone,timeZone:b.timeZone,source:b.source,wording:b.wording,consentedAt:new Date(b.consentedAt).toISOString(),purposes})} onDone={reload}>
    <Field label="Consented mobile number" name="phone" type="tel" defaultValue={customer.phone} required placeholder="+1…" />
-   <Field label="Customer time zone" name="timeZone" required placeholder="America/New_York" />
+   <CustomerTimeZone />
    <fieldset><legend>Consented text purposes</legend>{['invoice','reminder','estimate'].map(p=><label className="check" key={p}><input type="checkbox" checked={purposes.includes(p)} onChange={e=>setPurposes(v=>e.target.checked?[...v,p]:v.filter(x=>x!==p))} />{p==='invoice'?'Invoice links':p==='reminder'?'Invoice reminders':'Estimate links'}</label>)}</fieldset>
    <Field label="Consent source" name="source" required hint="Where the customer gave permission, such as a signed form or email." />
    <Field label="Exact consent wording" name="wording" type="textarea" required />
    <Field label="Consent given at" name="consentedAt" type="datetime-local" required hint="Use the time the customer gave permission, in your device’s time zone." />
   </Form>
   <Table heads={['Number','Purposes','Consent evidence','Status']} empty="No text consent recorded.">
-   {consents.map((c:D)=><tr key={c.phone}><td>{c.phone}<small className="sub block">{c.time_zone}</small></td><td>{c.purposes.join(', ')}</td><td><details><summary>{c.source}</summary><p>{c.wording}</p><p>Given {new Date(c.consented_at).toLocaleString()}. Recorded {new Date(c.recorded_at).toLocaleString()} by {c.recorded_by}.</p></details></td><td>{c.revoked_at?<Chip tone="warn">{c.revoked_at==='restored'?'New consent required':'Opted out'}</Chip>:<><Chip tone="good">Consented</Chip><Action tone="danger" run={async()=>{await command('texting.consent',{customerId:customer.id,phone:c.phone,revoke:true});await reload()}}>Revoke text consent</Action></>}</td></tr>)}
+   {consents.map((c:D)=><tr key={c.phone}><td>{c.phone}<small className="sub block">{c.time_zone}</small></td><td>{c.purposes.join(', ')}</td><td><details><summary>{c.source}</summary><p>{c.wording}</p><p>Given {timeText(c.consented_at)}. Recorded {timeText(c.recorded_at)} by {c.recorded_by}.</p></details></td><td>{c.revoked_at?<Chip tone="warn">{c.revoked_at==='restored'?'New consent required':'Opted out'}</Chip>:<><Chip tone="good">Consented</Chip><Action tone="danger" run={async()=>{await command('texting.consent',{customerId:customer.id,phone:c.phone,revoke:true});await reload()}}>Revoke text consent</Action></>}</td></tr>)}
   </Table>
  </Card>
 }
@@ -72,7 +73,7 @@ export function InvoiceTexting({invoice,kind='invoice'}:{invoice:D;kind?:'invoic
   {shares.length+messages.length===0&&<p>No text activity recorded.</p>}
   <ul className="send-log">
    {shares.map((s:D)=><li key={s.id}><span><strong>Own phone</strong> · {s.phone}</span><small>{day(s.at)} · {s.actor_email}</small><small>Link shared; sending happens on the phone</small></li>)}
-   {messages.map((m:D)=><li key={m.id}><span><strong>Twilio test · {m.purpose}</strong> · {m.phone}</span><Chip tone={m.status==='delivered'?'good':['failed','undeliverable','uncertain'].includes(m.status)?'warn':'neutral'}>{m.status}</Chip><small>{day(m.at)} · {m.actor_email}</small><details style={{gridColumn:'1 / -1',overflowWrap:'anywhere'}}><summary>Text outcomes</summary><p>{m.body}</p>{m.not_before&&<p>Held until {new Date(m.not_before).toLocaleString()}.</p>}<p>{m.detail}</p>{m.provider_message_id&&<p>{m.provider_message_id}</p>}{m.events.map((e:D)=><p key={e.id}>{e.status} · {new Date(e.at).toLocaleString()} · {e.detail}</p>)}</details></li>)}
+   {messages.map((m:D)=><li key={m.id}><span><strong>Twilio test · {m.purpose}</strong> · {m.phone}</span><Chip tone={m.status==='delivered'?'good':['failed','undeliverable','uncertain'].includes(m.status)?'warn':'neutral'}>{m.status}</Chip><small>{day(m.at)} · {m.actor_email}</small><details style={{gridColumn:'1 / -1',overflowWrap:'anywhere'}}><summary>Text outcomes</summary><p>{m.body}</p>{m.not_before&&<p>Held until {timeText(m.not_before)}.</p>}<p>{m.detail}</p>{m.provider_message_id&&<p>{m.provider_message_id}</p>}{m.events.map((e:D)=><p key={e.id}>{e.status} · {timeText(e.at)} · {e.detail}</p>)}</details></li>)}
   </ul>
  </section>
 }

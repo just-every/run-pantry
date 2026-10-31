@@ -1,3 +1,4 @@
+import { Help } from './help'
 import { LineSuggestion, SuggestionRates } from './line-suggestions'
 // Transactions: every bank and card line from files and feeds, newest first,
 // with how it was filed. Lines filed by a rule name the rule and can be undone;
@@ -18,7 +19,7 @@ function Status({ l, onUndo, picked, onFile }: { l: D; onUndo: () => Promise<voi
   if (l.pending) return <Chip>Pending</Chip>
   if (l.removed_at) return <Chip tone="bad">Removed by the bank</Chip>
   if (l.transfer && (['pending', 'exception'].includes(l.transfer.status) || (l.transfer.status === 'paired' && l.transfer.pair_status === 'paired'))) return <TransferStatus l={l} onDone={onUndo} />
-  if (l.rule_id) return <span className="filed"><Chip tone="good">{l.agent_permission_name?'Books agent · '+l.agent_permission_name:'Filed by rule · '+l.rule_name}</Chip><small className="sub">{l.filed_to.join(', ')} · {l.rule_snapshot?.legacy ? 'Legacy filing; original conditions not recorded' : <>Revision <abbr title={l.rule_revision}>{l.rule_revision?.slice(0, 8)}</abbr></>}</small>
+  if (l.rule_id) return <span className="filed"><Chip tone="good">{l.agent_permission_name?'Books agent · '+l.agent_permission_name:'Filed by rule · '+l.rule_name}</Chip><small className="sub">{l.filed_to.join(', ')} · {l.rule_snapshot?.legacy ? 'Legacy filing; original conditions not recorded' : <details><summary>Filing details</summary><p>Rule version: {l.rule_revision}</p></details>}</small>
     {can && !l.reconciliation_id && <Action run={async () => { await command('bank-rule.undo', { matchId: l.match_id }); await onUndo() }}>Undo</Action>}</span>
   if (l.match_id) return <span className="filed"><Chip tone="good">{l.automatic ? 'Matched automatically' : 'Filed'}</Chip><small className="sub">{l.filed_to.join(', ')}</small>
     {can && !l.reconciliation_id && <Action run={async () => { await command('match.undo', { id: l.match_id }); await onUndo() }}>Undo</Action>}</span>
@@ -81,12 +82,12 @@ export function Transactions({ data, onDone, feeds }: { data: D | undefined; onD
   return <fieldset disabled={updating} aria-label="Bank review queue" aria-busy={updating} style={{border:0,padding:0,margin:0,minWidth:0}}>
     {updating&&<p role="status" className="hint">Updating the review queue…</p>}
     <MatchPanelScroll count={chosen.length} />
-    {state.actor.can.record && <p className="hint">J/K move between review lines · X selects the focused line · Shift+A selects up to 50 visible lines · Escape clears the selection.</p>}
+    {state.actor.can.record && <Help label="Keyboard shortcuts"><p>J/K move between review lines · X selects the focused line · Shift+A selects up to 50 visible lines · Escape clears the selection.</p></Help>}
     <Card title="Transactions" actions={<div className="inline-fields">
       <Field label="Show" name="filter" value={filter} onChange={(e: any) => setFilter(e.target.value)} options={FILTERS.map(f => ({ value: f, label: f }))} />
       <Field label="Account" name="account" empty="All accounts" value={account} onChange={(e: any) => setAccount(e.target.value)} options={state.bankAccounts.map((b: D) => ({ value: b.id, label: b.name }))} />
     </div>}>
-      {rows.some(l => !l.pending && !l.match_id && !l.removed_at && !l.excluded_at) && state.actor.can.record && <p className="hint">Choose a line marked To file, or several that one payment covers, and file it below: match it to what is already in the books, or add the expense, income or transfer it is.</p>}
+      {rows.some(l => !l.pending && !l.match_id && !l.removed_at && !l.excluded_at) && state.actor.can.record && <Help label="How to file a transaction"><p>Choose a line marked To file, or several that one payment covers, and file it below: match it to what is already in the books, or add the expense, income or transfer it is.</p></Help>}
       {state.actor.can.record && <div className="row-actions"><button type="button" className="btn btn-secondary" onClick={()=>setPicked(rows.filter(l=>!l.pending&&!l.match_id&&!l.removed_at&&!l.excluded_at).slice(0,50).map(l=>l.id))}>Select up to 50 visible review lines</button><button type="button" className="btn btn-link" onClick={()=>setPicked([])}>Clear selection</button></div>}
       <div className="table-wrap"><table className="ledger selectable"><thead><tr><th><span className="sr-only">Select</span></th><th>Date</th><th>Account</th><th>Description</th><th className="fig">Amount</th><th>Filed</th></tr></thead>
         <tbody>{rows.length ? rows.map(l => { const open = !l.pending && !l.match_id && !l.removed_at && !l.excluded_at
