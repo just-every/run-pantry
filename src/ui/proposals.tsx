@@ -1,8 +1,8 @@
 // Shared approval controls for agent work, bank matches and Pantry's answers.
 // Every approval carries the exact date and the server's freshly calculated
 // effects token. A changed date immediately withdraws the previous approval.
-import { useEffect, useState } from 'react'
-import { Action, command, Field, Table, usd, type D } from './kit'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Action, command, day, Field, Table, usd, type D } from './kit'
 
 type Pair = { label: string; before: number; after: number }
 const pair = (label: string, before: number, after: number): Pair => ({ label, before: before ?? 0, after: after ?? 0 })
@@ -69,7 +69,7 @@ export function ProposalApproval({ p, onDone, canApprove = true, approveLabel }:
   </>
 }
 
-export function QuestionApproval({ q, answer, label, onDone }: { q: D; answer: D; label: string; onDone: () => Promise<void> }) {
+export function QuestionApproval({ q, answer, label, onDone, folded }: { q: D; answer: D; label: string; onDone: () => Promise<void>; folded?: { lead: ReactNode; also: ReactNode } }) {
   const [date, setDate] = useState(q.pending?.date || ''), [effects, setEffects] = useState<D | null>(null), [error, setError] = useState(''), [refresh, setRefresh] = useState(0)
   const identity = JSON.stringify(answer)
   useEffect(() => {
@@ -77,12 +77,22 @@ export function QuestionApproval({ q, answer, label, onDone }: { q: D; answer: D
     command('question.preview', { id: q.id, ...JSON.parse(identity), ...(date ? { date } : {}) }).then(result => { if (!cancelled) setEffects(result.effects) }).catch(err => { if (!cancelled) setError(err.message) })
     return () => { cancelled = true }
   }, [q.id, q.revision, identity, date, refresh])
+  const dateField = <Field label="Correction date" name={`correction-date-${q.id}`} type="date" value={date || effects?.date || ''} onChange={(e: any) => { setEffects(null); setDate(e.target.value) }} />
+  const status = <p role={error ? 'alert' : 'status'} className={error ? 'error' : 'hint'}>{error || 'Calculating report effects…'}</p>
+  const approve = <Action tone="primary" disabled={!effects || !!effects.locks.length} run={async () => {
+    try { await command('question.answer', { id: q.id, ...answer, date: effects!.date, previewToken: effects!.token }); await onDone() }
+    catch (err) { setEffects(null); setError((err as Error).message); throw err }
+  }}>{label}</Action>, again = <Action run={async () => { setRefresh(r => r + 1) }}>Refresh effects</Action>
+  // Folded (the Overview's first item): the answer, its net income change and date, then the
+  // decision; every report effect waits under its disclosure, opened by itself when a lock blocks the yes.
+  if (folded) return <div className="answer-inline">
+    <div className="answer-text">{folded.lead}{effects ? <p className="hint">Net income {usd(effects.netIncome.before)} → {usd(effects.netIncome.after)} · correction dated {day(effects.date)}</p> : status}</div>
+    <div className="row-actions">{approve}{folded.also}</div>
+    <details className="details" open={!!effects?.locks.length}><summary>Report effects</summary>{dateField}{effects && <ProposalEffects effects={effects} onReopen={() => setRefresh(r => r + 1)} />}{again}</details>
+  </div>
   return <>
-    <Field label="Correction date" name={`correction-date-${q.id}`} type="date" value={date || effects?.date || ''} onChange={(e: any) => { setEffects(null); setDate(e.target.value) }} />
-    {effects ? <ProposalEffects effects={effects} onReopen={() => setRefresh(r => r + 1)} /> : <p role={error ? 'alert' : 'status'} className={error ? 'error' : 'hint'}>{error || 'Calculating report effects…'}</p>}
-    <div className="row-actions small"><Action tone="primary" disabled={!effects || !!effects.locks.length} run={async () => {
-      try { await command('question.answer', { id: q.id, ...answer, date: effects!.date, previewToken: effects!.token }); await onDone() }
-      catch (err) { setEffects(null); setError((err as Error).message); throw err }
-    }}>{label}</Action><Action run={async () => { setRefresh(r => r + 1) }}>Refresh effects</Action></div>
+    {dateField}
+    {effects ? <ProposalEffects effects={effects} onReopen={() => setRefresh(r => r + 1)} /> : status}
+    <div className="row-actions small">{approve}{again}</div>
   </>
 }

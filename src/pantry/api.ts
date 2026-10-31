@@ -81,6 +81,7 @@ import { contractorCommands, contractors } from './contractors'
 import { accountantPackage, ledgerCsv } from './package'
 import { packageZip } from './package-files'
 import { dashboard } from './dashboard'
+import { home } from './home'
 import { activity, actorView, documents, lookups, overview } from './views'
 import { ruleCommands, rulesView } from './rules'
 import { bankLinesView } from './bank-lines'
@@ -244,6 +245,7 @@ api.get('/api/pantry/statements/:id/document', async c => {
     'referrer-policy': 'same-origin', 'x-robots-tag': 'noindex, nofollow' } })
 })
 view('dashboard', async (ctx, c) => dashboard(ctx.db, day(c, 'to'), c.req.query('basis') ? basisOf(c.req.query('basis')) : undefined))
+view('home', async (ctx, c) => home(ctx.db, day(c, 'to')))
 view('state', async ctx => ({ actor: actorView(ctx.actor as any), ...(await lookups(ctx.db)), dimensionHistory: financialSourceAllowed(ctx.actor,'profit-and-loss')?await dimensionHistory(ctx.db):[], overview: await overview(ctx.db), settings: await settingsView(ctx) }))
 view('close-board', async (ctx, c) => closeBoard(ctx.db, c.req.query('year') ?? new Date().getUTCFullYear().toString()))
 view('recurring-journals', async ctx => recurringJournalsView(ctx.db))
