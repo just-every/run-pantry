@@ -29,6 +29,7 @@ import { Route as AppSalesRouteImport } from './routes/app.sales'
 import { Route as AppSearchRouteImport } from './routes/app.search'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppTimeRouteImport } from './routes/app.time'
+import { Route as AppToolsRouteImport } from './routes/app.tools'
 import { Route as AppBankConnectRouteImport } from './routes/app.bank_.connect'
 import { Route as AppSalesBillBillIdRouteImport } from './routes/app.sales_.bill.$billId'
 
@@ -132,6 +133,11 @@ const AppTimeRoute = AppTimeRouteImport.update({
   path: '/time',
   getParentRoute: () => AppRoute,
 } as any)
+const AppToolsRoute = AppToolsRouteImport.update({
+  id: '/tools',
+  path: '/tools',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBankConnectRoute = AppBankConnectRouteImport.update({
   id: '/bank_/connect',
   path: '/bank/connect',
@@ -163,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/app/search': typeof AppSearchRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/time': typeof AppTimeRoute
+  '/app/tools': typeof AppToolsRoute
   '/app/': typeof AppIndexRoute
   '/app/bank/connect': typeof AppBankConnectRoute
   '/app/sales/bill/$billId': typeof AppSalesBillBillIdRoute
@@ -186,6 +193,7 @@ export interface FileRoutesByTo {
   '/app/search': typeof AppSearchRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/time': typeof AppTimeRoute
+  '/app/tools': typeof AppToolsRoute
   '/app': typeof AppIndexRoute
   '/app/bank/connect': typeof AppBankConnectRoute
   '/app/sales/bill/$billId': typeof AppSalesBillBillIdRoute
@@ -211,6 +219,7 @@ export interface FileRoutesById {
   '/app/search': typeof AppSearchRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/time': typeof AppTimeRoute
+  '/app/tools': typeof AppToolsRoute
   '/app/': typeof AppIndexRoute
   '/app/bank_/connect': typeof AppBankConnectRoute
   '/app/sales_/bill/$billId': typeof AppSalesBillBillIdRoute
@@ -237,6 +246,7 @@ export interface FileRouteTypes {
     | '/app/search'
     | '/app/settings'
     | '/app/time'
+    | '/app/tools'
     | '/app/'
     | '/app/bank/connect'
     | '/app/sales/bill/$billId'
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | '/app/search'
     | '/app/settings'
     | '/app/time'
+    | '/app/tools'
     | '/app'
     | '/app/bank/connect'
     | '/app/sales/bill/$billId'
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | '/app/search'
     | '/app/settings'
     | '/app/time'
+    | '/app/tools'
     | '/app/'
     | '/app/bank_/connect'
     | '/app/sales_/bill/$billId'
@@ -435,6 +447,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTimeRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/tools': {
+      id: '/app/tools'
+      path: '/tools'
+      fullPath: '/app/tools'
+      preLoaderRoute: typeof AppToolsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/bank_/connect': {
       id: '/app/bank_/connect'
       path: '/bank/connect'
@@ -471,6 +490,7 @@ interface AppRouteChildren {
   AppSearchRoute: typeof AppSearchRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppTimeRoute: typeof AppTimeRoute
+  AppToolsRoute: typeof AppToolsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppBankConnectRoute: typeof AppBankConnectRoute
   AppSalesBillBillIdRoute: typeof AppSalesBillBillIdRoute
@@ -495,6 +515,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSearchRoute: AppSearchRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppTimeRoute: AppTimeRoute,
+  AppToolsRoute: AppToolsRoute,
   AppIndexRoute: AppIndexRoute,
   AppBankConnectRoute: AppBankConnectRoute,
   AppSalesBillBillIdRoute: AppSalesBillBillIdRoute,

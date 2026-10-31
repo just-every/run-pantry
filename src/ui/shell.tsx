@@ -1,72 +1,68 @@
-// The signed-in shell: Pantry, five work destinations plus More, and who is
-// signed in. On a phone all six move to a bottom bar.
-import { Link, Outlet, useRouterState } from '@tanstack/react-router'
+// The signed-in shell: Pantry's mark, Overview and the daily jobs as tabs with live counts,
+// and at the right search, Tools, Settings and who is signed in. Narrower windows use short
+// labels, then a top bar, a bottom bar of four jobs and a Menu that holds everything.
+import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { HydrationUnit } from '../base/hydration/unit'
 import { api, Loading, ROLE_LABEL, SharedState, type D } from './kit'
 import { Icon } from './icons'
+import { Tip } from './tip'
+import { Entry } from './entry'
+import { OwnerMenu } from './owner-menu'
+import { AppMenu } from './app-menu'
+import { countText, currentEntry, offered, SEARCH, SETTINGS, TOOLS_PAGE, type Job } from './destinations'
 import { roleScreen } from './role-navigation'
-
-const MAIN = [
-  { to: '/app/sales', label: 'Sales & bills', short: 'Sales', icon: 'invoice' },
-  { to: '/app/bank', label: 'Bank', short: 'Bank', icon: 'bank' },
-  { to: '/app/books', label: 'Books', short: 'Books', icon: 'book' },
-  { to: '/app/close', label: 'Close', short: 'Close', icon: 'check' },
-  { to: '/app/reports', label: 'Reports', short: 'Reports', icon: 'chart' },
-] as const
-const MORE = [
-  { to: '/app/search', label: 'Find a transaction' },
-  { to: '/app/cash-planner', label: 'Cash planner' },
-  { to: '/app/assets', label: 'Fixed assets' },
-  { to: '/app/currency', label: 'Foreign amount worksheets' },
-  { to: '/app/collections', label: 'Collection drafts' },
-  { to: '/app/time', label: 'Time' },
-  { to: '/app', label: 'Overview' },
-  { to: '/app/questions', label: 'Questions from Pantry' },
-  { to: '/app/receipts', label: 'Receipts' },
-  { to: '/app/move-in', label: 'Move in from QuickBooks or Xero' },
-  { to: '/app/agents', label: 'Agent work' },
-  { to: '/app/documents', label: 'Documents' },
-  { to: '/app/settings', label: 'People & settings' },
-  { to: '/app/activity', label: 'Activity' },
-] as const
-
-function More({ path, allowed }: { path: string; allowed: (path: string) => boolean }) {
-  const [open, setOpen] = useState(false), ref = useRef<HTMLDivElement>(null), button = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    if (!open) return
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); button.current?.focus() } }
-    const click = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('keydown', key); document.addEventListener('mousedown', click)
-    ref.current?.querySelector<HTMLAnchorElement>('a')?.focus()
-    return () => { document.removeEventListener('keydown', key); document.removeEventListener('mousedown', click) }
-  }, [open])
-  const active = MORE.some(m => m.to === path && allowed(m.to))
-  return <div className="more" ref={ref}>
-    <button ref={button} type="button" className={`nav-link${active ? ' active' : ''}`} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen(o => !o)}><Icon name="more" /><span>More</span></button>
-    {open && <div className="more-menu" role="menu">{MORE.filter(m => allowed(m.to)).map(m => <Link key={m.to} to={m.to} role="menuitem" onClick={() => setOpen(false)} aria-current={path === m.to ? 'page' : undefined}>{m.label}</Link>)}<a href="/signout" role="menuitem">Sign out or switch person</a></div>}
-  </div>
-}
 
 export function Shell() {
   const path = useRouterState({ select: s => s.location.pathname.replace(/\/$/, '') || '/app' })
-  const [state, setState] = useState<D>(), [error, setError] = useState('')
+  const [state, setState] = useState<D>(), [error, setError] = useState(''), [menu, setMenu] = useState(false)
   const reload = useCallback(async () => { try { setState(await api('state')); setError('') } catch (e) { setError((e as Error).message) } }, [])
   useEffect(() => { void reload() }, [reload])
-  const allowed = (destination: string) => !state || roleScreen(state.actor.role, destination, state.actor.policy?.bankAccounts != null)
-  const main = state?.actor.role === 'time-only' ? [] : MAIN.filter(m => allowed(m.to))
+  const navigate = useNavigate(), menuButton = useRef<HTMLButtonElement>(null)
+  const actor = state?.actor, offer = offered(actor), current = currentEntry(path), queue = state?.overview?.queue
+  const role = actor && actor.name !== ROLE_LABEL[actor.role] ? ROLE_LABEL[actor.role] : undefined
+  const allowed = (destination: string) => !state || roleScreen(actor.role, destination, actor.policy?.bankAccounts != null)
+  const count = (j: Job) => j.count ? countText(queue?.[j.count]) : null
+  const waiting = (j: Job) => count(j) ? `${count(j)} waiting` : undefined
+  useEffect(() => setMenu(false), [path])
+  const closeMenu = useCallback(() => { setMenu(false); menuButton.current?.focus() }, [])
+  // ⌘K (Ctrl+K elsewhere) opens Find a transaction with the caret in its one box.
+  useEffect(() => {
+    if (!offer.search) return
+    const key = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'k') return
+      e.preventDefault(); setMenu(false)
+      const box = document.querySelector<HTMLInputElement>('main input[name="q"]')
+      if (path === SEARCH && box) { box.focus(); box.select() } else void navigate({ to: SEARCH })
+    }
+    document.addEventListener('keydown', key); return () => document.removeEventListener('keydown', key)
+  }, [offer.search, path, navigate])
+  // The bottom bar: the first four jobs, then Menu, current for every other entry but search.
+  const bar = offer.jobs.slice(0, 4), inMenu = !!current && current !== SEARCH && !bar.some(j => j.to === current)
   return <div className="app">
     <HydrationUnit><header className="app-header">
-      <Link to="/app" className="brand"><img src="/brand/pantry.svg" alt="" width="28" height="28" /><span data-rer-name>Pantry</span></Link>
-      <nav className="app-nav" aria-label="Work">
-        {main.map(m => <Link key={m.to} to={m.to} className={`nav-link${path.startsWith(m.to) ? ' active' : ''}`} aria-current={path.startsWith(m.to) ? 'page' : undefined}><Icon name={m.icon} /><span className="wide-label">{m.label}</span><span className="short-label">{m.short}</span></Link>)}
-        <More path={path} allowed={allowed} />
-      </nav>
-      {state && <div className="profile"><span className="profile-name">{state.actor.name}</span>{state.actor.name !== ROLE_LABEL[state.actor.role] && <small>{ROLE_LABEL[state.actor.role]}</small>}</div>}
+      <Entry to="/app" className="brand"><img src="/brand/pantry.svg" alt="" width="28" height="28" /><span>Pantry</span></Entry>
+      <nav className="app-nav" aria-label="Work">{offer.jobs.map(j => <Entry key={j.to} to={j.to} current={current === j.to} className={`nav-link${current === j.to ? ' active' : ''}`} aria-description={waiting(j)}>
+        <span className="full-label">{j.tab}</span><span className="short-label">{j.short}</span>{count(j) && <span className="tally" aria-hidden="true">{count(j)}</span>}
+      </Entry>)}</nav>
+      <div className="app-actions">
+        {offer.search && <Tip text="Find a transaction"><Entry to={SEARCH} current={current === SEARCH} className={`icon-link${current === SEARCH ? ' active' : ''}`} aria-label="Find a transaction" aria-keyshortcuts="Meta+K Control+K"><Icon name="search" /></Entry></Tip>}
+        {offer.toolsPage && <Entry to={TOOLS_PAGE} current={current === TOOLS_PAGE} className={`nav-link tools-link${current === TOOLS_PAGE ? ' active' : ''}`}>Tools</Entry>}
+        {offer.settings && <Tip text="People & settings"><Entry to={SETTINGS} current={current === SETTINGS} className={`icon-link settings-link${current === SETTINGS ? ' active' : ''}`} aria-label="People & settings"><Icon name="gear" /></Entry></Tip>}
+        {actor && <OwnerMenu variant="bar" name={actor.name} role={role} />}
+      </div>
     </header></HydrationUnit>
     <main className="workspace">
-      {state && state.actor.role !== 'time-only' && path !== '/app/search' && <form action="/app/search" className="transaction-search" role="search"><label htmlFor="transaction-search">Find a transaction</label><input id="transaction-search" name="q" type="search" placeholder="Amount, reference or words" maxLength={200} /><button className="btn btn-sm">Search</button></form>}
       {state ? <SharedState.Provider value={{ state, reload }}><>{allowed(path) ? <Outlet /> : <><h1>Access restricted</h1><p>This screen is not part of your role. Choose an available destination above.</p>{state.actor.role === 'time-only' && <Link to="/app/time">Record time</Link>}</>}</></SharedState.Provider> : <><Loading error={error} what="your books" />{error && <p><a href="/signout">Sign out or switch person</a></p>}</>}
     </main>
+    {actor && <nav className="tabbar" aria-label="Work">
+      {bar.map(j => <Entry key={j.to} to={j.to} current={!menu && current === j.to} className={`tabbar-link${!menu && current === j.to ? ' active' : ''}`} aria-description={waiting(j)}>
+        <span className="tabbar-icon"><Icon name={j.icon} />{count(j) && <span className="tally" aria-hidden="true">{count(j)}</span>}</span><span>{j.short}</span>
+      </Entry>)}
+      <button ref={menuButton} type="button" className={`tabbar-link${menu || inMenu ? ' active' : ''}`} aria-expanded={menu} aria-controls={menu ? 'app-menu' : undefined} aria-current={!menu && inMenu ? 'page' : undefined} onClick={() => setMenu(m => !m)}>
+        <span className="tabbar-icon"><Icon name="menu" /></span><span>Menu</span>
+      </button>
+    </nav>}
+    {menu && actor && <AppMenu offer={offer} current={current} count={count} name={actor.name} role={role} onClose={closeMenu} />}
   </div>
 }

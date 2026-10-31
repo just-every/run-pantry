@@ -31,9 +31,14 @@ export async function searchJourney(t) {
    assert.deepEqual(reads,[],'opening search does not request unfiltered records')
    page.off('request',record)
   }
+  // Search on every screen: ⌘K at 1440 and the bar's magnifier at 390 open Find a transaction with the caret in its one box.
   await page.goto(app.origin+'/app')
-  await page.getByRole('search').getByLabel('Find a transaction').fill('$1,234.56')
-  await page.getByRole('search').getByRole('button',{name:'Search',exact:true}).click()
+  await page.getByRole('heading',{name:'Needs attention',exact:true}).waitFor()
+  if(width===1440)await page.keyboard.press('ControlOrMeta+k')
+  else await page.getByRole('link',{name:'Find a transaction',exact:true}).click()
+  await page.waitForFunction(()=>location.pathname==='/app/search'&&document.activeElement?.getAttribute('name')==='q')
+  await page.keyboard.type('$1,234.56')
+  await page.keyboard.press('Enter')
   await page.getByRole('link',{name:invoice.number,exact:true}).waitFor()
   if(width===1440)assert.equal(await page.locator('input[name="q"]').count(),1)
   await page.getByRole('link',{name:invoice.number,exact:true}).click()

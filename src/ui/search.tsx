@@ -8,7 +8,7 @@ export function Search() {
   const { data,error } = useView<any>(hasSearch ? 'search?'+query : null), {state}=useShared()
   return <><PageHead title={query.has('record')?'Transaction record':'Find a transaction'} />
     <Card title="Search your books"><form action="/app/search" className="form" role="search">
-      <Field label="Amount, reference or words" name="q" defaultValue={query.get('q')??''} placeholder="1234.56, check 1047, vendor or memo" />
+      <Field label="Amount, reference or words" name="q" defaultValue={query.get('q')??''} placeholder="1234.56, check 1047, vendor or memo" autoFocus={!hasSearch} />
       <details open={['min','max','from','to','type','account','status'].some(k=>query.has(k))}><summary>Advanced filters</summary><div className="form-grid">
         <Field label="Minimum amount" name="min" defaultValue={query.get('min')} inputMode="decimal" />
         <Field label="Maximum amount" name="max" defaultValue={query.get('max')} inputMode="decimal" />

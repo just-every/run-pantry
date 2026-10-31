@@ -227,6 +227,11 @@ html.rer-themed label:has(input[type=checkbox]) { align-items: center; gap: 12px
   html.rer-themed dd { padding: 2px 16px 12px; margin-bottom: 10px; border-radius: 0 0 12px 12px; }
 }
 
+/* The demo's Run link: a whole row under the wordmark on the sign-in card, never cut beside it,
+   and none on a page someone is signed in to (the sign-out page, and sign-in's own sign-out link). */
+html.rer-themed:has(style[data-rer-run]) .brand { align-items: flex-start; min-height: calc(1em + 30px); margin-bottom: 14px; }
+html.rer-themed:has(main form[action="/signout"], main a[href="/signout"]) [data-rer-demo-exit] { display: none !important; }
+
 /* Base's Run page (/run) and not-found page, in the same look: heavier display
    type, white step cards on the lavender paper, navy numerals. */
 body:has(> main > .intro) h1, body:has(> main > .hero) h1 { font-weight: 800; letter-spacing: -.045em; word-spacing: .04em; }
