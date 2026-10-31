@@ -5,7 +5,7 @@ import { Card, Chip, Loading, today, useShared, useView, type D } from './kit'
 import { Figures, Overdue } from './home-figures'
 import { NeedsAttention } from './attention'
 
-const GO: Record<string, string> = { settings: '/app/settings', books: '/app/books', 'move-in': '/app/move-in', sales: '/app/sales', contacts: '/app/sales', bank: '/app/bank', close: '/app/close' }
+const GO: Record<string, string> = { settings: '/app/settings/business', books: '/app/books', 'move-in': '/app/move-in', sales: '/app/sales', contacts: '/app/sales', bank: '/app/bank', close: '/app/close' }
 
 function SetupSteps({ steps }: { steps: D[] }) {
   const done = steps.filter(s => s.done).length
@@ -17,7 +17,7 @@ function SetupSteps({ steps }: { steps: D[] }) {
       <span className="step-no">{i + 1}</span>
       <div className="step-text"><strong>{s.title}</strong><span>{s.detail}{s.key === 'chart' && !s.done && <>. Post opening balances as one journal entry. <a href="/app/books?tab=journal">Open journal entries</a>.</>}</span></div>
       {s.done ? <Chip tone="good">Complete</Chip> : <Chip tone="warn">To do</Chip>}
-      <Link className={`btn ${s.key === next ? 'btn-primary' : 'btn-secondary'}`} to={GO[s.go]} search={(s.go === 'settings' ? { step: 'business' } : s.go === 'contacts' ? { tab: 'contacts' } : undefined) as any}>{s.done ? 'View' : 'Start'}</Link>
+      <Link className={`btn ${s.key === next ? 'btn-primary' : 'btn-secondary'}`} to={GO[s.go]} search={(s.go === 'contacts' ? { tab: 'contacts' } : undefined) as any}>{s.done ? 'View' : 'Start'}</Link>
     </li>)}</ol>
   </Card>
 }

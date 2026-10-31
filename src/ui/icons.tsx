@@ -24,6 +24,7 @@ const PATHS: Record<string, string> = {
   tool: 'M14.5 3.5a4.5 4.5 0 0 0-4.2 6.1L3.8 16.1a1.9 1.9 0 0 0 2.7 2.7l6.5-6.5a4.5 4.5 0 0 0 6.1-4.2l-2.7 2.7-2.6-.5-.5-2.6z',
   down: 'M7 10l5 5 5-5',
   next: 'M10 7l5 5-5 5',
+  back: 'M14 7l-5 5 5 5',
 }
 
 export function Icon({ name }: { name: string }) {

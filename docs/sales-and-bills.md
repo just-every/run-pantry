@@ -13,7 +13,7 @@ An issued invoice never changes. To correct one, choose **Issue a credit**, whic
 
 Open an issued invoice and choose **Send invoice**. Pantry emails it to the customer's address (or the addresses you type) with the PDF attached and a link to the invoice's own page, where the customer can read it, download the PDF and pay. The panel shows when it was **sent** and when the customer first **viewed** it; opening the link yourself while signed in does not count.
 
-Reminders follow the schedule in **People & settings → Sending invoices and reminders**, for example 3 days before the due date, on the due date and 7 days after (`-3, 0, 7`). Each step goes once, at most one a day, and they stop as soon as the invoice is paid. Pause them for one invoice from its panel. Every invoice and reminder Pantry sends is listed under **Deliveries** with the mail provider's answer; "accepted" means the provider took the message, not that the customer read it.
+Reminders follow the schedule in **Settings → Invoices and reminders**, for example 3 days before the due date, on the due date and 7 days after (`-3, 0, 7`). Each step goes once, at most one a day, and they stop as soon as the invoice is paid. Pause them for one invoice from its panel. Every invoice and reminder Pantry sends is listed under **Deliveries** with the mail provider's answer; "accepted" means the provider took the message, not that the customer read it.
 
 Pantry on your own computer sends no email. Once it is [online](/docs/hosting) with a mail provider account of your own ([Connections and keys](/docs/connections#mail)), invoices and reminders are emailed.
 
@@ -29,7 +29,7 @@ When you import a bank statement, a deposit for exactly an open invoice's amount
 
 ## Customers pay by card or ACH
 
-Connect your own Stripe account in **People & settings → Online payments (Stripe)** by pasting its secret key. Pantry checks the key, adds a webhook when your install is reachable from the internet, and adds two accounts to your chart: **Stripe balance** and **Stripe fees**. The invoice page then offers **Pay by card** and, for a US Stripe account, **Pay by bank account (ACH)**. Customers pay on Stripe's own page; card and bank details never reach Pantry. Pantry records the payment against the invoice in Stripe balance and books Stripe's fee. An ACH payment shows as processing for a few business days and counts as paid when it clears.
+Connect your own Stripe account in **Settings → Online payments (Stripe)** by pasting its secret key. Pantry checks the key, adds a webhook when your install is reachable from the internet, and adds two accounts to your chart: **Stripe balance** and **Stripe fees**. The invoice page then offers **Pay by card** and, for a US Stripe account, **Pay by bank account (ACH)**. Customers pay on Stripe's own page; card and bank details never reach Pantry. Pantry records the payment against the invoice in Stripe balance and books Stripe's fee. An ACH payment shows as processing for a few business days and counts as paid when it clears.
 
 On RER Managed installs online payment is not available yet: they cannot reach Stripe until RER adds a relay, and the invoice page says so.
 

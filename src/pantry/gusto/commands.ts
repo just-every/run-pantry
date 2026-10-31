@@ -88,7 +88,7 @@ export function gustoRoutes(api: Hono<{ Bindings: Bindings }>) {
   api.get('/api/pantry/gusto/callback', async c => {
     const actor = await person(c.req.raw, c.env)
     must(actor, 'owner')
-    const db = c.env.DB, state = c.req.query('state') ?? '', fail = (message: string) => back(`/app/settings?gusto_error=${encodeURIComponent(message)}#payroll`)
+    const db = c.env.DB, state = c.req.query('state') ?? '', fail = (message: string) => back(`/app/settings/payroll?gusto_error=${encodeURIComponent(message)}`)
     const pending = await one(db, 'SELECT * FROM pt_gusto_states WHERE state = ?', state)
     await run(db, [q('DELETE FROM pt_gusto_states WHERE state = ?', state)])
     if (!pending || pending.started_by !== actor.email || Date.parse(pending.started_at) < Date.now() - STATE_MS) return fail('That Gusto sign-in expired or was not started here; connect Gusto again.')
@@ -114,7 +114,7 @@ export function gustoRoutes(api: Hono<{ Bindings: Bindings }>) {
         audit(who(actor), 'gusto.connect', 'gusto', '1', { company: name, companyUuid: company.uuid, environment: client.environment })])
       // The first read runs before the owner lands back on Settings, so the payrolls are there to see.
       if (bankId) await syncPayrolls(c.env, db)
-      return back('/app/settings?gusto=connected#payroll')
+      return back('/app/settings/payroll?gusto=connected')
     } catch (error) {
       if (error instanceof Fault || error instanceof GustoError) return fail(error.message)
       throw error

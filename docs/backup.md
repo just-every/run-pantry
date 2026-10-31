@@ -9,7 +9,7 @@ rer dev --stop
 rer export --output exports/pantry-books.rer
 ```
 
-The archive is saved in the `exports` folder, with its checksums inside it: `rer import` checks them before restoring. Copy it somewhere safe, away from this computer. Sign-ins are not part of it: after a restore you set up the owner again. Keys Pantry keeps sealed with this installation's own secret (Stripe, the AI key, Gusto and bank feed connections) only open in this installation, so after a restore into a fresh install, connect them again in People & settings and Bank.
+The archive is saved in the `exports` folder, with its checksums inside it: `rer import` checks them before restoring. Copy it somewhere safe, away from this computer. Sign-ins are not part of it: after a restore you set up the owner again. Keys Pantry keeps sealed with this installation's own secret (Stripe, the AI key, Gusto and bank feed connections) only open in this installation, so after a restore into a fresh install, connect them again in Settings and Bank.
 
 ## Back up a hosted Pantry
 

@@ -2,7 +2,7 @@
 // Typed commands for the owner's agent. The agent reads the books it may see
 // and files proposals; a person approves them in Pantry. Nothing here can post,
 // approve or lock. Set PANTRY_URL (for example http://127.0.0.1:8787) and
-// PANTRY_AGENT_TOKEN (created in People & settings → Agent access).
+// PANTRY_AGENT_TOKEN (created in Settings → Agent access).
 import { readFile } from 'node:fs/promises'
 
 const USAGE = `pantry-agent <command> [options]

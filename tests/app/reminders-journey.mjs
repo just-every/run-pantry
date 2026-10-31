@@ -37,7 +37,7 @@ export async function remindersJourney(t) {
 
       const subject = `Invoice {{invoice}} from {{business}} · ${width}`
       const body = 'Hello {{customer}},\nInvoice {{invoice}} was due {{due_date}}. The balance is {{balance}}.\nView it: {{link}}\nThank you, {{business}} <accounts & billing>'
-      await page.goto(`${app.origin}/app/settings`)
+      await page.goto(`${app.origin}/app/settings/invoices`)
       const settings = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Sending invoices and reminders', exact: true }) })
       await settings.getByRole('checkbox', { name: 'Send reminders for unpaid invoices', exact: true }).check()
       await settings.getByLabel('Reminder days', { exact: true }).fill('-3, 0, 7')

@@ -1,5 +1,6 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Action, Card, command, Field, Form, Table, useShared, type D } from './kit'
+import { Help } from './help'
 const KINDS = [['class','Class','classes_enabled'],['location','Location','locations_enabled'],['project','Project','projects_enabled']] as const
 
 // Use the existing forms, fields and responsive tables; no new visual system.
@@ -12,10 +13,10 @@ export function DimensionSettings() {
  const {state,reload}=useShared(),d=state.dimensions
  if(!d||!state.actor.can.owner)return null
  return <Card title="Classes, locations and projects">
-  <p className="hint">Turn on the dimensions used by this business. Names are retained on posted records. Deactivation stops new coding; it keeps earlier evidence.</p>
   <Form key={d.settings.revision} label="Save dimension settings" submit={b=>command('dimensions.settings',{revision:d.settings.revision,...Object.fromEntries(KINDS.map(([kind])=>[kind,b[kind]==='on']))})} onDone={reload}>
    {KINDS.map(([kind,label,flag])=><label className="check" key={kind}><input type="checkbox" name={kind} defaultChecked={!!d.settings[flag]} /> Enable {kind==='class'?'classes':kind==='location'?'locations':'projects'}</label>)}
   </Form>
+  <Help label="How dimensions work"><p>Turn on the dimensions used by this business. Names are retained on posted records. Deactivation stops new coding; it keeps earlier evidence.</p></Help>
   <Table heads={['Dimension','Name','Status','']} empty="No dimension values yet.">
    {d.values.map((v:D)=><tr key={v.id}><td>{v.kind}</td><td>{v.name}</td><td>{v.active?'Active':'Inactive'}</td><td><Action run={async()=>{await command('dimension.save',{...v,active:!v.active});await reload()}}>{v.active?'Deactivate':'Reactivate'} {v.name}</Action></td></tr>)}
   </Table>

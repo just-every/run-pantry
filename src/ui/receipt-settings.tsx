@@ -14,7 +14,7 @@ function ReadingCard({ reader, onChange }: { reader: D; onChange: () => Promise<
         <li><strong>Anthropic:</strong> open <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">console.anthropic.com → API keys</a>, choose <strong>Create Key</strong>, and copy it. An organization key that is not tied to one workspace also needs that workspace’s ID (Console → Workspaces).</li>
         <li><strong>OpenAI or another OpenAI-compatible provider:</strong> open <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">platform.openai.com → API keys</a>, create a key, and enter a model that reads images and PDFs.</li>
         <li>Paste it below and choose <strong>Save</strong>, then <strong>Test the key</strong>.</li>
-      </ol><p className="hint">Pantry sends the receipt and your expense account names to that provider, and only ever proposes.</p></details>
+      </ol><p className="hint">Pantry sends the receipt and your expense account names to that provider, and only ever proposes. The key is stored sealed and never shown again.</p></details>
       <Form key={saved?.revision ?? 'new'} label={saved ? 'Save' : 'Save key'} submit={b => command('reader.save', { ...b, provider })} onDone={async () => { setCheck(null); await onChange() }} className="grid-form">
         <Field label="Provider" name="providerChoice" value={provider} onChange={(e: any) => setProvider(e.target.value)} options={[{ value: 'anthropic', label: 'Anthropic (Claude)' }, { value: 'openai', label: 'OpenAI or OpenAI-compatible' }]} />
         <Field label="Model" name="model" defaultValue={saved?.provider === provider ? saved.model : reader.defaults[provider].model} placeholder={provider === 'openai' ? 'The model name from your provider' : ''} required={provider === 'openai'} />
@@ -25,7 +25,7 @@ function ReadingCard({ reader, onChange }: { reader: D; onChange: () => Promise<
       {saved && <div className="row-actions">
         <Action run={async () => setCheck(await command('reader.test', {}))}>Test the key</Action>
         <Action tone="danger" run={async () => { await command('reader.remove', {}); setCheck(null); await onChange() }}>Remove key</Action>
-        <span className="hint">Saved by {saved.updated_by}, {day(saved.updated_at)}. The key is stored sealed and never shown again.</span>
+        <span className="hint">Saved by {saved.updated_by}, {day(saved.updated_at)}.</span>
       </div>}
       {check && <p role="status" className={check.ok ? 'tone-good' : 'error'}>{check.message}</p>}
     </>}

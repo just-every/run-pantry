@@ -29,7 +29,7 @@ export async function person(request: Request, original: Bindings): Promise<Pers
   if (session.operator.role === 'owner') return { ...base, role: 'owner', grants: { post: true, lock: true, reopen: true } }
   const member = await one(env.DB, 'SELECT m.*, p.mask_tin, p.mask_bank, p.revision AS privacy_revision FROM pt_members m JOIN pt_role_privacy p ON p.role = m.role WHERE m.email = ? AND m.active = 1', base.email)
   requireThat(member, env.AUTH_LOCAL === 'true' && base.email.endsWith('@dev.localhost')
-    ? `${base.email} has no role in these books yet. Sign out, sign in as the owner, and add ${base.email} under People & settings › People with the role to try.`
+    ? `${base.email} has no role in these books yet. Sign out, sign in as the owner, and add ${base.email} under Settings › People and permissions with the role to try.`
     : 'You have no role in these books; ask the owner to add you', 403)
   return { ...base, name: member.name, role: member.role, revision: member.revision, policy: { bankAccounts: member.bank_accounts === null ? null : JSON.parse(member.bank_accounts), timePeople: JSON.parse(member.time_people), billLimit: member.bill_limit_cents, paymentLimit: member.payment_limit_cents, journalLimit: member.journal_limit_cents, maskTin: !!member.mask_tin, maskBank: !!member.mask_bank, privacyRevision: member.privacy_revision }, grants: { post: !!member.can_post && !['viewer', 'time-only'].includes(member.role), lock: !!member.can_lock && ['bookkeeper', 'accountant'].includes(member.role), reopen: !!member.can_reopen && ['bookkeeper', 'accountant'].includes(member.role) } }
 }

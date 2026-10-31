@@ -1,35 +1,25 @@
-import { TextingSettings } from './texting'
-// People & settings: the business, its declared policies, who has which role, and agent access.
-import { DimensionSettings } from './dimensions'
+// Settings cards of the owner's own: their name and sign-in email, agent access, and putting
+// Pantry online from this computer. Each section page composes its cards (settings-pages.tsx).
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Action, Card, Chip, command, Details, Field, Form, PageHead, ROLE_LABEL, Table, day, placeholderEmail, useShared, type D } from './kit'
+import { Action, Card, Chip, command, Details, Field, Form, Table, day, placeholderEmail, useShared, type D } from './kit'
 import { Icon } from './icons'
-import { BusinessSummary } from './business-settings'
-import { IssuingLimits } from './issuing-limits'
-import { ReceiptSettings } from './receipt-settings'
-import { InvoicingSettings } from './invoicing-settings'
-import { ConnectedSettings } from './connected-settings'
-import { WebhookSettings } from './webhook-settings'
-import { ErasureSettings } from './erasure-settings'
-import { IntegrationSettings } from './integration-settings'
-import { DataFlows } from './data-flows'
-import { People, RolePrivacy } from './people'
+import { onThisComputer, sectionPath } from './settings-sections'
 
 /** The owner's own name and sign-in email, as people and invoices see them. */
-function Owner() {
+export function Owner() {
   const { state, reload } = useShared(), me = state.actor, [saved, setSaved] = useState(0)
   const here = onThisComputer(), setupOwner = state.settings.setupOwner
   return <Card title="You, the owner">
     <Form key={saved} label="Save name and email" submit={b => command('owner.save', b)} onDone={async () => { await reload(); setSaved(n => n + 1) }} className="grid-form">
       <Field label="Your name" name="name" defaultValue={me.name} required hint="Shown on entries you prepare or post, and to the people you invite" />
-      <Field label="Your sign-in email" name="email" type="email" defaultValue={me.email} required hint={placeholderEmail(me.email) ? `${me.email} is a placeholder no mail reaches, which is fine on this computer. Put Pantry online (below) asks for your own email for the hosted Pantry.` : 'Where your sign-in links go. Entries you already made keep the address they were made with.'} />
+      <Field label="Your sign-in email" name="email" type="email" defaultValue={me.email} required hint={placeholderEmail(me.email) ? `${me.email} is a placeholder no mail reaches, which is fine on this computer. Put Pantry online asks for your own email for the hosted Pantry.` : 'Where your sign-in links go. Entries you already made keep the address they were made with.'} />
     </Form>
-    {here && setupOwner && setupOwner !== me.email && <details className="setup-steps"><summary>Set up: stay the owner when Pantry goes online</summary><p className="hint">Put <code>OWNER_EMAIL={me.email}</code> in <code>.env.pantry</code> (see <a href="#put-online">Put Pantry online</a>). Without it, the hosted Pantry's owner is {setupOwner}, the address this Pantry was first set up with.</p></details>}
+    {here && setupOwner && setupOwner !== me.email && <details className="setup-steps"><summary>Set up: stay the owner when Pantry goes online</summary><p className="hint">Put <code>OWNER_EMAIL={me.email}</code> in <code>.env.pantry</code> (see <Link to={sectionPath('hosting')}>Put Pantry online</Link>). Without it, the hosted Pantry's owner is {setupOwner}, the address this Pantry was first set up with.</p></details>}
   </Card>
 }
 
-function Agents() {
+export function Agents() {
   const { state, reload } = useShared(), [token, setToken] = useState<D | null>(null)
   return <Card title={<><Icon name="agent" /> Agent access</>}>
     <p>An agent reads your books through its token and files proposals. A person approves each one; agents never post, approve or lock.</p>
@@ -51,12 +41,10 @@ function Agents() {
   </Card>
 }
 
-const onThisComputer = () => typeof window !== 'undefined' && ['127.0.0.1', 'localhost', '[::1]'].includes(window.location.hostname)
-
 /** On this computer only: what to put in the deploy file, with this owner's own email, and where the steps are.
  *  A placeholder owner address (no mail reaches it) is never offered: the card asks for the owner's own email
  *  and fills the lines with that. This browser remembers it; the sign-in here is unchanged. */
-function Hosting() {
+export function Hosting() {
   const { state } = useShared(), me = state.actor
   const [typed, setTyped] = useState(() => { try { return window.localStorage.getItem(HOSTED_OWNER) ?? '' } catch { return '' } })
   if (!onThisComputer()) return null
@@ -83,13 +71,3 @@ function Hosting() {
 }
 
 const HOSTED_OWNER = 'pantry.hosted-owner-email'
-
-export function Settings() {
-  const { state } = useShared()
-  return <>
-    <PageHead title="People & settings" lead="The business these books belong to, invoice sending and online payments, Stripe payouts and Gusto payroll, who works in them, agent access, and how receipts are read and received." actions={<Link className="btn btn-secondary" to="/app/activity">Activity</Link>} />
-    <BusinessSummary /><DimensionSettings />
-    {state.settings.entity && <><InvoicingSettings /><ConnectedSettings /></>}
-    {state.actor.can.owner && <><TextingSettings /><DataFlows /><Owner /><People /><RolePrivacy /><IssuingLimits /><Agents /><IntegrationSettings /><WebhookSettings /><ErasureSettings /><ReceiptSettings /><Hosting /></>}
-  </>
-}

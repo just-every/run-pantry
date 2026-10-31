@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Action, Card, Chip, command, day, Field, Form, Loading, Table, useShared, useView } from './kit'
+import { Help } from './help'
 
 type Scope = { id: string; label: string; help: string }
 type Credential = { id: string; name: string; scopes: string[]; created_at: string; created_by: string; revoked_at: string | null }
@@ -14,14 +15,14 @@ function NewCredential({ scopes, onCreated }: { scopes: Scope[]; onCreated: (cre
     return command('integration.create', { name: String(b.name).trim(), scopes: selected })
   }} onDone={onCreated}>
     <Field label="Integration name" name="name" required hint="For example, Pier, Cabin or Coffer. Use a separate credential for each connection." />
-    <p className="hint field-wide">Choose each record type separately. Read grants allow business records without writing or posting. Saved report and management package definition grants delegate access to all definitions of that type, separately from sharing with people. Security settings, credentials and webhook history remain owner-only.</p>
     <fieldset className="checks field-wide"><legend>Allowed scopes</legend>
       {scopes.map(scope => <label key={scope.id}>
         <input type="checkbox" name={scope.id} checked={selected.includes(scope.id)} onChange={e => setSelected(current => e.target.checked ? [...current, scope.id] : current.filter(id => id !== scope.id))} />
         <span>{scope.label} <code>{scope.id}</code><small className="hint" style={{ display: 'block' }}>{scope.help}</small></span>
       </label>)}
     </fieldset>
-    <p className="hint field-wide">The <strong>post</strong> scope lets a sibling book post its approved records in Pantry. Without it, bills, invoices and journals stay drafts for a person to review. Recording money already received or paid needs both <strong>payments:write</strong> and <strong>post</strong>; it does not move money. Vendor credits and their allocations also need both <strong>vendor-credits:write</strong> and <strong>post</strong>; credits post immediately and have no draft state.</p>
+    <div className="field-wide"><Help label="How scopes work"><p>Choose each record type separately. Read grants allow business records without writing or posting. Saved report and management package definition grants delegate access to all definitions of that type, separately from sharing with people. Security settings, credentials and webhook history remain owner-only.</p>
+      <p>The <strong>post</strong> scope lets a sibling book post its approved records in Pantry. Without it, bills, invoices and journals stay drafts for a person to review. Recording money already received or paid needs both <strong>payments:write</strong> and <strong>post</strong>; it does not move money. Vendor credits and their allocations also need both <strong>vendor-credits:write</strong> and <strong>post</strong>; credits post immediately and have no draft state.</p></Help></div>
   </Form>
 }
 

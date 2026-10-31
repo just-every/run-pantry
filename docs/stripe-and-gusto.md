@@ -4,12 +4,12 @@ Connect the Stripe account customers pay you through and the Gusto company you r
 
 Stripe pays out the money it collected less its fees and any refunds. Pantry books the whole of it, not just the deposit.
 
-1. Connect Stripe under **People & settings → Online payments (Stripe)** by pasting your Stripe secret key (the same connection invoices use for card and ACH payment).
+1. Connect Stripe under **Settings → Online payments (Stripe)** by pasting your Stripe secret key (the same connection invoices use for card and ACH payment).
 2. Under **Stripe payouts**, choose the bank account Stripe pays out to, the income account for sales, and the activity start date. Choose **Book Stripe payouts**.
 
 Pantry reads Stripe’s balance transactions independently of paid payouts. Each USD charge, refund, dispute or fee posts at its provider creation date (UTC), with its own provider ID. Invoice-link payments use their existing receipt and fee entries, so the charge is never also booked as sales. A payout moves money from **Stripe balance** to the receiving bank on its provider event date; the expected arrival date is used to match its bank deposit. The payout view retains its gross sales, fees and refund totals.
 
-**Stripe clearing** on the dashboard, settings and close compares the current posted clearing ledger with Stripe’s reported USD available plus pending balance and names every missing, changed, unsupported, reversed or held provider item. The observation time is shown. An incomplete provider inventory cannot establish a tie. Re-reading is idempotent, and repairing a missing event clears its exception only when the actual ledger agrees; Pantry creates no unexplained balancing adjustment.
+**Stripe clearing**, on **Settings → Online payments (Stripe)** and in the close checklist, compares the current posted clearing ledger with Stripe’s reported USD available plus pending balance and names every missing, changed, unsupported, reversed or held provider item. The observation time is shown. An incomplete provider inventory cannot establish a tie. Re-reading is idempotent, and repairing a missing event clears its exception only when the actual ledger agrees; Pantry creates no unexplained balancing adjustment.
 
 Prior payout entries stay immutable and their constituent provider IDs are associated with those entries before new recognition. Native invoice receipts are adopted once. The configured activity start date keeps otherwise-unowned earlier activity in a named historical review queue; use the accountant’s existing correction/opening-entry process to resolve a historical difference. Locked event dates remain held until an approved reopening permits their posting.
 
@@ -17,7 +17,7 @@ Payouts are read every few hours and when you choose **Read payouts now**. Manua
 
 ## Gusto payroll
 
-1. Under **People & settings → Payroll (Gusto)**, choose **Connect Gusto**, sign in to Gusto as a company admin and choose the company.
+1. Under **Settings → Payroll (Gusto)**, choose **Connect Gusto**, sign in to Gusto as a company admin and choose the company.
 2. Back in Pantry, choose the bank account Gusto debits (it is chosen for you when you have one) and the first check date to post.
 
 Each processed payroll posts as one balanced entry on its check date: gross wages to **Wages and salaries**, the employer's taxes to **Payroll taxes**, company benefit contributions and reimbursements to their expense accounts; out of the bank, Gusto's net pay debit and its tax debit (the taxes withheld from employees and the employer's taxes, each on its own line); and what you still owe others (paper checks, benefit and other deductions) to **Payroll liabilities**. Pantry matches the entry to Gusto's debits when they arrive, whether Gusto took them as one debit or one per kind. A payroll whose totals do not add up waits for you with the difference named. Payrolls entered in Gusto only for its records (external payrolls) are not posted.

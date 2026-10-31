@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
-import { Card, command, Field, Form, PageHead, day, useShared } from './kit'
+import { Card, command, Field, Form, day, useShared } from './kit'
 import { Icon } from './icons'
 
 const ENTITY_LABEL: Record<string, string> = { 'sole-proprietorship': 'Sole proprietorship', 'single-member-llc': 'Single-member LLC', 'multi-member-llc': 'Multi-member LLC', 's-corporation': 'S corporation', 'c-corporation': 'C corporation', partnership: 'Partnership' }
@@ -24,11 +24,11 @@ export function Business() {
   </Card>
 }
 
-export function BusinessSetup() {
+/** Business details (/app/settings/business): the shared Business, then these books' accounting details. */
+export function BusinessDetails() {
   const { state } = useShared()
   const business = state.settings.business
   return <>
-    <PageHead title={state.settings.entity ? 'Business details' : 'Set up the business'} lead="Choose your shared Business first, then confirm the accounting details for these books." />
     <Card title="Your shared Business">
       {business ? <p><strong><a href={business.url} target="_blank" rel="noreferrer">{business.name}</a></strong> · {new URL(business.origin).host}</p> : <p>Already use a Business in another Run Edit Run app? Open that same Business here.</p>}
       <a className="btn btn-secondary" href={business ? business.origin + '/business' : 'https://app.runeditrun.com/business'} target="_blank" rel="noreferrer">Use your existing Business</a>
@@ -36,14 +36,5 @@ export function BusinessSetup() {
     </Card>
     <Business />
     <p><Link className="btn btn-secondary" to="/app">Continue to setup steps</Link></p>
-    <p><Link to="/app/settings">People &amp; settings</Link></p>
   </>
-}
-
-export function BusinessSummary() {
-  const { state } = useShared()
-  return <Card title={<><Icon name="building" /> The business</>}>
-    <p>{state.settings.entity?.legal_name ?? state.settings.business?.name ?? 'Choose your shared Business and set up the accounting details for these books.'}</p>
-    <Link className="btn btn-secondary" to="/app/settings" search={{ step: 'business' }}>{state.settings.entity ? 'Business details' : 'Set up the business'}</Link>
-  </Card>
 }

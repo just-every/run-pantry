@@ -27,7 +27,7 @@ export function Agents() {
   return <>
     <PageHead title="Agent work" lead="Your agent prepares; a person approves. Approval re-checks every record the agent cited, the period lock and your role." />
     <TaxReadiness />
-    {!waiting.length && <Card title="Nothing waiting" className="empty-card"><Empty><p>No proposals are waiting. {shared.state.actor.can.owner ? 'Create an agent token in People & settings, then follow Agent work in the Pantry docs.' : ''}</p></Empty></Card>}
+    {!waiting.length && <Card title="Nothing waiting" className="empty-card"><Empty><p>No proposals are waiting. {shared.state.actor.can.owner ? 'Create an agent token in Settings › Agent access, then follow Agent work in the Pantry docs.' : ''}</p></Empty></Card>}
     {waiting.map((p: D) => <Card key={p.id} title={<><Icon name="agent" /> {KIND[p.kind]} from {p.agent_name}</>} actions={<Chip tone="agent">Proposed</Chip>}>
       <p><strong>{p.summary}</strong></p>
       <ProposalBody p={p} accounts={shared.state.accounts} />

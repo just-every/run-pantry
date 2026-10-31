@@ -1,7 +1,8 @@
 // Connected: Stripe payouts booked as sales, fees and refunds against the
 // deposit, and Gusto payrolls posted as one entry against their debits. Each
-// card is completed from this page and says plainly what this install can do.
-import { StripeClearing } from './stripe-clearing'
+// card is completed on its section page and says plainly what this install can do.
+import { ClearingStatus } from './stripe-clearing'
+import { Help } from './help'
 import { SetupSteps } from './provider-guides'
 import { ago } from './bank-feeds'
 import { Action, Card, Chip, command, day, Field, Form, Loading, Table, today, usd, useShared, useView, type D } from './kit'
@@ -32,11 +33,11 @@ function PayoutSettings({ v, onDone }: { v: D; onDone: () => Promise<void> }) {
   </Form>
 }
 
-function Payouts({ v, onDone }: { v: D; onDone: () => Promise<void> }) {
+function Payouts({ v, clearing, onDone }: { v: D; clearing: D | null; onDone: () => Promise<void> }) {
   const owner = useShared().state.actor.can.owner, can = useShared().state.actor.can.record, s = v.settings
-  if (!v.available) return <Card title="Stripe payouts"><p className="hint">{v.reason}</p></Card>
+  if (!v.available) return <Card title="Stripe payouts"><ClearingStatus value={clearing} /><p className="hint">{v.reason}</p></Card>
   return <Card title="Stripe payouts" actions={s.bank && can && <Action run={async () => { await command('stripe.payouts-sync', {}); await onDone() }}>Read payouts now</Action>}>
-    <p>Stripe charges, fees, refunds and disputes post through Stripe clearing on their provider event dates. Each payout transfers clearing to the bank and matches its deposit when the bank line arrives. Reading the same provider item again never books it twice.</p>
+    <ClearingStatus value={clearing} />
     {s.bank ? <dl className="facts">
       <div><dt>Lands in</dt><dd>{s.bank.name} (…{s.bank.number_last4})</dd></div>
       <div><dt>Posted to</dt><dd>{s.sales.code} {s.sales.name} · {s.fees.code} {s.fees.name} · {s.refunds.code} {s.refunds.name}</dd></div>
@@ -49,6 +50,7 @@ function Payouts({ v, onDone }: { v: D; onDone: () => Promise<void> }) {
       {v.payouts.map((p: D) => <tr key={p.id}><td className="nowrap">{day(p.arrival_date)}</td><td className="fig">{money(p.amount_cents, p.currency)}</td><td className="fig">{p.charges}</td><td className="fig">{money(p.gross_cents, p.currency)}{p.invoiced_cents ? <small className="sub"> {money(p.invoiced_cents, p.currency)} invoiced</small> : null}</td>
         <td className="fig">{money(p.fee_cents, p.currency)}</td><td className="fig">{money(p.refund_cents, p.currency)}</td><td><PayoutStatus p={p} /></td></tr>)}
     </Table>}
+    <Help label="How payouts are booked"><p>Stripe charges, fees, refunds and disputes post through Stripe clearing on their provider event dates. Each payout transfers clearing to the bank and matches its deposit when the bank line arrives. Reading the same provider item again never books it twice.</p></Help>
   </Card>
 }
 
@@ -66,7 +68,6 @@ function Payroll({ g, onDone }: { g: D; onDone: () => Promise<void> }) {
   const failed = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('gusto_error')
   if (!a.available && !c) return <Card title="Payroll (Gusto)">{a.needsKeys ? <SetupSteps provider="gusto" reason={a.reason} summary="Set up payroll from Gusto" owner={owner} /> : <p className="hint">{a.reason}</p>}</Card>
   return <div id="payroll"><Card title="Payroll (Gusto)" actions={c?.bank && a.available && can && <Action run={async () => { await command('gusto.sync', {}); await onDone() }}>Read payrolls now</Action>}>
-    <p>Each processed Gusto payroll posts as one balanced entry on its check date: gross wages and employer taxes, the taxes and deductions withheld, and net pay. Pantry matches it to Gusto's bank debits when they arrive.</p>
     {failed && <div className="callout callout-warn" role="alert"><strong>Gusto did not connect</strong><span>{failed}</span></div>}
     {!a.available && <p className="hint">{a.reason}</p>}
     {c ? <>
@@ -92,12 +93,20 @@ function Payroll({ g, onDone }: { g: D; onDone: () => Promise<void> }) {
         <li>Pantry adds Wages and salaries, Payroll taxes, Employee benefits, Employee reimbursements and Payroll liabilities to your chart and posts each processed payroll.</li>
       </ol></details>
     </> : <p className="hint">The owner connects Gusto.</p>}
+    <Help label="How payrolls are posted"><p>Each processed Gusto payroll posts as one balanced entry on its check date: gross wages and employer taxes, the taxes and deductions withheld, and net pay. Pantry matches it to Gusto's bank debits when they arrive.</p></Help>
   </Card></div>
 }
 
-export function ConnectedSettings() {
+/** Stripe payouts, with the Stripe clearing status, on Online payments (Stripe). */
+export function StripePayouts() {
   const { data, error, reload } = useView<D>('connected'), shared = useShared()
   if (!data) return <Loading error={error} what="connected services" />
-  const done = async () => { await Promise.all([reload(), shared.reload()]) }
-  return <><StripeClearing value={data.clearing} /><Payouts v={data.payouts} onDone={done} /><Payroll g={data.gusto} onDone={done} /></>
+  return <Payouts v={data.payouts} clearing={data.clearing} onDone={async () => { await Promise.all([reload(), shared.reload()]) }} />
+}
+
+/** Payroll (Gusto), on its own section page. */
+export function PayrollSettings() {
+  const { data, error, reload } = useView<D>('connected'), shared = useShared()
+  if (!data) return <Loading error={error} what="connected services" />
+  return <Payroll g={data.gusto} onDone={async () => { await Promise.all([reload(), shared.reload()]) }} />
 }

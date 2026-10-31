@@ -36,7 +36,7 @@ export async function textingBrowser(t) {
    try {
     page.on('pageerror',error=>errors.push(String(error)))
     const submit=async(op,action)=>{const [response]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/command/'+op)),action()]);assert.equal(response.status(),200,await response.text());return response.json()}
-    await page.goto(app.origin+'/app/settings')
+    await page.goto(app.origin+'/app/settings/invoices')
     const settings=page.locator('section.card').filter({has:page.getByRole('heading',{name:'Texting',exact:true})})
     await settings.getByLabel('Invoice text template',{exact:true}).waitFor()
     if(width===1440){

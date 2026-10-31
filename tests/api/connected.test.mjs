@@ -196,7 +196,7 @@ test('REPORT-005 / CLOSE-005 / CLOSE-004 / PAYROLL-001 a Gusto payroll posts as 
   assert.deepEqual([authorize.searchParams.get('client_id'), authorize.searchParams.get('redirect_uri'), authorize.searchParams.get('response_type')], ['demo-client-id', `${h.origin}/api/pantry/gusto/callback`, 'code'])
   const state = authorize.searchParams.get('state')
   const back = await h.send(`/api/pantry/gusto/callback?code=demo-authorization-code&state=${state}`, undefined, { cookie: h.owner })
-  assert.equal(back.status, 303); assert.equal(back.headers.get('location'), '/app/settings?gusto=connected#payroll')
+  assert.equal(back.status, 303); assert.equal(back.headers.get('location'), '/app/settings/payroll?gusto=connected')
   const replay = await h.send(`/api/pantry/gusto/callback?code=demo-authorization-code&state=${state}`, undefined, { cookie: h.owner })
   assert.match(decodeURIComponent(replay.headers.get('location')), /expired or was not started here/)
 

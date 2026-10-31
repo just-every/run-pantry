@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 
 export async function lateFeeBrowser({ page, context, invoice, width, origin, accountId }) {
-  await page.goto(origin + '/app/settings')
+  await page.goto(origin + '/app/settings/invoices')
   const policy = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Late-fee policy', exact: true }) })
   await policy.getByRole('checkbox', { name: 'Allow late-fee drafts', exact: true }).check()
   await policy.getByLabel('Late-fee method', { exact: true }).selectOption('percentage')

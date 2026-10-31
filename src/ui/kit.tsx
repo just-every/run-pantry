@@ -120,14 +120,14 @@ export function FileInput({ onChange, ...props }: ComponentProps<'input'>) {
 }
 
 /** A form that sends its fields (plus `extra`) and shows the server's refusal beside its action. */
-export function Form({ children, submit, label, onDone, extra, className = '', secondary }: { children: ReactNode; submit: (body: D) => Promise<any>; label: string; onDone?: (result: any) => void | Promise<void>; extra?: () => D; className?: string; secondary?: ReactNode }) {
+export function Form({ children, submit, label, onDone, extra, className = '', secondary, tone = 'primary' }: { children: ReactNode; submit: (body: D) => Promise<any>; label: string; onDone?: (result: any) => void | Promise<void>; extra?: () => D; className?: string; secondary?: ReactNode; tone?: 'primary' | 'secondary' }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   return <form className="form" onSubmit={async e => {
     e.preventDefault(); const form = e.currentTarget
     setBusy(true); setError('')
     try { const result = await submit({ ...Object.fromEntries(new FormData(form)), ...(extra?.() ?? {}) }); await onDone?.(result) }
     catch (err) { setError((err as Error).message) } finally { setBusy(false) }
-  }}>{className ? <div className={className}>{children}</div> : children}<div className="form-end"><button className="btn btn-primary" disabled={busy}>{busy ? 'Working…' : label}</button>{secondary}{error && <p role="alert" className="error">{error}</p>}</div></form>
+  }}>{className ? <div className={className}>{children}</div> : children}<div className="form-end"><button className={`btn btn-${tone}`} disabled={busy}>{busy ? 'Working…' : label}</button>{secondary}{error && <p role="alert" className="error">{error}</p>}</div></form>
 }
 
 /** A button that runs one action and reports its refusal in place. */

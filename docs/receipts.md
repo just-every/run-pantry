@@ -19,7 +19,7 @@ The original photograph has the same signed-in financial access as other receipt
 
 ## Forward receipts by email
 
-The owner sets up a private **Pantry address** once, in **People & settings › Forward receipts by email**. It needs a domain of yours, such as `yourbusiness.com`, on the Cloudflare account Pantry runs in; the `workers.dev` address Pantry starts on cannot receive mail. Without a domain nothing is lost: photos and uploads work everywhere.
+The owner sets up a private **Pantry address** once, in **Settings › Receipts**, under **Forward receipts by email**. It needs a domain of yours, such as `yourbusiness.com`, on the Cloudflare account Pantry runs in; the `workers.dev` address Pantry starts on cannot receive mail. Without a domain nothing is lost: photos and uploads work everywhere.
 
 No domain on that Cloudflare account yet? Either buy one there, under **Domain Registration → Register Domains** (it is on your account at once), or add one you own: choose **Add a domain**, pick the Free plan, check the DNS records Cloudflare copied against your current ones, then at the company you bought it from replace its nameservers with the two Cloudflare shows. It says **Active** once the change has spread, usually within an hour. The domain you send Pantry's mail from can be the same one.
 
@@ -36,7 +36,7 @@ On your own computer, mail cannot reach Pantry: send a saved `.eml` to the addre
 
 ## AI reading
 
-Pantry reads receipts with your own AI provider account. The owner adds the key in **People & settings › AI reading**: choose Anthropic or an OpenAI-compatible provider, paste the key, and choose **Test the key**. The key is stored sealed and never shown again. Without a key, every receipt says **Add a key to read receipts** and Pantry reads nothing; you can still type the vendor, date and total from the receipt, and the transactions with that total appear under **Attach to**, ready for **Accept and attach**.
+Pantry reads receipts with your own AI provider account. The owner adds the key in **Settings › Receipts**, under **AI reading**: choose Anthropic or an OpenAI-compatible provider, paste the key, and choose **Test the key**. The key is stored sealed and never shown again. Without a key, every receipt says **Add a key to read receipts** and Pantry reads nothing; you can still type the vendor, date and total from the receipt, and the transactions with that total appear under **Attach to**, ready for **Accept and attach**.
 
 Pantry sends the receipt and your expense account names to that provider. What the model reads is only a proposal, and anything written on a receipt is never followed as an instruction.
 

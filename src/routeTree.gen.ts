@@ -31,6 +31,20 @@ import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppTimeRouteImport } from './routes/app.time'
 import { Route as AppToolsRouteImport } from './routes/app.tools'
 import { Route as AppBankConnectRouteImport } from './routes/app.bank_.connect'
+import { Route as AppSettingsIndexRouteImport } from './routes/app.settings.index'
+import { Route as AppSettingsAgentsRouteImport } from './routes/app.settings.agents'
+import { Route as AppSettingsApiRouteImport } from './routes/app.settings.api'
+import { Route as AppSettingsBusinessRouteImport } from './routes/app.settings.business'
+import { Route as AppSettingsConnectionsRouteImport } from './routes/app.settings.connections'
+import { Route as AppSettingsDimensionsRouteImport } from './routes/app.settings.dimensions'
+import { Route as AppSettingsHostingRouteImport } from './routes/app.settings.hosting'
+import { Route as AppSettingsInvoicesRouteImport } from './routes/app.settings.invoices'
+import { Route as AppSettingsPayrollRouteImport } from './routes/app.settings.payroll'
+import { Route as AppSettingsPeopleRouteImport } from './routes/app.settings.people'
+import { Route as AppSettingsPrivacyRouteImport } from './routes/app.settings.privacy'
+import { Route as AppSettingsReceiptsRouteImport } from './routes/app.settings.receipts'
+import { Route as AppSettingsStripeRouteImport } from './routes/app.settings.stripe'
+import { Route as AppSettingsYouRouteImport } from './routes/app.settings.you'
 import { Route as AppSalesBillBillIdRouteImport } from './routes/app.sales_.bill.$billId'
 
 const AppRoute = AppRouteImport.update({
@@ -143,6 +157,76 @@ const AppBankConnectRoute = AppBankConnectRouteImport.update({
   path: '/bank/connect',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsAgentsRoute = AppSettingsAgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsApiRoute = AppSettingsApiRouteImport.update({
+  id: '/api',
+  path: '/api',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsBusinessRoute = AppSettingsBusinessRouteImport.update({
+  id: '/business',
+  path: '/business',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsConnectionsRoute = AppSettingsConnectionsRouteImport.update({
+  id: '/connections',
+  path: '/connections',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsDimensionsRoute = AppSettingsDimensionsRouteImport.update({
+  id: '/dimensions',
+  path: '/dimensions',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsHostingRoute = AppSettingsHostingRouteImport.update({
+  id: '/hosting',
+  path: '/hosting',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsInvoicesRoute = AppSettingsInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsPayrollRoute = AppSettingsPayrollRouteImport.update({
+  id: '/payroll',
+  path: '/payroll',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsPeopleRoute = AppSettingsPeopleRouteImport.update({
+  id: '/people',
+  path: '/people',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsPrivacyRoute = AppSettingsPrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsReceiptsRoute = AppSettingsReceiptsRouteImport.update({
+  id: '/receipts',
+  path: '/receipts',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsStripeRoute = AppSettingsStripeRouteImport.update({
+  id: '/stripe',
+  path: '/stripe',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsYouRoute = AppSettingsYouRouteImport.update({
+  id: '/you',
+  path: '/you',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSalesBillBillIdRoute = AppSalesBillBillIdRouteImport.update({
   id: '/sales_/bill/$billId',
   path: '/sales/bill/$billId',
@@ -167,11 +251,25 @@ export interface FileRoutesByFullPath {
   '/app/reports': typeof AppReportsRoute
   '/app/sales': typeof AppSalesRoute
   '/app/search': typeof AppSearchRoute
-  '/app/settings': typeof AppSettingsRoute
+  '/app/settings': typeof AppSettingsRouteWithChildren
   '/app/time': typeof AppTimeRoute
   '/app/tools': typeof AppToolsRoute
   '/app/': typeof AppIndexRoute
   '/app/bank/connect': typeof AppBankConnectRoute
+  '/app/settings/agents': typeof AppSettingsAgentsRoute
+  '/app/settings/api': typeof AppSettingsApiRoute
+  '/app/settings/business': typeof AppSettingsBusinessRoute
+  '/app/settings/connections': typeof AppSettingsConnectionsRoute
+  '/app/settings/dimensions': typeof AppSettingsDimensionsRoute
+  '/app/settings/hosting': typeof AppSettingsHostingRoute
+  '/app/settings/invoices': typeof AppSettingsInvoicesRoute
+  '/app/settings/payroll': typeof AppSettingsPayrollRoute
+  '/app/settings/people': typeof AppSettingsPeopleRoute
+  '/app/settings/privacy': typeof AppSettingsPrivacyRoute
+  '/app/settings/receipts': typeof AppSettingsReceiptsRoute
+  '/app/settings/stripe': typeof AppSettingsStripeRoute
+  '/app/settings/you': typeof AppSettingsYouRoute
+  '/app/settings/': typeof AppSettingsIndexRoute
   '/app/sales/bill/$billId': typeof AppSalesBillBillIdRoute
 }
 export interface FileRoutesByTo {
@@ -191,11 +289,24 @@ export interface FileRoutesByTo {
   '/app/reports': typeof AppReportsRoute
   '/app/sales': typeof AppSalesRoute
   '/app/search': typeof AppSearchRoute
-  '/app/settings': typeof AppSettingsRoute
   '/app/time': typeof AppTimeRoute
   '/app/tools': typeof AppToolsRoute
   '/app': typeof AppIndexRoute
   '/app/bank/connect': typeof AppBankConnectRoute
+  '/app/settings/agents': typeof AppSettingsAgentsRoute
+  '/app/settings/api': typeof AppSettingsApiRoute
+  '/app/settings/business': typeof AppSettingsBusinessRoute
+  '/app/settings/connections': typeof AppSettingsConnectionsRoute
+  '/app/settings/dimensions': typeof AppSettingsDimensionsRoute
+  '/app/settings/hosting': typeof AppSettingsHostingRoute
+  '/app/settings/invoices': typeof AppSettingsInvoicesRoute
+  '/app/settings/payroll': typeof AppSettingsPayrollRoute
+  '/app/settings/people': typeof AppSettingsPeopleRoute
+  '/app/settings/privacy': typeof AppSettingsPrivacyRoute
+  '/app/settings/receipts': typeof AppSettingsReceiptsRoute
+  '/app/settings/stripe': typeof AppSettingsStripeRoute
+  '/app/settings/you': typeof AppSettingsYouRoute
+  '/app/settings': typeof AppSettingsIndexRoute
   '/app/sales/bill/$billId': typeof AppSalesBillBillIdRoute
 }
 export interface FileRoutesById {
@@ -217,11 +328,25 @@ export interface FileRoutesById {
   '/app/reports': typeof AppReportsRoute
   '/app/sales': typeof AppSalesRoute
   '/app/search': typeof AppSearchRoute
-  '/app/settings': typeof AppSettingsRoute
+  '/app/settings': typeof AppSettingsRouteWithChildren
   '/app/time': typeof AppTimeRoute
   '/app/tools': typeof AppToolsRoute
   '/app/': typeof AppIndexRoute
   '/app/bank_/connect': typeof AppBankConnectRoute
+  '/app/settings/agents': typeof AppSettingsAgentsRoute
+  '/app/settings/api': typeof AppSettingsApiRoute
+  '/app/settings/business': typeof AppSettingsBusinessRoute
+  '/app/settings/connections': typeof AppSettingsConnectionsRoute
+  '/app/settings/dimensions': typeof AppSettingsDimensionsRoute
+  '/app/settings/hosting': typeof AppSettingsHostingRoute
+  '/app/settings/invoices': typeof AppSettingsInvoicesRoute
+  '/app/settings/payroll': typeof AppSettingsPayrollRoute
+  '/app/settings/people': typeof AppSettingsPeopleRoute
+  '/app/settings/privacy': typeof AppSettingsPrivacyRoute
+  '/app/settings/receipts': typeof AppSettingsReceiptsRoute
+  '/app/settings/stripe': typeof AppSettingsStripeRoute
+  '/app/settings/you': typeof AppSettingsYouRoute
+  '/app/settings/': typeof AppSettingsIndexRoute
   '/app/sales_/bill/$billId': typeof AppSalesBillBillIdRoute
 }
 export interface FileRouteTypes {
@@ -249,6 +374,20 @@ export interface FileRouteTypes {
     | '/app/tools'
     | '/app/'
     | '/app/bank/connect'
+    | '/app/settings/agents'
+    | '/app/settings/api'
+    | '/app/settings/business'
+    | '/app/settings/connections'
+    | '/app/settings/dimensions'
+    | '/app/settings/hosting'
+    | '/app/settings/invoices'
+    | '/app/settings/payroll'
+    | '/app/settings/people'
+    | '/app/settings/privacy'
+    | '/app/settings/receipts'
+    | '/app/settings/stripe'
+    | '/app/settings/you'
+    | '/app/settings/'
     | '/app/sales/bill/$billId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -268,11 +407,24 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app/sales'
     | '/app/search'
-    | '/app/settings'
     | '/app/time'
     | '/app/tools'
     | '/app'
     | '/app/bank/connect'
+    | '/app/settings/agents'
+    | '/app/settings/api'
+    | '/app/settings/business'
+    | '/app/settings/connections'
+    | '/app/settings/dimensions'
+    | '/app/settings/hosting'
+    | '/app/settings/invoices'
+    | '/app/settings/payroll'
+    | '/app/settings/people'
+    | '/app/settings/privacy'
+    | '/app/settings/receipts'
+    | '/app/settings/stripe'
+    | '/app/settings/you'
+    | '/app/settings'
     | '/app/sales/bill/$billId'
   id:
     | '__root__'
@@ -298,6 +450,20 @@ export interface FileRouteTypes {
     | '/app/tools'
     | '/app/'
     | '/app/bank_/connect'
+    | '/app/settings/agents'
+    | '/app/settings/api'
+    | '/app/settings/business'
+    | '/app/settings/connections'
+    | '/app/settings/dimensions'
+    | '/app/settings/hosting'
+    | '/app/settings/invoices'
+    | '/app/settings/payroll'
+    | '/app/settings/people'
+    | '/app/settings/privacy'
+    | '/app/settings/receipts'
+    | '/app/settings/stripe'
+    | '/app/settings/you'
+    | '/app/settings/'
     | '/app/sales_/bill/$billId'
   fileRoutesById: FileRoutesById
 }
@@ -461,6 +627,104 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBankConnectRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/settings/': {
+      id: '/app/settings/'
+      path: '/'
+      fullPath: '/app/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/agents': {
+      id: '/app/settings/agents'
+      path: '/agents'
+      fullPath: '/app/settings/agents'
+      preLoaderRoute: typeof AppSettingsAgentsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/api': {
+      id: '/app/settings/api'
+      path: '/api'
+      fullPath: '/app/settings/api'
+      preLoaderRoute: typeof AppSettingsApiRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/business': {
+      id: '/app/settings/business'
+      path: '/business'
+      fullPath: '/app/settings/business'
+      preLoaderRoute: typeof AppSettingsBusinessRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/connections': {
+      id: '/app/settings/connections'
+      path: '/connections'
+      fullPath: '/app/settings/connections'
+      preLoaderRoute: typeof AppSettingsConnectionsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/dimensions': {
+      id: '/app/settings/dimensions'
+      path: '/dimensions'
+      fullPath: '/app/settings/dimensions'
+      preLoaderRoute: typeof AppSettingsDimensionsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/hosting': {
+      id: '/app/settings/hosting'
+      path: '/hosting'
+      fullPath: '/app/settings/hosting'
+      preLoaderRoute: typeof AppSettingsHostingRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/invoices': {
+      id: '/app/settings/invoices'
+      path: '/invoices'
+      fullPath: '/app/settings/invoices'
+      preLoaderRoute: typeof AppSettingsInvoicesRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/payroll': {
+      id: '/app/settings/payroll'
+      path: '/payroll'
+      fullPath: '/app/settings/payroll'
+      preLoaderRoute: typeof AppSettingsPayrollRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/people': {
+      id: '/app/settings/people'
+      path: '/people'
+      fullPath: '/app/settings/people'
+      preLoaderRoute: typeof AppSettingsPeopleRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/privacy': {
+      id: '/app/settings/privacy'
+      path: '/privacy'
+      fullPath: '/app/settings/privacy'
+      preLoaderRoute: typeof AppSettingsPrivacyRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/receipts': {
+      id: '/app/settings/receipts'
+      path: '/receipts'
+      fullPath: '/app/settings/receipts'
+      preLoaderRoute: typeof AppSettingsReceiptsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/stripe': {
+      id: '/app/settings/stripe'
+      path: '/stripe'
+      fullPath: '/app/settings/stripe'
+      preLoaderRoute: typeof AppSettingsStripeRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/app/settings/you': {
+      id: '/app/settings/you'
+      path: '/you'
+      fullPath: '/app/settings/you'
+      preLoaderRoute: typeof AppSettingsYouRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/app/sales_/bill/$billId': {
       id: '/app/sales_/bill/$billId'
       path: '/sales/bill/$billId'
@@ -470,6 +734,44 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AppSettingsRouteChildren {
+  AppSettingsAgentsRoute: typeof AppSettingsAgentsRoute
+  AppSettingsApiRoute: typeof AppSettingsApiRoute
+  AppSettingsBusinessRoute: typeof AppSettingsBusinessRoute
+  AppSettingsConnectionsRoute: typeof AppSettingsConnectionsRoute
+  AppSettingsDimensionsRoute: typeof AppSettingsDimensionsRoute
+  AppSettingsHostingRoute: typeof AppSettingsHostingRoute
+  AppSettingsInvoicesRoute: typeof AppSettingsInvoicesRoute
+  AppSettingsPayrollRoute: typeof AppSettingsPayrollRoute
+  AppSettingsPeopleRoute: typeof AppSettingsPeopleRoute
+  AppSettingsPrivacyRoute: typeof AppSettingsPrivacyRoute
+  AppSettingsReceiptsRoute: typeof AppSettingsReceiptsRoute
+  AppSettingsStripeRoute: typeof AppSettingsStripeRoute
+  AppSettingsYouRoute: typeof AppSettingsYouRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+}
+
+const AppSettingsRouteChildren: AppSettingsRouteChildren = {
+  AppSettingsAgentsRoute: AppSettingsAgentsRoute,
+  AppSettingsApiRoute: AppSettingsApiRoute,
+  AppSettingsBusinessRoute: AppSettingsBusinessRoute,
+  AppSettingsConnectionsRoute: AppSettingsConnectionsRoute,
+  AppSettingsDimensionsRoute: AppSettingsDimensionsRoute,
+  AppSettingsHostingRoute: AppSettingsHostingRoute,
+  AppSettingsInvoicesRoute: AppSettingsInvoicesRoute,
+  AppSettingsPayrollRoute: AppSettingsPayrollRoute,
+  AppSettingsPeopleRoute: AppSettingsPeopleRoute,
+  AppSettingsPrivacyRoute: AppSettingsPrivacyRoute,
+  AppSettingsReceiptsRoute: AppSettingsReceiptsRoute,
+  AppSettingsStripeRoute: AppSettingsStripeRoute,
+  AppSettingsYouRoute: AppSettingsYouRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
+}
+
+const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
+  AppSettingsRouteChildren,
+)
 
 interface AppRouteChildren {
   AppActivityRoute: typeof AppActivityRoute
@@ -488,7 +790,7 @@ interface AppRouteChildren {
   AppReportsRoute: typeof AppReportsRoute
   AppSalesRoute: typeof AppSalesRoute
   AppSearchRoute: typeof AppSearchRoute
-  AppSettingsRoute: typeof AppSettingsRoute
+  AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppTimeRoute: typeof AppTimeRoute
   AppToolsRoute: typeof AppToolsRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -513,7 +815,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppReportsRoute: AppReportsRoute,
   AppSalesRoute: AppSalesRoute,
   AppSearchRoute: AppSearchRoute,
-  AppSettingsRoute: AppSettingsRoute,
+  AppSettingsRoute: AppSettingsRouteWithChildren,
   AppTimeRoute: AppTimeRoute,
   AppToolsRoute: AppToolsRoute,
   AppIndexRoute: AppIndexRoute,

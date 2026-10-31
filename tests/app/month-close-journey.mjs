@@ -28,7 +28,7 @@ export async function monthCloseBrowser(browser) {
       const context = await browser.newContext({ storageState: await owner.storageState(), viewport: { width, height: width === 390 ? 844 : 1000 } })
       try {
         const page = await context.newPage()
-        await page.goto(origin + '/app/settings')
+        await page.goto(origin + '/app/settings/agents')
         await page.getByText('Monthly close preparation', { exact: true }).click()
         if (width === 1440) {
           await page.getByLabel('Close agent', { exact: true }).selectOption({ label: 'synthetic-pantry-11' })

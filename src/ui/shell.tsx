@@ -48,7 +48,7 @@ export function Shell() {
       <div className="app-actions">
         {offer.search && <Tip text="Find a transaction"><Entry to={SEARCH} current={current === SEARCH} className={`icon-link${current === SEARCH ? ' active' : ''}`} aria-label="Find a transaction" aria-keyshortcuts="Meta+K Control+K"><Icon name="search" /></Entry></Tip>}
         {offer.toolsPage && <Entry to={TOOLS_PAGE} current={current === TOOLS_PAGE} className={`nav-link tools-link${current === TOOLS_PAGE ? ' active' : ''}`}>Tools</Entry>}
-        {offer.settings && <Tip text="People & settings"><Entry to={SETTINGS} current={current === SETTINGS} className={`icon-link settings-link${current === SETTINGS ? ' active' : ''}`} aria-label="People & settings"><Icon name="gear" /></Entry></Tip>}
+        {offer.settings && <Tip text="Settings"><Entry to={SETTINGS} current={current === SETTINGS} className={`icon-link settings-link${current === SETTINGS ? ' active' : ''}`} aria-label="Settings"><Icon name="gear" /></Entry></Tip>}
         {actor && <OwnerMenu variant="bar" name={actor.name} role={role} />}
       </div>
     </header></HydrationUnit>

@@ -80,7 +80,7 @@ export async function cashPlanner(c:Context,query:URLSearchParams) {
   }
  }
  const payroll=await upcomingPayroll(c.env,c.db,asOf,end)
- for(const p of payroll.items)add({id:'payroll:'+p.id,date:p.date,amount:-p.amount,label:'Gusto payroll · '+p.date,reason:'Provider schedule and current calculated debit totals; not a posted payroll',href:'/app/settings?section=connected',kind:'payroll'})
+ for(const p of payroll.items)add({id:'payroll:'+p.id,date:p.date,amount:-p.amount,label:'Gusto payroll · '+p.date,reason:'Provider schedule and current calculated debit totals; not a posted payroll',href:'/app/settings/payroll',kind:'payroll'})
  let whatIf:unknown=[]
  try{whatIf=JSON.parse(query.get('whatIf')??'[]')}catch{requireThat(false,'What-if items must be a JSON list')}
  requireThat(Array.isArray(whatIf)&&whatIf.length<=20,'Use at most 20 what-if items')

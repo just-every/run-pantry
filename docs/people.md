@@ -23,7 +23,7 @@ Someone other than the preparer approves journals, invoices and reopening reques
 
 ## Add a person
 
-In **People & settings**, under **People**, enter their name, email and role, tick their grants and choose **Add person**. Adding someone also sends their sign-in invitation: a hosted Pantry emails them a one-time sign-in link, and **Send sign-in invitation** sends a fresh one if it expires. While you run Pantry on your own computer, no email is sent; the person can still be signed in as here (below).
+In **Settings → People and permissions**, under **Add a person**, enter their name, email and role, tick their grants and choose **Add person**. Adding someone also sends their sign-in invitation: a hosted Pantry emails them a one-time sign-in link, and **Send sign-in invitation** sends a fresh one if it expires. While you run Pantry on your own computer, no email is sent; the person can still be signed in as here (below).
 
 ## Work as someone else on your own computer
 

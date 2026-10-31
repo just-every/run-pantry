@@ -1,4 +1,4 @@
-Live bank feeds, Gusto payroll, Xero attachments and email each work through an account of your own with that provider. Pantry does not come with any of them, so each card in Pantry says when one is not set up yet and shows these same steps. Stripe and the AI key are set up inside Pantry itself, in **People & settings**.
+Live bank feeds, Gusto payroll, Xero attachments and email each work through an account of your own with that provider. Pantry does not come with any of them, so each card in Pantry says when one is not set up yet and shows these same steps. Stripe and the AI key are set up inside Pantry itself, in **Settings**.
 
 Each provider gives you keys. You put them in lines like `PLAID_CLIENT_ID=…` and hand them to Pantry in one of two ways, shown at the end of this page.
 
@@ -35,7 +35,7 @@ GUSTO_CLIENT_SECRET=the Secret
 GUSTO_ENV=demo
 ```
 
-Then connect in **People & settings → Payroll (Gusto)** ([Stripe payouts and Gusto payroll](/docs/stripe-and-gusto)).
+Then connect in **Settings → Payroll (Gusto)** ([Stripe payouts and Gusto payroll](/docs/stripe-and-gusto)).
 
 ## Attachments (Xero)
 
@@ -78,7 +78,7 @@ MAIL_API_KEY=the API key
 MAIL_FROM=billing@example.com
 ```
 
-Write `MAIL_FROM` as the address alone, with no name: `rer deploy` refuses `Your Business <billing@…>`. Invoices and reminders show your business's legal name (**People & settings → The business**) as the sender, and sign-in and invitation emails show Pantry. Customer replies go to the address in **People & settings → Sending invoices and reminders**, or to the owner's current sign-in email.
+Write `MAIL_FROM` as the address alone, with no name: `rer deploy` refuses `Your Business <billing@…>`. Invoices and reminders show your business's legal name (**Settings → Business details**) as the sender, and sign-in and invitation emails show Pantry. Customer replies go to the address in **Settings → Invoices and reminders**, or to the owner's current sign-in email.
 
 ## Give the keys to Pantry
 

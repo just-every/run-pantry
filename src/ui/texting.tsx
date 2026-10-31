@@ -1,6 +1,7 @@
 import { CustomerTimeZone, timeText } from './display-time'
 import { useState } from 'react'
 import { Action, Card, Chip, Field, Form, Loading, Table, command, day, useShared, useView, type D } from './kit'
+import { Help } from './help'
 
 export function TextingSettings() {
  const {data,error,reload}=useView<D>('texting')
@@ -8,7 +9,7 @@ export function TextingSettings() {
  const s=data.settings
  return <Card title="Texting" actions={<Chip tone={s.enabled?'info':'neutral'}>{s.enabled?'Test texting enabled':'Off'}</Chip>}>
   <p>Send hosted invoice links and reminders through your business’s Twilio test account. Test requests send no real SMS. Your email history stays on the invoice.</p>
-  <details className="details"><summary>Twilio registration, fees and data</summary><p className="hint">Only test messaging is available. Before live US business texting, register an A2P 10DLC brand and campaign in Twilio, or verify a toll-free sender. Twilio bills your account for live messages and carrier fees. Pantry sends the customer’s number, exact text and hosted link directly to Twilio, which returns a message ID and status.</p></details>
+  <details className="details"><summary>Twilio registration, fees and data</summary><p className="hint">Only test messaging is available. Before live US business texting, register an A2P 10DLC brand and campaign in Twilio, or verify a toll-free sender. Twilio bills your account for live messages and carrier fees. Pantry sends the customer’s number, exact text and hosted link directly to Twilio, which returns a message ID and status.</p><p className="hint">Test messages in history show how texting works; they do not confirm delivery to a phone.</p></details>
   <details className="details"><summary>{s.connected?'Replace Twilio test account':'Connect Twilio test account'}</summary>
    <Form label="Connect test account" submit={b=>command('texting.connect',{testAccountSid:b.testAccountSid,testAuthToken:b.testAuthToken,confirmTestOnly:b.confirmTestOnly==='on'})} onDone={reload}>
     <Field label="Twilio test account SID" name="testAccountSid" required autoComplete="off" />
@@ -22,11 +23,11 @@ export function TextingSettings() {
    <Field label="Invoice text template" name="invoiceTemplate" type="textarea" defaultValue={s.invoiceTemplate} required />
    <Field label="Text reminder template" name="reminderTemplate" type="textarea" defaultValue={s.reminderTemplate} required />
    <Field label="Text reminder days" name="reminderDays" defaultValue={s.reminderDays.join(', ')} hint="Days before (negative) or after the due date. Empty turns automatic texts off. A customer override can narrow these approved days." />
-   <p className="hint">Fields: {'{{business}}, {{customer}}, {{invoice}}, {{balance}}, {{due_date}}, {{link}}'}. Include the link, STOP and HELP. Texts wait until 08:00–21:00 in the customer’s time zone and 08:00–18:00 in the business’s time zone. STOP cancels held texts immediately.</p>
+   <Help label="Template fields and sending hours"><p>Fields: {'{{business}}, {{customer}}, {{invoice}}, {{balance}}, {{due_date}}, {{link}}'}. Include the link, STOP and HELP. Texts wait until 08:00–21:00 in the customer’s time zone and 08:00–18:00 in the business’s time zone. STOP cancels held texts immediately.</p></Help>
    <label className="check"><input type="checkbox" name="approve" required />I approve these exact templates and reminder days for the consented purposes.</label>
   </Form>
   {s.connected&&<Action tone="danger" run={async()=>{await command('texting.disconnect',{});await reload()}}>Disconnect Twilio</Action>}
-  <p className="hint">{s.updatedAt?<>Last changed {day(s.updatedAt)} by {s.updatedBy}.</>:'No provider connected.'} Test messages in history show how texting works; they do not confirm delivery to a phone.</p>
+  <p className="hint">{s.updatedAt?<>Last changed {day(s.updatedAt)} by {s.updatedBy}.</>:'No provider connected.'}</p>
  </Card>
 }
 

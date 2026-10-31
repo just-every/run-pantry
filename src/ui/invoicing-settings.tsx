@@ -1,4 +1,6 @@
 import { PaymentComparison } from './provider-payment-status'
+import { TextingSettings } from './texting'
+import { StripePayouts } from './connected-settings'
 import { PaymentReceiptPreference } from './payment-notices'
 // Settings for invoices out: how reminders follow up, and connecting the
 // business's own Stripe account so customers can pay by card or ACH from the
@@ -62,9 +64,24 @@ function Stripe({ st, onDone }: { st: D; onDone: () => Promise<void> }) {
   </Card>
 }
 
-export function InvoicingSettings() {
-  const owner=useShared().state.actor.can.owner
+/** Invoices and reminders: how invoices and reminders go out, texting, and the late-fee policy. */
+export function InvoiceSettings() {
+  const { state } = useShared(), business = !!state.settings.entity
+  const { data, error, reload } = useView<D>(business ? 'invoicing' : null)
+  return <>
+    {business && (data ? <Sending s={data.sending} onDone={reload} /> : <Loading error={error} what="invoice settings" />)}
+    {state.actor.can.owner && <TextingSettings />}
+    {business && <LateFeeSettings />}
+  </>
+}
+
+/** Online payments: the Stripe connection, its payouts with the clearing status, and the payment comparison. */
+export function PaymentSettings() {
+  const owner = useShared().state.actor.can.owner
   const { data, error, reload } = useView<D>('invoicing')
-  if (!data) return <Loading error={error} what="invoice settings" />
-  return <><Sending s={data.sending} onDone={reload} /><LateFeeSettings /><Stripe st={data.stripe} onDone={reload} />{data.stripe.connected && owner && <PaymentComparison />}</>
+  return <>
+    {data ? <Stripe st={data.stripe} onDone={reload} /> : <Loading error={error} what="invoice settings" />}
+    <StripePayouts />
+    {data?.stripe.connected && owner && <PaymentComparison />}
+  </>
 }

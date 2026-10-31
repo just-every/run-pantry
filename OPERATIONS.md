@@ -69,7 +69,7 @@ health.
 
 ## Receipts: AI reading and the Pantry address
 
-Both are set up by the owner on **People & settings**; no deploy setting is
+Both are set up by the owner on **Settings → Receipts**; no deploy setting is
 needed. The AI key is stored in the installation's database sealed with a key
 derived from `SESSION_SECRET`: rotating that secret, or importing the books
 into another installation, leaves the key unreadable and the card asks for it

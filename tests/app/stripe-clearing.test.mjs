@@ -21,15 +21,15 @@ test('REPORT-005 / PROC-003 missing Stripe refund is named on close and settings
   for(const repaired of [false,true]){
     if(repaired){
       provider.repair()
-      const repairPage=await owner.newPage();await repairPage.goto(`${app.origin}/app/settings`)
+      const repairPage=await owner.newPage();await repairPage.goto(`${app.origin}/app/settings/stripe`)
       await repairPage.getByRole('button',{name:'Read payouts now',exact:true}).click()
-      await repairPage.locator('.card').filter({has:repairPage.getByRole('heading',{name:'Stripe clearing',exact:true})}).getByText('Matches provider',{exact:true}).waitFor()
+      await repairPage.locator('.clearing-status').getByText('Matches provider',{exact:true}).waitFor()
       await repairPage.close()
     }
     for(const width of [1440,390]){
       const context=await browser.newContext({storageState,viewport:{width,height:width===390?844:1000}}),page=await context.newPage(),errors=[]
       page.on('pageerror',e=>errors.push(String(e)))
-      for(const [name,path] of [['close','/app/close?period=2026-09'],['settings','/app/settings']]){
+      for(const [name,path] of [['close','/app/close?period=2026-09'],['settings','/app/settings/stripe']]){
         await page.goto(app.origin+path)
         if(name==='close'){
           const row=page.getByRole('row').filter({has:page.getByText('Stripe clearing agrees to the provider',{exact:true})})
@@ -37,8 +37,10 @@ test('REPORT-005 / PROC-003 missing Stripe refund is named on close and settings
           if(!repaired){assert.ok((await row.innerText()).includes('txn_refund'));assert.ok((await row.innerText()).includes('$100.00'))}
           else assert.ok((await row.innerText()).includes('difference $0.00'))
         }else{
-          const card=page.locator('.card').filter({has:page.getByRole('heading',{name:'Stripe clearing',exact:true})})
+          // The payouts card shows clearing as a status line; its comparison and items fold under Clearing evidence.
+          const card=page.locator('.card').filter({has:page.getByRole('heading',{name:'Stripe payouts',exact:true})}).locator('.clearing-status')
           await card.getByText(repaired?'Matches provider':'Needs attention',{exact:true}).waitFor()
+          await card.getByText('Clearing evidence',{exact:true}).click()
           if(!repaired){await card.getByRole('cell',{name:/txn_refund/}).waitFor();await card.getByText('refund',{exact:true}).waitFor()}
           else assert.equal(await card.getByRole('cell',{name:/txn_refund/}).count(),0)
           const response=await context.request.get(new URL(await card.getByRole('link',{name:'Download comparison and item evidence',exact:true}).getAttribute('href'),app.origin).href)
@@ -46,7 +48,7 @@ test('REPORT-005 / PROC-003 missing Stripe refund is named on close and settings
         }
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${name} ${width} fits`)
         if(name==='settings'){
-          await page.locator('.card').filter({has:page.getByRole('heading',{name:'Stripe clearing',exact:true})}).screenshot({path:`/tmp/pantry-r14-proc003-settings-card-${repaired?'repaired':'missing'}-${width}.png`})
+          await page.locator('.clearing-status').screenshot({path:`/tmp/pantry-r14-proc003-settings-card-${repaired?'repaired':'missing'}-${width}.png`})
           const payout=page.locator('.card').filter({has:page.getByRole('heading',{name:'Stripe payouts',exact:true})})
           await payout.getByText('Change payout settings',{exact:true}).click()
           const start=payout.getByLabel('Activity start date',{exact:true});await start.waitFor();assert.equal(await start.inputValue(),'2026-09-01')

@@ -34,7 +34,7 @@ export async function webhookJourney(t) {
     try {
       const page = await context.newPage(), errors = []
       page.on('pageerror', error => errors.push(String(error)))
-      await page.goto(app.origin + '/app/settings')
+      await page.goto(app.origin + '/app/settings/api')
       const card = page.getByRole('heading', { name: 'Webhooks', exact: true }).locator('../..')
       const history = page.getByRole('heading', { name: 'Webhook delivery history', exact: true }).locator('../..')
       const secret = page.getByRole('status', { name: 'One-time webhook secret' })

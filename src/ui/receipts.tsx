@@ -26,7 +26,7 @@ function Preview({ r }: { r: D }) {
 
 function ReadLine({ r, reader }: { r: D; reader: D }) {
   if (r.read_status === 'read') return <p className="read-line"><Chip tone="info">Read with AI</Chip>{r.read_note && <span className="hint"> {r.read_note}</span>}</p>
-  if (r.read_status === 'no-key') return <p className="read-line"><Chip tone="warn">Not read</Chip> <span>Add a key to read receipts. {reader.canSet && <Link to="/app/settings" hash="ai-reading">Add a key</Link>}</span></p>
+  if (r.read_status === 'no-key') return <p className="read-line"><Chip tone="warn">Not read</Chip> <span>Add a key to read receipts. {reader.canSet && <Link to="/app/settings/receipts">Add a key</Link>}</span></p>
   return <p className="read-line"><Chip tone="warn">Not read</Chip> <span>{r.read_note}</span></p>
 }
 
@@ -119,7 +119,7 @@ function Rules({ data, onChange }: { data: D; onChange: () => Promise<void> }) {
 function Forwarding({ inbox, owner }: { inbox: D; owner: boolean }) {
   if (inbox.address) return <p className="forward-line"><Icon name="receipt" /> <span>Forward receipt emails to <code className="token">{inbox.address}</code>{inbox.lastReceivedAt && <small className="sub"> Last received {day(inbox.lastReceivedAt)}.</small>}</span></p>
   if (inbox.hosting === 'no-domain') return <p className="forward-line hint">Forwarding receipts by email needs a domain of your own; RER Managed hosting has none yet. Photos and uploads work here.</p>
-  return <p className="forward-line hint">Forward receipts by email: {owner ? <Link to="/app/settings" hash="receipt-address">set up your Pantry address</Link> : 'the owner sets up a Pantry address'}.</p>
+  return <p className="forward-line hint">Forward receipts by email: {owner ? <Link to="/app/settings/receipts">set up your Pantry address</Link> : 'the owner sets up a Pantry address'}.</p>
 }
 
 export function Receipts() {
@@ -131,7 +131,7 @@ export function Receipts() {
     {!data ? <Loading error={error} what="receipts" /> : <>
       <Card title="Add a receipt">
         {state.actor.can.record ? <CaptureButtons onDone={refresh} /> : <p className="hint">Viewers see receipts; a bookkeeper, accountant or the owner adds them.</p>}
-        {data.reader.unavailable ? <p className="hint">{data.reader.unavailable}</p> : data.reader.missing ? <p className="hint">{data.reader.missing} {state.actor.can.owner && <Link to="/app/settings" hash="ai-reading">Add a key</Link>}</p> : <p className="hint">Read with your connected AI. The original is kept exactly as received.</p>}
+        {data.reader.unavailable ? <p className="hint">{data.reader.unavailable}</p> : data.reader.missing ? <p className="hint">{data.reader.missing} {state.actor.can.owner && <Link to="/app/settings/receipts">Add a key</Link>}</p> : <p className="hint">Read with your connected AI. The original is kept exactly as received.</p>}
         <Forwarding inbox={data.inbox} owner={state.actor.can.owner} />
       </Card>
       <CaptureApprovalRules rules={data.approvalRules} accounts={data.accounts} onChange={refresh} />

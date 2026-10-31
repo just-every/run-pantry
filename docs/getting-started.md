@@ -35,7 +35,7 @@ Open the `RER_OPEN` link in your browser on the same computer. Keep the terminal
 
 ## Finish setup
 
-The first time you sign in, Pantry asks you to confirm the owner of this installation. It shows the owner's name and email (on your own computer the name starts as "Owner"); you change both later in **People & settings › You, the owner**. Tick **I confirm this owner account is ready to use.** and choose **Finish setup**. Pantry then opens **Overview**, with the five setup steps described in [Your first month](/docs/first-month).
+The first time you sign in, Pantry asks you to confirm the owner of this installation. It shows the owner's name and email (on your own computer the name starts as "Owner"); you change both later in **Settings › You, the owner**. Tick **I confirm this owner account is ready to use.** and choose **Finish setup**. Pantry then opens **Overview**, with the five setup steps described in [Your first month](/docs/first-month).
 
 ## Stop and start again
 

@@ -2,7 +2,7 @@ Pantry has no built-in model. Instead, you point the agent you already use at yo
 
 ## Give your agent a token
 
-The owner opens **People & settings** and, under **Agent access**, enters a name and chooses **Create agent token**. The token is shown once: copy it into your agent's settings straight away. Pantry keeps only its hash, and you can deactivate the agent at any time.
+The owner opens **Settings → Agent access**, enters a name and chooses **Create agent token**. The token is shown once: copy it into your agent's settings straight away. Pantry keeps only its hash, and you can deactivate the agent at any time.
 
 ## What an agent can propose
 

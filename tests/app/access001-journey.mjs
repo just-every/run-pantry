@@ -36,7 +36,7 @@ export async function access001Browser(t) {
   await command(owner, 'management-package.save', { name: 'Sales management package', reportIds: [sharedReport.id], sharedRoles: ['sales'] })
   for (const width of [1440, 390]) {
     const settings = await owner.newPage(); await settings.setViewportSize({ width, height: 1000 })
-    await settings.goto(`${origin}/app/settings`)
+    await settings.goto(`${origin}/app/settings/people`)
     const people = settings.locator('section.card').filter({ has: settings.getByRole('heading', { name: 'People', exact: true }) })
     const emails = {}
     for (const [role, n] of [['sales', 7], ['payables-clerk', 8], ['accountant', 9], ['time-only', 10]]) {
@@ -54,6 +54,7 @@ export async function access001Browser(t) {
     await people.screenshot({ path: `${evidence}/access001-people-${width}.png` })
     const privacy = settings.locator('section.card').filter({ has: settings.getByRole('heading', { name: 'Role privacy', exact: true }) })
     await privacy.screenshot({ path: `${evidence}/access001-privacy-${width}.png` })
+    await settings.goto(`${origin}/app/settings/api`)
     const timeScope = settings.getByRole('checkbox', { name: /time-entries:read/ })
     const projectScope = settings.getByRole('checkbox', { name: /time-projects:read/ })
     await settings.getByLabel('Integration name', { exact: true }).fill(`Time readback ${width}`)

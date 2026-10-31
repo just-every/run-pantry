@@ -43,7 +43,7 @@ export async function destinationExportsBrowser(t) {
         const response = await next.request.get(destination.origin + url)
         assert.equal(response.status(), 200); assert.equal(response.headers()['content-type'],'application/zip')
       }
-      await page.goto(destination.origin+'/app/settings');const disclosure=page.locator('[data-service="qbo"]');await disclosure.locator('summary').click();if(process.env.PANTRY_PROOF_DIR)await disclosure.screenshot({path:`${process.env.PANTRY_PROOF_DIR}/qbo-disclosure-${width}.png`});assert.deepEqual(errors, [])
+      await page.goto(destination.origin+'/app/settings/connections');const disclosure=page.locator('[data-service="qbo"]');await disclosure.locator('summary').click();if(process.env.PANTRY_PROOF_DIR)await disclosure.screenshot({path:`${process.env.PANTRY_PROOF_DIR}/qbo-disclosure-${width}.png`});assert.deepEqual(errors, [])
     } finally { await next.close(); await destination.close() }
   }
 }

@@ -27,8 +27,8 @@ export async function dimensionsBrowser(t){
   const errors=[];page.on('pageerror',e=>errors.push(String(e)))
   const submit=async(button,operation)=>{const saved=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/pantry/command/'+operation&&r.request().method()==='POST');await button.click();assert.equal((await saved).status(),200)}
   const shot=async(name)=>{for(const control of await page.locator('.card-actions select,.card-actions input,.card-actions button').all()){if(await control.isVisible()){const b=await control.boundingBox();assert.ok(b&&b.x>=0&&b.x+b.width<=width+1,`${name} filter control fits ${width}`)}}assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${name} fits ${width}`);await page.screenshot({path:`${proof}/dimensions-${name}-${width}.png`,fullPage:true})}
-  await page.goto(origin+'/app/settings')
-  const section=page.getByRole('heading',{name:'Classes, locations and projects',exact:true}).locator('..').locator('..')
+  await page.goto(origin+'/app/settings/dimensions')
+  const section=page.getByRole('heading',{name:'Classes, locations and projects',exact:true,level:2}).locator('..').locator('..')
   for(const name of ['Enable classes','Enable locations','Enable projects'])await section.getByLabel(name,{exact:true}).check()
   await section.getByRole('button',{name:'Save dimension settings',exact:true}).click()
   for(const [kind,name] of [['class',`Studio ${width}`],['location',`New York ${width}`],['project',`Cedar website ${width}`]]){

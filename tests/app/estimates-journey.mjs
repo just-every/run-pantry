@@ -147,7 +147,7 @@ export async function estimatesJourney(t) {
     await page.getByRole('link', { name: lastInvoice.number, exact: true }).click()
     await expect(page.getByRole('heading', { name: `${customer.name} — ${lastInvoice.number}`, exact: true })).toBeVisible()
     await shot('converted-invoice-link')
-    await page.goto(`${origin}/app/settings`)
+    await page.goto(`${origin}/app/settings/connections`)
     const mailInventory = page.locator('#data-flows [data-service="mail"]')
     await mailInventory.locator('summary').click()
     await mailInventory.screenshot({ path: `${evidence}/estimate-mail-data-${width}.png` })

@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { DimensionFormFields } from './dimensions'
 import { Card, command, Field, Form, Loading, today, useShared, useView, type D } from './kit'
+import { Help } from './help'
 
 export function LateFeeSettings() {
   const { state } = useShared(), { data, error, reload } = useView<D>(state.actor.can.owner ? 'late-fees' : null)
@@ -8,7 +9,7 @@ export function LateFeeSettings() {
   if (!data) return <Loading error={error} what="late-fee policy" />
   const p = data.policy
   return <Card title="Late-fee policy">
-    <p>Late fees are off until you enable them. Decide with your accountant what your state allows. Preparing a fee creates a separate invoice draft for review and approval.</p>
+    <Help label="How late fees work"><p>Late fees are off until you enable them. Decide with your accountant what your state allows. Preparing a fee creates a separate invoice draft for review and approval.</p></Help>
     <Form key={p.revision} label="Save late-fee policy" submit={b => command('late-fee-policy.save', { ...b, enabled: b.enabled === 'on', revision: p.revision })} onDone={reload} className="grid-form">
       <label className="check"><input name="enabled" type="checkbox" defaultChecked={p.enabled} /> Allow late-fee drafts</label>
       <Field label="Late-fee method" name="method" defaultValue={p.method} required options={[{ value: 'percentage', label: 'Percentage of open invoice balance' }, { value: 'flat', label: 'Flat amount' }]} />

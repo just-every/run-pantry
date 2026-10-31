@@ -2,7 +2,7 @@ Give a sibling book such as Pier, Cabin or Coffer its own credential to read and
 
 ## Create a credential
 
-The owner opens **People & settings → Integration credentials**, names the connection and ticks the scopes it needs. Use a separate credential for each connection so you can stop one without stopping the others.
+The owner opens **Settings → API and webhooks**, under **Integration credentials**, names the connection and ticks the scopes it needs. Use a separate credential for each connection so you can stop one without stopping the others.
 
 Choose **Create integration credential** and copy the value into the sibling book's private configuration. It is shown once. Pantry stores only its hash and cannot show it again. Anyone holding the value can use its scopes; keep it out of source files, logs and shared commands.
 

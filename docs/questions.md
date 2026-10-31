@@ -16,7 +16,7 @@ Months that are locked are left alone. A question is asked once: once you answer
 
 Each new question goes to the owner's email, a few a day (3 by default). The email says what doesn't add up, shows the record, and lists the answers by number, each with what it changes, for example *Files it to 6200 Software and subscriptions; October net income $9,840.00 → $9,785.01.* The link opens that exact record in Pantry.
 
-If you have set up your **Pantry address** (**People & settings › Forward receipts by email**), the question comes from your books with that address to reply to:
+If you have set up your **Pantry address** (**Settings › Receipts**), the question comes from your books with that address to reply to:
 
 - Reply with the **number** to file it that way. Add **always** (for example `2 always`) and Pantry also makes a bank rule, so the next ones from that payee file themselves.
 - For a receipt question, reply with the **receipt attached**, and Pantry attaches it to the bill or entry.
@@ -37,7 +37,7 @@ Each question keeps its conversation: what Pantry asked, every answer by email o
 
 ## AI model key
 
-Pantry checks with built-in rules and says so. With the installation's own AI model key (**People & settings › AI reading**, the same key that reads receipts) it also reads answers written in your own words and guesses the category of a payee it has never seen. The model only ever picks one of the answers or one of your categories, and nothing is filed until you say yes. RER Managed hosting has no outbound connection for AI providers yet and says so in one line.
+Pantry checks with built-in rules and says so. With the installation's own AI model key (**Settings › Receipts**, the same key that reads receipts) it also reads answers written in your own words and guesses the category of a payee it has never seen. The model only ever picks one of the answers or one of your categories, and nothing is filed until you say yes. RER Managed hosting has no outbound connection for AI providers yet and says so in one line.
 
 ## At month end
 
@@ -49,7 +49,7 @@ The owner sets, on the Questions page, whether new questions are emailed, how ma
 
 ## Questions for your accountant
 
-Invite an accountant in People & settings. From a bank transaction, journal entry,
+Invite an accountant in Settings › People and permissions. From a bank transaction, journal entry,
 report figure or its source record, choose **Ask accountant**, choose the invited
 accountant and write the question. Pantry keeps the exact record and its date and
 amount (or the report, period, basis and figure) with the thread. Existing agent

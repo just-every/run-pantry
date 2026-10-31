@@ -29,7 +29,7 @@ export async function erasureJourney(t) {
       }
     }
     const errors=[];page.on('pageerror',e=>errors.push(String(e)))
-    await page.goto(app.origin+'/app/settings')
+    await page.goto(app.origin+'/app/settings/privacy')
     await page.getByRole('heading',{name:'Erase personal data',exact:true}).waitFor()
     const subject=page.getByLabel('Person or contact',{exact:true})
     await subject.selectOption({label:`Cedar Studio ${width} · customer`})

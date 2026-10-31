@@ -212,7 +212,7 @@ test('REPORT-002 every report opens by clicking it, at 1440 and 390, and a payme
   assert.equal(pl.expenses.find(e => e.code === '6000').amount, 150000, 'the cash basis counts the contractor cost in September')
 
   // Put Pantry online never offers the placeholder owner address: it asks for the owner's own email, then fills the deploy lines with it.
-  await page.goto(`${app.origin}/app/settings`)
+  await page.goto(`${app.origin}/app/settings/hosting`)
   const online = page.locator('#put-online')
   await online.getByText('Set up hosting').click()
   await online.getByLabel('Your own email').waitFor()
@@ -390,7 +390,7 @@ test('Settings carry the Business and API-001 financial-report and vendor-credit
   for (const width of [1440, 390]) {
     const context = await browser.newContext({ storageState: await owner.storageState(), viewport: { width, height: width === 390 ? 844 : 1000 } })
     const page = await context.newPage(), errors = []; page.on('pageerror', error => errors.push(String(error)))
-    await page.goto(`${app.origin}/app/settings`)
+    await page.goto(`${app.origin}/app/settings/api`)
     const scope = page.getByRole('checkbox', { name: /Reports reports:read/ })
     await scope.waitFor()
     await page.getByText('Read financial statements, ledgers, sales, tax, open items and financial report-library summaries.', { exact: true }).waitFor()

@@ -130,9 +130,9 @@ function AgentSettings({ agent, onSaved }: { agent: D; onSaved: () => Promise<vo
       <Field label="Ask about an unfiled payment or missing receipt after (days)" name="fileDays" type="number" min={0} max={120} defaultValue={s.fileDays} required />
       <Field label="Ask for receipts from (amount)" name="receiptAmount" defaultValue={s.receiptAmount} required hint="Costs under this need no receipt question" />
       <p className="hint field-wide">{agent.replyTo ? <>Replies come back to your Pantry address, {agent.replyTo}: reply with a number, in your own words, or with the receipt attached.</>
-        : agent.hosting === 'local' ? 'On this computer no email reaches Pantry; answer here, or send a saved reply (.eml) to your Pantry address in People & settings → Forward receipts by email to try it.'
+        : agent.hosting === 'local' ? 'On this computer no email reaches Pantry; answer here, or send a saved reply (.eml) to your Pantry address in Settings › Receipts to try it.'
         : agent.hosting === 'no-domain' ? 'RER Managed hosting has no domain of yours yet, so replies cannot reach Pantry; the emails link here to answer.'
-        : <>To answer by replying, create your Pantry address in <a href="/app/settings#receipt-address">People & settings → Forward receipts by email</a>. Until then the emails link here to answer.</>}</p>
+        : <>To answer by replying, create your Pantry address in <a href="/app/settings/receipts">Settings › Receipts</a>. Until then the emails link here to answer.</>}</p>
     </div><div className="form-end"><button className="btn btn-primary">Save</button>{saved && <span role="status" className="hint">Saved.</span>}{error && <p role="alert" className="error">{error}</p>}</div></form>
   </Card>
 }
