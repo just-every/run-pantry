@@ -336,7 +336,8 @@ test('REPORT-005 / BILL-001 captured bill visits every lifecycle state, credits 
 })
 
 test('ACCESS-003 owner limits, exact atomic self-issue, second-person corrections, templates and discount authority through HTTP', async t => {
-  const h = await harness(); t.after(() => h.close())
+  // Midday UTC is also October 31 in the business's America/New_York zone.
+  const h = await harness({ clock: '2026-10-31T12:00:00Z' }); t.after(() => h.close())
   await (await import('./access003-journey.mjs')).access003Journey(h)
 })
 

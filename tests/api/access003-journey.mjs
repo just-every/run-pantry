@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { at, books } from './harness.mjs'
 
 export async function access003Journey(h) {
-  const { acct } = await books(h), day = new Date().toISOString().slice(0, 10)
+  // Match this journey's fixed accounting clock, independently of the host date.
+  const { acct } = await books(h), day = '2026-10-31'
   const book = await h.member('bea@example.test', 'bookkeeper', { canPost: true })
   const accountant = await h.member('ann@example.test', 'accountant', { canPost: true })
   const noPost = await h.member('cal@example.test', 'bookkeeper')
@@ -91,8 +92,7 @@ export async function access003Journey(h) {
     await h.command('recurring.approve-price', { id: price.id, revision: price.revision, templateRevision: within.revision, limitRevision: (await limit()).revision }, book, status)
   }
   // A valid standing template approval survives a later limit change; schedules do not spend a person's limit.
-  const scheduleDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
-  const scheduled = await h.command('recurring.save', { customerId: c.id, startDate: scheduleDay, endDate: scheduleDay, every: 1, unit: 'month', mode: 'send', lines: [line('1800')] }, book)
+  const scheduled = await h.command('recurring.save', { customerId: c.id, startDate: day, endDate: day, every: 1, unit: 'month', mode: 'send', lines: [line('1800')] }, book)
   await h.command('recurring.approve', { id: scheduled.id, revision: scheduled.revision, limitRevision: (await limit()).revision }, book)
   await saveLimit('role:bookkeeper', '0', '0')
   await h.cron()
