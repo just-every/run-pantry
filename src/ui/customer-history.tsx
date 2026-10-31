@@ -53,7 +53,7 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
     {state.actor.can.owner && <CustomerTextConsent customer={c} />}
     <CustomerStatements data={data} reload={reload} />
     <Card title="Customer email history">
-      <p className="hint">Accepted means the provider accepted the message. It does not confirm delivery or reading. Local messages are suppressed.</p>
+      <p className="hint">Accepted means the provider accepted the message. It does not confirm delivery or reading.</p>
       <Table heads={['When', 'Record', 'Recipient', 'Message', 'Outcome']} empty="No customer email recorded.">
         {data.deliveries.map((d: D) => <tr id={`delivery-${d.id}`} key={d.id}><td>{day(d.at)}</td><td><a href={d.kind === 'statement' ? d.href : d.kind === 'estimate' ? d.href || `/app/sales?tab=estimates&estimate=${encodeURIComponent(d.estimate_id)}` : `/app/reports?record=${encodeURIComponent(`invoice:${d.invoice_id}`)}`}>{d.number}</a></td><td>{d.recipient}</td><td><details className="details"><summary>{d.subject}</summary><p>{d.kind === 'autopay-failed' ? 'Automatic payment failure' : d.kind === 'statement' ? 'Statement' : d.kind === 'estimate' ? 'Estimate' : d.kind === 'reminder' ? 'Reminder' : d.kind === 'receipt' ? 'Payment receipt' : d.kind === 'processing' ? 'Bank payment processing' : d.kind === 'returned' ? 'Payment returned' : 'Invoice'} · {d.provider || 'No provider'}{d.provider_message_id ? ` · ${d.provider_message_id}` : ''}</p><p>{d.detail || 'No additional outcome detail.'}</p></details></td><td><Chip>{d.status}</Chip></td></tr>)}
       </Table>

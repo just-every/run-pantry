@@ -1,3 +1,4 @@
+import { timeText } from './display-time'
 // Connected banks and cards: each connection's accounts with their last sync,
 // a plain warning and a Re-link button when the bank needs the owner to sign in
 // again, and the link to connect another one.
@@ -33,10 +34,10 @@ function Connection({ c, notice, onDone }: { c: D; notice?: D; onDone: () => Pro
     <div className="feed-head"><strong>{c.institution_name}</strong>{notice ? <Chip tone="warn">{notice.kind === 'expiring' ? 'Consent expiring' : notice.requiresRelink ? 'Needs re-link' : 'Needs attention'}</Chip> : <Chip tone="good">Live</Chip>}</div>
     <ul className="feed-accounts">{c.accounts.map((a: D) => <li key={a.id}>
       <span>{a.name} <small className="sub">••{a.mask}</small></span>
-      {a.bank_account_id ? <small>→ {a.bank_name} · {a.last_synced_at ? <>synced {ago(a.last_synced_at)}</> : 'not synced yet'}{a.pending ? ` · ${a.pending} pending` : ''}{a.balance_cents !== null ? ` · bank shows ${usd(a.balance_cents)}${a.kind.startsWith('credit') ? ' owed' : ''} · ${a.balance_as_of ? `as of ${a.balance_as_of}` : `observed ${a.balance_observed_at ?? a.last_synced_at ?? 'at an unknown time'} (bank gave no as-of time)`}` : ''}</small> : <small className="sub">Not brought in</small>}
+      {a.bank_account_id ? <small>→ {a.bank_name} · {a.last_synced_at ? <>synced {ago(a.last_synced_at)}</> : 'not synced yet'}{a.pending ? ` · ${a.pending} pending` : ''}{a.balance_cents !== null ? ` · bank shows ${usd(a.balance_cents)}${a.kind.startsWith('credit') ? ' owed' : ''} · ${a.balance_as_of ? `as of ${timeText(a.balance_as_of)}` : `observed ${a.balance_observed_at || a.last_synced_at ? timeText(a.balance_observed_at ?? a.last_synced_at) : 'at an unknown time'} (bank gave no as-of time)`}` : ''}</small> : <small className="sub">Not brought in</small>}
       {a.bank_account_id && can && <HistoryChoice account={a} onDone={onDone} />}
     </li>)}</ul>
-    {c.status === 'active' && brought.length > 0 && <p className="hint">Next sync: {new Date(c.sync_due_at).getTime() <= Date.now() ? 'due now' : new Date(c.sync_due_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</p>}
+    {c.status === 'active' && brought.length > 0 && <p className="hint">Next sync: {new Date(c.sync_due_at).getTime() <= Date.now() ? 'due now' : timeText(c.sync_due_at)}</p>}
     {c.status === 'relink' && <p className="hint">Next sync: after you re-link.</p>}
     {c.status === 'active' && c.last_sync_error && <p className="hint">Last try: {c.last_sync_error}. Pantry tries again within the hour.</p>}
     {can && <div className="row-actions small">
@@ -53,8 +54,8 @@ function Connection({ c, notice, onDone }: { c: D; notice?: D; onDone: () => Pro
 export function FeedHealthNotices({ notices, onDone }: { notices: D[]; onDone: () => Promise<void> }) {
   const can = useShared().state.actor.can.record
   return <>{notices.map(n => <div key={n.itemId} className="callout callout-warn relink" role="status"><Icon name="alert" />
-    <div><strong>{n.message}</strong><span>{n.name}. Last successful sync: {n.lastSyncedAt ? new Date(n.lastSyncedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'never'}.</span>
-      {n.notification?.detail && <small>{n.notification.detail}</small>}</div>
+    <div><strong>{n.message}</strong><span>{n.name}. Last successful sync: {n.lastSyncedAt ? timeText(n.lastSyncedAt) : 'never'}.</span>
+      {n.notification?.detail && n.notification.status !== 'local' && <small>{n.notification.detail}</small>}</div>
     {can && <Action tone="primary" run={async () => { if (n.requiresRelink) await relink({ id: n.itemId }); else await command('feed.sync', { itemId: n.itemId }); await onDone() }}>{n.requiresRelink ? 'Re-link' : 'Sync now'}</Action>}</div>)}</>
 }
 

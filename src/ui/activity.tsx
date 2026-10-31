@@ -1,3 +1,4 @@
+import { timeText } from './display-time'
 import { useEffect, useState } from 'react'
 import { Card, Chip, Field, Form, Loading, PageHead, Table, useView, useWho, type D } from './kit'
 import { ListFilters } from './list-filters'
@@ -24,14 +25,14 @@ export function Activity() {
     <ListFilters active={[...new URLSearchParams(query)].map(([key, value]) => ({ label: `${({ person: 'Person', from: 'From', to: 'Through', record: 'Record' } as Record<string, string>)[key]}: ${key === 'person' ? who(value) : value}`, clear: () => { const next = new URLSearchParams(query); next.delete(key); setQuery(next.toString()) } }))}><Form label="Filter activity" className="grid-form" submit={async b => { setQuery(new URLSearchParams(Object.entries(b).filter(([, v]) => v !== '') as [string, string][]).toString()) }}>
       <Field label="Person or connection" name="person" key={query + 'person'} defaultValue={new URLSearchParams(query).get('person') ?? ''} options={people.map((email: string) => ({ value: email, label: who(email) }))} empty="Everyone" />
       <Field label="From date" name="from" key={query + 'from'} defaultValue={new URLSearchParams(query).get('from') ?? ''} type="date" /><Field label="Through date" name="to" key={query + 'to'} defaultValue={new URLSearchParams(query).get('to') ?? ''} type="date" />
-      <Field label="Record ID" name="record" key={query + 'record'} defaultValue={new URLSearchParams(query).get('record') ?? ''} hint="Copy the record ID from Inspect history." />
+      <Field label="Record reference" name="record" key={query + 'record'} defaultValue={new URLSearchParams(query).get('record') ?? ''} placeholder="Copy from Inspect history" />
     </Form></ListFilters>
     {!data ? <Loading error={error} what="activity" /> : <>
       <Card title="Activity"><Table heads={['When', 'Who', 'Action', 'Record']} empty="No activity matches these filters.">
-        {data.audit.map((e: D) => <tr key={e.id}><td>{new Date(e.at).toLocaleString()}</td><td><div>{who(e.actor_email)}</div><small className="sub">{e.origin_kind || e.actor_kind}</small></td><td>{actionLabel(e.action)}</td><td>{recordLabel(e.subject_kind, e.subject_id)}<Evidence event={e} /></td></tr>)}
+        {data.audit.map((e: D) => <tr key={e.id}><td>{timeText(e.at)}</td><td><div>{who(e.actor_email)}</div><small className="sub">{({ person: 'Person', rule: 'Rule', agent: 'Books agent', connection: 'Connection', schedule: 'Schedule', system: 'System', integration: 'Integration' } as Record<string, string>)[e.origin_kind || e.actor_kind] ?? 'Unknown origin'}</small></td><td>{actionLabel(e.action)}</td><td>{recordLabel(e.subject_kind, e.subject_id)}<Evidence event={e} /></td></tr>)}
       </Table></Card>
       <Card title="Approvals"><Table heads={['When', 'Who', 'What', 'Decision', 'History']} empty="No approvals match these filters.">
-        {data.approvals.map((a: D) => <tr key={a.id}><td>{new Date(a.at).toLocaleString()}</td><td>{who(a.actor_email)}</td><td>{approvalLabel(a.subject_kind, a.action)}</td><td><Chip tone={a.decision === 'approved' ? 'good' : 'warn'}>{a.decision === 'approved' ? 'Approved' : 'Declined'}</Chip>{a.note && <small className="sub">{a.note}</small>}</td><td><details><summary>Inspect approval</summary><dl><dt>Record</dt><dd>{recordLabel(a.subject_kind, a.subject_id)} · {a.subject_id}</dd><dt>Revision</dt><dd>{a.subject_revision}</dd><dt>Action</dt><dd>{a.action}</dd></dl></details></td></tr>)}
+        {data.approvals.map((a: D) => <tr key={a.id}><td>{timeText(a.at)}</td><td>{who(a.actor_email)}</td><td>{approvalLabel(a.subject_kind, a.action)}</td><td><Chip tone={a.decision === 'approved' ? 'good' : 'warn'}>{a.decision === 'approved' ? 'Approved' : 'Declined'}</Chip>{a.note && <small className="sub">{a.note}</small>}</td><td><details><summary>Inspect approval</summary><dl><dt>Record</dt><dd>{recordLabel(a.subject_kind, a.subject_id)} · {a.subject_id}</dd><dt>Revision</dt><dd>{a.subject_revision}</dd><dt>Action</dt><dd>{a.action}</dd></dl></details></td></tr>)}
       </Table></Card>
     </>}
   </>
