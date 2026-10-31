@@ -9,9 +9,7 @@ import { runPageHtml, siteNotFoundHtml, type RunData, type SiteBuild, type SiteC
 import { identity } from '../identity'
 import { DocsArticle } from './docs/DocsArticle'
 import { DocsIndex } from './docs/DocsIndex'
-import { docsHead, docsPages, docsSections, getDocsPage } from './docs/pages'
-import { SearchField } from './docs/search/SearchField'
-import { searchSections, type SearchPage } from './docs/build/search'
+import { docsHead, docsPages } from './docs/pages'
 import { Landing } from './landing/Landing'
 import run from './run.json'
 import { runPricing } from '../base/run-pricing'
@@ -25,7 +23,7 @@ const SHARE_IMAGE = `${identity.runSite}/site/share.jpg`
 // Pantry’s header skips to this target on Base-rendered pages too.
 const withMainTarget = (html: string) => html.replace('<main>', '<main id="main">')
 
-export function sitePages({ styles, clients, contract, hosting }: SiteContext): SiteBuild {
+export function sitePages({ styles, contract, hosting }: SiteContext): SiteBuild {
   const data: RunData = { ...run, pricing: runPricing }
   const homepageHeader = { html: renderToStaticMarkup(<SiteHeader />), styles }
   const document = (title: string, description: string, body: ReactElement, script = '') => '<!doctype html>' + renderToStaticMarkup(
@@ -57,27 +55,14 @@ export function sitePages({ styles, clients, contract, hosting }: SiteContext): 
     </html>,
   )
   const head = (slug?: string) => { const { title, description } = docsHead(slug); return [title, description] as const }
-  const hostingHtml = withMainTarget(hostingPageHtml(identity, data, hosting ?? null, contract, homepageHeader))
-    .replace('<h1>', '<h1 id="docs-title">')
-  const searchPages: SearchPage[] = [
-    { href: '/docs', searchSections: [{ anchor: 'docs-title', titlePath: ['Docs'], text: docsSections.flatMap(section => section.pages.map(page => `${page.title}. ${page.summary}`)).join(' ') }] },
-    ...docsPages.map(page => ({ href: `/docs/${page.slug}`, searchSections: searchSections(
-      page.slug === 'hosting' ? hostingHtml.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)![1] : getDocsPage(page.slug)!.html,
-      page.title, 'docs-title') })),
-  ]
-  // Static local previews use these exact sections when the semantic service is unavailable.
-  const corpus = `<script id="docs-search-corpus" type="application/json">${JSON.stringify(searchPages).replaceAll('<', '\\u003c')}</script>`
-  const searchClient = `<script type="module" src="${clients.docsSearch}"></script>`
-  const enhanceDocs = (html: string, index = false) => html.replace('</body>', `${index ? corpus : ''}${searchClient}</body>`)
   return {
-    searchPages,
     pages: [
       { path: '/', html: document('Pantry — Know where every dollar went', identity.tagline, <Landing />) },
       { path: '/run', html: withMainTarget(runPageHtml(identity, data, contract, homepageHeader)) },
       ...(contract ? [{ path: '/contract', html: contractPageHtml(identity, data, contract) }] : []),
-      { path: '/docs', html: enhanceDocs(document(...head(), <DocsIndex />), true) },
-      { path: '/docs/hosting', html: enhanceDocs(hostingHtml.replace('<main id="main">', `<main id="main"><div class="docs-hosting-search">${renderToStaticMarkup(<SearchField id="docs-search-hosting" />)}</div>`)) },
-      ...docsPages.filter(page => page.slug !== 'hosting').map(page => ({ path: `/docs/${page.slug}`, html: enhanceDocs(document(...head(page.slug), <DocsArticle slug={page.slug} />, COPY)) })),
+      { path: '/docs', html: document(...head(), <DocsIndex />) },
+      { path: '/docs/hosting', html: withMainTarget(hostingPageHtml(identity, data, hosting ?? null, contract, homepageHeader)) },
+      ...docsPages.filter(page => page.slug !== 'hosting').map(page => ({ path: `/docs/${page.slug}`, html: document(...head(page.slug), <DocsArticle slug={page.slug} />, COPY) })),
       { path: '/404', html: siteNotFoundHtml(identity, data) },
     ],
     assets: ['rer-theme.css', 'fonts', 'brand', 'site', 'favicon.ico', 'apple-touch-icon.png'],

@@ -107,8 +107,3 @@
 /* The launch recipe stays fully readable beside Copy at every width. */
 .docs-getting-started .docs-code pre { white-space: pre-wrap; overflow-wrap: anywhere; padding-top: 54px; }
 .docs-getting-started .docs-code-head { display: block; }
-
-/* The shared search uses Pantry's existing paper, field and text tokens. */
-.docs-search { --ink-soft: var(--soft); --rule: var(--line); }
-.docs-home-search { max-width: 740px; margin-top: 28px; }
-.docs-hosting-search { max-width: 740px; margin: 28px auto 0; text-align: left; }

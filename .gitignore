@@ -20,5 +20,3 @@ exports/
 # Credential-free hosted delivery output is generated for each build.
 delivery-artifact/
 rer-package/
-
-.rer/docs-search/
