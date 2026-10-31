@@ -1019,7 +1019,7 @@
       "executable": false
     },
     "public/pantry.css": {
-      "sha256": "889999db8c898ccc94a6155533d21289ec1914865589f4667d990bbf9a23b909",
+      "sha256": "992da4034a19432aeaa1ce86c823cada9978b7c432c80db04d79198c11bbfe8b",
       "executable": false
     },
     "public/rer-theme.css": {
@@ -5899,7 +5899,7 @@
       "executable": false
     },
     "src/ui/bank.tsx": {
-      "sha256": "3221f9e336b5aa0593c6223d9e93bf57038eec7730899662b3d974f4449deb7a",
+      "sha256": "6fbbacd5f846a5450bd397ab0cc945d7d5a564566a2a0515067f1a3519d70042",
       "executable": false
     },
     "src/ui/bill-workflow.tsx": {
@@ -6099,7 +6099,7 @@
       "executable": false
     },
     "src/ui/invoice-template-editor.tsx": {
-      "sha256": "c5dafc4a8fd3c82ed76462e3eb5335303183f959598c9a3490c72321b4786b7d",
+      "sha256": "4cfa23542f0dde86e5051c83d3a2061cf92e94ea8fa663fc0c56bc9805f99300",
       "executable": false
     },
     "src/ui/invoice-templates.tsx": {
@@ -6123,7 +6123,7 @@
       "executable": false
     },
     "src/ui/kit.tsx": {
-      "sha256": "0a4bc4e4dbb72fcd39822121590dbbb4d2e85d500fc0d48ec5505eb245dac7dc",
+      "sha256": "012a43d5445a9c261b46651c7941ddc3a58e622a01295b1a9a094214575d6549",
       "executable": false
     },
     "src/ui/late-fees.tsx": {
@@ -6139,7 +6139,7 @@
       "executable": false
     },
     "src/ui/more.tsx": {
-      "sha256": "8e8e487318d5871af151a6b13e87e0695132f9b9e9391b58a95fcf2b845cd0bd",
+      "sha256": "dd9eaaf63a9f0dda7fea69645d55a724b62713c7d6ea2a41edc233b2ba39a03f",
       "executable": false
     },
     "src/ui/move-in-sources.ts": {
