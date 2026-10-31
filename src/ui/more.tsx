@@ -1,7 +1,7 @@
 // Agent work, documents and the activity record.
 import { TaxReadiness } from './tax-readiness'
 import { useRef } from 'react'
-import { Action, Card, Chip, command, Details, Empty, Field, FileLink, Form, Loading, PageHead, Table, day, readFileBase64, usd, useShared, useView, useWho, type D } from './kit'
+import { FileInput, Action, Card, Chip, command, Details, Empty, Field, FileLink, Form, Loading, PageHead, Table, day, readFileBase64, usd, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
 import { ProposalApproval } from './proposals'
 
@@ -45,7 +45,7 @@ export function Documents() {
   return <>
     <PageHead title="Documents" lead="Receipts, vendor invoices and statements, kept exactly as uploaded." />
     {shared.state.actor.can.record && <Card title="Upload a document"><Form label="Upload" submit={async b => command('document.upload', { ...(await readFileBase64(file.current)), note: b.note })} onDone={reload} className="grid-form">
-      <div className="field"><label htmlFor="doc-file">File</label><input id="doc-file" ref={file} type="file" required /></div><Field label="Note" name="note" />
+      <div className="field"><label htmlFor="doc-file">File</label><FileInput id="doc-file" ref={file} type="file" required /></div><Field label="Note" name="note" />
     </Form></Card>}
     {!data ? <Loading error={error} what="documents" /> : <Card title="All documents"><Table heads={['Name', 'Attached to', 'Size', 'Uploaded', '']} figures={[2]} empty="No documents yet.">
       {data.documents.map((d: D) => <tr key={d.id} className="quiet-row" tabIndex={0}><td><FileLink id={d.id} name={d.name} mediaType={d.media_type} /></td><td>{d.linked_label ?? 'Nothing yet'}{d.duplicate_of && <small className="sub block"><Chip tone="warn">{d.duplicate_decision === 'skip' ? 'Duplicate skipped' : d.duplicate_decision === 'keep' ? 'Kept both' : 'Duplicate'}</Chip> <a href={`/api/pantry/documents/${d.duplicate_of}`}>Original</a>{!d.duplicate_decision && <> · <a href={`/app/receipts#document-${d.id}`}>Review duplicate</a></>}{d.duplicate_reason && <> · {d.duplicate_reason}</>}</small>}</td><td className="fig">{Math.ceil(d.size / 1024)} KB</td><td>{who(d.uploaded_by)}, {day(d.uploaded_at)}</td><td><div className="row-reveal"><a href={`/api/pantry/documents/${d.id}`}>Download</a><Details facts={{ 'Fingerprint (SHA-256)': d.sha256 }} code={['Fingerprint (SHA-256)']} /></div></td></tr>)}
