@@ -227,7 +227,7 @@
       "executable": false
     },
     "docs/site.json": {
-      "sha256": "8212dd0dc4fcd000c6e4dc51f95c9f54b780966c60d39723297a3deec38f08f5",
+      "sha256": "148d6d774a49e4801ddd38c5dfb271bb97f1424f174b63069a5b6fc5a118fa5b",
       "executable": false
     },
     "docs/stripe-and-gusto.md": {
@@ -2099,7 +2099,7 @@
       "executable": false
     },
     "src/base/run-site.ts": {
-      "sha256": "6f6657704332d097daf8796ae2586405a49f7447f8b69fa2c90d0834a620de0f",
+      "sha256": "7e015536ae02b8fe0796e98e201c994b5171169523a07336c0a50f72ac240630",
       "executable": false
     },
     "src/base/seed-contract.d.mts": {
@@ -5703,7 +5703,7 @@
       "executable": false
     },
     "src/site/landing/Hero.tsx": {
-      "sha256": "8b7c276ded3bb20d326b30cbaff7eba33e0109fcfc240865a853d8398375ad7f",
+      "sha256": "7dafbbf5cf9b43c1d567236903f2a8d8beae05c789ebeaaa696d68e2237baadf",
       "executable": false
     },
     "src/site/landing/HeroCards.tsx": {
@@ -5731,7 +5731,7 @@
       "executable": false
     },
     "src/site/landing/sections/Closing.tsx": {
-      "sha256": "bed3a176691e2d731af6d21c69942a780ca7f1a44cee26fe5c8260bb5b564296",
+      "sha256": "d63f6e8a2920fe827ae36935fce25bbbc6681868fb4f0bf379d5caac2ef9668d",
       "executable": false
     },
     "src/site/landing/sections/FeedHealth.tsx": {

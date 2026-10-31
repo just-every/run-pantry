@@ -10,7 +10,7 @@ export function Hero() {
       <div className="hero-copy">
         <h1 id="hero-title">Know where <span className="brush">every dollar</span> went.</h1>
         <p className="hero-sub">Pantry pulls in your bank and cards, catches every receipt, gets invoices paid, and closes the month with your accountant.</p>
-        <p className="hero-alt">100% free, open source alternative to <br /><strong>QuickBooks Online</strong>, <strong>Xero</strong> and <strong>FreshBooks</strong></p>
+        <p className="hero-alt">Open source accounting alternative to <br /><strong>QuickBooks Online</strong>, <strong>Xero</strong> and <strong>FreshBooks</strong></p>
         <Actions />
       </div>
       <HeroCards />

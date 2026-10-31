@@ -122,30 +122,6 @@
           "summary": "Deploy Pantry to your own Cloudflare account with rer deploy: the token it needs, the mail it sends with, and how to update or remove it."
         }
       ]
-    },
-    {
-      "title": "Contract records",
-      "pages": [
-        {
-          "slug": "accounting-rules",
-          "title": "Accounting and custody rules",
-          "file": "contract-mechanisms.md",
-          "summary": "The detailed accounting, provider and custody rules behind the product contract."
-        },
-        {
-          "slug": "done-audit",
-          "title": "Carried done audit",
-          "file": "contract/DONE-AUDIT.md",
-          "summary": "The old-reference acceptance outcomes and the exact assertions that support or limit their carried status."
-        },
-        {
-          "slug": "rulings",
-          "title": "Contract rulings",
-          "file": "RULINGS.md",
-          "source": "repository",
-          "summary": "The recorded product decisions and ct rulings that govern Pantry\u2019s clauses."
-        }
-      ]
     }
   ]
 }
