@@ -6,7 +6,7 @@ import { LearnedRecognition } from './learned-recognition'
 // writes are read into an answer that waits for their yes.
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Action, Card, Chip, command, day, Field, Loading, PageHead, readFileBase64, useShared, useView, useWho, type D } from './kit'
+import { Action, Card, Chip, command, day, Field, FileInput, Loading, PageHead, readFileBase64, useShared, useView, useWho, type D } from './kit'
 import { Icon } from './icons'
 import { AssignAccountant } from './ask-accountant'
 import { QuestionApproval } from './proposals'
@@ -30,13 +30,8 @@ export function Thread({ messages }: { messages: D[] }) {
 /** One question with its record and every way to answer it. */
 export function QuestionCard({ q, onDone, focused = false, compact = false }: { q: D; onDone: () => Promise<void>; focused?: boolean; compact?: boolean }) {
   const { state } = useShared(), can = state.actor.can.record, who = useWho()
-  const [pick, setPick] = useState<string>(''), [remember, setRemember] = useState(false), [note, setNote] = useState(''), [words, setWords] = useState(''), [other, setOther] = useState('')
-  const choice = q.choices.find((c: D) => c.id === pick)
-  const lineQuestion = q.subject_kind === 'bank-line' && (q.kind === 'unfiled' || q.kind === 'unmatched-deposit')
-  const categories = state.accounts.filter((a: D) => a.active && !['bank', 'receivable', 'payable', 'retained'].includes(a.subtype))
   const facts = Object.entries(q.facts as Record<string, string>)
   const asked = q.email_status === 'sent' ? <>Emailed to {q.emailed_to}, {day(q.emailed_at)}</> : q.email_status === 'local' ? 'Asked here: this computer sends no email' : q.email_status === 'no-mail' ? 'Asked here: no mail provider is set up' : q.email_status === 'failed' ? <>Email failed: {q.email_detail}</> : <>Asked {day(q.asked_at)}</>
-  const send = async (body: D) => { await command('question.answer', { id: q.id, ...body }); await onDone() }
   return <Card className={`question${focused ? ' focused' : ''}`} title={<><Icon name={q.kind === 'accountant' ? 'people' : 'agent'} /> {q.title}</>} actions={<StatusChip status={q.status} />}>
     {focused && <p className="hint"><Icon name="ok" /> Opened this conversation.</p>}
     <p className="ask"><strong>{q.question}</strong></p>
@@ -45,7 +40,29 @@ export function QuestionCard({ q, onDone, focused = false, compact = false }: { 
     <p className="hint">{asked}{q.recordLink && <> · <a href={q.recordLink}>Open the record</a></>}</p>
     <p className="hint">For {q.assignee ? who(q.assignee) : 'the owner'}{q.assignee && <> · {q.assignee}</>}</p>
     {can && (q.status === 'open' || q.status === 'confirm') && <AssignAccountant q={q} onDone={onDone} />}
-    {q.status !== 'open' && q.status !== 'confirm' ? <div className="callout" role="status"><Icon name="ok" /><div>
+    <QuestionAnswer q={q} onDone={onDone} compact={compact} />
+    {q.messages.length > 0 && <details className="details" open={!compact && q.messages.length > 1}><summary>Conversation ({q.messages.length})</summary><Thread messages={q.messages} /></details>}
+  </Card>
+}
+
+/** Every way to answer one question. `inline` is the Overview's first item: the same controls,
+ * with the report effects folded under the answer instead of above it. */
+export function QuestionAnswer({ q, onDone, compact = false, inline = false }: { q: D; onDone: () => Promise<void>; compact?: boolean; inline?: boolean }) {
+  const { state } = useShared(), can = state.actor.can.record, who = useWho()
+  const [pick, setPick] = useState<string>(''), [remember, setRemember] = useState(false), [note, setNote] = useState(''), [words, setWords] = useState(''), [other, setOther] = useState('')
+  const choice = q.choices.find((c: D) => c.id === pick)
+  const lineQuestion = q.subject_kind === 'bank-line' && (q.kind === 'unfiled' || q.kind === 'unmatched-deposit')
+  const categories = state.accounts.filter((a: D) => a.active && !['bank', 'receivable', 'payable', 'retained'].includes(a.subtype))
+  const send = async (body: D) => { await command('question.answer', { id: q.id, ...body }); await onDone() }
+  const notThat = <Action run={async () => { await command('question.confirm', { id: q.id, yes: false }); await onDone() }}>Not that</Action>
+  const yes = <Action tone="primary" run={async () => { await command('question.confirm', { id: q.id, yes: true }); await onDone() }}>Yes, do it</Action>
+  const pending = q.pending && { choice: q.pending.choice, accountId: q.pending.accountId, remember: q.pending.remember, note: q.pending.note }
+  if (inline && q.status === 'confirm' && can && q.kind !== 'accountant') {
+    const lead = <><p>You said: “{q.pending.read}”</p><p className="hint">Pantry reads that as <b>{q.pending.label}</b>{q.pending.effects ? '' : `. ${q.pending.effect}`}{q.pending.remember ? '. And from now on, the same for this payee (a bank rule).' : ''}</p></>
+    return q.pending.effects ? <QuestionApproval q={q} answer={pending} label="Yes, do it" onDone={onDone} folded={{ lead, also: notThat }} />
+      : <div className="answer-inline"><div className="answer-text">{lead}</div><div className="row-actions">{yes}{notThat}</div></div>
+  }
+  return q.status !== 'open' && q.status !== 'confirm' ? <div className="callout" role="status"><Icon name="ok" /><div>
       <strong>{q.answer ? <>Answered: “{q.answer}”</> : STATUS[q.status]?.[0]}</strong>
       <span>{q.answered_by ? <>{who(q.answered_by)}{q.answered_via === 'email' ? ' by email' : ' in Pantry'}, {day(q.answered_at)}. </> : null}{q.messages.filter((m: D) => m.via === 'agent').at(-1)?.body}</span>
     </div></div> : !can ? <p className="hint">The owner, bookkeeper or accountant answers.</p> : q.kind === 'accountant' ? <div className="own-words">
@@ -53,8 +70,8 @@ export function QuestionCard({ q, onDone, focused = false, compact = false }: { 
       <Action tone="primary" disabled={!words.trim()} run={async () => { await send({ words }); setWords('') }}>Save answer</Action>
     </div> : q.status === 'confirm' ? <div className="callout" role="status"><Icon name="agent" /><div>
       <strong>You said: “{q.pending.read}”</strong><span>Pantry reads that as <b>{q.pending.label}</b>. {q.pending.effects ? 'Review the current report effects below.' : q.pending.effect}{q.pending.remember ? ' And from now on, the same for this payee (a bank rule).' : ''}</span>
-      {q.pending.effects ? <QuestionApproval q={q} answer={{ choice: q.pending.choice, accountId: q.pending.accountId, remember: q.pending.remember, note: q.pending.note }} label="Yes, do it" onDone={onDone} /> : <Action tone="primary" run={async () => { await command('question.confirm', { id: q.id, yes: true }); await onDone() }}>Yes, do it</Action>}
-      <Action run={async () => { await command('question.confirm', { id: q.id, yes: false }); await onDone() }}>Not that</Action>
+      {q.pending.effects ? <QuestionApproval q={q} answer={pending} label="Yes, do it" onDone={onDone} /> : yes}
+      {notThat}
     </div></div> : <>
       {q.choices.length > 0 && <fieldset className="choices"><legend>{q.kind === 'missing-receipt' ? 'If there is no receipt' : 'What was it?'}</legend>
         {q.choices.map((c: D, i: number) => <label key={c.id} className={`choice${pick === c.id ? ' picked' : ''}`}>
@@ -74,15 +91,13 @@ export function QuestionCard({ q, onDone, focused = false, compact = false }: { 
         <Field label="Or tell Pantry in your own words" name={`words-${q.id}`} type="textarea" value={words} onChange={(e: any) => setWords(e.target.value)} placeholder="For example: that was my personal lunch, I'll pay it back" />
         <Action disabled={!words.trim()} run={async () => { await send({ words }); setWords('') }}>Send</Action>
       </div>}
-    </>}
-    {q.messages.length > 0 && <details className="details" open={!compact && q.messages.length > 1}><summary>Conversation ({q.messages.length})</summary><Thread messages={q.messages} /></details>}
-  </Card>
+    </>
 }
 
 function ReceiptUpload({ q, onDone }: { q: D; onDone: () => Promise<void> }) {
   const [file, setFile] = useState<HTMLInputElement | null>(null)
   return <div className="inline-form receipt-upload">
-    <div className="field"><label htmlFor={`receipt-${q.id}`}>Upload the receipt</label><input id={`receipt-${q.id}`} ref={setFile} type="file" accept="application/pdf,image/*" /></div>
+    <div className="field"><label htmlFor={`receipt-${q.id}`}>Upload the receipt</label><FileInput id={`receipt-${q.id}`} ref={setFile} accept="application/pdf,image/*" /></div>
     <Action tone="primary" run={async () => { await command('question.receipt', { id: q.id, ...(await readFileBase64(file)) }); await onDone() }}>Attach it</Action>
   </div>
 }

@@ -35,7 +35,15 @@ export async function overview(db: D1Database) {
     { key: 'bank', title: 'Bank statements', done: banks > 0 && statements > 0 && reconciled > 0, detail: !banks ? 'Add a bank account' : !statements ? 'Import a CSV or OFX statement' : reconciled ? `${reconciled} statement${reconciled === 1 ? '' : 's'} reconciled` : 'Reconcile your first statement', go: 'bank' },
     { key: 'close', title: 'First close', done: locked > 0, detail: locked ? `${locked} period${locked === 1 ? '' : 's'} locked` : 'Complete the checklist and lock a month', go: 'close' },
   ]
-  const queue = {
+  const queue = await queueCounts(db)
+  const lastLocked = (await one<{ id: string | null }>(db, "SELECT MAX(id) AS id FROM pt_periods WHERE status = 'locked'"))?.id ?? null
+  return { entity: e, steps, queue, feedHealth: await feedHealth(db), closing: await closing(db, e?.books_start), lastLocked }
+}
+
+/** Today's waiting work, counted: the shell's tab counts and the Overview's groups. */
+export async function queueCounts(db: D1Database) {
+  const n = async (sql: string) => Number((await one(db, sql))?.n ?? 0)
+  return {
     journalDrafts: await n("SELECT COUNT(*) AS n FROM pt_journal_entries WHERE status = 'draft'"),
     invoiceDrafts: await n("SELECT COUNT(*) AS n FROM pt_invoices WHERE status IN ('draft', 'approved')"),
     unmatchedLines: await n('SELECT COUNT(*) AS n FROM pt_bank_lines l WHERE l.removed_at IS NULL AND NOT EXISTS (SELECT 1 FROM pt_match_bank_lines m WHERE m.bank_line_id = l.id AND m.active = 1)'),
@@ -44,8 +52,6 @@ export async function overview(db: D1Database) {
     reopenRequests: await n("SELECT COUNT(*) AS n FROM pt_reopen_requests WHERE status = 'pending'"),
     questions: await n("SELECT COUNT(*) AS n FROM pt_questions WHERE status IN ('open', 'confirm')"),
   }
-  const lastLocked = (await one<{ id: string | null }>(db, "SELECT MAX(id) AS id FROM pt_periods WHERE status = 'locked'"))?.id ?? null
-  return { entity: e, steps, queue, feedHealth: await feedHealth(db), closing: await closing(db, e?.books_start), lastLocked }
 }
 
 /** The period due to close: the month after the last lock, else the books' first month; never past this month. */

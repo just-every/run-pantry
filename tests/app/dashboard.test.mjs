@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
+import { chromium, expect } from '@playwright/test'
 import { fakePlaid } from '../api/plaid.mjs'
 import { providerWorker } from './provider-worker.mjs'
 import { books } from './books.mjs'
@@ -26,34 +26,36 @@ test('REPORT-008 dashboard shows calculated balances and every waiting-work link
   plaid.state.loginRequired = true; await command('feed.sync', { itemId: connection.id })
   const data = await (await owner.request.get(`${app.origin}/api/pantry/dashboard?to=2026-10-31`)).json()
   assert.ok(data.work.missingReceipts && data.work.billsToApprove && data.work.brokenConnections)
-  const signedIn = await owner.storageState()
+  const signedIn = await owner.storageState(), money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
   for (const width of [1440, 390]) {
-    const context = await browser.newContext({ storageState: signedIn, viewport: { width, height: width === 390 ? 844 : 1000 } })
+    const context = await browser.newContext({ storageState: signedIn, viewport: { width, height: width === 390 ? 844 : 900 } })
     const page = await context.newPage(), errors = []; page.on('pageerror', e => errors.push(String(e)))
-    const home = async () => { await page.goto(`${app.origin}/app/`); await page.getByLabel('As of', { exact: true }).fill('2026-10-31'); await page.getByRole('heading', { name: 'Profit and loss trend', exact: true }).waitFor() }
+    const home = async () => { await page.goto(`${app.origin}/app/`); await page.getByRole('heading', { name: 'Needs attention', exact: true }).waitFor() }
+    const group = name => page.getByRole('region', { name, exact: true })
     await home()
-    await page.getByLabel('Dashboard basis', { exact: true }).selectOption('accrual')
-    await page.getByText('Accrual basis · This month runs through', { exact: false }).waitFor()
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    // The figures line shows the books' calculated cash, and the first question is answerable in the first screen.
+    await page.locator('.figures > div').filter({ hasText: 'Cash' }).getByText(data.cash.observed ? money.format(data.cash.total / 100) : 'No feed balance yet', { exact: true }).waitFor()
+    await expect(group('Questions from Pantry').locator('.attention-first').locator('button, label, textarea, select').filter({ visible: true }).first()).toBeInViewport()
     await page.screenshot({ path: `/tmp/sx-pantry-r5-report008-dashboard-${width}.png`, fullPage: true })
-    await page.locator('section').filter({ has: page.getByRole('heading', { name: 'Balances and evidence waiting', exact: true }) }).screenshot({ path: `/tmp/sx-pantry-r5-report008-balances-${width}.png` })
     const destinations = [
-      [/Unmatched statement lines/, 'Transactions'], [/Questions from Pantry/, 'Questions from Pantry'],
-      [/Bills to approve/, 'Bills'], [/Connections needing attention/, 'Transactions'],
-      [/Overdue receivables/, 'Receivables aging'], [/Overdue payables/, 'Payables aging'],
-      [/Sep 2026 · \d+ missing source document/, 'Receipts'],
-      [/Invoice drafts to review/, 'Invoices'],
+      [() => group('Bank').getByRole('link', { name: /unmatched statement lines?$/ }), 'Transactions'],
+      [() => group('Questions from Pantry').getByRole('link').first(), 'Questions from Pantry'],
+      [() => group('Sales & bills').getByRole('link', { name: /bills? to approve$/ }), 'Bills'],
+      [() => group('Bank').getByRole('link', { name: /needs you to sign in again/ }), 'Transactions'],
+      [() => page.getByRole('link', { name: /Overdue receivables/ }), 'Receivables aging'],
+      [() => page.getByRole('link', { name: /Overdue payables/ }), 'Payables aging'],
+      [() => group('Close').getByRole('link', { name: /^Sep 2026 · \d+ missing source document/ }), 'Receipts'],
+      [() => group('Sales & bills').getByRole('link', { name: /Draft$/ }).first(), 'Invoices'],
     ]
-    for (const [name, heading] of destinations) {
-      await home(); await page.getByRole('link', { name }).click()
+    for (const [link, heading] of destinations) {
+      await home(); await link().click()
       await page.getByRole('heading', { name: new RegExp('^' + heading) }).waitFor()
     }
-    await home(); await page.getByRole('link', { name: 'Oct 2026', exact: true }).click()
-    await page.getByRole('heading', { name: /Profit and loss/ }).waitFor()
-    assert.equal(new URL(page.url()).searchParams.get('to'), '2026-10-31')
     await home()
+    const through = page.locator('.figures > div').filter({ hasText: /^Books (up to date|locked) through/ })
     if (width === 1440) {
-      await page.getByText('No locked or fully reconciled date yet', { exact: true }).waitFor()
+      await through.getByText('Not yet', { exact: true }).waitFor()
       let close = await command('close.tasks', { period: '2026-08' })
       for (const task of close.tasks) close = await command('close.task', { id: task.id, revision: task.revision, done: true })
       await page.goto(`${app.origin}/app/close?period=2026-08`)
@@ -61,7 +63,7 @@ test('REPORT-008 dashboard shows calculated balances and every waiting-work link
       await page.getByText(/Locked by/).waitFor()
       await home()
     }
-    await page.locator('section').filter({ has: page.getByRole('heading', { name: 'Books up to date through', exact: true }) }).getByText('Aug 31, 2026', { exact: true }).waitFor()
+    await through.filter({ hasText: 'Books locked through' }).getByText('Aug 31, 2026', { exact: true }).waitFor()
     await page.screenshot({ path: `/tmp/sx-pantry-r5-report008-locked-${width}.png`, fullPage: true })
     assert.deepEqual(errors, []); await context.close()
   }

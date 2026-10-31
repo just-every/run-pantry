@@ -5,7 +5,7 @@ import { providerWorker } from './provider-worker.mjs'
 import { TOKEN } from './worker.mjs'
 import { clearingProvider } from '../providers/stripe-clearing.mjs'
 
-test('REPORT-005 / PROC-003 missing Stripe refund is named on dashboard, close and settings, then disappears when repaired at 1440 and 390',async t=>{
+test('REPORT-005 / PROC-003 missing Stripe refund is named on close and settings, then disappears when repaired at 1440 and 390',async t=>{
   const provider=clearingProvider(),app=await providerWorker({bindings:{},outbound:provider.outbound});t.after(()=>app.close())
   const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});t.after(()=>browser.close())
   const owner=await browser.newContext()
@@ -29,7 +29,7 @@ test('REPORT-005 / PROC-003 missing Stripe refund is named on dashboard, close a
     for(const width of [1440,390]){
       const context=await browser.newContext({storageState,viewport:{width,height:width===390?844:1000}}),page=await context.newPage(),errors=[]
       page.on('pageerror',e=>errors.push(String(e)))
-      for(const [name,path] of [['dashboard','/app'],['close','/app/close?period=2026-09'],['settings','/app/settings']]){
+      for(const [name,path] of [['close','/app/close?period=2026-09'],['settings','/app/settings']]){
         await page.goto(app.origin+path)
         if(name==='close'){
           const row=page.getByRole('row').filter({has:page.getByText('Stripe clearing agrees to the provider',{exact:true})})

@@ -268,7 +268,7 @@ fieldset.allocations { gap: 12px; }
 .details dd { margin: 0; word-break: break-word; }
 .details dd.code { min-width: 0; overflow-x: auto; white-space: nowrap; word-break: normal; font: var(--app-text-code, 12px)/1.5 var(--font-mono); }
 
-/* Overview: numbered setup steps, each with its state disc (a green tick when complete, a hollow ring when not), and today's queue. */
+/* Overview: numbered setup steps, each with its state disc (a green tick when complete, a hollow ring when not). */
 .steps { margin: 0; padding: 0; list-style: none; }
 .step:first-child { border-top: 0; }
 .step { display: grid; grid-template-columns: 34px 30px minmax(0, 1fr) auto 96px; align-items: center; gap: 0 16px; padding: 18px 0; border-top: 1px solid var(--line); }
@@ -284,15 +284,6 @@ fieldset.allocations { gap: 12px; }
 .progress-bar { display: block; height: 8px; margin: 8px 0 18px; border-radius: var(--radius-chip); background: var(--row); overflow: hidden; }
 .progress-bar span { display: block; height: 100%; border-radius: var(--radius-chip); background: var(--green); }
 .empty-card .card-body { padding-top: 18px; text-align: center; }
-.queue { margin: 0; padding: 0; list-style: none; }
-.queue a { display: grid; grid-template-columns: 52px 1fr 16px; align-items: center; gap: 12px; margin: 0 -12px; padding: 12px; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--lavender-ink); font-weight: 500; text-decoration: none; }
-.queue a::after { content: ''; width: 8px; height: 8px; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor; transform: rotate(45deg); }
-.queue li:last-child a { border-bottom: 0; }
-.queue a:hover span { text-decoration: underline; text-underline-offset: 3px; }
-.queue strong { color: var(--ink); font: 800 34px/1 var(--font-head); letter-spacing: -.04em; }
-.queue a.waiting { margin-bottom: 4px; border-bottom-color: transparent; border-radius: 12px; background: var(--apricot-tint); color: var(--apricot-text); }
-.queue a.waiting strong { color: var(--apricot-text); }
-.queue li:has(+ li > a.waiting) a { border-bottom-color: transparent; }
 .match-panel { margin-top: 4px; }
 .match-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) 260px; gap: 24px; }
 .pair { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 6px; font-variant-numeric: tabular-nums; }
@@ -600,7 +591,7 @@ details.setup-steps summary { width: fit-content; margin-bottom: 8px; color: var
 @media (max-width: 720px) {
   .app :is(button, .btn, select, textarea, input:not([type='checkbox'], [type='radio'], .sr-only)) { min-height: 44px; min-width: 44px; }
   .app a { min-height: 44px; min-width: 44px; }
-  .app a:not(.queue a, .btn, .nav-link, .brand, .file-link, .icon-link, .menu-row, .tool-list a) { display: inline-flex; align-items: center; max-width: 100%; }
+  .app a:not(.btn, .nav-link, .brand, .file-link, .icon-link, .attention-row, .alert-link, .menu-row, .tool-list a) { display: inline-flex; align-items: center; max-width: 100%; }
   .app summary { min-height: 44px; min-width: 44px; align-content: center; cursor: pointer; }
   .app label:has(> input[type='checkbox']) { display: flex; align-items: center; gap: 10px; min-height: 44px; width: 100%; cursor: pointer; }
   /* Unlabelled table selectors keep an 18px box inside their 44px control. */
@@ -617,6 +608,57 @@ details.setup-steps summary { width: fit-content; margin-bottom: 8px; color: var
 .file-field input[type='file'] { position: absolute; inset: -1px; z-index: 1; width: calc(100% + 2px); height: calc(100% + 2px); min-height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; }
 .file-prompt { flex: none; padding: 5px 12px; border-radius: var(--radius-chip); background: var(--pill); color: var(--ink); font-size: 13.5px; font-weight: 600; }
 .file-name { min-width: 0; color: var(--soft); overflow-wrap: anywhere; }
+
+/* Overview (pick B): the business and one quiet figures line, then one list of what needs
+   attention, its first question answered in place, and the overdue balances at its foot. */
+.home-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px 40px; flex-wrap: wrap; margin-bottom: 30px; }
+.figures { display: flex; margin: 0; }
+.figures > div { padding: 2px 0 2px 24px; margin-left: 24px; border-left: 1px solid var(--line); }
+.figures > div:first-child { margin-left: 0; padding-left: 0; border-left: 0; }
+.figures dt { color: var(--lavender-ink); font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.figures dd { margin: 6px 0 0; font: 800 22px/1.2 var(--font-head); letter-spacing: -0.03em; white-space: nowrap; }
+.figures dd a { color: inherit; text-decoration: none; }
+.figures dd a:hover { text-decoration: underline; }
+.figures small { display: block; margin-top: 2px; color: var(--soft); font: 500 13px/1.3 var(--font-body); letter-spacing: 0; }
+.attention > h2 { margin-bottom: 14px; }
+.attention-list { padding: 4px 24px; }
+.attention-group { padding: 18px 0 12px; }
+.attention-group + .attention-group { border-top: 1px solid var(--line-strong); }
+.attention-group h3 { margin-bottom: 4px; }
+.attention-group ul { margin: 0; padding: 0; list-style: none; }
+.attention-group li + li { border-top: 1px solid var(--line); }
+.attention-group li.attention-first + li { border-top: 0; }
+.attention-row { display: flex; align-items: center; gap: 18px; min-height: 46px; padding: 8px 0; color: var(--ink); text-decoration: none; }
+.attention-row .row-text, .attention-alert > a { flex: 1; min-width: 0; }
+.attention-row .sub { color: var(--soft); }
+.attention-row .row-text small, .attention-alert small { margin-left: 8px; color: var(--soft); }
+.row-meta { display: flex; align-items: baseline; gap: 18px; }
+.row-meta .fig { font-variant-numeric: tabular-nums; }
+.row-state { min-width: 76px; color: var(--soft); }
+.attention-group .icon { width: 16px; height: 16px; color: var(--soft); }
+.attention-row:hover .row-text, .attention-alert > a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.attention-more { display: inline-flex; align-items: center; min-height: 44px; color: var(--lavender-ink); font-weight: 600; text-decoration: none; }
+.attention-more:hover { text-decoration: underline; }
+.attention-alert { position: relative; display: flex; align-items: center; gap: 18px; min-height: 56px; padding: 8px 0; }
+.attention-alert > a { color: var(--ink); text-decoration: none; }
+.attention-alert > a::after { content: ''; position: absolute; inset: 0; }
+.attention-alert > .action { position: relative; z-index: 1; }
+.attention-first { margin: 6px -24px 2px; padding: 18px 24px 16px; background: var(--paper); }
+.first-head { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.first-head a { color: var(--ink); font-size: 17px; font-weight: 700; text-decoration: none; }
+.first-head a:hover { text-decoration: underline; }
+.first-ask { margin: 6px 0 2px; }
+.answer-inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 28px; }
+.answer-inline p { margin: 0 0 2px; color: var(--body); }
+.answer-inline .row-actions { margin: 0; flex-wrap: nowrap; }
+.answer-inline > details { grid-column: 1 / -1; margin-top: 2px; }
+.overdue { display: flex; margin-top: 20px; padding: 18px 24px; border-radius: var(--radius-card); background: var(--paper); }
+.overdue a { flex: 1; display: flex; align-items: flex-start; gap: 14px; color: var(--ink); text-decoration: none; }
+.overdue a + a { margin-left: 24px; padding-left: 24px; border-left: 1px solid var(--line-strong); }
+.overdue + .card { margin-top: 20px; }
+.overdue a > span > span { display: block; color: var(--body); }
+.overdue strong { font-weight: 600; font-variant-numeric: tabular-nums; }
+.overdue a:hover strong { text-decoration: underline; }
 
 /* Tools: the seldom-used jobs, one row each. */
 .tool-list { margin: 0 0 20px; padding: 4px 24px; list-style: none; }
@@ -679,5 +721,22 @@ details.setup-steps summary { width: fit-content; margin-bottom: 8px; color: var
 }
 
 @media (max-width: 720px) {
+  .home-head { flex-direction: column; align-items: stretch; gap: 18px; margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .figure-month { display: none; }
+  .figures > div { flex: 1; padding-left: 20px; margin-left: 20px; }
+  .figures dd { font-size: 20px; white-space: normal; }
+  .attention-list { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: none; overflow: visible; }
+  .attention-group { padding: 14px 0 8px; }
+  .attention-first { margin: 6px 0 4px; padding: 16px; border-radius: 16px; }
+  .answer-inline { grid-template-columns: minmax(0, 1fr); }
+  .answer-inline .row-actions { flex-wrap: wrap; }
+  .attention-row { display: grid; grid-template-columns: minmax(0, 1fr) 16px; gap: 2px 14px; }
+  .attention-row .row-text, .attention-row .row-meta { grid-column: 1; }
+  .attention-row > .icon { grid-column: 2; grid-row: 1 / span 2; }
+  .row-meta { gap: 10px; color: var(--body); }
+  .attention-row .row-text small, .attention-alert small { display: block; margin-left: 0; }
+  .row-state { min-width: 0; }
+  .overdue { flex-direction: column; padding: 16px; }
+  .overdue a + a { margin: 12px 0 0; padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--line-strong); }
   .tool-list { padding: 0 16px; }
 }
