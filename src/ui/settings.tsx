@@ -2,6 +2,7 @@ import { TextingSettings } from './texting'
 // People & settings: the business, its declared policies, who has which role, and agent access.
 import { DimensionSettings } from './dimensions'
 import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { Action, Card, Chip, command, Details, Field, Form, PageHead, ROLE_LABEL, Table, day, placeholderEmail, useShared, type D } from './kit'
 import { Icon } from './icons'
 import { BusinessSummary } from './business-settings'
@@ -86,7 +87,7 @@ const HOSTED_OWNER = 'pantry.hosted-owner-email'
 export function Settings() {
   const { state } = useShared()
   return <>
-    <PageHead title="People & settings" lead="The business these books belong to, invoice sending and online payments, Stripe payouts and Gusto payroll, who works in them, agent access, and how receipts are read and received." />
+    <PageHead title="People & settings" lead="The business these books belong to, invoice sending and online payments, Stripe payouts and Gusto payroll, who works in them, agent access, and how receipts are read and received." actions={<Link className="btn btn-secondary" to="/app/activity">Activity</Link>} />
     <BusinessSummary /><DimensionSettings />
     {state.settings.entity && <><InvoicingSettings /><ConnectedSettings /></>}
     {state.actor.can.owner && <><TextingSettings /><DataFlows /><Owner /><People /><RolePrivacy /><IssuingLimits /><Agents /><IntegrationSettings /><WebhookSettings /><ErasureSettings /><ReceiptSettings /><Hosting /></>}
