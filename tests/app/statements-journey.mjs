@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
+import { fold, openFold } from './folds.mjs'
 
 export async function statementsBrowser({ page, context, customer, width, origin, history }) {
-  const panel = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Statements', exact: true }) })
+  const panel = await openFold(fold(page, 'Statements'))
   await panel.getByLabel('Statement type', { exact: true }).selectOption('open-items')
   await panel.getByLabel('Statement date', { exact: true }).fill('2026-10-20')
   await panel.getByLabel('Statement starts', { exact: true }).fill('2026-01-01')
@@ -16,13 +17,13 @@ export async function statementsBrowser({ page, context, customer, width, origin
   assert.ok(statement.deliveries.every(d => d.status === 'suppressed'))
   const row = panel.getByRole('row').filter({ has: page.getByRole('link', { name: 'Open items statement', exact: true }) })
   await row.getByText('Not sent: local run', { exact: true }).first().waitFor()
-  const mail = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Customer email history', exact: true }) })
+  const mail = await openFold(fold(page, 'Customer email history'))
   await mail.getByRole('link', { name: /statement/i }).first().waitFor()
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
   const proof = process.env.PANTRY_PROOF_DIR
   if (proof) {
     await mkdir(proof, { recursive: true })
-    await panel.getByRole('heading', { name: 'Statements', exact: true }).evaluate(el => window.scrollBy(0, el.getBoundingClientRect().top - 100))
+    await panel.locator('summary').first().evaluate(el => window.scrollBy(0, el.getBoundingClientRect().top - 100))
     await page.screenshot({ path: `${proof}/statements-history-${width}.png` })
     await row.getByRole('link', { name: 'Open items statement', exact: true }).evaluate(el => window.scrollBy(0, el.getBoundingClientRect().top - 120))
     await page.screenshot({ path: `${proof}/statements-panel-${width}.png` })
@@ -40,6 +41,7 @@ export async function statementsBrowser({ page, context, customer, width, origin
   await source.click()
   await page.getByRole('heading', { name: /INV-/ }).first().waitFor()
   await page.goto(`${origin}/app/sales?tab=contacts&customer=${customer.id}`)
+  await openFold(panel)
   await panel.getByRole('link', { name: 'Open items statement', exact: true }).waitFor()
   for (const control of await panel.locator('button:visible,a:visible').all()) {
     if ((await control.innerText()).trim()) continue

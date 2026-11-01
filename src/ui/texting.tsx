@@ -2,6 +2,7 @@ import { CustomerTimeZone, timeText } from './display-time'
 import { useState } from 'react'
 import { Action, Card, Chip, Field, Form, Loading, Table, command, day, useShared, useView, type D } from './kit'
 import { Help } from './help'
+import { Fold } from './record-folds'
 
 export function TextingSettings() {
  const {data,error,reload}=useView<D>('texting')
@@ -33,9 +34,9 @@ export function TextingSettings() {
 
 export function CustomerTextConsent({customer}:{customer:D}) {
  const {data,error,reload}=useView<D>('texting'),[purposes,setPurposes]=useState<string[]>(['invoice','reminder'])
- if(!data)return <Card title="Customer text consent"><Loading error={error} what="text consent" /></Card>
+ if(!data)return <Fold title="Customer text consent"><Loading error={error} what="text consent" /></Fold>
  const consents=data.consents.filter((c:D)=>c.customer_id===customer.id)
- return <Card title="Customer text consent">
+ return <Fold title="Customer text consent">
   <p>Record the customer’s permission for each number and purpose before Pantry sends a text. Sharing from your own phone is recorded separately.</p>
   <Form label="Record text consent" submit={b=>command('texting.consent',{customerId:customer.id,phone:b.phone,timeZone:b.timeZone,source:b.source,wording:b.wording,consentedAt:new Date(b.consentedAt).toISOString(),purposes})} onDone={reload}>
    <Field label="Consented mobile number" name="phone" type="tel" defaultValue={customer.phone} required placeholder="+1…" />
@@ -48,7 +49,7 @@ export function CustomerTextConsent({customer}:{customer:D}) {
   <Table heads={['Number','Purposes','Consent evidence','Status']} empty="No text consent recorded.">
    {consents.map((c:D)=><tr key={c.phone}><td>{c.phone}<small className="sub block">{c.time_zone}</small></td><td>{c.purposes.join(', ')}</td><td><details><summary>{c.source}</summary><p>{c.wording}</p><p>Given {timeText(c.consented_at)}. Recorded {timeText(c.recorded_at)} by {c.recorded_by}.</p></details></td><td>{c.revoked_at?<Chip tone="warn">{c.revoked_at==='restored'?'New consent required':'Opted out'}</Chip>:<><Chip tone="good">Consented</Chip><Action tone="danger" run={async()=>{await command('texting.consent',{customerId:customer.id,phone:c.phone,revoke:true});await reload()}}>Revoke text consent</Action></>}</td></tr>)}
   </Table>
- </Card>
+ </Fold>
 }
 
 export function InvoiceTexting({invoice,kind='invoice'}:{invoice:D;kind?:'invoice'|'estimate'}) {

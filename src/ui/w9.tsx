@@ -1,22 +1,27 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Action, Card, Chip, Loading, Table, command, useShared, useView, usd, type D } from './kit'
-export function VendorW9({ id }: { id: string }) {
+import { Fold } from './record-folds'
+
+type W9View = { data?: D; error: string; reload: () => Promise<void> }
+
+/** The vendor's W-9 status chip, as the summary and the fold row both show it. */
+export function W9Chip({ status }: { status: string }) {
+  return <Chip tone={status === 'complete' ? 'good' : 'warn'}>{status === 'complete' ? 'W-9 complete' : status === 'requested' ? 'W-9 requested' : 'W-9 missing'}</Chip>
+}
+
+/** W-9 status. On a vendor's own record it is the one fold, reading the view its summary already holds. */
+export function VendorW9({ id, fold, view }: { id: string; fold?: boolean; view?: W9View }) {
   const { state } = useShared(),
-    { data, error, reload } = useView<D>(`vendor-w9/${id}`),
+    own = useView<D>(view ? null : `vendor-w9/${id}`),
+    { data, error, reload } = view ?? own,
     [link, setLink] = useState('')
-  return (
-    <Card title="W-9 status">
+  const wrap = (children: ReactNode) => fold ? <Fold title="W-9 status">{children}</Fold> : <Card title="W-9 status">{children}</Card>
+  return wrap(<>
       {!data ? (
         <Loading error={error} what="W-9 status" />
       ) : (
         <>
-          <Chip tone={data.status === 'complete' ? 'good' : 'warn'}>
-            {data.status === 'complete'
-              ? 'W-9 complete'
-              : data.status === 'requested'
-                ? 'W-9 requested'
-                : 'W-9 missing'}
-          </Chip>
+          {!fold && <W9Chip status={data.status} />}
           {data.completedAt && (
             <p>Certified {data.completedAt.slice(0, 10)}. Tax identity stays masked in ordinary views.</p>
           )}
@@ -67,8 +72,7 @@ export function VendorW9({ id }: { id: string }) {
           )}
         </>
       )}
-    </Card>
-  )
+  </>)
 }
 export function MissingW9({ year }: { year: number }) {
   const { data, error } = useView<D>(`missing-w9?year=${year}`)

@@ -5,6 +5,7 @@ import { refundsBrowser,voidBrowser } from './refunds-journey.mjs'
 import { approvedAdjustmentsBrowser } from './approved-adjustments-journey.mjs'
 import { lateFeeBrowser } from './late-fee-journey.mjs'
 import { statementsBrowser } from './statements-journey.mjs'
+import { fold, openFold } from './folds.mjs'
 import { remindersJourney } from './reminders-journey.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -100,20 +101,23 @@ test('INVOICE-009 customer records edit contacts and defaults, show every curren
     assert.equal(aging.items.filter(r => r.contact_id === customer.id).reduce((n, r) => n + r.open, 0), history.summary.open_balance_cents)
     await page.getByRole('heading', { name: `${name} · customer history`, exact: true }).waitFor()
     const historyCard = page.locator('.card').filter({ has: page.getByRole('heading', { name: `${name} · customer history`, exact: true }) })
-    await historyCard.getByText(notes, { exact: true }).waitFor()
-    await historyCard.getByText('18 Cedar Street, New York NY 10001', { exact: true }).waitFor()
-    await historyCard.getByText('40 Studio Lane, Brooklyn NY 11201', { exact: true }).waitFor()
+    assert.equal(await page.locator('details.fold[open]').count(), 1, 'Records is the one open section')
     await historyCard.getByText('45 days', { exact: true }).first().waitFor()
-    await historyCard.getByText('Card, Offline payment instructions', { exact: true }).waitFor()
-    await page.getByRole('heading', { name: 'Customer email history', exact: true }).waitFor()
-    assert.equal(await page.getByText('suppressed', { exact: true }).count(), 2)
+    const details = await openFold(fold(page, 'Details'))
+    await details.getByText(notes, { exact: true }).waitFor()
+    await details.getByText('18 Cedar Street, New York NY 10001', { exact: true }).waitFor()
+    await details.getByText('40 Studio Lane, Brooklyn NY 11201', { exact: true }).waitFor()
+    await details.getByText('Card, Offline payment instructions', { exact: true }).waitFor()
+    const mailFold = await openFold(fold(page, 'Customer email history'))
+    assert.equal(await mailFold.getByText('suppressed', { exact: true }).count(), 2)
+    await openFold(fold(page, 'Customer exemption certificates'))
     await page.getByRole('link', { name: `Cedar-certificate-${width}.txt`, exact: true }).waitFor()
     const certificate = await context.request.get(`${app.origin}/api/pantry/documents/${history.certificates[0].document_id}`)
     assert.equal(await certificate.text(), `Cedar Studio NY exemption ${width}`)
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `record fits ${width}`)
     await page.screenshot({ path: `/tmp/sx-pantry-r12-customer-history-${width}.png`, fullPage: true })
     await historyCard.screenshot({ path: `/tmp/sx-pantry-r12-customer-card-${width}.png` })
-    await page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Customer email history', exact: true }) }).screenshot({ path: `/tmp/sx-pantry-r12-customer-mail-${width}.png` })
+    await mailFold.screenshot({ path: `/tmp/sx-pantry-r12-customer-mail-${width}.png` })
     for (const row of history.rows) {
       await page.getByRole('link', { name: `${row.kind === 'credit' ? 'Credit' : row.kind === 'payment' ? 'Payment' : 'Invoice'} ${row.reference}`, exact: true }).first().click()
       await page.getByRole('heading', { name: row.kind === 'payment' ? new RegExp('Payment') : new RegExp(row.reference) }).first().waitFor()

@@ -11,16 +11,20 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppAccountsRouteImport } from './routes/app.accounts'
 import { Route as AppActivityRouteImport } from './routes/app.activity'
 import { Route as AppAgentsRouteImport } from './routes/app.agents'
 import { Route as AppAssetsRouteImport } from './routes/app.assets'
 import { Route as AppBankRouteImport } from './routes/app.bank'
+import { Route as AppBillsRouteImport } from './routes/app.bills'
 import { Route as AppBooksRouteImport } from './routes/app.books'
 import { Route as AppCashPlannerRouteImport } from './routes/app.cash-planner'
 import { Route as AppCloseRouteImport } from './routes/app.close'
 import { Route as AppCollectionsRouteImport } from './routes/app.collections'
 import { Route as AppCurrencyRouteImport } from './routes/app.currency'
+import { Route as AppCustomersRouteImport } from './routes/app.customers'
 import { Route as AppDocumentsRouteImport } from './routes/app.documents'
+import { Route as AppInvoicesRouteImport } from './routes/app.invoices'
 import { Route as AppMoveInRouteImport } from './routes/app.move-in'
 import { Route as AppQuestionsRouteImport } from './routes/app.questions'
 import { Route as AppReceiptsRouteImport } from './routes/app.receipts'
@@ -31,6 +35,7 @@ import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppTimeRouteImport } from './routes/app.time'
 import { Route as AppToolsRouteImport } from './routes/app.tools'
 import { Route as AppBankConnectRouteImport } from './routes/app.bank_.connect'
+import { Route as AppReportsSlugRouteImport } from './routes/app.reports.$slug'
 import { Route as AppSettingsIndexRouteImport } from './routes/app.settings.index'
 import { Route as AppSettingsAgentsRouteImport } from './routes/app.settings.agents'
 import { Route as AppSettingsApiRouteImport } from './routes/app.settings.api'
@@ -45,6 +50,15 @@ import { Route as AppSettingsPrivacyRouteImport } from './routes/app.settings.pr
 import { Route as AppSettingsReceiptsRouteImport } from './routes/app.settings.receipts'
 import { Route as AppSettingsStripeRouteImport } from './routes/app.settings.stripe'
 import { Route as AppSettingsYouRouteImport } from './routes/app.settings.you'
+import { Route as AppBankLineIndexRouteImport } from './routes/app.bank.line.index'
+import { Route as AppBooksEntryIndexRouteImport } from './routes/app.books.entry.index'
+import { Route as AppSalesBillIndexRouteImport } from './routes/app.sales.bill.index'
+import { Route as AppSalesCustomerIndexRouteImport } from './routes/app.sales.customer.index'
+import { Route as AppSalesCustomerCustomerIdRouteImport } from './routes/app.sales.customer.$customerId'
+import { Route as AppSalesInvoiceIndexRouteImport } from './routes/app.sales.invoice.index'
+import { Route as AppSalesRecurringIndexRouteImport } from './routes/app.sales.recurring.index'
+import { Route as AppSalesVendorIndexRouteImport } from './routes/app.sales.vendor.index'
+import { Route as AppSalesVendorVendorIdRouteImport } from './routes/app.sales.vendor.$vendorId'
 import { Route as AppSalesBillBillIdRouteImport } from './routes/app.sales_.bill.$billId'
 
 const AppRoute = AppRouteImport.update({
@@ -55,6 +69,11 @@ const AppRoute = AppRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAccountsRoute = AppAccountsRouteImport.update({
+  id: '/accounts',
+  path: '/accounts',
   getParentRoute: () => AppRoute,
 } as any)
 const AppActivityRoute = AppActivityRouteImport.update({
@@ -75,6 +94,11 @@ const AppAssetsRoute = AppAssetsRouteImport.update({
 const AppBankRoute = AppBankRouteImport.update({
   id: '/bank',
   path: '/bank',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBillsRoute = AppBillsRouteImport.update({
+  id: '/bills',
+  path: '/bills',
   getParentRoute: () => AppRoute,
 } as any)
 const AppBooksRoute = AppBooksRouteImport.update({
@@ -102,9 +126,19 @@ const AppCurrencyRoute = AppCurrencyRouteImport.update({
   path: '/currency',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCustomersRoute = AppCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDocumentsRoute = AppDocumentsRouteImport.update({
   id: '/documents',
   path: '/documents',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInvoicesRoute = AppInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMoveInRoute = AppMoveInRouteImport.update({
@@ -156,6 +190,11 @@ const AppBankConnectRoute = AppBankConnectRouteImport.update({
   id: '/bank_/connect',
   path: '/bank/connect',
   getParentRoute: () => AppRoute,
+} as any)
+const AppReportsSlugRoute = AppReportsSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => AppReportsRoute,
 } as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   id: '/',
@@ -227,6 +266,52 @@ const AppSettingsYouRoute = AppSettingsYouRouteImport.update({
   path: '/you',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppBankLineIndexRoute = AppBankLineIndexRouteImport.update({
+  id: '/line/',
+  path: '/line/',
+  getParentRoute: () => AppBankRoute,
+} as any)
+const AppBooksEntryIndexRoute = AppBooksEntryIndexRouteImport.update({
+  id: '/entry/',
+  path: '/entry/',
+  getParentRoute: () => AppBooksRoute,
+} as any)
+const AppSalesBillIndexRoute = AppSalesBillIndexRouteImport.update({
+  id: '/bill/',
+  path: '/bill/',
+  getParentRoute: () => AppSalesRoute,
+} as any)
+const AppSalesCustomerIndexRoute = AppSalesCustomerIndexRouteImport.update({
+  id: '/customer/',
+  path: '/customer/',
+  getParentRoute: () => AppSalesRoute,
+} as any)
+const AppSalesCustomerCustomerIdRoute =
+  AppSalesCustomerCustomerIdRouteImport.update({
+    id: '/customer/$customerId',
+    path: '/customer/$customerId',
+    getParentRoute: () => AppSalesRoute,
+  } as any)
+const AppSalesInvoiceIndexRoute = AppSalesInvoiceIndexRouteImport.update({
+  id: '/invoice/',
+  path: '/invoice/',
+  getParentRoute: () => AppSalesRoute,
+} as any)
+const AppSalesRecurringIndexRoute = AppSalesRecurringIndexRouteImport.update({
+  id: '/recurring/',
+  path: '/recurring/',
+  getParentRoute: () => AppSalesRoute,
+} as any)
+const AppSalesVendorIndexRoute = AppSalesVendorIndexRouteImport.update({
+  id: '/vendor/',
+  path: '/vendor/',
+  getParentRoute: () => AppSalesRoute,
+} as any)
+const AppSalesVendorVendorIdRoute = AppSalesVendorVendorIdRouteImport.update({
+  id: '/vendor/$vendorId',
+  path: '/vendor/$vendorId',
+  getParentRoute: () => AppSalesRoute,
+} as any)
 const AppSalesBillBillIdRoute = AppSalesBillBillIdRouteImport.update({
   id: '/sales_/bill/$billId',
   path: '/sales/bill/$billId',
@@ -235,27 +320,32 @@ const AppSalesBillBillIdRoute = AppSalesBillBillIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
+  '/app/accounts': typeof AppAccountsRoute
   '/app/activity': typeof AppActivityRoute
   '/app/agents': typeof AppAgentsRoute
   '/app/assets': typeof AppAssetsRoute
-  '/app/bank': typeof AppBankRoute
-  '/app/books': typeof AppBooksRoute
+  '/app/bank': typeof AppBankRouteWithChildren
+  '/app/bills': typeof AppBillsRoute
+  '/app/books': typeof AppBooksRouteWithChildren
   '/app/cash-planner': typeof AppCashPlannerRoute
   '/app/close': typeof AppCloseRoute
   '/app/collections': typeof AppCollectionsRoute
   '/app/currency': typeof AppCurrencyRoute
+  '/app/customers': typeof AppCustomersRoute
   '/app/documents': typeof AppDocumentsRoute
+  '/app/invoices': typeof AppInvoicesRoute
   '/app/move-in': typeof AppMoveInRoute
   '/app/questions': typeof AppQuestionsRoute
   '/app/receipts': typeof AppReceiptsRoute
-  '/app/reports': typeof AppReportsRoute
-  '/app/sales': typeof AppSalesRoute
+  '/app/reports': typeof AppReportsRouteWithChildren
+  '/app/sales': typeof AppSalesRouteWithChildren
   '/app/search': typeof AppSearchRoute
   '/app/settings': typeof AppSettingsRouteWithChildren
   '/app/time': typeof AppTimeRoute
   '/app/tools': typeof AppToolsRoute
   '/app/': typeof AppIndexRoute
   '/app/bank/connect': typeof AppBankConnectRoute
+  '/app/reports/$slug': typeof AppReportsSlugRoute
   '/app/settings/agents': typeof AppSettingsAgentsRoute
   '/app/settings/api': typeof AppSettingsApiRoute
   '/app/settings/business': typeof AppSettingsBusinessRoute
@@ -270,29 +360,43 @@ export interface FileRoutesByFullPath {
   '/app/settings/stripe': typeof AppSettingsStripeRoute
   '/app/settings/you': typeof AppSettingsYouRoute
   '/app/settings/': typeof AppSettingsIndexRoute
+  '/app/sales/customer/$customerId': typeof AppSalesCustomerCustomerIdRoute
+  '/app/sales/vendor/$vendorId': typeof AppSalesVendorVendorIdRoute
   '/app/sales/bill/$billId': typeof AppSalesBillBillIdRoute
+  '/app/bank/line/': typeof AppBankLineIndexRoute
+  '/app/books/entry/': typeof AppBooksEntryIndexRoute
+  '/app/sales/bill/': typeof AppSalesBillIndexRoute
+  '/app/sales/customer/': typeof AppSalesCustomerIndexRoute
+  '/app/sales/invoice/': typeof AppSalesInvoiceIndexRoute
+  '/app/sales/recurring/': typeof AppSalesRecurringIndexRoute
+  '/app/sales/vendor/': typeof AppSalesVendorIndexRoute
 }
 export interface FileRoutesByTo {
+  '/app/accounts': typeof AppAccountsRoute
   '/app/activity': typeof AppActivityRoute
   '/app/agents': typeof AppAgentsRoute
   '/app/assets': typeof AppAssetsRoute
-  '/app/bank': typeof AppBankRoute
-  '/app/books': typeof AppBooksRoute
+  '/app/bank': typeof AppBankRouteWithChildren
+  '/app/bills': typeof AppBillsRoute
+  '/app/books': typeof AppBooksRouteWithChildren
   '/app/cash-planner': typeof AppCashPlannerRoute
   '/app/close': typeof AppCloseRoute
   '/app/collections': typeof AppCollectionsRoute
   '/app/currency': typeof AppCurrencyRoute
+  '/app/customers': typeof AppCustomersRoute
   '/app/documents': typeof AppDocumentsRoute
+  '/app/invoices': typeof AppInvoicesRoute
   '/app/move-in': typeof AppMoveInRoute
   '/app/questions': typeof AppQuestionsRoute
   '/app/receipts': typeof AppReceiptsRoute
-  '/app/reports': typeof AppReportsRoute
-  '/app/sales': typeof AppSalesRoute
+  '/app/reports': typeof AppReportsRouteWithChildren
+  '/app/sales': typeof AppSalesRouteWithChildren
   '/app/search': typeof AppSearchRoute
   '/app/time': typeof AppTimeRoute
   '/app/tools': typeof AppToolsRoute
   '/app': typeof AppIndexRoute
   '/app/bank/connect': typeof AppBankConnectRoute
+  '/app/reports/$slug': typeof AppReportsSlugRoute
   '/app/settings/agents': typeof AppSettingsAgentsRoute
   '/app/settings/api': typeof AppSettingsApiRoute
   '/app/settings/business': typeof AppSettingsBusinessRoute
@@ -307,32 +411,46 @@ export interface FileRoutesByTo {
   '/app/settings/stripe': typeof AppSettingsStripeRoute
   '/app/settings/you': typeof AppSettingsYouRoute
   '/app/settings': typeof AppSettingsIndexRoute
+  '/app/sales/customer/$customerId': typeof AppSalesCustomerCustomerIdRoute
+  '/app/sales/vendor/$vendorId': typeof AppSalesVendorVendorIdRoute
   '/app/sales/bill/$billId': typeof AppSalesBillBillIdRoute
+  '/app/bank/line': typeof AppBankLineIndexRoute
+  '/app/books/entry': typeof AppBooksEntryIndexRoute
+  '/app/sales/bill': typeof AppSalesBillIndexRoute
+  '/app/sales/customer': typeof AppSalesCustomerIndexRoute
+  '/app/sales/invoice': typeof AppSalesInvoiceIndexRoute
+  '/app/sales/recurring': typeof AppSalesRecurringIndexRoute
+  '/app/sales/vendor': typeof AppSalesVendorIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/app': typeof AppRouteWithChildren
+  '/app/accounts': typeof AppAccountsRoute
   '/app/activity': typeof AppActivityRoute
   '/app/agents': typeof AppAgentsRoute
   '/app/assets': typeof AppAssetsRoute
-  '/app/bank': typeof AppBankRoute
-  '/app/books': typeof AppBooksRoute
+  '/app/bank': typeof AppBankRouteWithChildren
+  '/app/bills': typeof AppBillsRoute
+  '/app/books': typeof AppBooksRouteWithChildren
   '/app/cash-planner': typeof AppCashPlannerRoute
   '/app/close': typeof AppCloseRoute
   '/app/collections': typeof AppCollectionsRoute
   '/app/currency': typeof AppCurrencyRoute
+  '/app/customers': typeof AppCustomersRoute
   '/app/documents': typeof AppDocumentsRoute
+  '/app/invoices': typeof AppInvoicesRoute
   '/app/move-in': typeof AppMoveInRoute
   '/app/questions': typeof AppQuestionsRoute
   '/app/receipts': typeof AppReceiptsRoute
-  '/app/reports': typeof AppReportsRoute
-  '/app/sales': typeof AppSalesRoute
+  '/app/reports': typeof AppReportsRouteWithChildren
+  '/app/sales': typeof AppSalesRouteWithChildren
   '/app/search': typeof AppSearchRoute
   '/app/settings': typeof AppSettingsRouteWithChildren
   '/app/time': typeof AppTimeRoute
   '/app/tools': typeof AppToolsRoute
   '/app/': typeof AppIndexRoute
   '/app/bank_/connect': typeof AppBankConnectRoute
+  '/app/reports/$slug': typeof AppReportsSlugRoute
   '/app/settings/agents': typeof AppSettingsAgentsRoute
   '/app/settings/api': typeof AppSettingsApiRoute
   '/app/settings/business': typeof AppSettingsBusinessRoute
@@ -347,22 +465,35 @@ export interface FileRoutesById {
   '/app/settings/stripe': typeof AppSettingsStripeRoute
   '/app/settings/you': typeof AppSettingsYouRoute
   '/app/settings/': typeof AppSettingsIndexRoute
+  '/app/sales/customer/$customerId': typeof AppSalesCustomerCustomerIdRoute
+  '/app/sales/vendor/$vendorId': typeof AppSalesVendorVendorIdRoute
   '/app/sales_/bill/$billId': typeof AppSalesBillBillIdRoute
+  '/app/bank/line/': typeof AppBankLineIndexRoute
+  '/app/books/entry/': typeof AppBooksEntryIndexRoute
+  '/app/sales/bill/': typeof AppSalesBillIndexRoute
+  '/app/sales/customer/': typeof AppSalesCustomerIndexRoute
+  '/app/sales/invoice/': typeof AppSalesInvoiceIndexRoute
+  '/app/sales/recurring/': typeof AppSalesRecurringIndexRoute
+  '/app/sales/vendor/': typeof AppSalesVendorIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/app'
+    | '/app/accounts'
     | '/app/activity'
     | '/app/agents'
     | '/app/assets'
     | '/app/bank'
+    | '/app/bills'
     | '/app/books'
     | '/app/cash-planner'
     | '/app/close'
     | '/app/collections'
     | '/app/currency'
+    | '/app/customers'
     | '/app/documents'
+    | '/app/invoices'
     | '/app/move-in'
     | '/app/questions'
     | '/app/receipts'
@@ -374,6 +505,7 @@ export interface FileRouteTypes {
     | '/app/tools'
     | '/app/'
     | '/app/bank/connect'
+    | '/app/reports/$slug'
     | '/app/settings/agents'
     | '/app/settings/api'
     | '/app/settings/business'
@@ -388,19 +520,32 @@ export interface FileRouteTypes {
     | '/app/settings/stripe'
     | '/app/settings/you'
     | '/app/settings/'
+    | '/app/sales/customer/$customerId'
+    | '/app/sales/vendor/$vendorId'
     | '/app/sales/bill/$billId'
+    | '/app/bank/line/'
+    | '/app/books/entry/'
+    | '/app/sales/bill/'
+    | '/app/sales/customer/'
+    | '/app/sales/invoice/'
+    | '/app/sales/recurring/'
+    | '/app/sales/vendor/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/app/accounts'
     | '/app/activity'
     | '/app/agents'
     | '/app/assets'
     | '/app/bank'
+    | '/app/bills'
     | '/app/books'
     | '/app/cash-planner'
     | '/app/close'
     | '/app/collections'
     | '/app/currency'
+    | '/app/customers'
     | '/app/documents'
+    | '/app/invoices'
     | '/app/move-in'
     | '/app/questions'
     | '/app/receipts'
@@ -411,6 +556,7 @@ export interface FileRouteTypes {
     | '/app/tools'
     | '/app'
     | '/app/bank/connect'
+    | '/app/reports/$slug'
     | '/app/settings/agents'
     | '/app/settings/api'
     | '/app/settings/business'
@@ -425,20 +571,33 @@ export interface FileRouteTypes {
     | '/app/settings/stripe'
     | '/app/settings/you'
     | '/app/settings'
+    | '/app/sales/customer/$customerId'
+    | '/app/sales/vendor/$vendorId'
     | '/app/sales/bill/$billId'
+    | '/app/bank/line'
+    | '/app/books/entry'
+    | '/app/sales/bill'
+    | '/app/sales/customer'
+    | '/app/sales/invoice'
+    | '/app/sales/recurring'
+    | '/app/sales/vendor'
   id:
     | '__root__'
     | '/app'
+    | '/app/accounts'
     | '/app/activity'
     | '/app/agents'
     | '/app/assets'
     | '/app/bank'
+    | '/app/bills'
     | '/app/books'
     | '/app/cash-planner'
     | '/app/close'
     | '/app/collections'
     | '/app/currency'
+    | '/app/customers'
     | '/app/documents'
+    | '/app/invoices'
     | '/app/move-in'
     | '/app/questions'
     | '/app/receipts'
@@ -450,6 +609,7 @@ export interface FileRouteTypes {
     | '/app/tools'
     | '/app/'
     | '/app/bank_/connect'
+    | '/app/reports/$slug'
     | '/app/settings/agents'
     | '/app/settings/api'
     | '/app/settings/business'
@@ -464,7 +624,16 @@ export interface FileRouteTypes {
     | '/app/settings/stripe'
     | '/app/settings/you'
     | '/app/settings/'
+    | '/app/sales/customer/$customerId'
+    | '/app/sales/vendor/$vendorId'
     | '/app/sales_/bill/$billId'
+    | '/app/bank/line/'
+    | '/app/books/entry/'
+    | '/app/sales/bill/'
+    | '/app/sales/customer/'
+    | '/app/sales/invoice/'
+    | '/app/sales/recurring/'
+    | '/app/sales/vendor/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -485,6 +654,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/app/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/accounts': {
+      id: '/app/accounts'
+      path: '/accounts'
+      fullPath: '/app/accounts'
+      preLoaderRoute: typeof AppAccountsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/activity': {
@@ -513,6 +689,13 @@ declare module '@tanstack/react-router' {
       path: '/bank'
       fullPath: '/app/bank'
       preLoaderRoute: typeof AppBankRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/bills': {
+      id: '/app/bills'
+      path: '/bills'
+      fullPath: '/app/bills'
+      preLoaderRoute: typeof AppBillsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/books': {
@@ -550,11 +733,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCurrencyRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/customers': {
+      id: '/app/customers'
+      path: '/customers'
+      fullPath: '/app/customers'
+      preLoaderRoute: typeof AppCustomersRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/documents': {
       id: '/app/documents'
       path: '/documents'
       fullPath: '/app/documents'
       preLoaderRoute: typeof AppDocumentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/invoices': {
+      id: '/app/invoices'
+      path: '/invoices'
+      fullPath: '/app/invoices'
+      preLoaderRoute: typeof AppInvoicesRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/move-in': {
@@ -626,6 +823,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/bank/connect'
       preLoaderRoute: typeof AppBankConnectRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/app/reports/$slug': {
+      id: '/app/reports/$slug'
+      path: '/$slug'
+      fullPath: '/app/reports/$slug'
+      preLoaderRoute: typeof AppReportsSlugRouteImport
+      parentRoute: typeof AppReportsRoute
     }
     '/app/settings/': {
       id: '/app/settings/'
@@ -725,6 +929,69 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsYouRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/app/bank/line/': {
+      id: '/app/bank/line/'
+      path: '/line'
+      fullPath: '/app/bank/line/'
+      preLoaderRoute: typeof AppBankLineIndexRouteImport
+      parentRoute: typeof AppBankRoute
+    }
+    '/app/books/entry/': {
+      id: '/app/books/entry/'
+      path: '/entry'
+      fullPath: '/app/books/entry/'
+      preLoaderRoute: typeof AppBooksEntryIndexRouteImport
+      parentRoute: typeof AppBooksRoute
+    }
+    '/app/sales/bill/': {
+      id: '/app/sales/bill/'
+      path: '/bill'
+      fullPath: '/app/sales/bill/'
+      preLoaderRoute: typeof AppSalesBillIndexRouteImport
+      parentRoute: typeof AppSalesRoute
+    }
+    '/app/sales/customer/': {
+      id: '/app/sales/customer/'
+      path: '/customer'
+      fullPath: '/app/sales/customer/'
+      preLoaderRoute: typeof AppSalesCustomerIndexRouteImport
+      parentRoute: typeof AppSalesRoute
+    }
+    '/app/sales/customer/$customerId': {
+      id: '/app/sales/customer/$customerId'
+      path: '/customer/$customerId'
+      fullPath: '/app/sales/customer/$customerId'
+      preLoaderRoute: typeof AppSalesCustomerCustomerIdRouteImport
+      parentRoute: typeof AppSalesRoute
+    }
+    '/app/sales/invoice/': {
+      id: '/app/sales/invoice/'
+      path: '/invoice'
+      fullPath: '/app/sales/invoice/'
+      preLoaderRoute: typeof AppSalesInvoiceIndexRouteImport
+      parentRoute: typeof AppSalesRoute
+    }
+    '/app/sales/recurring/': {
+      id: '/app/sales/recurring/'
+      path: '/recurring'
+      fullPath: '/app/sales/recurring/'
+      preLoaderRoute: typeof AppSalesRecurringIndexRouteImport
+      parentRoute: typeof AppSalesRoute
+    }
+    '/app/sales/vendor/': {
+      id: '/app/sales/vendor/'
+      path: '/vendor'
+      fullPath: '/app/sales/vendor/'
+      preLoaderRoute: typeof AppSalesVendorIndexRouteImport
+      parentRoute: typeof AppSalesRoute
+    }
+    '/app/sales/vendor/$vendorId': {
+      id: '/app/sales/vendor/$vendorId'
+      path: '/vendor/$vendorId'
+      fullPath: '/app/sales/vendor/$vendorId'
+      preLoaderRoute: typeof AppSalesVendorVendorIdRouteImport
+      parentRoute: typeof AppSalesRoute
+    }
     '/app/sales_/bill/$billId': {
       id: '/app/sales_/bill/$billId'
       path: '/sales/bill/$billId'
@@ -734,6 +1001,65 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AppBankRouteChildren {
+  AppBankLineIndexRoute: typeof AppBankLineIndexRoute
+}
+
+const AppBankRouteChildren: AppBankRouteChildren = {
+  AppBankLineIndexRoute: AppBankLineIndexRoute,
+}
+
+const AppBankRouteWithChildren =
+  AppBankRoute._addFileChildren(AppBankRouteChildren)
+
+interface AppBooksRouteChildren {
+  AppBooksEntryIndexRoute: typeof AppBooksEntryIndexRoute
+}
+
+const AppBooksRouteChildren: AppBooksRouteChildren = {
+  AppBooksEntryIndexRoute: AppBooksEntryIndexRoute,
+}
+
+const AppBooksRouteWithChildren = AppBooksRoute._addFileChildren(
+  AppBooksRouteChildren,
+)
+
+interface AppReportsRouteChildren {
+  AppReportsSlugRoute: typeof AppReportsSlugRoute
+}
+
+const AppReportsRouteChildren: AppReportsRouteChildren = {
+  AppReportsSlugRoute: AppReportsSlugRoute,
+}
+
+const AppReportsRouteWithChildren = AppReportsRoute._addFileChildren(
+  AppReportsRouteChildren,
+)
+
+interface AppSalesRouteChildren {
+  AppSalesCustomerCustomerIdRoute: typeof AppSalesCustomerCustomerIdRoute
+  AppSalesVendorVendorIdRoute: typeof AppSalesVendorVendorIdRoute
+  AppSalesBillIndexRoute: typeof AppSalesBillIndexRoute
+  AppSalesCustomerIndexRoute: typeof AppSalesCustomerIndexRoute
+  AppSalesInvoiceIndexRoute: typeof AppSalesInvoiceIndexRoute
+  AppSalesRecurringIndexRoute: typeof AppSalesRecurringIndexRoute
+  AppSalesVendorIndexRoute: typeof AppSalesVendorIndexRoute
+}
+
+const AppSalesRouteChildren: AppSalesRouteChildren = {
+  AppSalesCustomerCustomerIdRoute: AppSalesCustomerCustomerIdRoute,
+  AppSalesVendorVendorIdRoute: AppSalesVendorVendorIdRoute,
+  AppSalesBillIndexRoute: AppSalesBillIndexRoute,
+  AppSalesCustomerIndexRoute: AppSalesCustomerIndexRoute,
+  AppSalesInvoiceIndexRoute: AppSalesInvoiceIndexRoute,
+  AppSalesRecurringIndexRoute: AppSalesRecurringIndexRoute,
+  AppSalesVendorIndexRoute: AppSalesVendorIndexRoute,
+}
+
+const AppSalesRouteWithChildren = AppSalesRoute._addFileChildren(
+  AppSalesRouteChildren,
+)
 
 interface AppSettingsRouteChildren {
   AppSettingsAgentsRoute: typeof AppSettingsAgentsRoute
@@ -774,21 +1100,25 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppAccountsRoute: typeof AppAccountsRoute
   AppActivityRoute: typeof AppActivityRoute
   AppAgentsRoute: typeof AppAgentsRoute
   AppAssetsRoute: typeof AppAssetsRoute
-  AppBankRoute: typeof AppBankRoute
-  AppBooksRoute: typeof AppBooksRoute
+  AppBankRoute: typeof AppBankRouteWithChildren
+  AppBillsRoute: typeof AppBillsRoute
+  AppBooksRoute: typeof AppBooksRouteWithChildren
   AppCashPlannerRoute: typeof AppCashPlannerRoute
   AppCloseRoute: typeof AppCloseRoute
   AppCollectionsRoute: typeof AppCollectionsRoute
   AppCurrencyRoute: typeof AppCurrencyRoute
+  AppCustomersRoute: typeof AppCustomersRoute
   AppDocumentsRoute: typeof AppDocumentsRoute
+  AppInvoicesRoute: typeof AppInvoicesRoute
   AppMoveInRoute: typeof AppMoveInRoute
   AppQuestionsRoute: typeof AppQuestionsRoute
   AppReceiptsRoute: typeof AppReceiptsRoute
-  AppReportsRoute: typeof AppReportsRoute
-  AppSalesRoute: typeof AppSalesRoute
+  AppReportsRoute: typeof AppReportsRouteWithChildren
+  AppSalesRoute: typeof AppSalesRouteWithChildren
   AppSearchRoute: typeof AppSearchRoute
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppTimeRoute: typeof AppTimeRoute
@@ -799,21 +1129,25 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAccountsRoute: AppAccountsRoute,
   AppActivityRoute: AppActivityRoute,
   AppAgentsRoute: AppAgentsRoute,
   AppAssetsRoute: AppAssetsRoute,
-  AppBankRoute: AppBankRoute,
-  AppBooksRoute: AppBooksRoute,
+  AppBankRoute: AppBankRouteWithChildren,
+  AppBillsRoute: AppBillsRoute,
+  AppBooksRoute: AppBooksRouteWithChildren,
   AppCashPlannerRoute: AppCashPlannerRoute,
   AppCloseRoute: AppCloseRoute,
   AppCollectionsRoute: AppCollectionsRoute,
   AppCurrencyRoute: AppCurrencyRoute,
+  AppCustomersRoute: AppCustomersRoute,
   AppDocumentsRoute: AppDocumentsRoute,
+  AppInvoicesRoute: AppInvoicesRoute,
   AppMoveInRoute: AppMoveInRoute,
   AppQuestionsRoute: AppQuestionsRoute,
   AppReceiptsRoute: AppReceiptsRoute,
-  AppReportsRoute: AppReportsRoute,
-  AppSalesRoute: AppSalesRoute,
+  AppReportsRoute: AppReportsRouteWithChildren,
+  AppSalesRoute: AppSalesRouteWithChildren,
   AppSearchRoute: AppSearchRoute,
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppTimeRoute: AppTimeRoute,
