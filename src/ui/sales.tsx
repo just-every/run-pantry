@@ -237,10 +237,10 @@ export function Sales({ billId }: { billId?: string } = {}) {
   const tab = recordOpen ? 'Customers & vendors' : tabs.includes(requestedTab) ? requestedTab : tabs[0]
   const refresh = async () => { await reload(); await shared.reload() }
   // A customer or vendor path: beside its list rail at 1440, its own page (no list) at 1180 px and below.
-  if (recordOpen && narrow) return <GuardProvider><Outlet /></GuardProvider>
+  // The tree keeps its shape across that breakpoint, so resizing never remounts the record or drops an open editor.
   return <GuardProvider>
-    <PageHead title="Sales & bills" lead="Invoices you send and follow up, recurring invoices, bills and their evidence, and payments." />
-    <Tabs tabs={tabs} current={tab} onChange={setTab} pick="Show" />
+    {!(recordOpen && narrow) && <><PageHead title="Sales & bills" lead="Invoices you send and follow up, recurring invoices, bills and their evidence, and payments." />
+    <Tabs tabs={tabs} current={tab} onChange={setTab} pick="Show" /></>}
     {recordOpen ? <RecordSplit rail={<Contacts rail selected={params.customerId ?? params.vendorId} />}><Outlet /></RecordSplit> : tab === 'Estimates' ? <Estimates onChange={refresh} /> : tab === 'Invoice templates' ? <InvoiceTemplates /> : tab === 'Customers & vendors' ? <Contacts /> : tab === 'Products & services' ? <Items /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
       : tab === 'Customer deposits' ? <CustomerDeposits sales={data} onChange={refresh} /> : tab === 'Bills' ? <Bills initialBillId={billId} data={data} reload={refresh} /> : tab === 'Deliveries' ? <Card title="Deliveries"><p className="hint">Every invoice and reminder Pantry has sent, with the mail provider's answer. Accepted means the provider took the message, not that the customer read it; "Viewed" on an invoice means the customer opened its link.</p><Deliveries data={data} /></Card> : <Payments data={data} reload={refresh} />}
   </GuardProvider>

@@ -37,7 +37,9 @@ export function BackBar({ list }: { list: RecordList }) {
 
 /** The rail beside the record at 1440; the record alone at 1180 px and below. */
 export function RecordSplit({ rail, children }: { rail: ReactNode; children: ReactNode }) {
-  return useNarrow() ? <>{children}</> : <div className="record-split"><aside className="record-rail" aria-label="Customers and vendors">{rail}</aside><div className="record-col">{children}</div></div>
+  const narrow = useNarrow()
+  // One shape at every width: only the rail comes and goes, so the record is never remounted by a resize.
+  return <div className={narrow ? undefined : 'record-split'}>{!narrow && <aside className="record-rail" aria-label="Customers and vendors">{rail}</aside>}<div className="record-col">{children}</div></div>
 }
 
 /** The record column: the guard on top, then the back control, then the record itself. */
