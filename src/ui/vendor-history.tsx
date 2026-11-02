@@ -46,8 +46,11 @@ export function VendorHistory({ vendorId, record, onEdit }: { vendorId: string; 
   const { data, error, reload } = useView<VendorHistoryData>(vendorId ? `vendors/${encodeURIComponent(vendorId)}/history?${new URLSearchParams({from,to})}` : null)
   const w9 = useView<D>(record && vendorId ? `vendor-w9/${vendorId}` : null)
   const picker = <div className="inline-fields"><label>Spend from <input aria-label="Spend from" type="date" value={from} onChange={e=>{if(e.target.value)setFrom(e.target.value)}} /></label><label>Spend to <input aria-label="Spend to" type="date" value={to} onChange={e=>{if(e.target.value)setTo(e.target.value)}} /></label></div>
+  const edit = state.actor.can.record && onEdit && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit contact details</button>
+  // On the record, a refused history read still names the vendor and offers its permitted edit, from the shared contact alone.
+  const contact = state.contacts.find((x: D) => x.id === vendorId)
   if (!vendorId) return null
-  if (!data) return record ? <section className="card record-summary">{picker}<Loading error={error} what="vendor history" /></section> : <Card title="Vendor history">{picker}<Loading error={error} what="vendor history" /></Card>
+  if (!data) return record ? <section className="card record-summary">{error && contact && <div className="record-head"><h2>{contact.name} · vendor history</h2><Chip>Vendor</Chip></div>}{picker}<Loading error={error} what="vendor history" />{error && edit}</section> : <Card title="Vendor history">{picker}<Loading error={error} what="vendor history" /></Card>
   const s = data.summary
   const facts = <>
     {error && <p role="alert" className="error">{error}</p>}
@@ -89,7 +92,7 @@ export function VendorHistory({ vendorId, record, onEdit }: { vendorId: string; 
       <div className="record-head"><h2>{data.vendor.name} · vendor history</h2><Chip>Vendor</Chip>{w9.data && <W9Chip status={w9.data.status} />}<Action run={reload}>Refresh</Action></div>
       {facts}
       {metrics}
-      {state.actor.can.record && onEdit && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit contact details</button>}
+      {edit}
     </section>
     <section className="card record-sections">
       <Fold title="Vendor history" open>{periodNotes}{payableNotes}{rows}</Fold>

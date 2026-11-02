@@ -14,7 +14,10 @@ const METHOD: Record<string, string> = { card: 'Card', us_bank_account: 'Bank ac
 export function CustomerHistory({ customerId, onEdit }: { customerId: string; onEdit?: () => void }) {
   const { state } = useShared()
   const { data, error, reload } = useView<D>(`customers/${encodeURIComponent(customerId)}`)
-  if (!data) return <section className="card record-summary"><Loading error={error} what="customer history" /></section>
+  const edit = state.actor.can.record && onEdit && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit contact details</button>
+  // A refused history read still names the record and offers its permitted edit, from the shared contact alone.
+  const contact = state.contacts.find((x: D) => x.id === customerId)
+  if (!data) return <section className="card record-summary">{error && contact && <div className="record-head"><h2>{contact.name} · customer history</h2><Chip>Customer</Chip></div>}<Loading error={error} what="customer history" />{error && edit}</section>
   const c = data.customer, s = data.summary
   return <div className="stack record-card">
     <section className="card record-summary">
@@ -33,7 +36,7 @@ export function CustomerHistory({ customerId, onEdit }: { customerId: string; on
             <div><dt>Default terms</dt><dd>{c.terms_days} days</dd></div>
             <div><dt>Customer email and phone</dt><dd>{c.email || 'No email'}{c.phone ? ` · ${c.phone}` : ''}</dd></div>
           </dl>
-          {state.actor.can.record && onEdit && <button type="button" className="btn btn-secondary" onClick={onEdit}>Edit contact details</button>}
+          {edit}
         </div>
       </div>
     </section>
