@@ -6407,7 +6407,7 @@
       "executable": false
     },
     "src/ui/record-layout.tsx": {
-      "sha256": "eebef26baa4336cb79825e1a0910c9dc8b40fcc6a267071953d00f3635b9e1c1",
+      "sha256": "65faffada1c0a69504523959ccc86c4bc9ae70312b2d2bb5f25072999add91f8",
       "executable": false
     },
     "src/ui/record-paths.ts": {
@@ -6459,7 +6459,7 @@
       "executable": false
     },
     "src/ui/sales.tsx": {
-      "sha256": "8df0a72c90287f0884dd2b344e4b8786be45852185c6609433e594a27acdccd8",
+      "sha256": "a0538f66ed8f25affc8e059623fbb1d08c1687597ac33e289a425f150c3a9c90",
       "executable": false
     },
     "src/ui/search.tsx": {
