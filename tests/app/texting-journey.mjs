@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { fold, openFold } from './folds.mjs'
 import { mkdir } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
 import { providerWorker } from './provider-worker.mjs'
@@ -55,7 +56,7 @@ export async function textingBrowser(t) {
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Text settings fit ${width}`)
     if(proof)await settings.screenshot({path:`${proof}/texting-settings-${width}.png`})
     await page.goto(`${app.origin}/app/sales?tab=contacts&customer=${customer.id}`)
-    const consent=page.locator('section.card').filter({has:page.getByRole('heading',{name:'Customer text consent',exact:true})})
+    const consent=await openFold(fold(page,'Customer text consent'))
     await consent.getByLabel('Consented mobile number',{exact:true}).fill('+15005550006')
     await consent.getByLabel('Customer time zone',{exact:true}).selectOption('America/New_York')
     await consent.getByRole('checkbox',{name:'Estimate links',exact:true}).check()

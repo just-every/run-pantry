@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { Card, Chip, command, Field, Form, Table, useShared, type D } from './kit'
 import { VendorHistory } from './vendor-history'
 import { CustomerHistory } from './customer-history'
 import { ExemptionCertificates } from './exemption-certificates'
+import { GuardCard, RecordColumn, RecordLine, unknownRecordText, useGuard, useGuardDirty } from './record-layout'
+import { CONTACTS_LIST } from './record-paths'
 
 const METHODS = [['card', 'Card'], ['us_bank_account', 'Bank account (ACH)'], ['offline', 'Offline payment instructions']] as const
 const ROLES = ['primary', 'billing', 'cc'] as const
@@ -16,7 +19,14 @@ function ContactEditor({ editing, onDone, onCancel }: { editing: D | null; onDon
   const [businessReminders, setBusinessReminders] = useState(editing?.reminder_days == null)
   const [reminderDays, setReminderDays] = useState(() => (parsed(editing?.reminder_days, []) as number[]).join(', '))
   const patch = (index: number, values: D) => setPeople(p => p.map((v, i) => i === index ? { ...v, ...values } : v))
-  return <Card title={editing ? `Edit ${editing.name}` : 'Add a customer or vendor'}>
+  // Text typed and not yet saved holds the editor open: every way out of the page asks first.
+  const box = useRef<HTMLDivElement>(null), baseline = useRef<string | null>(null), [typed, setTyped] = useState(false), [, touch] = useState(0)
+  const snapshot = () => { const form = box.current?.querySelector('form'); return JSON.stringify([form ? [...new FormData(form)].filter(([, v]) => typeof v === 'string') : [], kind, people, methods, businessReminders, reminderDays]) }
+  useEffect(() => { baseline.current ??= snapshot(); setTyped(snapshot() !== baseline.current) })
+  useGuardDirty(typed)
+  const guard = useGuard()
+  const changed = () => { baseline.current ??= snapshot(); guard?.markDirty(snapshot() !== baseline.current); touch(n => n + 1) }
+  return <div ref={box} onInput={changed} onChange={changed}><Card title={editing ? `Edit ${editing.name}` : 'Add a customer or vendor'}>
     <Form label={editing ? 'Save' : 'Add'} submit={b => command('contact.save', { ...b, id: editing?.id, revision: editing?.revision, kind,
       active: b.active !== 'no', contacts: people, ...(kind === 'customer' ? { payMethods: methods, reminderDays: businessReminders ? null : reminderDays } : {}) })} onDone={onDone}
       secondary={editing && <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>}>
@@ -63,30 +73,59 @@ function ContactEditor({ editing, onDone, onCancel }: { editing: D | null; onDon
       </>}
       {editing && <Field label="Status" name="active" defaultValue={editing.active ? 'yes' : 'no'} options={[{ value: 'yes', label: 'Active' }, { value: 'no', label: 'Inactive' }]} />}
     </Form>
-  </Card>
+  </Card></div>
 }
 
-export function Contacts() {
-  const { state, reload } = useShared(), [selected, setSelected] = useState<string | null>(() => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('customer'))
-  const [added, setAdded] = useState(0), [editingOpen, setEditingOpen] = useState(false), editing = state.contacts.find((c: D) => c.id === selected) ?? null
-  const choose = (c: D) => {
-    setSelected(c.id); setEditingOpen(false)
-    const url = new URL(window.location.href); url.searchParams.set('tab', 'contacts')
-    if (c.kind === 'customer') url.searchParams.set('customer', c.id); else url.searchParams.delete('customer')
-    window.history.replaceState(null, '', url)
-  }
-  const clear = () => { setSelected(null); setEditingOpen(false); const url = new URL(window.location.href); url.searchParams.delete('customer'); window.history.replaceState(null, '', url) }
+const contactPath = (c: D) => c.kind === 'customer' ? { to: '/app/sales/customer/$customerId' as const, params: { customerId: c.id } } : { to: '/app/sales/vendor/$vendorId' as const, params: { vendorId: c.id } }
+
+/** The one list of customers and vendors: today's full table, or, beside an open record, a condensed rail of rows. */
+function ContactList({ contacts, selected, rail, onPick }: { contacts: D[]; selected?: string; rail?: boolean; onPick: (c: D) => void }) {
+  const list = useRef<HTMLUListElement>(null)
+  useEffect(() => {
+    // Keep the open record's row in view inside the rail's own scroll; the page's scroll stays where it is.
+    const row = list.current?.querySelector<HTMLElement>('[aria-current]'), box = list.current?.closest<HTMLElement>('.record-rail')
+    if (!row || !box) return
+    const top = row.offsetTop - list.current!.offsetTop
+    if (top < box.scrollTop) box.scrollTop = top
+    else if (top + row.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = top + row.offsetHeight - box.clientHeight
+  }, [selected, rail])
+  const key = (c: D) => (k: React.KeyboardEvent) => { if (k.key === 'Enter' && k.target === k.currentTarget) onPick(c) }
+  const status = (c: D) => c.active ? <Chip tone="good">Active</Chip> : <Chip>Inactive</Chip>
+  if (rail) return <ul ref={list} className="rail-list">{contacts.map(c => <li key={c.id} className={selected === c.id ? 'selected' : ''} aria-current={selected === c.id ? 'true' : undefined} tabIndex={0} onClick={() => onPick(c)} onKeyDown={key(c)}>
+    <span className="rail-text"><button type="button" className="btn btn-link" onClick={e => { e.stopPropagation(); onPick(c) }}>{c.name}</button><small>{c.kind === 'customer' ? 'Customer' : 'Vendor'} · {c.terms_days} days</small></span>{status(c)}
+  </li>)}</ul>
+  return <Table heads={['Name', 'Kind', 'Email', 'Terms', 'Status']} empty="No customers or vendors yet.">
+    {contacts.map(c => <tr key={c.id} className={selected === c.id ? 'selected' : ''} tabIndex={0} onClick={() => onPick(c)} onKeyDown={key(c)}>
+      <td><button type="button" className="btn btn-link" onClick={e => { e.stopPropagation(); onPick(c) }}>{c.name}</button></td><td>{c.kind === 'customer' ? 'Customer' : 'Vendor'}</td><td>{c.email || '—'}</td><td>{c.terms_days} days</td><td>{status(c)}</td>
+    </tr>)}
+  </Table>
+}
+
+/** Customers & vendors. With no record open it is today's full page; beside an open record (`rail`) it is rows only. */
+export function Contacts({ selected, rail }: { selected?: string; rail?: boolean }) {
+  const { state, reload } = useShared(), navigate = useNavigate(), guard = useGuard(), [added, setAdded] = useState(0)
+  const open = (c: D) => { if (c.id !== selected) void navigate(contactPath(c)) }
+  // An empty book opens on the add form with Name ready to type in.
+  useEffect(() => { if (!rail && !state.contacts.length) document.querySelector<HTMLInputElement>('main input[name=name]')?.focus() }, [])
+  if (rail) return <ContactList contacts={state.contacts} selected={selected} rail onPick={open} />
   return <>
+    <GuardCard />
     <div className="split split-wide-left">
-      <Card title="Customers and vendors" actions={selected && <button type="button" className="btn btn-secondary" onClick={clear}>Add a contact</button>}>
-        <Table heads={['Name', 'Kind', 'Email', 'Terms', 'Status']} empty="No customers or vendors yet.">
-          {state.contacts.map((c: D) => <tr key={c.id} className={selected === c.id ? 'selected' : ''} tabIndex={0} onClick={() => choose(c)} onKeyDown={k => { if (k.key === 'Enter') choose(c) }}>
-            <td><button type="button" className="btn btn-link" onClick={() => choose(c)}>{c.name}</button></td><td>{c.kind === 'customer' ? 'Customer' : 'Vendor'}</td><td>{c.email || '—'}</td><td>{c.terms_days} days</td><td>{c.active ? <Chip tone="good">Active</Chip> : <Chip>Inactive</Chip>}</td>
-          </tr>)}
-        </Table>
-      </Card>
-      {state.actor.can.record && (editing && !editingOpen ? <Card title={editing.name}><p>{editing.kind === 'customer' ? 'Customer history, balances and preferences are below.' : 'Vendor contact details are saved in your books.'}</p><button type="button" className="btn btn-secondary" onClick={() => setEditingOpen(true)}>Edit contact details</button></Card> : <ContactEditor key={`${editing?.id ?? 'new'}-${editing?.revision ?? added}`} editing={editing} onCancel={clear} onDone={async c => { await reload(); setAdded(n => n + 1); choose(c) }} />)}
+      <Card title="Customers and vendors"><ContactList contacts={state.contacts} onPick={open} /></Card>
+      {state.actor.can.record && <ContactEditor key={`new-${added}`} editing={null} onCancel={() => {}} onDone={async c => { guard?.markDirty(false); await reload(); setAdded(n => n + 1); open(c) }} />}
     </div>
-    {editing?.kind === 'customer' ? <CustomerHistory key={editing.id + editing.revision} customerId={editing.id} /> : editing?.kind === 'vendor' ? <VendorHistory key={editing.id + editing.revision} vendorId={editing.id} /> : !['sales', 'payables-clerk'].includes(state.actor.role) && <ExemptionCertificates />}
+    {!['sales', 'payables-clerk'].includes(state.actor.role) && <ExemptionCertificates />}
   </>
+}
+
+/** A customer or vendor at its own address: the record, its editor in place, or one line saying it is not there. */
+export function ContactRecord({ kind, id }: { kind: 'customer' | 'vendor'; id: string }) {
+  const { state, reload } = useShared(), guard = useGuard(), [editing, setEditing] = useState(false)
+  const contact = state.contacts.find((c: D) => c.id === id && c.kind === kind)
+  if (!contact) return <RecordColumn list={CONTACTS_LIST}><RecordLine text={unknownRecordText(kind)} list={CONTACTS_LIST} /></RecordColumn>
+  const edit = () => setEditing(true)
+  return <RecordColumn list={CONTACTS_LIST}>
+    {editing ? <ContactEditor key={`${contact.id}-${contact.revision}`} editing={contact} onCancel={() => setEditing(false)} onDone={async () => { guard?.markDirty(false); await reload(); setEditing(false) }} />
+      : kind === 'customer' ? <CustomerHistory key={contact.id + contact.revision} customerId={contact.id} onEdit={edit} /> : <VendorHistory key={contact.id + contact.revision} vendorId={contact.id} record onEdit={edit} />}
+  </RecordColumn>
 }

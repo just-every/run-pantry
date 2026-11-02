@@ -7,7 +7,8 @@ import { RefundCustomerBalance } from './customer-refunds'
 import { DimensionFormFields } from './dimensions'
 import { useEffect, useState } from 'react'
 import { useAddressTab } from './address-tabs'
-import { useLocation } from '@tanstack/react-router'
+import { Outlet, useChildMatches, useLocation, useParams } from '@tanstack/react-router'
+import { GuardProvider, RecordSplit, useNarrow, useTrackPrevious } from './record-layout'
 import { Action, Card, Chip, command, contactOptions, Details, Field, Form, Loading, Metrics, PageHead, Table, Tabs, accountOptions, day, today, usd, useShared, useView, useWho, type D } from './kit'
 import { canSelfApprove } from './issuing-limits'
 import { Bills } from './bills'
@@ -227,17 +228,20 @@ function VendorCredits({ data, reload }: { data: D; reload: () => Promise<void> 
 
 export function Sales({ billId }: { billId?: string } = {}) {
   // Overview's Customers and vendors step opens this page at ?tab=contacts.
-  const location=useLocation()
+  const location=useLocation(), recordOpen=useChildMatches({select:m=>m.length>0}), params=useParams({strict:false}) as {customerId?:string;vendorId?:string}, narrow=useNarrow()
+  useTrackPrevious()
   const [requestedTab, setTab] = useAddressTab('/app/sales', [['Invoices', 'invoices'], ['Invoice templates', 'templates'], ['Customers & vendors', 'contacts'], ['Bills', 'bills'], ['Payments', 'payments'], ['Estimates', 'estimates'], ['Customer deposits', 'deposits'], ['Recurring', 'recurring'], ['Deliveries', 'deliveries'], ['Products & services', 'items']], billId || /^#?bill-/.test(location.hash) ? 'Bills' : undefined)
   const { data, error, reload } = useView<D>('sales'), shared = useShared()
   const role = shared.state.actor.role
   const tabs = role === 'sales' ? ['Invoices', 'Estimates', 'Recurring', 'Deliveries', 'Customers & vendors'] : role === 'payables-clerk' ? ['Bills', 'Customers & vendors'] : ['Invoices', 'Invoice templates', ...(['owner', 'bookkeeper', 'accountant', 'viewer'].includes(role) ? ['Estimates'] : []), 'Recurring', 'Bills', 'Payments', ...(mayRecordDeposits(shared.state) ? ['Customer deposits'] : []), 'Deliveries', 'Customers & vendors', 'Products & services']
-  const tab = tabs.includes(requestedTab) ? requestedTab : tabs[0]
+  const tab = recordOpen ? 'Customers & vendors' : tabs.includes(requestedTab) ? requestedTab : tabs[0]
   const refresh = async () => { await reload(); await shared.reload() }
-  return <>
+  // A customer or vendor path: beside its list rail at 1440, its own page (no list) at 1180 px and below.
+  if (recordOpen && narrow) return <GuardProvider><Outlet /></GuardProvider>
+  return <GuardProvider>
     <PageHead title="Sales & bills" lead="Invoices you send and follow up, recurring invoices, bills and their evidence, and payments." />
     <Tabs tabs={tabs} current={tab} onChange={setTab} pick="Show" />
-    {tab === 'Estimates' ? <Estimates onChange={refresh} /> : tab === 'Invoice templates' ? <InvoiceTemplates /> : tab === 'Customers & vendors' ? <Contacts /> : tab === 'Products & services' ? <Items /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
+    {recordOpen ? <RecordSplit rail={<Contacts rail selected={params.customerId ?? params.vendorId} />}><Outlet /></RecordSplit> : tab === 'Estimates' ? <Estimates onChange={refresh} /> : tab === 'Invoice templates' ? <InvoiceTemplates /> : tab === 'Customers & vendors' ? <Contacts /> : tab === 'Products & services' ? <Items /> : !data ? <Loading error={error} what="sales and bills" /> : tab === 'Invoices' ? <Invoices data={data} reload={refresh} /> : tab === 'Recurring' ? <Recurring data={data} reload={refresh} />
       : tab === 'Customer deposits' ? <CustomerDeposits sales={data} onChange={refresh} /> : tab === 'Bills' ? <Bills initialBillId={billId} data={data} reload={refresh} /> : tab === 'Deliveries' ? <Card title="Deliveries"><p className="hint">Every invoice and reminder Pantry has sent, with the mail provider's answer. Accepted means the provider took the message, not that the customer read it; "Viewed" on an invoice means the customer opened its link.</p><Deliveries data={data} /></Card> : <Payments data={data} reload={refresh} />}
-  </>
+  </GuardProvider>
 }

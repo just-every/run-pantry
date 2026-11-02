@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { fold, openFold } from './folds.mjs'
 import {mkdir} from 'node:fs/promises'
 import {chromium} from '@playwright/test'
 import {providerWorker} from './provider-worker.mjs'
@@ -58,8 +59,7 @@ export async function paymentStatusBrowser(t) {
       }
     }
     await page.goto(`${h.origin}/app/sales?tab=contacts&customer=${customer.id}`)
-    const preference=page.locator('details').filter({has:page.locator('summary',{hasText:'Payment receipt preference'})})
-    await preference.locator('summary').click()
+    const preference=await openFold(fold(page,'Details'))
     await preference.getByRole('button',{name:'Turn payment receipts off',exact:true}).click()
     await preference.getByRole('button',{name:'Turn payment receipts on',exact:true}).waitFor()
     if(proof)await page.screenshot({path:`${proof}/payer-preference-${width}.png`,fullPage:true})

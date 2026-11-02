@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { fold, openFold } from './folds.mjs'
 import { mkdir } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
 import { providerWorker } from './provider-worker.mjs'
@@ -33,8 +34,8 @@ export async function autopayBrowser(t) {
     const context=await browser.newContext({storageState,extraHTTPHeaders:clock,viewport:{width,height:width===390?844:1000}}),page=await context.newPage(),errors=[]
     page.on('pageerror',e=>errors.push(String(e)))
     await page.goto(`${app.origin}/app/sales?tab=contacts&customer=${customer.id}`)
-    const card=page.locator('section.card').filter({has:page.getByRole('heading',{name:'Saved payment and autopay',exact:true})})
-    await card.getByText('Off',{exact:true}).waitFor();await card.locator('summary',{hasText:'Authorization and schedule'}).click()
+    const card=fold(page,'Saved payment and autopay')
+    await card.getByText('Off',{exact:true}).waitFor();await openFold(card);await card.locator('summary',{hasText:'Authorization and schedule'}).click()
     await card.getByLabel('Recurring template',{exact:true}).selectOption(recurring.id)
     await card.getByLabel('Charge purpose',{exact:true}).fill('Monthly studio design retainer')
     await card.getByLabel(`Retry email time zone for cedar-${width}@example.test`,{exact:true}).fill('America/New_York')
@@ -69,7 +70,7 @@ export async function autopayBrowser(t) {
       throw new Error(`Autopay return at ${new URL(hosted.url()).hostname}: ${await hosted.locator('body').innerText()}`)
     })
     if(proof)await hosted.screenshot({path:`${proof}/autopay-payer-saved-${width}.png`,fullPage:true})
-    await page.reload();await card.getByText('Authorized',{exact:true}).waitFor()
+    await page.reload();await card.getByText('Authorized',{exact:true}).waitFor();await openFold(card)
     if(proof)await card.screenshot({path:`${proof}/autopay-owner-authorized-${width}.png`})
     await card.locator('summary',{hasText:'Retry email preferences'}).click()
     await card.getByLabel('Observed email outcome',{exact:true}).selectOption('complained')
@@ -106,6 +107,7 @@ export async function autopayBrowser(t) {
     assert.equal(retries.notices.length,4)
     assert.ok(retries.notices.every(n=>n.status==='accepted'))
     await page.reload()
+    await openFold(card)
     await card.locator('summary',{hasText:'Retry email outcomes'}).click()
     assert.equal(await card.getByText('failed',{exact:true}).count(),4)
     assert.equal(await card.getByText('accepted',{exact:true}).count(),4)
