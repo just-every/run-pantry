@@ -6139,7 +6139,7 @@
       "executable": false
     },
     "src/ui/customer-history.tsx": {
-      "sha256": "0fa414be2465ffb4aaa419e8a1360e75b21059eca69fe7b5a0fc4f54bd7eb0dd",
+      "sha256": "22d9f7defdc1adfdebe64f42bb613320f5740872883cdfe7ca1603784674749a",
       "executable": false
     },
     "src/ui/customer-refunds.tsx": {
@@ -6527,7 +6527,7 @@
       "executable": false
     },
     "src/ui/vendor-history.tsx": {
-      "sha256": "8ebecd3893be5621e46a232ce92d5c566ce6d9f81cf49378d6afb790cd049dab",
+      "sha256": "aa0f31ae4bd56f81e047ec00bf2a5c2d78505b1b084ff31ebea304a4172fdcae",
       "executable": false
     },
     "src/ui/w9.tsx": {
