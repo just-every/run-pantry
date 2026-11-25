@@ -2,6 +2,8 @@
 
 ## Unreleased (next minor)
 
+- Scheduled and request-driven due work no longer scans the books on every run. Transfer pairing, the daily checks, the economic-nexus watch and the books agent's pass run when the day turns or something was recorded since their last run (a request leaves a changed ledger 25 minutes between looks), so an unchanged ledger costs about a hundred D1 rows a tick instead of ten per journal line, and the agent's per-line questions are asked of the books once per pass. Migration `0121_work_gate.sql` adds the small `pt_work_gate` table and an index on a journal line's account and net amount. Behaviour for people is unchanged; a change now reaches those checks on the next Cron tick.
+
 - ACH invoice payment is proven end to end on a US Stripe test account: the customer verifies their bank in Stripe Checkout, Pantry shows processing until it clears, and the payment and Stripe fee post once.
 
 - Bank feed mapping keeps deposit accounts in asset ledgers and cards or lines of credit in liability ledgers, both in the picker and on the server. Each connection shows its next sync, or that it waits for Re-link. Checking and card feeds, expired sign-in and Plaid Link update mode are proven against Plaid’s sandbox.

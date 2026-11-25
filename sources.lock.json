@@ -107,7 +107,7 @@
       "executable": false
     },
     "CHANGELOG.md": {
-      "sha256": "7905f2feb33c01dbe6be85deeec37267130bd090bb8973b7dd270e11e17c7b7e",
+      "sha256": "13d76705c95a016ed32b0bbfdf8832fac8618faf8c1601fc37f38b894873aa55",
       "executable": false
     },
     "composition.lock.json": {
@@ -4455,7 +4455,7 @@
       "executable": false
     },
     "src/pantry/due.ts": {
-      "sha256": "8f3f40193680110179dd84165a6bb7a9a30a2a81924260262e3c9e74c3c1baf2",
+      "sha256": "934d90280258dbb243c103a5722ee9c84a5d13349ee0552f344ae57454ce05ab",
       "executable": false
     },
     "src/pantry/early-payment-table.ts": {
@@ -4879,7 +4879,7 @@
       "executable": false
     },
     "src/pantry/nexus.ts": {
-      "sha256": "cdad048f8061f931c54741c6b3a780cb2b1f7d6dff32bfe458c2908fa939eae4",
+      "sha256": "351698e12ddb9c7629a5b3f0623ebcb71d4350b30666a0a5d65aeb475764e324",
       "executable": false
     },
     "src/pantry/open-items.ts": {
@@ -4971,7 +4971,7 @@
       "executable": false
     },
     "src/pantry/questions/checks.ts": {
-      "sha256": "81752c6f6480a4bdfe170116354eefefc4de84bac7a9dfda35be5ee11b6312f1",
+      "sha256": "e24a79499e22bcdcadf5b0ffdb038d9d9519b9d01e4390b5929d868a544e9d2d",
       "executable": false
     },
     "src/pantry/questions/close.ts": {
@@ -4999,7 +4999,7 @@
       "executable": false
     },
     "src/pantry/questions/run.ts": {
-      "sha256": "b2fbc1b343ffe907b435fcd54bbe53faaabd17ddeb6cb1341df77ca6728895a9",
+      "sha256": "41899ecb49f6d9db7ca5f93dd3ef4c64454cf6c5627c01df50dbca47f6696813",
       "executable": false
     },
     "src/pantry/questions/store.ts": {

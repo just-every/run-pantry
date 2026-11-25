@@ -86,9 +86,11 @@ const escape = (s: string) => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&l
 
 /** Due work: raise new 80%/100% alerts once, email them, and resolve alerts no longer reached. */
 export async function runNexusAlerts(env: Bindings, db: D1Database) {
-  const watch = await nexusWatch(db), stamp = now()
+  const watch = await nexusWatch(db), stamp = now(), reachedLevel = new Map(watch.states.map(s => [s.state, s.level]))
+  // Only an open alert can resolve, so the states without one cost nothing.
+  const fallen = (await all(db, 'SELECT id, state, level FROM pt_nexus_alerts WHERE resolved_at IS NULL')).filter(a => a.level > (reachedLevel.get(a.state) ?? a.level))
+  if (fallen.length) await run(db, fallen.map(a => q('UPDATE pt_nexus_alerts SET resolved_at = ? WHERE id = ? AND resolved_at IS NULL', stamp, a.id)))
   for (const s of watch.states) {
-    await run(db, [q('UPDATE pt_nexus_alerts SET resolved_at = ? WHERE state = ? AND resolved_at IS NULL AND level > ?', stamp, s.state, s.level)])
     for (const level of [80, 100].filter(l => l <= s.level)) {
       const id = uid()
       const claim = await db.prepare(`INSERT OR IGNORE INTO pt_nexus_alerts (id, state, level, period, sales_cents, transactions, threshold_version, raised_at)

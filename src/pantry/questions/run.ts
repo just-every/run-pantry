@@ -11,6 +11,7 @@ import { all, one, q, run, type Sql } from '../db'
 import { categoryEffect, findIssues, NetIncome, type Choice, type Issue } from './checks'
 import { emailedToday, emailQuestion, waitingForEmail } from './mail'
 import { modelState, suggestCategory } from './model'
+import { whenChanged } from '../work-gate'
 import { AGENT, agentSettings, newRef, OPEN, parse, say, type Question } from './store'
 
 const HOURLY = 55 * 60 * 1000
@@ -64,54 +65,67 @@ export async function runAgent(env: Bindings, { scheduled = false } = {}): Promi
     const claimed = await db.prepare('UPDATE pt_books_agent SET last_run_at = ? WHERE id = 1 AND (last_run_at IS NULL OR last_run_at < ?)').bind(at, new Date(Date.now() - HOURLY).toISOString()).run()
     if (claimed.meta.changes !== 1) return null
   }
-  await runStanding(db)
-  const issues = await findIssues(db, settings, at.slice(0, 10))
-  const known = new Map((await all(db, 'SELECT * FROM pt_questions')).map(r => [r.fingerprint, parse(r)]))
-  const accounts = await all(db, 'SELECT * FROM pt_accounts ORDER BY code'), budget = { left: 5 }
-  const writes: Sql[] = []
-  let asked = 0, reopened = 0, resolved = 0
-  for (const issue of issues) {
-    const existing = known.get(issue.fingerprint)
-    if (!existing) {
-      const id = uid(), choices = await withGuess(env, db, issue, accounts, budget)
-      writes.push(q(`INSERT INTO pt_questions (id, kind, fingerprint, subject_kind, subject_id, period, record_date, amount_cents, title, question, why, facts, choices, status, ref, asked_at, revision)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`, id, issue.kind, issue.fingerprint, issue.subjectKind, issue.subjectId, issue.period, issue.recordDate, issue.amount,
-        issue.title, issue.question, issue.why, JSON.stringify(issue.facts), JSON.stringify(choices), newRef(), at, uid()),
-        say(id, AGENT.email, 'agent', `${issue.question} ${issue.why}`))
-      asked++
-    } else if (existing.status === 'resolved') {
-      // It came back (a filing undone, a receipt removed): the same question opens again.
-      writes.push(q("UPDATE pt_questions SET status = 'open', facts = ?, revision = ? WHERE id = ? AND status = 'resolved'", JSON.stringify(issue.facts), uid(), existing.id),
-        say(existing.id, AGENT.email, 'agent', `This needs an answer again: ${issue.why}`))
-      reopened++
+  // The pass reads the whole books, so a scheduled one waits for the day to turn or for something to be
+  // recorded (work-gate.ts); the email, which only counts a few rows, still goes out each hour.
+  const scan = async () => {
+    await runStanding(db)
+    const issues = await findIssues(db, settings, at.slice(0, 10))
+    const known = new Map((await all(db, 'SELECT * FROM pt_questions')).map(r => [r.fingerprint, parse(r)]))
+    const accounts = await all(db, 'SELECT * FROM pt_accounts ORDER BY code'), budget = { left: 5 }
+    const writes: Sql[] = []
+    let asked = 0, reopened = 0, resolved = 0
+    for (const issue of issues) {
+      const existing = known.get(issue.fingerprint)
+      if (!existing) {
+        const id = uid(), choices = await withGuess(env, db, issue, accounts, budget)
+        writes.push(q(`INSERT INTO pt_questions (id, kind, fingerprint, subject_kind, subject_id, period, record_date, amount_cents, title, question, why, facts, choices, status, ref, asked_at, revision)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)`, id, issue.kind, issue.fingerprint, issue.subjectKind, issue.subjectId, issue.period, issue.recordDate, issue.amount,
+          issue.title, issue.question, issue.why, JSON.stringify(issue.facts), JSON.stringify(choices), newRef(), at, uid()),
+          say(id, AGENT.email, 'agent', `${issue.question} ${issue.why}`))
+        asked++
+      } else if (existing.status === 'resolved') {
+        // It came back (a filing undone, a receipt removed): the same question opens again.
+        writes.push(q("UPDATE pt_questions SET status = 'open', facts = ?, revision = ? WHERE id = ? AND status = 'resolved'", JSON.stringify(issue.facts), uid(), existing.id),
+          say(existing.id, AGENT.email, 'agent', `This needs an answer again: ${issue.why}`))
+        reopened++
+      }
     }
+    const current = new Set(issues.map(i => i.fingerprint))
+    for (const qn of known.values()) if (qn.kind !== 'accountant' && OPEN.includes(qn.status) && !current.has(qn.fingerprint)) {
+      writes.push(q("UPDATE pt_questions SET status = 'resolved', pending = NULL, revision = ? WHERE id = ? AND revision = ?", uid(), qn.id, qn.revision), say(qn.id, AGENT.email, 'agent', `No answer needed any more: ${await settledBy(db, qn)}`))
+      resolved++
+    }
+    for (let i = 0; i < writes.length; i += 80) await run(db, writes.slice(i, i + 80))
+    return { found: issues.length, asked, reopened, resolved }
   }
-  const current = new Set(issues.map(i => i.fingerprint))
-  for (const qn of known.values()) if (qn.kind !== 'accountant' && OPEN.includes(qn.status) && !current.has(qn.fingerprint)) {
-    writes.push(q("UPDATE pt_questions SET status = 'resolved', pending = NULL, revision = ? WHERE id = ? AND revision = ?", uid(), qn.id, qn.revision), say(qn.id, AGENT.email, 'agent', `No answer needed any more: ${await settledBy(db, qn)}`))
-    resolved++
-  }
-  for (let i = 0; i < writes.length; i += 80) await run(db, writes.slice(i, i + 80))
-
   // Email the oldest unasked ones, a few a day, by email first.
-  let emailed = 0, mail = 'off'
-  if (settings.email_on) {
-    const room = Math.max(0, settings.per_day - await emailedToday(db))
-    for (const qn of (await waitingForEmail(db)).slice(0, room)) {
-      const status = await emailQuestion(env, db, qn)
-      mail = status
-      if (status === 'sent') emailed++
-      else break
+  const mailPass = async () => {
+    let emailed = 0, mail = 'off'
+    if (settings.email_on) {
+      const room = Math.max(0, settings.per_day - await emailedToday(db))
+      for (const qn of (await waitingForEmail(db)).slice(0, room)) {
+        const status = await emailQuestion(env, db, qn)
+        mail = status
+        if (status === 'sent') emailed++
+        else break
+      }
+      if (mail === 'off') mail = room ? 'nothing new' : 'daily limit reached'
     }
-    if (mail === 'off') mail = room ? 'nothing new' : 'daily limit reached'
+    return { emailed, mail }
   }
-  const model = await modelState(db, env)
-  const open = Number((await one(db, "SELECT COUNT(*) AS n FROM pt_questions WHERE status IN ('open', 'confirm')"))?.n ?? 0)
-  const result: RunResult = { at, found: issues.length, asked, reopened, resolved, emailed, open, model: 'config' in model ? 'on' : 'unavailable' in model ? 'unavailable' : 'missing', mail }
-  await run(db, [q('UPDATE pt_books_agent SET last_run_at = ?, last_run = ? WHERE id = 1', at, JSON.stringify(result)),
-    ...(asked || resolved || reopened ? [q('INSERT INTO pt_audit (id, at, actor_email, actor_kind, action, subject_kind, subject_id, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', uid(), at, AGENT.email, AGENT.kind, 'books-agent.run', 'books-agent', '1', JSON.stringify({ asked, resolved, reopened, emailed }))] : [])])
-  await discoverLearning(db)
-  return result
+  const full = async () => {
+    const { found, asked, reopened, resolved } = await scan()
+    const { emailed, mail } = await mailPass()
+    const model = await modelState(db, env)
+    const open = Number((await one(db, "SELECT COUNT(*) AS n FROM pt_questions WHERE status IN ('open', 'confirm')"))?.n ?? 0)
+    const result: RunResult = { at, found, asked, reopened, resolved, emailed, open, model: 'config' in model ? 'on' : 'unavailable' in model ? 'unavailable' : 'missing', mail }
+    await run(db, [q('UPDATE pt_books_agent SET last_run_at = ?, last_run = ? WHERE id = 1', at, JSON.stringify(result)),
+      ...(asked || resolved || reopened ? [q('INSERT INTO pt_audit (id, at, actor_email, actor_kind, action, subject_kind, subject_id, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', uid(), at, AGENT.email, AGENT.kind, 'books-agent.run', 'books-agent', '1', JSON.stringify({ asked, resolved, reopened, emailed }))] : [])])
+    await discoverLearning(db)
+    return result
+  }
+  if (!scheduled) return full()
+  return await whenChanged(db, 'agent', at.slice(0, 10), full) ?? (await mailPass(), null)
 }
 
 /** The month's questions, every status, each with its thread: what the close shows. */
