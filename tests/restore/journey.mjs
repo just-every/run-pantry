@@ -137,6 +137,10 @@ async function archivedBooks(t) {
   const bill = (await (await context.request.get(`${server.origin}/api/pantry/sales`)).json()).bills.find(b => b.reference === 'A-778')
   assert.equal((await context.request.post(`${server.origin}/api/pantry/command/document.upload`, { headers: { origin: server.origin }, data: { name: 'acme-a-778.pdf', mediaType: 'application/pdf', base64: pdf.toString('base64'), linkedKind: 'bill', linkedId: bill.id } })).status(), 200)
   const command = async (op, data) => { const r = await context.request.post(`${server.origin}/api/pantry/command/${op}`, { headers: { origin: server.origin }, data }); assert.equal(r.status(), 200, await r.text()); return r.json() }
+  // The fixture books are dated September 2026. The daily checks run on the real clock, so as those dates age past a
+  // check's default limit a restored install flags them and its books no longer equal the saved ones: widen the limits.
+  const checks = (await (await context.request.get(`${server.origin}/api/pantry/continuous-checks`)).json()).settings
+  await command('continuous-check.settings', { revision: checks.revision, unreconciledDays: 365, staleQueueDays: 365, suspenseDays: 365 })
   const saved = await command('custom-report.save', { sharedRoles: ['accountant'], definition: { name: 'Restored management margin', source: 'profit-and-loss', from: '2026-09-01', to: '2026-09-30', basis: 'accrual', columns: ['name', 'amount'], layout: [
     { id: 'revenue', kind: 'section', label: 'Revenue', accountTypes: ['income'] }, { id: 'cost', kind: 'section', label: 'Costs', accountTypes: ['expense'] },
     { id: 'gross', kind: 'formula', label: 'Gross profit', expression: 'row("revenue") - row("cost")', unit: 'money' },
