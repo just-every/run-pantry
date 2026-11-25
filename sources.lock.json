@@ -107,7 +107,7 @@
       "executable": false
     },
     "CHANGELOG.md": {
-      "sha256": "7905f2feb33c01dbe6be85deeec37267130bd090bb8973b7dd270e11e17c7b7e",
+      "sha256": "b84d4e084044e8f6fb870d60b05f2b85d4e23bdaba3a948c48493f6d5f1b0912",
       "executable": false
     },
     "composition.lock.json": {
@@ -131,7 +131,7 @@
       "executable": false
     },
     "deploy.json": {
-      "sha256": "7e7c4fdeee31b9ebde00ce98b6370eaeae13f1ff39382023a244878b814f8fd4",
+      "sha256": "08fbd416276d802390174e3698372d55cfb8a5ee928b141d80aacb82ced4f9e6",
       "executable": false
     },
     "docs/agent-work.md": {
@@ -419,7 +419,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "478a935279616a4ad9e5c6e7afdfec4fc5159dfc7f3cc41df24165ec0e60faed",
+      "sha256": "635ad42bda32137a424397b312eb55d41b61c40aec3517c7fe67969881938713",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -927,7 +927,7 @@
       "executable": false
     },
     "package.json": {
-      "sha256": "03f95f6ee82851354b83b5b7ceff20acbb8bf04031f525ddd89128ef279f51e7",
+      "sha256": "f571f3e531035d08d9a14ab855eea123c324968c38677eaf2cc25029ccb3bb9c",
       "executable": false
     },
     "packaging.json": {
@@ -935,7 +935,7 @@
       "executable": false
     },
     "pnpm-lock.yaml": {
-      "sha256": "08fb9ce6d7c726e3670c37a65acdb621cda0edcbd1172e07830bd3ca19d5c9ba",
+      "sha256": "43de5e7ed04a56121e1f29aabf3985ef79db3e4d00ea0fc86e15af6c49338657",
       "executable": false
     },
     "public/apple-touch-icon.png": {
@@ -1975,7 +1975,7 @@
       "executable": false
     },
     "scripts/installer/local.mjs": {
-      "sha256": "7bcb32e65ef07903b2654a66f7a484277059afe52a26ba68af73ce406a3b7917",
+      "sha256": "acaf86bde8ae978dfd7a8636109754a7f232db9a1c3f0e38d634e82f676f24c6",
       "executable": false
     },
     "scripts/installer/portability.mjs": {
@@ -2015,7 +2015,7 @@
       "executable": false
     },
     "src/auth.server.ts": {
-      "sha256": "3e7a0ee69ef27d66498386dde6c3a34ad53e8a9a9ee154aeea3c3c00b12b3775",
+      "sha256": "1dc39713bc92b67873596ca9fe5c1f67fc58029b4ab66d9537e62d8f28bb2417",
       "executable": false
     },
     "src/base/contract-docs.mjs": {
@@ -2187,11 +2187,11 @@
       "executable": false
     },
     "src/mail.server.d.mts": {
-      "sha256": "2e3eaa0588f12f6f04b565b948a0b8b823c201f349cdf9dd75c42c2d2413732b",
+      "sha256": "6e83e0f4cf19161f6e33a28e684d93e95cef79feb002fe47fbff4ea506e79aa4",
       "executable": false
     },
     "src/mail.server.mjs": {
-      "sha256": "fa6d412800998c0b140d4a7246f58d9d3a43d8f52d275f5cae0aa041fd578c7d",
+      "sha256": "672c715035e92eaa06c2145a0f19fc34fb0319810297f74d28030ddb7e67ea80",
       "executable": false
     },
     "src/modules/ai/client.mjs": {
@@ -4355,7 +4355,7 @@
       "executable": false
     },
     "src/pantry/data-flows.ts": {
-      "sha256": "1e7f4566788215e362545acfd794f8cfa760e3f66e3632a6c6a30d39af4468c6",
+      "sha256": "4ea9420b34be71ed7db0e1b262321aa95c784edad580d6b52be3b6b62c3c9cf3",
       "executable": false
     },
     "src/pantry/data-services.ts": {
@@ -4371,7 +4371,7 @@
       "executable": false
     },
     "src/pantry/delivery.ts": {
-      "sha256": "1aac9e8216e107b470db22e56ab51cd1d14117653340e10da7913f8c45eda834",
+      "sha256": "e2287437321e645499c65fe9528bb0f78b0a2a031b7e444dbbd5780a23ebf60d",
       "executable": false
     },
     "src/pantry/deposit-confirm.ts": {
@@ -4559,7 +4559,7 @@
       "executable": false
     },
     "src/pantry/estimates/delivery.ts": {
-      "sha256": "333b2d413d9ba2e947428c207e3971163c7650e0b74323f06d7400aee6476663",
+      "sha256": "4629e220896f07e64e00fbd2cf8e9024faa22753f3c4d91a1f771d79fdb124fc",
       "executable": false
     },
     "src/pantry/estimates/documents.ts": {
@@ -4983,7 +4983,7 @@
       "executable": false
     },
     "src/pantry/questions/mail.ts": {
-      "sha256": "bac84719362efffaad2be18e392086dea0bdd6e92eb809d02c98af870d7450e3",
+      "sha256": "53aa8e08826b160bf3ded921debf51ee9f8c4bfe88420ae92631de4ba48e19ef",
       "executable": false
     },
     "src/pantry/questions/model.ts": {
@@ -5315,7 +5315,7 @@
       "executable": false
     },
     "src/pantry/settings.ts": {
-      "sha256": "b958a12e8ed004bd0e254f129c4ce625bf20f247d8576966ac898c2a09ed4112",
+      "sha256": "8fb883b7a4330eb10594f50ba347a9bb532ffb065dc03dded2b23dc8a5d1b5b0",
       "executable": false
     },
     "src/pantry/standing/index.ts": {
@@ -6883,7 +6883,7 @@
       "executable": false
     },
     "tests/app/app.test.mjs": {
-      "sha256": "5685316729082d7378a3f5f6aef14a8842cbb6edf0d710f68f609230879a8dbd",
+      "sha256": "7ade37e676e849ef8814824a90791f951b2ed6651fca3ea1ab383eeaf5e9747a",
       "executable": false
     },
     "tests/app/approved-adjustments-journey.mjs": {
@@ -7020,6 +7020,10 @@
     },
     "tests/app/learning-journey.mjs": {
       "sha256": "8fd5acf5d241ce959e7ff669914563d168d3dfa29e7baab5ac08ce1e47b996f5",
+      "executable": false
+    },
+    "tests/app/mail-off-journey.mjs": {
+      "sha256": "3e6d34b14769a872307a2d8731fef8ee55e33c79020bae92a0dbc12c3b4272b3",
       "executable": false
     },
     "tests/app/managed-mail-journey.mjs": {
