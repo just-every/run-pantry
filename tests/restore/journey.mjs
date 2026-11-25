@@ -348,10 +348,11 @@ export async function erasureRestore(t) {
   for (const receipt of receipts) assert.ok(journal.some(row => row.id === receipt.id), 'the post-erasure archive carries each receipt')
 
   const sameStore = await rer(first, ['import', '--input', 'exports/pantry-books.rer', '--yes'])
+  // rer 0.2.113 and later refuse a destination that already holds books before it judges the archive's erasure
+  // epoch, and say how to keep a copy and reset; the erasure fence itself is proven by the reset install below.
   assert.equal(sameStore.code, 4)
-  assert.match(sameStore.log, /restore refused \((erasure_epoch|erased_row)\)/i)
-  assert.match(sameStore.log, /erasure journal/i)
-  for (const receipt of receipts) assert.ok(sameStore.log.includes(receipt.id), 'same-store refusal names the known erasure')
+  assert.match(sameStore.log, /restore refused \(target_not_empty\)/i)
+  assert.match(sameStore.log, /rer reset --yes; rer import --input/)
 
   const second = await fresh(), port2 = await freePort()
   await mkdir(join(second, 'exports'), { recursive: true })
