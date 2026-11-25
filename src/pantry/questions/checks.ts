@@ -57,7 +57,10 @@ export async function categoryEffect(net: NetIncome, account: Data, signed: numb
   return `${to}; ${MONTH(period)} net income ${usd(before)} → ${usd(before + signed)}.`
 }
 
-type Ctx = { db: D1Database; today: string; settings: Settings; net: NetIncome; accounts: Data[]; locked: Data[]; banks: Data[] }
+type Ctx = { db: D1Database; today: string; settings: Settings; net: NetIncome; accounts: Data[]; locked: Data[]; banks: Data[]; memo: Map<string, Promise<any>> }
+
+/** One pass asks the same question of the books for many lines (a bank account's filing history, the usual categories); the books do not move during a pass, so it is asked once. */
+const once = <T>(c: Ctx, key: string, load: () => Promise<T>): Promise<T> => { if (!c.memo.has(key)) c.memo.set(key, load()); return c.memo.get(key)! }
 
 const lockedOn = (c: Ctx, day: string) => c.locked.some(p => day >= p.start_date && day <= p.end_date)
 const accountById = (c: Ctx, id: string) => c.accounts.find(a => a.id === id)
@@ -66,11 +69,11 @@ const accountById = (c: Ctx, id: string) => c.accounts.find(a => a.id === id)
 async function history(c: Ctx, line: Data) {
   const key = payeeKey(line), direction = line.amount_cents < 0 ? 'out' : 'in'
   if (!key) return []
-  const rows = await all(c.db, `SELECT l.payee, l.description, l.amount_cents, jl.account_id FROM pt_matches m
+  const rows = await once(c, `history:${line.bank_account_id}`, () => all(c.db, `SELECT l.payee, l.description, l.amount_cents, jl.account_id FROM pt_matches m
     JOIN pt_match_bank_lines mb ON mb.match_id = m.id AND mb.active = 1 JOIN pt_bank_lines l ON l.id = mb.bank_line_id
     JOIN pt_match_postings mp ON mp.match_id = m.id AND mp.active = 1 JOIN pt_journal_lines bl ON bl.id = mp.journal_line_id
     JOIN pt_journal_entries e ON e.id = bl.entry_id AND e.source_kind = 'bank' JOIN pt_journal_lines jl ON jl.entry_id = e.id AND jl.id <> bl.id
-    WHERE m.status = 'approved' AND l.bank_account_id = ? ORDER BY l.posted_date DESC LIMIT 1000`, line.bank_account_id)
+    WHERE m.status = 'approved' AND l.bank_account_id = ? ORDER BY l.posted_date DESC LIMIT 1000`, line.bank_account_id))
   const counts = new Map<string, number>()
   for (const r of rows) if (payeeKey(r) === key && (r.amount_cents < 0 ? 'out' : 'in') === direction) counts.set(r.account_id, (counts.get(r.account_id) ?? 0) + 1)
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id, n]) => ({ account: accountById(c, id), n })).filter(x => x.account?.active && !['receivable', 'payable', 'retained'].includes(x.account.subtype))
@@ -86,8 +89,8 @@ async function asBefore(c: Ctx, line: Data, h: { account?: Data; n: number }): P
 
 /** The categories people used most in the last 90 days, for a payee Pantry has never seen. */
 async function usual(c: Ctx, type: 'income' | 'expense') {
-  return (await all(c.db, `SELECT l.account_id, COUNT(*) AS n FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id JOIN pt_accounts a ON a.id = l.account_id
-    WHERE e.status = 'posted' AND a.type = ? AND a.active = 1 AND e.entry_date >= ? GROUP BY l.account_id ORDER BY n DESC, a.code LIMIT 3`, type, addDays(c.today, -90))).map(r => accountById(c, r.account_id)!).filter(Boolean)
+  return (await once(c, `usual:${type}`, () => all(c.db, `SELECT l.account_id, COUNT(*) AS n FROM pt_journal_lines l JOIN pt_journal_entries e ON e.id = l.entry_id JOIN pt_accounts a ON a.id = l.account_id
+    WHERE e.status = 'posted' AND a.type = ? AND a.active = 1 AND e.entry_date >= ? GROUP BY l.account_id ORDER BY n DESC, a.code LIMIT 3`, type, addDays(c.today, -90)))).map(r => accountById(c, r.account_id)!).filter(Boolean)
 }
 
 /** The owner's equity account for money in or out that is the owner's own. */
@@ -286,7 +289,7 @@ export async function findIssues(db: D1Database, settings: Settings, today: stri
     db, today, settings, net: new NetIncome(db),
     accounts: await all(db, 'SELECT * FROM pt_accounts ORDER BY code'),
     locked: await all(db, "SELECT * FROM pt_periods WHERE status = 'locked'"),
-    banks: await all(db, 'SELECT * FROM pt_bank_accounts ORDER BY name'),
+    banks: await all(db, 'SELECT * FROM pt_bank_accounts ORDER BY name'), memo: new Map(),
   }
   const lines = (await all(db, `${OPEN_LINES} ORDER BY l.posted_date, l.id LIMIT 500`)).filter(l => !lockedOn(c, l.posted_date))
   const issues = [...await deposits(c, lines), ...await unfiled(c, lines), ...await receipts(c), ...await duplicates(c), ...await balances(c)]
