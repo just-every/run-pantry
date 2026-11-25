@@ -6,7 +6,7 @@ import { noticeMailFence, noticeMailState } from './autopay/mail-controls'
 // reminder step is claimed once. Reminders follow the business's schedule
 // (days before or after the due date) and stop once the invoice is paid.
 import { runtimeBindings, type Bindings } from '../auth.server'
-import { operatorMail } from '../mail.server.mjs'
+import { operatorMail, mailOff } from '../mail.server.mjs'
 import { authority, ownerEmail, pantry, who } from './access'
 import { addDays, daysBetween, longDay, now, optionalText, requireThat, sha256, text, uid, usd, type Data } from './core'
 import { all, audit, changed, guard, one, q, run, type AuditActor, type Sql } from './db'
@@ -57,6 +57,7 @@ export async function deliver(env: Bindings, db: D1Database, actor: AuditActor, 
   recipient = recipient.trim().toLowerCase()
   const mailer = operatorMail(runtimeBindings(env)) as unknown as InvoiceMailer | undefined
   requireThat(mailer, 'No mail provider is set up for this installation, so Pantry cannot send email. Set MAIL_PROVIDER and MAIL_API_KEY when you deploy.', 409)
+  requireThat(!mailOff(runtimeBindings(env)), 'Email is off for this installation (it was deployed with MAIL_PROVIDER=none), so Pantry cannot send email. Deploy again with a mail provider to send it.', 409)
   const inv = await invoice(db, invoiceId)
   requireThat(inv.kind === 'invoice' && inv.status === 'issued', 'Issue the invoice before sending it', 409)
   const token = await ensureLink(db, inv.id), link = customerLink(env, token)
@@ -171,7 +172,7 @@ export const deliveryCommands: Record<string, Command> = {
 
 export async function sendingView(env: Bindings, db: D1Database) {
   const e = runtimeBindings(env), mailer = operatorMail(e)
-  const mail = !mailer ? 'none' : e.MAIL_PROVIDER === 'development' || e.RER_DEMO === '1' ? 'local' : 'ready'
+  const mail = !mailer || mailOff(e) ? 'none' : e.MAIL_PROVIDER === 'development' || e.RER_DEMO === '1' ? 'local' : 'ready'
   return { ...(await sendingSettings(db)), zones: ZONES, mail, from: mail === 'ready' ? e.MAIL_FROM ?? '' : '', ownerEmail: await ownerEmail(db, env) }
 }
 
@@ -210,7 +211,7 @@ export async function reminderPlans(db: D1Database) {
 /** Send every reminder due today. Paid, paused and never-sent invoices get none; an ACH payment in flight pauses them. */
 export async function sendDueReminders(env: Bindings, db: D1Database, today: string) {
   const settings = await sendingSettings(db)
-  if (!settings.reminders_on || !operatorMail(runtimeBindings(env))) return []
+  if (!settings.reminders_on || !operatorMail(runtimeBindings(env)) || mailOff(runtimeBindings(env))) return []
   const open = await all(db, `SELECT i.id, i.due_date, i.customer_id FROM pt_invoices i
     WHERE i.kind = 'invoice' AND i.status = 'issued' AND i.void_date IS NULL AND i.sent_at IS NOT NULL AND i.reminders_paused = 0
       AND NOT EXISTS (SELECT 1 FROM pt_stripe_payments sp WHERE sp.invoice_id = i.id AND (sp.status = 'processing' OR sp.disputed_cents>0))`)

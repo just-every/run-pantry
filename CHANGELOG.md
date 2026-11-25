@@ -2,6 +2,8 @@
 
 ## Unreleased (next minor)
 
+- Pantry can be deployed with email off (`MAIL_PROVIDER=none`), for a Business that has no mail provider. Every send is refused with `mail_off`, no sender or key is needed, the sign-in page offers no email link, and the owner signs in with `rer signin`. Pantry pins rer 0.2.134.
+
 - ACH invoice payment is proven end to end on a US Stripe test account: the customer verifies their bank in Stripe Checkout, Pantry shows processing until it clears, and the payment and Stripe fee post once.
 
 - Bank feed mapping keeps deposit accounts in asset ledgers and cards or lines of credit in liability ledgers, both in the picker and on the server. Each connection shows its next sync, or that it waits for Re-link. Checking and card feeds, expired sign-in and Plaid Link update mode are proven against Plaid’s sandbox.

@@ -36,7 +36,7 @@ export async function dataFlows(c: Context) {
     gusto: { connected: !!gusto, detail: gusto?.company_name ?? 'No payroll company connected', ...(!gustoAvailability(c.env).available?{unavailable:'Application keys or this hosting path are unavailable.'}:{}) },
     xero: { connected: xero?.status==='connected', detail: xero?.tenant_name ?? 'No Xero organisation connected', ...(!xeroAvailability(c.env).available?{unavailable:'Application keys or this hosting path are unavailable; report files still work.'}:{}) },
     model: { connected:'config' in model, detail:'config' in model?`${model.config.provider} · ${model.config.model} · ${new URL(model.config.endpoint).host}`:'Manual capture; model reading and reasoning are off' },
-    mail: { connected:!['development','rer'].includes(mailProvider)&&!!c.env.MAIL_API_KEY, detail: mailProvider==='development'?'Local mail is suppressed':mailProvider, ...(mailProvider==='rer'?{unavailable:'Managed mail is a Base route; Pantry Connect mail is unavailable.'}:{}) },
+    mail: { connected:!['development','rer','none'].includes(mailProvider)&&!!c.env.MAIL_API_KEY, detail: mailProvider==='development'?'Local mail is suppressed':mailProvider==='none'?'Email is off (deployed with MAIL_PROVIDER=none)':mailProvider, ...(mailProvider==='rer'?{unavailable:'Managed mail is a Base route; Pantry Connect mail is unavailable.'}:{}) },
     inbound: { connected:!!inbox.address, detail:inbox.address??'No private capture address configured' },
   }
   return {

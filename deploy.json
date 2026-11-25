@@ -11,8 +11,16 @@
     }
   ],
   "originVar": "AUTH_ORIGIN",
+  "publicSettings": [
+    "MAIL_PROVIDER",
+    "MAIL_RELAY_URL",
+    "MAIL_ACCOUNT_ID"
+  ],
   "vars": {
-    "AUTH_LOCAL": "false"
+    "AUTH_LOCAL": "false",
+    "MAIL_PROVIDER": "",
+    "MAIL_RELAY_URL": "",
+    "MAIL_ACCOUNT_ID": ""
   },
   "secrets": [
     {
@@ -29,7 +37,8 @@
     },
     {
       "binding": "MAIL_API_KEY",
-      "environment": "MAIL_API_KEY"
+      "environment": "MAIL_API_KEY",
+      "optional": true
     },
     {
       "binding": "PLAID_CLIENT_ID",
@@ -78,11 +87,13 @@
     },
     {
       "binding": "MAIL_PROVIDER",
-      "environment": "MAIL_PROVIDER"
+      "environment": "MAIL_PROVIDER",
+      "optional": true
     },
     {
       "binding": "MAIL_FROM",
-      "environment": "MAIL_FROM"
+      "environment": "MAIL_FROM",
+      "optional": true
     },
     {
       "binding": "MAIL_RELAY_URL",

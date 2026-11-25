@@ -5,7 +5,7 @@
 // a receipt question is kept and attached, and other words are read by the
 // install's model into an answer that waits for a "yes".
 import { runtimeBindings, type Bindings } from '../../auth.server'
-import { operatorMail } from '../../mail.server.mjs'
+import { operatorMail, mailOff } from '../../mail.server.mjs'
 // @ts-expect-error Base's inbound MIME parser ships without type declarations.
 import { parseMime as parseBaseMime } from '../../modules/mail/src/inbound/mime.mjs'
 import { ownerEmail } from '../access'
@@ -22,7 +22,7 @@ type Mailer = { send(message: Data): Promise<MailResult> }
 /** Whether this install can email questions: 'ready', 'local' (this computer sends none) or 'none'. */
 export function mailState(env: Bindings): 'ready' | 'local' | 'none' {
   const e = runtimeBindings(env), mailer = operatorMail(e)
-  return !mailer ? 'none' : e.MAIL_PROVIDER === 'development' || e.RER_DEMO === '1' ? 'local' : 'ready'
+  return !mailer || mailOff(e) ? 'none' : e.MAIL_PROVIDER === 'development' || e.RER_DEMO === '1' ? 'local' : 'ready'
 }
 
 export const questionLink = (env: Bindings, id: string) => `${runtimeBindings(env).AUTH_ORIGIN}/app/questions?q=${encodeURIComponent(id)}`

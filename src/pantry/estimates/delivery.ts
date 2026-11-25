@@ -1,5 +1,5 @@
 import { runtimeBindings } from '../../auth.server'
-import { operatorMail } from '../../mail.server.mjs'
+import { operatorMail, mailOff } from '../../mail.server.mjs'
 import { authority, ownerEmail, pantry, who } from '../access'
 import { bankAuthority } from '../access-policy/banks'
 import { customerRecipients } from '../customer-profile'
@@ -24,7 +24,7 @@ export async function sendEstimate(c:Context,b:Data) {
   const recipients=customerRecipients(customer)
   requireThat(recipients.length,'Add a customer billing email before sending',409)
   const mailer=operatorMail(runtimeBindings(c.env)) as unknown as {send(message:Data):Promise<Data>}|undefined
-  requireThat(mailer,'Set up a mail provider before sending an estimate',409)
+  requireThat(mailer&&!mailOff(runtimeBindings(c.env)),'Set up a mail provider before sending an estimate (this installation has email off)',409)
   const bytes=crypto.getRandomValues(new Uint8Array(24)), token=row.link_token??btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
   const retained=await one(c.db,'SELECT * FROM pt_estimate_documents WHERE estimate_id=? AND revision=?',row.id,row.revision)
   const document=retained?JSON.parse(retained.document):await estimateDocument(c.db,row,p)

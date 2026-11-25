@@ -91,7 +91,7 @@ async function invite(c: Context, email: string, name: string, conflictIsError: 
   }
   await run(c.db, [authority(c.actor, 'owner'), audit(who(c.actor), 'member.invite', 'member', email)])
   const e = runtimeBindings(c.env)
-  return { invited: email, name, emailed: !(e.MAIL_PROVIDER === 'development' || e.RER_DEMO === '1') }
+  return { invited: email, name, emailed: !(e.MAIL_PROVIDER === 'development' || e.MAIL_PROVIDER === 'none' || e.RER_DEMO === '1') }
 }
 
 const inviteMember: Command = { need: 'owner', async run(c, b) {

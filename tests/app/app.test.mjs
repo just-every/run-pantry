@@ -1,6 +1,7 @@
 import { monthCloseBrowser } from './month-close-journey.mjs'
 import { askJourney } from './ask-books-journey.mjs'
 import { managedMailJourney } from './managed-mail-journey.mjs'
+import { mailOffJourney } from './mail-off-journey.mjs'
 import { archiveJourney } from './archive-journey.mjs'
 import { collectionsJourney } from './collections-journey.mjs'
 import { standingJourney } from './standing-journey.mjs'
@@ -524,6 +525,8 @@ import {reportDeliveryBrowser} from './report-delivery.mjs'
 test('REPORT-007 dedicated exports and owner-consented lender delivery on month lock at 1440 and 390',reportDeliveryBrowser)
 
 test('Managed relay delivers owner sign-in links and unconfigured mail refuses by name', managedMailJourney)
+
+test('Mail off (MAIL_PROVIDER=none) offers no sign-in mail and the owner signs in with the rer signin link', mailOffJourney)
 
 test('AGENT-007 calculated answers, citations and saved reports at 1440 and 390', askJourney)
 
