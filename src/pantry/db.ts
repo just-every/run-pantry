@@ -8,6 +8,15 @@ type AuditEvent = { id: string; at: string; actor: AuditActor; action: string; s
 export type Sql = { sql: string; params: unknown[]; auditEvent?: AuditEvent; auditBefore?: Sql; auditVersion?: Sql; auditAfter?: Sql[] }
 export const q = (sql: string, ...params: unknown[]): Sql => ({ sql, params })
 
+/** json_object over any number of key/value pairs. D1 refuses a SQL function with more than 32 arguments
+ *  (16 pairs); the pairs past the first 15 go in through json_set, which keeps a NULL value as JSON null. */
+export function wideJsonObject(pairs: readonly (readonly [key: string, expression: string])[]): string {
+  const object = (list: typeof pairs) => `json_object(${list.map(([key, expression]) => `'${key}', ${expression}`).join(', ')})`
+  let sql = object(pairs.slice(0, 15))
+  for (let i = 15; i < pairs.length; i += 15) sql = `json_set(${sql}, ${pairs.slice(i, i + 15).map(([key, expression]) => `'$.${key}', ${expression}`).join(', ')})`
+  return sql
+}
+
 export const guard = (condition: string, ...params: unknown[]): Sql =>
   q(`INSERT INTO pt_guard SELECT CASE WHEN (${condition}) THEN 1 ELSE 0 END`, ...params)
 
@@ -101,7 +110,7 @@ async function snapshotExpression(db: D1Database, kind: string, id: string): Pro
   const [table, key = 'id'] = source
   const columns = (await columnsFor(db, table)).filter(c => !/(content|token|key|secret|sealed|password|credential|signature|tin|hash|routing|account_number|endpoint|url|accepted_ip|accepted_name|input|pricing)/i.test(c))
   if (!columns.length) return null
-  return q(`(SELECT json_object(${columns.map(c => `'${c}', "${c}"`).join(', ')}) FROM "${table}" WHERE "${key}" = ?)`, kind === 'settings' ? '1' : id)
+  return q(`(SELECT ${wideJsonObject(columns.map(c => [c, `"${c}"`] as const))} FROM "${table}" WHERE "${key}" = ?)`, kind === 'settings' ? '1' : id)
 }
 async function auditStatement(db: D1Database, e: AuditEvent): Promise<Sql> {
   const d = e.detail, rule = e.action === 'bank-rule.file' ? d.ruleId : e.action === 'receipt.attach-by-rule' ? d.rule : null

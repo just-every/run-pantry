@@ -1,15 +1,17 @@
 import { requireThat } from '../core'
-import { guard, one, type Sql } from '../db'
+import { guard, one, wideJsonObject, type Sql } from '../db'
 import { recognitionTies } from './view'
 
 // Capture the complete recognition authority and execution state before reading
 // ties. Even a new schedule on an otherwise untracked account invalidates close.
+const scheduleColumns = [['id', 'id'], ['revision', 'revision'], ['kind', 'kind'], ['name', 'name'], ['balance', 'balance_account_id'],
+  ['recognition', 'recognition_account_id'], ['amount', 'amount_cents'], ['start', 'start_date'], ['months', 'months'], ['plan', 'plan'],
+  ['source', 'source_journal_id'], ['line', 'source_line_id'], ['source_date', 'source_date'], ['status', 'status'], ['preparer', 'prepared_by'],
+  ['approver', 'approved_by'], ['approval_revision', 'approved_revision'], ['approval_snapshot', 'approved_snapshot'], ['updated_at', 'updated_at']] as const
+
+// D1 refuses a SQL function with more than 32 arguments, so the 19-column schedule object is built in chunks.
 const fingerprint = `json_object(
- 'schedules', (SELECT json_group_array(json_object('id', id, 'revision', revision, 'kind', kind, 'name', name,
-   'balance', balance_account_id, 'recognition', recognition_account_id, 'amount', amount_cents,
-   'start', start_date, 'months', months, 'plan', plan, 'source', source_journal_id, 'line', source_line_id,
-   'source_date', source_date, 'status', status, 'preparer', prepared_by, 'approver', approved_by,
-   'approval_revision', approved_revision, 'approval_snapshot', approved_snapshot, 'updated_at', updated_at))
+ 'schedules', (SELECT json_group_array(${wideJsonObject(scheduleColumns)})
    FROM (SELECT * FROM pt_recognition_schedules ORDER BY id)),
  'runs', (SELECT json_group_array(json_object('schedule', schedule_id, 'revision', revision, 'occurrence', occurrence,
    'scheduled', scheduled_date, 'date', entry_date, 'snapshot', snapshot, 'journal', journal_id,
