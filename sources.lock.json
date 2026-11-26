@@ -4363,7 +4363,7 @@
       "executable": false
     },
     "src/pantry/db.ts": {
-      "sha256": "5c4c3283fe4c7f47a0d727b180ae98e45c00cf22abf6ce61778238908bcc6659",
+      "sha256": "ec4bec3e0088871dd6c22a92df8558e45c90bd1d6a307cfca841e546e20edc79",
       "executable": false
     },
     "src/pantry/dedicated-report-export.ts": {
@@ -5099,7 +5099,7 @@
       "executable": false
     },
     "src/pantry/recognition/close-guards.ts": {
-      "sha256": "b2f8761e2e2512a51fbb9f6a50b296886cc9e408d54c671e9977a46107e645eb",
+      "sha256": "fe2d3ea4788b6576c0e018e0f8ea66088b017d075fb667f4fb6d7fb5053f3545",
       "executable": false
     },
     "src/pantry/recognition/commands.ts": {
