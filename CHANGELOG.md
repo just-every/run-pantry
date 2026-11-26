@@ -1,12 +1,18 @@
 # Changelog
 
-## Unreleased (next minor)
+## 0.3.0 (27 Nov 2026)
 
+Pantry 0.3.0 is the first release since 0.2.8. It is the first that deploys with the current rer: 0.2.8 pins rer 0.2.80, which refuses the `MAIL_ACCOUNT_ID` placeholder in its own deploy files, so it could not be deployed. Pantry now pins rer 0.2.134.
+
+- **Closing a month works on Cloudflare D1.** The close fingerprint and the audit snapshot were built with one `json_object` over every column, which D1 refuses beyond 32 arguments ("SQL function arguments maximum 32"). They are now built in chunks of at most 31 arguments with the same output, so locking a period and the seeded demo close succeed on D1 and in a Durable Object.
 - Pantry can be deployed with email off (`MAIL_PROVIDER=none`), for a Business that has no mail provider. Every send is refused with `mail_off`, no sender or key is needed, the sign-in page offers no email link, and the owner signs in with `rer signin`. Pantry pins rer 0.2.134.
-
 - ACH invoice payment is proven end to end on a US Stripe test account: the customer verifies their bank in Stripe Checkout, Pantry shows processing until it clears, and the payment and Stripe fee post once.
-
 - Bank feed mapping keeps deposit accounts in asset ledgers and cards or lines of credit in liability ledgers, both in the picker and on the server. Each connection shows its next sync, or that it waits for Re-link. Checking and card feeds, expired sign-in and Plaid Link update mode are proven against Plaid’s sandbox.
+- Customer and vendor records open at their own paths with a list rail; Settings is a short index with a page per section; the Overview opens on what needs attention with its first question answered in place.
+- New since 0.2.8: W-9 requests and retention, tax reminder batches, invoice reminder preferences, customer statements, late fees, customer refunds, invoice void, payment notices, Stripe event records, a QuickBooks Online move-in, autopay with mail controls, texting, month close, hosted backups, a terminal tool and document objects.
+- Migrations added: `0103_w9_requests.sql`, `0104_w9_retention.sql`, `0105_tax_reminder_batches.sql`, `0106_invoice_reminder_preferences.sql`, `0107_customer_statements.sql`, `0108_late_fees.sql`, `0109_customer_refunds.sql`, `0111_invoice_void.sql`, `0112_payment_notices.sql`, `0113_stripe_events.sql`, `0114_qbo_move_in.sql`, `0115_autopay.sql`, `0116_texting.sql`, `0117_autopay_mail_controls.sql`, `0118_month_close.sql`, `0119_hosted_backups.sql`, `0119_terminal.sql`, `0120_document_objects.sql`. Existing books stay in place; back up first, as for any update.
+
+## Unreleased (next minor)
 
 - Use the published rer 0.2.51 package. Current package scripts and command guides replace removed queue/copy paths.
 

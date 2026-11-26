@@ -1,10 +1,29 @@
 {
-  "version": "0.2.8",
-  "previousVersion": "0.2.7",
-  "date": "2026-10-25",
-  "publicReleaseNotes": "Pantry keeps the exact rer 0.2.80 pin and refreshed Base delivery sources, and clears runtime test state from the built server so the native delivery artifact succeeds after verification on Linux. The existing app capture, direct Run Pantry link and D1 document storage declaration are retained. No migrations change.",
+  "version": "0.3.0",
+  "previousVersion": "0.2.8",
+  "date": "2026-11-27",
+  "publicReleaseNotes": "Pantry 0.3.0 is the first release since 0.2.8 and the first that can be deployed with the current rer. It deploys with email off for a Business with no mail provider, closes a month (including the seeded demo close) on Cloudflare D1, which refuses a SQL function with more than 32 arguments, adds customer and vendor records at their own paths, Settings as an index with a page per section, an Overview that opens on what needs attention, ACH invoice payment, bank feed mapping that keeps deposit and card accounts apart, autopay, texting, late fees, customer statements and refunds, W-9 requests, hosted backups, a QuickBooks Online move-in, and document storage in objects. It pins rer 0.2.134. Migrations added: 0103_w9_requests.sql, 0104_w9_retention.sql, 0105_tax_reminder_batches.sql, 0106_invoice_reminder_preferences.sql, 0107_customer_statements.sql, 0108_late_fees.sql, 0109_customer_refunds.sql, 0111_invoice_void.sql, 0112_payment_notices.sql, 0113_stripe_events.sql, 0114_qbo_move_in.sql, 0115_autopay.sql, 0116_texting.sql, 0117_autopay_mail_controls.sql, 0118_month_close.sql, 0119_hosted_backups.sql, 0119_terminal.sql, 0120_document_objects.sql.",
   "extensionPointChanges": [],
-  "migrations": [],
+  "migrations": [
+    "migrations/core/0103_w9_requests.sql",
+    "migrations/core/0104_w9_retention.sql",
+    "migrations/core/0105_tax_reminder_batches.sql",
+    "migrations/core/0106_invoice_reminder_preferences.sql",
+    "migrations/core/0107_customer_statements.sql",
+    "migrations/core/0108_late_fees.sql",
+    "migrations/core/0109_customer_refunds.sql",
+    "migrations/core/0111_invoice_void.sql",
+    "migrations/core/0112_payment_notices.sql",
+    "migrations/core/0113_stripe_events.sql",
+    "migrations/core/0114_qbo_move_in.sql",
+    "migrations/core/0115_autopay.sql",
+    "migrations/core/0116_texting.sql",
+    "migrations/core/0117_autopay_mail_controls.sql",
+    "migrations/core/0118_month_close.sql",
+    "migrations/core/0119_hosted_backups.sql",
+    "migrations/core/0119_terminal.sql",
+    "migrations/core/0120_document_objects.sql"
+  ],
   "breaking": false,
-  "agentUpdateInstructions": "Before updating local books, stop Pantry with rer dev --stop and save a private archive with rer export --output exports/pantry-before-0.2.7.rer. For hosted books use node scripts/hosted-backup.mjs with the private environment file as documented in docs/backup.md; rer export covers local books only. Retain the exact source, .rer deployment records and private settings. Pull the accepted source, then use rer dev locally or rer deploy with the same private environment file for owner-account hosting. Preserve every applied migration name and byte; never reset populated books to update. Run rer verify and the release upgrade checks before adopting. The checkout pins rer 0.2.80. Registry publication and platform source qualification are separate from building the delivery artifact. Managed hosting supplies its relay URL, sender and private mail credential. Assisted hosting requires the selected provider, verified sender and provider credentials in setup; Cloudflare also requires its account ID. Local development suppresses mail."
+  "agentUpdateInstructions": "Before updating local books, stop Pantry with rer dev --stop and save a private archive with rer export --output exports/pantry-before-0.2.8.rer. For hosted books use node scripts/hosted-backup.mjs with the private environment file as documented in docs/backup.md; rer export covers local books only. Retain the exact source, .rer deployment records and private settings. Pull the accepted source, then use rer dev locally or rer deploy with the same private environment file for owner-account hosting. Preserve every applied migration name and byte; never reset populated books to update. Run rer verify and the release upgrade checks before adopting. The checkout pins rer 0.2.134. Registry publication and platform source qualification are separate from building the delivery artifact. Managed hosting supplies its relay URL, sender and private mail credential. Assisted hosting requires the selected provider, verified sender and provider credentials in setup; Cloudflare also requires its account ID. Local development suppresses mail."
 }
